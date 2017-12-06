@@ -4,6 +4,6 @@ The High Availability function is the the heart of CacheGuard using RAID, link b
 
 CacheGuard is available as an OS appliance to install on a hardware or virtual machine of your choice. You can implement it transparently in any existing architecture as your main central point where all the Web traffic passes through.
 
-CacheGuard is based on a hardened Linux system built from scratch (with LFS) and integrates netfilter and iproute2, squid, squidGuard, apache, modSecurity, clamAV and multiple other open source products interfaced together as a whole to allow an easy and straightforward configuration using the CLI or the Web GUI.
+CacheGuard is based on a hardened Linux system built from scratch (with LFS) and integrates netfilter and iproute2, squid, squidGuard, apache, modSecurity, clamAV and multiple other open source products interfaced together as a whole to allow an easy and straightforward configuration using the CLI or the Web GUI. Please find more information about CacheGuard at https://www.cacheguard.com/.
 
-You can download CacheGuard-OS at https://sourceforge.net/projects/webgateway/ OR https://www.cacheguard.com/index.php/download-cacheguard/
+You can download CacheGuard-OS at https://sourceforge.net/projects/webgateway/.
