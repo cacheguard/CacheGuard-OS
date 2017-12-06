@@ -6,4 +6,4 @@ CacheGuard is available as an OS appliance to install on a hardware or virtual m
 
 CacheGuard is based on a hardened Linux system built from scratch (with LFS) and integrates netfilter and iproute2, squid, squidGuard, apache, modSecurity, clamAV and multiple other open source products interfaced together as a whole to allow an easy and straightforward configuration using the CLI or the Web GUI.
 
-Download CacheGuard at https://www.cacheguard.com/index.php/download-cacheguard/
+You can download CacheGuard-OS at https://sourceforge.net/projects/webgateway/.
