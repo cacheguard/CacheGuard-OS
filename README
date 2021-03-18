@@ -6,6 +6,5 @@ CacheGuard is available as an OS appliance to install on a hardware or virtual m
 
 CacheGuard is based on a hardened Linux system built from scratch and integrates netfilter, iproute2, squid, squidGuard, apache, StrongSwan, modSecurity, clamAV and multiple other open source products interfaced together as a whole to allow an easy and straightforward configuration using the CLI or the Web GUI. Please find more information about CacheGuard at https://www.cacheguard.com/.
 
-You can download the bootable ISO CDROM image of the latest 64 bits version of CacheGuard-OS at https://sourceforge.net/projects/webgateway/.
 
-Please note that as CacheGuard is provided as an OS it is complicated to share its source code here but CacheGuard-OS is still an Open Source project. If you need to look at our code we suggest that you download the installation CDROM, install it on a machine and then see the code.
+Please note that as CacheGuard is provided as an OS it is complicated to share its source code here but CacheGuard-OS is still an Open Source project. If you need to look at our code we suggest that you download the installation CDROM, install it on a machine and then see the code. You can download the bootable ISO CDROM image of the latest 64 bits version of CacheGuard-OS at https://sourceforge.net/projects/webgateway/.
