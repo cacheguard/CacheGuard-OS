@@ -1,0 +1,2288 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       Commands
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+source functions
+
+check-waf-application()
+{
+    test -n "${1}" || return 1
+    local application=${1}
+
+    case ${application} in
+	cpanel|dokuwiki|drupal|nextcloud|wordpress|xenforo)
+	    return 0
+	    ;;
+	*)
+	    return 11
+	    ;;
+    esac
+}
+
+show-level()
+{
+    echo-begin-show
+    echo-command-form "waf level"
+    echo-mark-cur
+    echo-value "${CURRENT_WAF_LEVEL}"
+    if test "${CURRENT_WAF_LEVEL}" != "${WAF_LEVEL}" ; then
+	echo-command-form "waf level"
+	echo-mark-new
+	echo-value "${WAF_LEVEL}"
+    fi
+    echo-end-show
+
+}
+
+manage-waf-level()
+{
+    if test -z "${1}" ; then
+	show-level
+	return 0
+    fi
+
+    local level=${1}
+
+    check-digit ${level} || return 190
+    test ${level} -ge 1 -a ${level} -le 4 || return 160
+    export WAF_LEVEL=${level}
+
+    SAVENV=1
+}
+
+show-score-request()
+{
+    echo-command-form "waf score request"
+    echo-mark-cur
+    echo-value "${CURRENT_WAF_REQUEST_SCORE}"
+
+    if test "${CURRENT_WAF_REQUEST_SCORE}" != "${WAF_REQUEST_SCORE}" ; then
+	echo-command-form "waf score request"
+	echo-mark-new
+	echo-value "${WAF_REQUEST_SCORE}"
+    fi
+}
+
+show-score-response()
+{
+    echo-command-form "waf score response"
+    echo-mark-cur
+    echo-value "${CURRENT_WAF_RESPONSE_SCORE}"
+
+    if test "${CURRENT_WAF_RESPONSE_SCORE}" != "${WAF_RESPONSE_SCORE}" ; then
+	echo-command-form "waf score response"
+	echo-mark-new
+	echo-value "${WAF_RESPONSE_SCORE}"
+    fi
+}
+
+show-score()
+{
+    echo-begin-show
+    case "${1}" in
+	request|response)
+	    show-score-${1}
+	    ;;
+	"")
+	    show-score-request
+	    show-score-response
+	    ;;
+	*)
+	    return 255
+	    ;;
+    esac
+    echo-end-show
+}
+
+check-waf-score()
+{
+    test -n "${1}" || return 1
+    local limit=${1}
+
+    case ${limit} in
+	response|request)
+	    return 0
+	    ;;
+	*)
+	    return 1
+	    ;;
+    esac
+}
+
+manage-waf-score()
+{
+    if test -z "${1}" ; then
+	show-score
+	return 0
+    fi
+
+    local attribute=${1}
+    check-waf-score ${attribute} || return 1
+
+    if test -z "${2}" ; then
+	show-score ${attribute}
+	return 0
+    fi
+
+    local value=${2}
+
+    check-digit ${value} || return 190
+
+    case ${attribute} in
+	request)
+	    test ${value} -ge 1 || return 160
+	    test ${value} -le ${MAX_WAF_SCORE} || return 159
+	    export WAF_REQUEST_SCORE=${value}
+	    ;;
+	response)
+	    test ${value} -ge 1 || return 160
+	    test ${value} -le ${MAX_WAF_SCORE} || return 159
+	    export WAF_RESPONSE_SCORE=${value}
+	    ;;
+	*)
+	    return 255
+	    ;;
+    esac
+
+    SAVENV=1
+}
+
+get-generic-pos()
+{
+    test -n "${1}" || return 1
+    local filter=${1}
+
+    local i len=${#WAF_GENERIC_FILTER_ID[@]}
+
+    for ((i=0;i<len;i++))
+    do
+	test ${WAF_GENERIC_FILTER_ID[${i}]} != ${filter} || break
+    done
+
+    echo ${i}
+}
+
+get-generic-pos-value()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 1
+    local filters=${1}
+    local name=${2}
+
+    local pos=$(get-generic-pos ${name})
+    local value=${filters:${pos}:1}
+    echo ${value}
+}
+
+show-all-generic()
+{
+    local flag1 flag2
+    local i len=${#WAF_GENERIC_FILTER_ID[@]}
+
+    echo-command-form "waf generic"
+    echo-mark-cur
+
+    for ((i=0 ; i<len ; i++))
+    do
+	
+	flag1=${CURRENT_WAF_GENERIC:${i}:1}
+	flag1=$(waf-external-form ${flag1})
+	
+	flag2=${WAF_GENERIC:${i}:1}
+	flag2=$(waf-external-form ${flag2})
+
+	if test ${TERM} == ${WADMIN_TERM} ; then
+	    if test ${i} -ne 0 ; then
+		echo -n "<td></td>"
+		echo-mark-cur
+	    fi
+	    echo-value "${WAF_GENERIC_FILTER_ID[${i}]} ${flag1}"
+	else
+	    echo-value "${WAF_GENERIC_FILTER_ID[${i}]}" ${PRINT_COL} -n
+	    echo-value ${flag1} ${WAF_GENERIC_COL}
+	fi
+		
+	if test ${flag1} != ${flag2} ; then
+	    if test ${TERM} == ${WADMIN_TERM} ; then
+		echo -n "<td></td>"
+		echo-mark-new
+		echo-value "${WAF_GENERIC_FILTER_ID[${i}]} ${flag2}"
+	    else
+		echo-value "${WAF_GENERIC_FILTER_ID[${i}]}" ${PRINT_COL} -n
+		echo-mark-new
+		echo-value ${flag2} ${WAF_GENERIC_COL}
+	    fi
+	fi
+    done
+}
+
+show-generic()
+{
+    echo-begin-show
+
+    if test -z "${1}" ; then
+	show-all-generic
+    else
+	local name=${1}
+
+	local flag1=$(get-generic-pos-value ${CURRENT_WAF_GENERIC} ${name})
+	local flag2=$(get-generic-pos-value ${WAF_GENERIC} ${name})
+
+	flag1=$(waf-external-form ${flag1})
+	flag2=$(waf-external-form ${flag2})
+
+	echo-command-form "waf generic"
+	echo-mark-cur
+	echo-value "${name}" ${PRINT_COL} -n ; echo-value ${flag1} ${WAF_GENERIC_COL}
+
+	if test ${flag1} != ${flag2} ; then
+	    echo-value "${name}" ${PRINT_COL} -n
+	    echo-mark-new
+	    echo-value ${flag2} ${WAF_GENERIC_COL}
+	fi
+    fi
+
+    echo-end-show
+}
+
+show-limit-request()
+{
+    echo-command-form "waf limit request"
+    echo-mark-cur
+    echo-value "${CURRENT_WAF_REQUEST_BODY} KB"
+
+    if test "${CURRENT_WAF_REQUEST_BODY}" != "${WAF_REQUEST_BODY}" ; then
+	echo-command-form "waf limit request"
+	echo-mark-new
+	echo-value "${WAF_REQUEST_BODY} KB"
+    fi
+}
+
+show-limit-response()
+{
+    echo-command-form "waf limit response"
+    echo-mark-cur
+    echo-value "${CURRENT_WAF_RESPONSE_BODY} KB"
+
+    if test "${CURRENT_WAF_RESPONSE_BODY}" != "${WAF_RESPONSE_BODY}" ; then
+	echo-command-form "waf limit response"
+	echo-mark-new
+	echo-value "${WAF_RESPONSE_BODY} KB"
+    fi
+}
+
+show-limit-assertions()
+{
+    echo-command-form "waf limit assertions"
+    echo-mark-cur
+    echo-value "${CURRENT_WAF_NUM_ARG}"
+
+    if test "${CURRENT_WAF_NUM_ARG}" != "${WAF_NUM_ARG}" ; then
+	echo-command-form "waf limit assertions"
+	echo-mark-new
+	echo-value "${WAF_NUM_ARG}"
+    fi
+}
+
+show-limit-name()
+{
+    echo-command-form "waf limit name"
+    echo-mark-cur
+    echo-value "${CURRENT_WAF_ARG_NAME_LENGTH}"
+
+    if test "${CURRENT_WAF_ARG_NAME_LENGTH}" != "${WAF_ARG_NAME_LENGTH}" ; then
+	echo-command-form "waf limit name"
+	echo-mark-new
+	echo-value "${WAF_ARG_NAME_LENGTH}"
+    fi
+}
+
+show-limit-value()
+{
+    echo-command-form "waf limit value"
+    echo-mark-cur
+    echo-value "${CURRENT_WAF_ARG_LENGTH}"
+
+    if test "${CURRENT_WAF_ARG_LENGTH}" != "${WAF_ARG_LENGTH}" ; then
+	echo-command-form "waf limit value"
+	echo-mark-new
+	echo-value "${WAF_ARG_LENGTH}"
+    fi
+}
+
+show-limit-arguments()
+{
+    echo-command-form "waf limit arguments"
+    echo-mark-cur
+    echo-value "${CURRENT_WAF_TOTAL_ARG_LENGTH}"
+
+    if test "${CURRENT_WAF_TOTAL_ARG_LENGTH}" != "${WAF_TOTAL_ARG_LENGTH}" ; then
+	echo-command-form "waf limit arguments"
+	echo-mark-new
+	echo-value "${WAF_TOTAL_ARG_LENGTH}"
+    fi
+}
+
+show-limit-files()
+{
+    echo-command-form "waf limit files"
+    echo-mark-cur
+    echo-value "${CURRENT_WAF_FILES_SIZE} KB"
+
+    if test "${CURRENT_WAF_FILES_SIZE}" != "${WAF_FILES_SIZE}" ; then
+	echo-command-form "waf limit files"
+	echo-mark-new
+	echo-value "${WAF_FILES_SIZE} KB"
+    fi
+}
+
+show-limit()
+{
+    echo-begin-show
+    case "${1}" in
+	request|response|assertions|name|value|arguments|files)
+	    show-limit-${1}
+	    ;;
+	"")
+	    show-limit-request
+	    show-limit-response
+	    show-limit-assertions
+	    show-limit-name
+	    show-limit-value
+	    show-limit-arguments
+	    show-limit-files
+	    ;;
+	*)
+	    return 255
+	    ;;
+    esac
+    echo-end-show
+}
+
+set-generic()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 1
+    local in_filter=${1}
+    local in_flag=${2}
+
+    local i elt range
+    local len=${#WAF_GENERIC}
+    local name filters
+
+    local list
+
+    for ((i=0;i<len;i++))
+    do
+	flag=${WAF_GENERIC:${i}:1}
+	if test ${i} -eq ${in_filter} ; then
+	    filters="${filters}${in_flag}"
+	else
+	    filters="${filters}${flag}"
+	fi
+    done
+
+    WAF_GENERIC=${filters}
+
+    i=0
+    for elt in ${WAF_RWEB_GENERIC}
+    do
+	range=$[${i} % 2]
+	case ${range} in
+	    0)
+		name=${elt}
+		;;
+	    1)
+		filters=${elt}
+		test ${filters} == ${WAF_GENERIC} || list="${list} ${name} ${filters}"
+		;;
+	    *)
+		return 1
+		;;
+	esac
+	((i++))
+    done
+
+    list=${list:1}
+    WAF_RWEB_GENERIC=${list}
+}
+
+check-generic-filter()
+{
+    test -n "${1}" || return 1
+    local filter=${1}
+
+    local i len=${#WAF_GENERIC_FILTER_ID[@]}
+
+    for ((i=0;i<len;i++))
+    do
+	test ${WAF_GENERIC_FILTER_ID[${i}]} != ${filter} || return 0
+    done
+
+    return 1
+}
+
+manage-waf-generic()
+{
+    if test -z "${1}" ; then
+	show-generic
+	return 0
+    fi
+
+    local filter=${1}
+    check-generic-filter ${filter} || return 80
+
+    if test -z "${2}" ; then
+	show-generic ${filter}
+	return 0
+    fi
+
+    local flag=${2}
+    check-boolean ${flag} || return 18
+
+    filter=$(get-generic-pos ${filter})
+    flag=$(waf-internal-form ${flag})
+
+    set-generic ${filter} ${flag}
+    SAVENV=1
+}
+
+show-reputation-country1()
+{
+    test -n "${1}" || return 1
+    local ver=${1}
+    local countries=${2}
+
+    echo-command-form "waf reputation country"
+    if test "${ver}" == "new" ; then
+	echo-mark-new
+    else
+	echo-mark-cur
+    fi
+
+    if test -z "${countries}" ; then
+	echo-value-null ${PRINT_COL}
+    else
+	local country_code country i=0
+	for country_code in ${countries}
+	do
+	    test ${i} -eq 0 || echo-blank-command
+	    country=$(get-country-name ${country_code})
+	    echo-value "${country_code^^} (${country})" ${PRINT_COL}
+	    ((i++))
+	done
+    fi
+}
+
+show-reputation-country()
+{
+    local current_waf_reputation_countries=$(sqlite3 ${USERENV_DIR}/${CONFIGURATION_CURRENT_DB_NAME} \
+						     "SELECT country FROM waf_reputation_country WHERE reputation = TRUE;")
+
+    local waf_reputation_countries=$(sqlite3 ${USERENV_DIR}/${CONFIGURATION_DB_NAME} \
+					     "SELECT country FROM waf_reputation_country WHERE reputation = TRUE;")
+
+    show-reputation-country1 'cur' "${current_waf_reputation_countries}"
+    test "${current_waf_reputation_countries}" == "${waf_reputation_countries}" || show-reputation-country1 'new' "${waf_reputation_countries}"
+}
+
+show-reputation-rbl()
+{
+    echo-command-form "waf reputation rbl"
+    echo-mark-cur
+    if test -z "${CURRENT_WAF_REPUTATION_RBL_KEY}" ; then
+	echo-value-null ${PRINT_COL}
+    else
+	echo-value "..." ${PRINT_COL}
+    fi
+    
+    if test "${CURRENT_WAF_REPUTATION_RBL_KEY}" != "${WAF_REPUTATION_RBL_KEY}" ; then
+	echo-command-form "waf reputation rbl"
+	echo-mark-new
+	if test -z "${WAF_REPUTATION_RBL_KEY}" ; then
+	    echo-value-null ${PRINT_COL}
+	else
+	    echo-value "..." ${PRINT_COL}
+	fi
+    fi
+}
+
+show-reputation()
+{
+    echo-begin-show
+    case "${1}" in
+	rbl|country)
+	    show-reputation-${1}
+	    ;;
+	'')
+	    show-reputation-country
+	    show-reputation-rbl
+	    ;;
+	*)
+	    return 255
+	    ;;
+    esac
+    echo-end-show
+}
+
+check-waf-reputation()
+{
+    test -n "${1}" || return 1
+    local limit=${1}
+
+    case ${limit} in
+	rbl|country)
+	    return 0
+	    ;;
+	*)
+	    return 1
+	    ;;
+    esac
+}
+
+manage-waf-reputation()
+{
+    if test -z "${1}" ; then
+	show-reputation
+	return 0
+    fi
+
+    local attribute=${1}
+    check-waf-reputation ${attribute} || return 1
+
+    if test -z "${2}" ; then
+	show-reputation ${attribute}
+	return 0
+    fi
+
+    local action=${2}
+
+    case ${attribute} in
+	rbl)
+	    local rbl_key
+
+	    case ${action} in
+		set)		
+		    rbl_key=${ARGS[3]}
+		    if ! check-api-key ${rbl_key} ; then
+			INDIRECT_ERROR_CODE=523
+			return 254
+		    fi
+		    export WAF_REPUTATION_RBL_KEY=${rbl_key}
+		    ;;
+		set:encrypted)
+		    local enc_rbl_key=${ARGS[3]}
+		    test -n "${enc_rbl_key}" || return 0
+		    rbl_key=$(decrypt-password "encrypted:${enc_rbl_key}" "${WAF_REPUTATION_RBL_PASSWD}")
+
+		    if ! check-api-key ${rbl_key} ; then
+			INDIRECT_ERROR_CODE=523
+			return 254
+		    fi
+		    export WAF_REPUTATION_RBL_KEY=${rbl_key}
+		    ;;
+
+		*)
+		    return 1
+		    ;;
+	    esac
+	    ;;
+	country)
+	    case ${action} in
+		raz)
+		    sqlite3 ${USERENV_DIR}/${CONFIGURATION_DB_NAME} \
+			    "UPDATE waf_reputation_country SET reputation = FALSE;"
+		    ;;
+		add|del)
+		    test -n "${3}" || return 1
+		    shift 2
+		    local country_code
+		    for country_code in ${*}
+		    do
+			country_code=${country_code,,}
+			check-country-code ${country_code} || return 99
+
+			case ${action} in
+			    add)
+				sqlite3 ${USERENV_DIR}/${CONFIGURATION_DB_NAME} \
+					"UPDATE waf_reputation_country SET reputation = TRUE WHERE country = '${country_code}';"
+				;;
+			    del)
+				sqlite3 ${USERENV_DIR}/${CONFIGURATION_DB_NAME} \
+					"UPDATE waf_reputation_country SET reputation = FALSE WHERE country = '${country_code}';"
+				;;
+			    *)
+				return 255
+				;;
+			esac
+		    done
+		    ;;
+		*)
+		    return 1
+		    ;;
+	    esac
+	    ;;
+	*)
+	    return 255
+	    ;;
+    esac
+
+    SAVENV=1
+}
+
+show-waf-imethods()
+{
+    echo-begin-show
+    echo-command-form "waf imethods"
+    echo-mark-cur
+    echo-value "${CURRENT_WAF_IMETHODS}"
+
+    if test "${CURRENT_WAF_IMETHODS}" != "${WAF_IMETHODS}" ; then
+	echo-command-form "waf imethods"
+	echo-mark-new
+	echo-value "${WAF_IMETHODS}"
+    fi
+    echo-end-show
+}
+
+manage-waf-imethods()
+{
+    local policy=${1}
+    if test -z "${policy}" ; then
+	show-waf-imethods
+	return 0
+    fi
+
+    case ${policy} in
+	allow)
+	    export WAF_IMETHODS=allow
+	    ;;
+	deny)
+	    export WAF_IMETHODS=deny
+	    ;;
+
+	*)
+	    return 1
+	    ;;
+    esac
+
+    SAVENV=1
+}
+
+check-waf-limit()
+{
+    test -n "${1}" || return 1
+    local limit=${1}
+
+    case ${limit} in
+	response|request|assertions|name|value|arguments|files)
+	    return 0
+	    ;;
+	*)
+	    return 1
+	    ;;
+    esac
+}
+
+manage-waf-limits()
+{
+    if test -z "${1}" ; then
+	show-limit
+	return 0
+    fi
+
+    local attribute=${1}
+    check-waf-limit ${attribute} || return 1
+
+    if test -z "${2}" ; then
+	show-limit ${attribute}
+	return 0
+    fi
+
+    local value=${2}
+    local mega=$[1024 * 1024]
+
+    check-digit ${value} || return 190
+
+    case ${attribute} in
+	request)
+	    test ${value} -ge 1 || return 160
+	    test ${value} -le ${mega} || return 159
+	    export WAF_REQUEST_BODY=${value}
+	    ;;
+	response)
+	    test ${value} -ge 1 || return 160
+	    test ${value} -le ${mega} || return 159
+	    export WAF_RESPONSE_BODY=${value}
+	    ;;
+
+	assertions)
+	    test ${value} -le 8192 || return 159
+	    export WAF_NUM_ARG=${value}
+	    ;;
+	name)
+	    test ${value} -le 1024 || return 159
+	    export WAF_ARG_NAME_LENGTH=${value}
+	    ;;
+	value)
+	    test ${value} -le ${mega} || return 159
+	    export WAF_ARG_LENGTH=${value}
+	    ;;
+	arguments)
+	    test ${value} -le $[${mega} * 1024] || return 159
+	    export WAF_TOTAL_ARG_LENGTH=${value}
+	    ;;
+	files)
+	    test ${value} -le ${MAX_UPLOAD_FILE_SZ} || return 161
+	    export WAF_FILES_SIZE=${value}
+	    ;;
+	*)
+	    return 255
+	    ;;
+    esac
+
+    SAVENV=1
+}
+
+show-waf-http-errors()
+{
+    echo-begin-show
+    echo-command-form "waf errors"
+    echo-mark-cur
+    echo-value "${CURRENT_WAF_REWRITE_HTTP_ERRORS}"
+
+    if test "${CURRENT_WAF_REWRITE_HTTP_ERRORS}" != "${WAF_REWRITE_HTTP_ERRORS}" ; then
+	echo-command-form "waf errors"
+	echo-mark-new
+	echo-value "${WAF_REWRITE_HTTP_ERRORS}"
+    fi
+    echo-end-show
+}
+
+manage-waf-http-errors()
+{
+    local policy=${1}
+    if test -z "${policy}" ; then
+	show-waf-http-errors
+	return 0
+    fi
+
+    case ${policy} in
+	allow)
+	    export WAF_REWRITE_HTTP_ERRORS=allow
+	    ;;
+	deny)
+	    export WAF_REWRITE_HTTP_ERRORS=deny
+	    ;;
+
+	*)
+	    return 1
+	    ;;
+    esac
+
+    SAVENV=1
+}
+
+get-rweb-generic-filters()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 1
+    local rweb_generic_filters=${1}
+    local in_name=${2}
+
+    local i=0 elt range
+
+    for elt in ${rweb_generic_filters}
+    do
+	range=$[${i} % 2]
+	case ${range} in
+	    0)
+		name=${elt}
+		;;
+	    1)
+		filters=${elt}
+		if test ${name} == ${in_name} ; then
+		    echo ${filters}
+		    return 0
+		fi
+		;;
+	    *)
+		echo "Unknown"
+		return 1
+		;;
+	esac
+	((i++))
+    done
+}
+
+get-rweb-generic-filter()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 1
+    test -n "${3}" || return 1
+    local rweb_generic_filters=${1}
+    local name=${2}
+    local pos=${3}
+
+    local filters=$(get-rweb-generic-filters "${rweb_generic_filters}" ${name})
+    test -z ${filters} || echo ${filters:${pos}:1}
+}
+
+echo-filters()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 1
+    test -n "${3}" || return 1
+
+    local filters=${1}
+    local col1=${2}
+    local col2=${3}
+
+    local i len=${#WAF_GENERIC}
+
+    for ((i=0;i<len;i++))
+    do
+	filter=$(get-generic-waf-id ${i})
+	flag=${filters:${i}:1}
+	flag=$(waf-external-form ${flag})
+
+	echo-blank-command
+
+	if test ${TERM} == ${WADMIN_TERM} ; then
+	    echo-value "${filter} ${flag}"
+	else
+	    echo-value "${filter}" ${col1} -n
+	    echo-value "${flag}" ${col2}
+	fi
+    done
+}
+
+show-all-rweb-generic1()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    local col1=${1}
+    local col2=${2}
+    local rweb_generic_filters=${3}
+
+    if test -z "${rweb_generic_filters}" ; then
+	echo-command-form "waf rweb generic"
+	if test "${4}" == "new" ; then
+	    echo-mark-new
+	else
+	    echo-mark-cur
+	fi
+	echo-value-inherit ${PRINT_COL}
+	return 0
+    fi
+
+    local i=0 n=0 elt range
+    local name filters
+
+    local col1=${PRINT_COL}
+    local col2=$[22 + ${col1}]
+
+    echo-command-form "waf rweb generic"
+    if test "${4}" == "new" ; then
+	echo-mark-new
+    else
+	echo-mark-cur
+    fi
+
+    for elt in ${rweb_generic_filters}
+    do
+	range=$[${i} % 2]
+	case ${range} in
+	    0)
+		name=${elt}
+		;;
+	    1)
+		filters=${elt}
+		test ${n} -eq 0 || echo-blank-command
+		echo-highlighted-value "${name}" ${PRINT_COL}
+		echo-filters ${filters} ${col1} ${col2}
+		((n++))
+		;;
+	    *)
+		return 225
+		;;
+	esac
+	((i++))
+    done
+}
+
+show-all-rweb-generic()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    local col1=${1}
+    local col2=${2}
+
+    show-all-rweb-generic1 ${col1} ${col2} "${CURRENT_WAF_RWEB_GENERIC}"
+    test "${WAF_RWEB_GENERIC}" == "${CURRENT_WAF_RWEB_GENERIC}" || \
+	show-all-rweb-generic1 ${col1} ${col2} "${WAF_RWEB_GENERIC}" new
+}
+
+show-rweb-generic-site()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 1
+    test -n "${3}" || return 1
+    test -n "${4}" || return 1
+    local new=${1}
+    local col1=${2}
+    local col2=${3}
+    local name=${4}
+    local filters=${5}
+
+    echo-command-form "waf rweb generic"
+    if test "${new}" == "new" ; then
+	echo-mark-new
+    else
+	echo-mark-cur
+    fi
+
+    echo-highlighted-value "${name}"
+
+    if test -n "${filters}" ; then
+	echo-filters ${filters} ${col1} ${col2}
+    else
+	echo-value-inherit ${col1}
+    fi
+}
+
+show-rweb-generic-site-filter()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 1
+    test -n "${3}" || return 1
+    test -n "${4}" || return 1
+    test -n "${5}" || return 1
+    local new=${1}
+    local col1=${2}
+    local col2=${3}
+    local name=${4}
+    local filter=${5}
+    local value=${6}
+
+    echo-command-form "waf rweb generic"
+    if test "${new}" == "new" ; then
+	echo-mark-new
+    else
+	echo-mark-cur
+    fi
+
+    echo-value "${name}:" ${PRINT_COL}
+    
+    if test -n "${value}" ; then
+	echo-value "${filter}" ${col1} -n
+	value=$(waf-external-form ${value})
+	echo-value "${value}" ${col2}
+    else
+	echo-value-inherit ${col1}
+    fi
+}
+
+show-rweb-generic()
+{
+    echo-begin-show
+
+    local col1=${PRINT_COL}
+    local col2=$[22 + ${col1}]
+
+    if test -z "${1}" ; then
+	show-all-rweb-generic ${col1} ${col2}
+    else
+	local name=${1}
+	if test -z "${2}" ; then
+	    local filters=$(get-rweb-generic-filters "${CURRENT_WAF_RWEB_GENERIC}" ${name})
+	    show-rweb-generic-site cur ${col1} ${col2} ${name} ${filters}
+
+	    local new_filters=$(get-rweb-generic-filters "${WAF_RWEB_GENERIC}" ${name})
+	    test "${filters}" == "${new_filters}" || \
+		show-rweb-generic-site new ${col1} ${col2} ${name} ${new_filters}
+	else
+	    local filter=${2}
+	    local pos=$(get-generic-pos ${filter})
+	    local val=$(get-rweb-generic-filter "${CURRENT_WAF_RWEB_GENERIC}" ${name} ${pos})
+	    show-rweb-generic-site-filter cur ${col1} ${col2} ${name} ${filter} ${val}
+
+	    local new_val=$(get-rweb-generic-filter "${WAF_RWEB_GENERIC}" ${name} ${pos})
+	    test "${val}" == "${new_val}" || \
+		show-rweb-generic-site-filter new ${col1} ${col2} ${name} ${filter} ${new_val}
+	fi
+    fi
+
+    echo-end-show
+}
+
+make-filters()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 1
+    test -n "${3}" || return 1
+    local filters=${1}
+    local filter=${2}
+    local in_value=${3}
+
+    local value
+    local new_filters
+    local i len=${#WAF_GENERIC}
+
+    for ((i=0;i<len;i++))
+    do
+	if test ${i} -eq ${filter} ; then
+	    new_filters="${new_filters}${in_value}"
+	else
+	    value=${filters:${i}:1}
+	    new_filters="${new_filters}${value}"
+	fi
+    done
+    
+    echo ${new_filters}
+}
+
+set-rweb-generic()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 1
+    test -n "${3}" || return 1
+    local in_name=${1}
+    local in_filter=${2}
+    local in_value=${3}
+
+    local i=0 elt range
+    local name filter filters
+
+    local new_filters list
+    local searched=0
+
+    for elt in ${WAF_RWEB_GENERIC}
+    do
+	range=$[${i} % 2]
+	case ${range} in
+	    0)
+		name=${elt}
+		;;
+	    1)
+		filters=${elt}
+		if test ${name} == ${in_name} ; then
+		    searched=1
+		    new_filters=$(make-filters ${filters} ${in_filter} ${in_value})
+		    test ${new_filters} == ${WAF_GENERIC} || list="${list} ${name} ${new_filters}"
+		else
+		    list="${list} ${name} ${filters}"
+		fi
+		;;
+	    *)
+		return 1
+		;;
+	esac
+	((i++))
+    done
+    
+    if test ${searched} -eq 0 ; then
+	new_filters=$(make-filters ${WAF_GENERIC} ${in_filter} ${in_value})
+	test ${new_filters} == ${WAF_GENERIC} || list="${list} ${in_name} ${new_filters}"
+    fi
+    
+    WAF_RWEB_GENERIC=${list}
+}
+
+set-rweb-generic-inherit()
+{
+    test -n "${1}" || return 1
+    local in_name=${1}
+
+    local i=0 elt range
+    local name filter filters
+
+    local list
+
+    for elt in ${WAF_RWEB_GENERIC}
+    do
+	range=$[${i} % 2]
+	case ${range} in
+	    0)
+		name=${elt}
+		;;
+	    1)
+		filters=${elt}
+		test ${name} == ${in_name} || list="${list} ${name} ${filters}"
+		;;
+	    *)
+		return 1
+		;;
+	esac
+	((i++))
+    done
+    
+    WAF_RWEB_GENERIC=${list:1}
+}
+
+show-rweb-custom()
+{
+    test ${TERM} != ${WADMIN_TERM} || return 0
+
+    echo-begin-show
+    db-waf-rule-show "${@}"
+    echo-end-show
+}
+
+manage-rweb-custom()
+{
+    ! db-waf-custom-is-global-locked || return 105
+
+    if test -z "${1}" ; then
+	show-rweb-custom
+	return 0
+    fi
+
+    local name=${1}
+    site-name-exist ${name} || return 72
+
+    if test -z "${2}" ; then
+	show-rweb-custom ${name}
+	return 0
+    fi
+
+    local op=${2}
+
+    case ${op} in
+	clear)
+	    user-has-admin-rights || return 31
+	    db-waf-rule-raz ${name}
+	    ;;
+	load|save)
+	    local pt=${3}
+	    local ip=${4}
+	    local fn=${5}
+
+	    test -n "${pt}" || return 1
+	    test -n "${ip}" || return 1
+	    test -n "${fn}" || return 1
+
+	    check-file-protocol ${pt} || return 63
+	    check-ip-name ${ip} || return 113
+	    check-filename ${fn} || return 19
+	    check-file-ip ${ip} || return 27
+
+	    user-has-admin-rights || return 31
+
+	    case ${op} in
+		load)
+		    db-waf-load-filter ${name} ${pt} ${ip} ${fn}
+		    ;;
+		save)
+		    local new=${6}
+		    db-waf-save-filter ${name} ${pt} ${ip} ${fn} ${new}
+		    ;;
+		*)
+		    return 1
+		    ;;
+	    esac
+	    local ret=${?}
+	    test ${ret} -eq 0 || return ${ret}
+	    ;;
+	*)
+	    return 1
+	    ;;
+    esac
+}
+
+show-audit-mode1()
+{
+    test -n "${1}" || return 1
+    local name=${1}
+
+    local state1 state2
+
+    echo-command-form "waf rweb audit"
+    echo-mark-cur
+    if member "${CURRENT_WAF_RWEB_AUDIT_LIST}" ${name} ; then
+	echo-value "${name} on"
+	state1=0
+    else
+	echo-value "${name} off"
+	state1=1
+    fi
+
+    member "${WAF_RWEB_AUDIT_LIST}" ${name}
+    state2=${?}
+    test ${state1} -ne ${state2} || return 0
+
+    echo-command-form "waf rweb audit"
+    echo-mark-new
+    if test ${state2} -eq 0 ; then
+	echo-value "${name} on"
+    else
+	echo-value "${name} off"
+    fi
+}
+
+show-all-audit-mode()
+{
+    if test -z "${RWEB_SITE_LIST}" ; then
+	echo-command-form "waf rweb audit"
+	echo-mark-cur
+	echo-value-null
+	return 0
+    fi
+
+    local name names=$(get-site-name-list "${RWEB_SITE_LIST}")
+
+    for name in ${names}
+    do
+	show-audit-mode1 ${name}
+    done
+}
+
+show-audit-mode()
+{
+    echo-begin-show
+
+    if test -z "${1}" ; then
+	show-all-audit-mode
+    else
+	show-audit-mode1 ${1}
+    fi
+
+    echo-end-show
+}
+
+manage-rweb-audit()
+{
+    local name=${1}
+    local value=${2}
+
+    if test -z "${name}" ; then
+	show-audit-mode
+	return 0
+    fi
+
+    site-name-exist ${name} || return 72
+
+    if test -z "${value}" ; then
+	show-audit-mode ${name}
+	return 0
+    fi
+
+    check-boolean ${value} || return 18
+
+    case ${value} in
+	on)
+	    ! member "${WAF_RWEB_AUDIT_LIST}" ${name} || return 0
+	    if test -z "${WAF_RWEB_AUDIT_LIST}" ; then
+		export WAF_RWEB_AUDIT_LIST=${name}
+	    else
+		export WAF_RWEB_AUDIT_LIST="${WAF_RWEB_AUDIT_LIST} ${name}"
+	    fi
+	    SAVENV=1
+	    ;;
+	off)
+	    export WAF_RWEB_AUDIT_LIST=$(remove "${WAF_RWEB_AUDIT_LIST}" ${name})
+	    SAVENV=1
+	    ;;
+	*)
+	    error 255
+	    ;;
+    esac
+}
+
+manage-rweb-bypass-rule()
+{
+    if test -z "${1}" ; then
+	echo-begin-show
+	show-rweb-bypass-rule
+	echo-end-show
+	return 0
+    fi
+
+    local name=${1}
+    site-name-exist ${name} || return 72
+
+    if test -z "${2}" ; then
+	show-rweb-bypass-rule ${name}
+	return 0
+    fi
+
+    local action=${2}
+    case ${action} in
+	add|del)
+	    shift 2
+	    local new_ids=${*}
+	    test -n "${new_ids}" || return 1
+
+	    local id new_len=0
+	    for id in ${new_ids}
+	    do
+		check-digit ${id} || return 172
+		((new_len++))
+	    done
+
+	    local ids=$(get-bypass-rule-ids ${name} new)
+	    ids=${ids//:/ }
+	    local len=$(length-list "${ids}")
+	    len=$((len+new_len))
+
+	    test ${len} -le ${MAX_WAF_BYPASS_NB} || return 90
+
+	    case ${action} in
+		add)
+		    for id in ${new_ids}
+		    do
+			ids=$(insert-record-in-slist 1 1 "${id}" "${ids}")
+		    done
+		    ;;
+		del)
+		    for id in ${new_ids}
+		    do
+			ids=$(remove "${ids}" "${id}")
+		    done
+		    ;;
+		*)
+		    return 255
+		    ;;
+	    esac
+
+	    if test -z "${ids}" ; then
+		remove-waf-bypass-rule ${name}
+	    else
+		export WAF_RWEB_BYPASS_RULE_LIST=$(insert-record-in-slist 2 1 "${name} ${ids// /:}" "${WAF_RWEB_BYPASS_RULE_LIST}")
+	    fi
+	    SAVENV=1
+	    ;;
+	raz)
+	    remove-waf-bypass-rule ${name}
+	    SAVENV=1
+	    ;;
+	*)
+	    return 1
+	    ;;
+    esac
+}
+
+manage-rweb-bypass-application()
+{
+    if test -z "${1}" ; then
+	echo-begin-show
+	show-rweb-bypass-application
+	echo-end-show
+	return 0
+    fi
+
+    local name=${1}
+    site-name-exist ${name} || return 72
+
+    if test -z "${2}" ; then
+	echo-begin-show
+	show-rweb-bypass-application ${name}
+	echo-end-show
+	return 0
+    fi
+
+    local action=${2}
+    case ${action} in
+	raz)
+	    remove-waf-bypass-application "${name}"
+	    SAVENV=1
+	    ;;
+	set)
+	    test -n "${3}" || return 1
+	    local application=${3}
+	    check-waf-application ${application} || return 119
+	    remove-waf-bypass-application "${name}"
+	    WAF_RWEB_BYPASS_APPLICATION_LIST=$(insert-record-in-slist 2 1 "${name} ${application}" "${WAF_RWEB_BYPASS_APPLICATION_LIST}")
+	    SAVENV=1
+	    ;;
+	*)
+	    return 1
+	    ;;
+    esac
+}
+
+manage-rweb-bypass()
+{
+    local arg1=${1}
+    if test -z "${arg1}" ; then
+	show-rweb-bypass
+	return 0
+    fi
+
+    case ${arg1} in
+	application|rule)
+	    shift
+	    manage-rweb-bypass-${arg1} "${@}"
+	    ;;
+	*)
+	    return 1
+	    ;;
+    esac
+}
+
+show-all-rweb-errors1()
+{
+    local states=${2}
+
+    echo-command-form "waf rweb errors"
+    if test "${1}" == "new" ; then
+	echo-mark-new
+    else
+	echo-mark-cur
+    fi
+
+    if test -z "${states}" ; then
+	echo-value-null
+    else
+	local i=0 n=0 elt range 
+	local name state
+
+	for elt in ${states}
+	do
+	    range=$[${i} % 2]
+	    case ${range} in
+		0)
+		    name=${elt}
+		    ;;
+		1)
+		    state=${elt}
+		    test ${n} -eq 0 || echo-blank-command
+		    echo-value "${name} ${state}"
+		    ((n++))
+		    ;;
+		*)
+		    return 1
+		    ;;
+	    esac
+	    ((i++))
+	done
+    fi
+}
+
+show-all-rweb-errors()
+{
+    show-all-rweb-errors1 current "${CURRENT_WAF_RWEB_REWRITE_HTTP_ERRORS_LIST}"
+    test "${WAF_RWEB_REWRITE_HTTP_ERRORS_LIST}" == "${CURRENT_WAF_RWEB_REWRITE_HTTP_ERRORS_LIST}" || \
+	show-all-rweb-errors1 new "${WAF_RWEB_REWRITE_HTTP_ERRORS_LIST}"
+}
+
+show-rweb-http-errors1()
+{
+    echo-command-form "waf rweb errors"
+    if test "${1}" == "new" ; then
+	echo-mark-new
+    else
+	echo-mark-cur
+    fi
+
+    if test ${3} -eq 0 ; then
+	echo-value "${2} ${4}"
+    else
+	echo-value "${2} <inherit>"
+    fi
+}
+
+show-rweb-http-errors()
+{
+    echo-begin-show
+
+    if test -z "${1}" ; then
+	show-all-rweb-errors
+    else
+	local name=${1}
+	local cur_state cur_exist
+	local new_state new_exist
+
+	cur_state=$(get-rewrite-http-errors-state ${name} "${CURRENT_WAF_RWEB_REWRITE_HTTP_ERRORS_LIST}")
+	cur_exist=${?}
+	show-rweb-http-errors1 current ${name} ${cur_exist} ${cur_state}
+
+	new_state=$(get-rewrite-http-errors-state ${name} "${WAF_RWEB_REWRITE_HTTP_ERRORS_LIST}")
+	new_exist=${?}
+
+	if test ${cur_exist} -ne ${new_exist} ; then
+	    show-rweb-http-errors1 new ${name} ${new_exist} ${new_state}
+	else
+	    test ${cur_state} == ${new_state} || show-rweb-http-errors1 new ${name} ${new_exist} ${new_state}
+	fi
+    fi
+
+    echo-end-show
+}
+
+manage-rweb-http-errors()
+{
+    if test -z "${1}" ; then
+	show-rweb-http-errors
+	return 0
+    fi
+
+    local action=${1}
+    local name
+
+    if test -n "${2}" ; then
+    	name=${2}
+	site-name-exist ${name} || return 72
+    fi
+
+    case ${action} in
+	show)
+	    if test -z "${2}" ; then
+		show-rweb-http-errors
+		return 0
+	    else
+		show-rweb-http-errors ${name}
+		return 0
+	    fi
+	    ;;
+	raz)
+	    export WAF_RWEB_REWRITE_HTTP_ERRORS_LIST=
+	    ;;
+	del)
+	    test -n "${name}" || return 1
+	    export WAF_RWEB_REWRITE_HTTP_ERRORS_LIST=$(remove-record-from-list 2 1 "${name}" "${WAF_RWEB_REWRITE_HTTP_ERRORS_LIST}")
+	    ;;
+	add)
+	    test -n "${name}" || return 1
+	    local policy=${3}
+
+	    case ${policy} in
+		allow|deny)
+		    ;;
+		*)
+		    return 1
+		    ;;
+	    esac
+
+	    export WAF_RWEB_REWRITE_HTTP_ERRORS_LIST=$(insert-record-in-slist 2 1 "${name} ${policy}" "${WAF_RWEB_REWRITE_HTTP_ERRORS_LIST}")
+	    ;;
+	*)
+	    return 1
+	    ;;
+    esac
+    
+    SAVENV=1
+}
+
+rweb-get-denyurl()
+{
+    test -n "${1}" || return 1
+    local in_name=${1}
+    local in_urls=${2}
+
+    local elt i=0 range
+    local name url
+
+    for elt in ${in_urls}
+    do
+	range=$[${i} % 2]
+	case ${range} in
+	    0)
+		name=${elt}
+		;;
+	    1)
+		url=${elt}
+		if test "${name}" == "${in_name}" ; then
+		    echo ${url}
+		    return 0
+		fi
+		;;
+	    *)
+		return 1
+		;;
+	esac
+	((i++))
+    done
+    
+    return 1
+}
+
+rweb-denyurl-remove()
+{
+    test -n "${1}" || return 1
+    local in_name="${1}"
+
+    local out_list
+    local name url
+    local elt i=0 range
+
+    for elt in ${RWEB_SITE_DENYURL_LIST}
+    do
+	range=$[${i} % 2]
+	case ${range} in
+	    0)
+		name=${elt}
+		;;
+	    1)
+		url=${elt}
+		test "${in_name}" == "${name}" || out_list="${out_list} ${name} ${url}"
+		;;
+	    *)
+		return 1
+		;;
+	esac
+	((i++))
+    done
+    
+    echo "${out_list}"
+    return 0
+}
+
+show-rweb-denyurl2()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    local name=${1}
+    local new=${2}
+    local denyurl=${3}
+
+    echo-command-form "waf rweb denyurl"
+    test ${new} != new || echo-mark-new
+	
+    if test -z "${denyurl}" ; then
+	echo-value "${name} $(get-null-value)" ${PRINT_COL}
+    else
+	echo-value "${name} ${denyurl}"
+    fi
+}
+
+show-rweb-denyurl1()
+{
+    test -n "${1}" || return 1
+    local name=${1}
+
+    local denyurl=$(rweb-get-denyurl ${name} "${CURRENT_RWEB_SITE_DENYURL_LIST}")
+    show-rweb-denyurl2 ${name} 'current' ${denyurl}
+
+    local new_denyurl=$(rweb-get-denyurl ${name} "${RWEB_SITE_DENYURL_LIST}")
+    test "${new_denyurl}" == "${denyurl}" || show-rweb-denyurl2 ${name} 'new' ${new_denyurl}
+}
+
+show-all-rweb-denyurl1()
+{
+    local denyurls=${1}
+
+    if test -z "${denyurls}" ; then
+	echo-value-null
+	return 0
+    fi
+
+    local elt i=0 range n=0
+    local name url
+
+    for elt in ${denyurls}
+    do
+	range=$[${i} % 2]
+	case ${range} in
+	    0)
+		name=${elt}
+		;;
+	    1)
+		url=${elt}
+		test ${n} -eq 0 || echo-blank-command
+		echo-value "${name} ${url}"
+		((n++))
+		;;
+	    *)
+		return 1
+		;;
+	esac
+	((i++))
+    done
+}
+
+show-all-rweb-denyurl()
+{
+    echo-command-form "waf rweb denyurl"
+    echo-mark-cur
+    show-all-rweb-denyurl1 "${CURRENT_RWEB_SITE_DENYURL_LIST}"
+    if test "${CURRENT_RWEB_SITE_DENYURL_LIST}" != "${RWEB_SITE_DENYURL_LIST}" ; then
+	echo-command-form "waf rweb denyurl"
+	echo-mark-new
+	show-all-rweb-denyurl1 "${RWEB_SITE_DENYURL_LIST}"
+    fi
+}
+
+show-rweb-denyurl()
+{
+    echo-begin-show
+    if test -z "${1}" ; then
+	show-all-rweb-denyurl
+    else
+	show-rweb-denyurl1 ${1}
+    fi
+    echo-end-show
+}
+
+manage-rweb-denyurl()
+{
+    if test -z "${1}" ; then
+	show-rweb-denyurl
+	return 0
+    fi
+
+    local action=${1}
+    case ${action} in
+	set)
+	    test -n "${2}" || return 1
+	    local name=${2}
+	    site-name-exist ${name} || return 72
+
+	    if test -z "${3}" ; then
+		show-rweb-denyurl ${name}
+		return 0
+	    fi
+
+	    local url=${3}
+	    check-url ${url} || return 21
+	    RWEB_SITE_DENYURL_LIST=$(rweb-denyurl-remove "${name}")
+	    export RWEB_SITE_DENYURL_LIST="${RWEB_SITE_DENYURL_LIST} ${name} ${url}"
+	    SAVENV=1
+	    ;;
+	raz)
+	    if test -z "${2}" ; then
+		RWEB_SITE_DENYURL_LIST=""
+		SAVENV=1
+		return 0
+	    fi
+	    local name=${2}
+	    site-name-exist ${name} || return 72
+	    RWEB_SITE_DENYURL_LIST=$(rweb-denyurl-remove "${name}")
+	    SAVENV=1
+	    ;;
+	*)
+	    return 1
+	    ;;
+    esac
+	
+}
+
+get-bypass-rule-ids()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    local in_name=${1}
+    local state=${2}
+
+    case ${state} in
+	new)
+	    local list=${WAF_RWEB_BYPASS_RULE_LIST}
+	    ;;
+	cur)
+	    local list=${CURRENT_WAF_RWEB_BYPASS_RULE_LIST}
+	    ;;
+	*)
+	    return 3
+	    ;;
+    esac
+
+    local elt range i=0
+    local name ids
+
+    for elt in ${list}
+    do
+	range=$[${i} % 2]
+	case ${range} in
+	    0)
+		name=${elt}
+		;;
+	    1)
+		ids=${elt}
+		if test ${name} == ${in_name} ; then
+		    echo ${ids}
+		    return 0
+		fi
+		;;
+	    *)
+		return 11
+		;;
+	esac
+	((i++))
+    done
+
+    return 13
+}
+
+show-rweb-bypass-rule()
+{
+    local in_name=${1}
+
+    local elt range i=0
+    local name ids
+    local new_ids
+
+    test -z "${in_name}" || echo-begin-show
+    echo-command-form "waf rweb bypass rule"
+
+    if test -z "${CURRENT_WAF_RWEB_BYPASS_RULE_LIST}" ; then
+	if test -z "${in_name}" ; then
+	    echo-mark-cur
+	    echo-value-null ${WAF_BYPASS_COL}
+	else
+	    echo-mark-cur
+	    echo-value "${in_name} $(get-null-value)" ${WAF_BYPASS_COL}
+	fi
+    else
+	local n=0
+	for elt in ${CURRENT_WAF_RWEB_BYPASS_RULE_LIST}
+	do
+	    range=$[${i} % 2]
+	    case ${range} in
+		0)
+		    name=${elt}
+		    ;;
+		1)
+		    if test -z "${in_name}" -o "${name}" == "${in_name}" ; then
+			ids=${elt}
+			test ${n} -eq 0 || echo-command-form-blank ${WAF_BYPASS_COL}
+			echo-mark-cur
+			echo-highlighted-value "${name}" ${WAF_BYPASS_COL}
+			echo-blank-command
+			echo-value "${ids//:/ }" ${WAF_BYPASS_COL}
+			new_ids=$(get-bypass-rule-ids ${name} new)
+
+			if test "${ids}" != "${new_ids}" ; then
+			    echo-command-form-blank ${WAF_BYPASS_COL}
+			    echo-mark-new ${PRINT_COL}
+			    if test -z "${new_ids}" ; then
+				echo-highlighted-value "${name}" ${WAF_BYPASS_COL}
+				echo-blank-command
+				echo-value-null ${WAF_BYPASS_COL}
+			    else
+				echo-highlighted-value "${name}" ${WAF_BYPASS_COL}
+				echo-blank-command
+				echo-value "${new_ids//:/ }" ${WAF_BYPASS_COL}
+			    fi
+			fi
+			test -z "${in_name}" || break
+		    fi
+		    ((n++))
+		    ;;
+		*)
+		    return 1
+		    ;;
+	    esac
+	    ((i++))
+	done
+
+	if test -n "${in_name}" -a "${name}" != "${in_name}" ; then
+	    echo-mark-cur
+	    echo-highlighted-value "${in_name} $(get-null-value)" ${WAF_BYPASS_COL}
+	fi
+    fi
+
+    test "${WAF_RWEB_BYPASS_RULE_LIST}" != "${CURRENT_WAF_RWEB_BYPASS_RULE_LIST}" || return 0
+
+    i=0
+    for elt in ${WAF_RWEB_BYPASS_RULE_LIST}
+    do
+	range=$[${i} % 2]
+	case ${range} in
+	    0)
+		name=${elt}
+		;;
+	    1)
+		new_ids=${elt}
+		if test -z "${in_name}" -o "${name}" == "${in_name}" ; then
+		    ids=$(get-bypass-rule-ids ${name} cur)
+		    if test -z "${ids}" ; then
+			echo-command-form-blank ${WAF_BYPASS_COL}
+			echo-mark-new ${WAF_BYPASS_COL}
+			echo-highlighted-value "${name}" ${WAF_BYPASS_COL}
+			echo-blank-command
+			echo-value "${new_ids//:/ }" ${WAF_BYPASS_COL}
+			test -z "${in_name}" || break
+		    fi
+		fi
+		;;
+	    *)
+		return 1
+		;;
+	esac
+	((i++))
+    done
+
+    test -z "${in_name}" || echo-end-show
+}
+
+show-all-bypass-application1()
+{
+    local list=${1}
+
+    if test -z "${list}" ; then
+	echo-value-null ${WAF_BYPASS_COL}
+	return 0
+    fi
+
+    local elt i=0 range n=0
+    local name atype
+
+    for elt in ${list}
+    do
+	range=$[${i} % 2]
+	case ${range} in
+	    0)
+		name=${elt}
+		;;
+	    1)
+		atype=${elt}
+		test ${n} -eq 0 || echo-blank-command
+		echo-value "${name} ${atype}" ${WAF_BYPASS_COL}
+		((n++))
+		;;
+	    *)
+		return 255
+		;;
+	esac
+	((i++))
+    done
+}
+
+show-all-bypass-application()
+{
+    echo-command-form "waf rweb bypass application"
+    echo-mark-cur
+    show-all-bypass-application1 "${CURRENT_WAF_RWEB_BYPASS_APPLICATION_LIST}"
+
+    if test "${CURRENT_WAF_RWEB_BYPASS_APPLICATION_LIST}" != "${WAF_RWEB_BYPASS_APPLICATION_LIST}" ; then
+	echo-command-form "waf rweb bypass application"
+	echo-mark-new
+	show-all-bypass-application1 "${WAF_RWEB_BYPASS_APPLICATION_LIST}"
+    fi
+}
+
+show-bypass-application1()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    test -n "${3}" || return 3
+    local name=${1}
+    local atype=${2}
+    local state=${3}
+
+    echo-command-form "waf rweb bypass application"
+    test ${state} != new || echo-mark-new
+
+    if test ${atype} == other ; then
+	echo-value-null ${WAF_BYPASS_COL}
+    else
+	echo-value ${atype} ${WAF_BYPASS_COL}
+    fi
+}
+
+show-bypass-application()
+{
+    test -n "${1}" || return 1
+    local name=${1}
+
+    local atype=$(get-rweb-waf-application-type ${name} cur)
+    show-bypass-application1 ${name} ${atype} cur
+
+    local new_atype=$(get-rweb-waf-application-type ${name} new)
+    test ${new_atype} == ${atype} || show-bypass-application1 ${name} ${new_atype} new
+}
+
+show-rweb-bypass-application()
+{
+    if test -z "${1}" ; then
+	show-all-bypass-application
+    else
+	show-bypass-application ${1}
+    fi
+}
+
+show-rweb-bypass()
+{
+    echo-begin-show
+    show-rweb-bypass-rule
+    show-rweb-bypass-application
+    echo-end-show
+}
+
+manage-waf-bypass-rule()
+{
+    local arg1=${1}
+    if test -z "${arg1}" ; then
+	echo-begin-show
+	show-rweb-bypass-rule
+	echo-end-show
+	return 0
+    fi
+
+    case ${arg1} in
+	raz)
+	    unset WAF_RWEB_BYPASS_RULE_LIST
+	    SAVENV=1
+	    return 0
+	    ;;
+	*)
+	    return 1
+	    ;;
+    esac
+}
+
+manage-waf-bypass-application()
+{
+    local arg1=${1}
+    if test -z "${arg1}" ; then
+	echo-begin-show
+	show-rweb-bypass-application
+	echo-end-show
+	return 0
+    fi
+
+    case ${arg1} in
+	raz)
+	    unset WAF_RWEB_BYPASS_APPLICATION_LIST
+	    SAVENV=1
+	    return 0
+	    ;;
+	*)
+	    return 1
+	    ;;
+    esac
+}
+
+manage-waf-bypass()
+{
+    local arg1=${1}
+    if test -z "${arg1}" ; then
+	show-rweb-bypass
+	return 0
+    fi
+
+    case ${arg1} in
+	application)
+	    shift
+	    manage-waf-bypass-application "${@}"
+	    ;;
+	rule)
+	    shift
+	    manage-waf-bypass-rule "${@}"
+	    ;;
+	*)
+	    return 1
+	    ;;
+    esac
+}
+
+manage-rweb-generic()
+{
+    if test -z "${1}" ; then
+	show-rweb-generic
+	return 0
+    fi
+
+    local name=${1}
+    site-name-exist ${name} || return 72
+    
+    if test -z "${2}" ; then
+	show-rweb-generic ${name}
+	return 0
+    fi
+    
+    local filter=${2}
+    if test ${filter} == inherit ; then
+	set-rweb-generic-inherit ${name}
+	SAVENV=1
+	return 0
+    fi
+    check-generic-filter ${filter} || return 80
+    
+    if test -z "${3}" ; then
+	show-rweb-generic ${name} ${filter}
+	return 0
+    fi
+    
+    local value=${3}
+    check-boolean ${value} || return 18
+    
+    filter=$(get-generic-pos ${filter})
+    value=$(waf-internal-form ${value})
+    
+    set-rweb-generic ${name} ${filter} ${value}
+
+    SAVENV=1
+}
+
+manage-waf-rweb()
+{
+    local op=${1}
+
+    case "${op}" in
+	audit)
+	    manage-rweb-audit ${ALLARGS}
+	    ;;
+	bypass)
+	    manage-rweb-bypass ${ALLARGS}
+	    ;;
+	errors)
+	    manage-rweb-http-errors ${ALLARGS}
+	    ;;
+	custom)
+	    manage-rweb-custom ${ALLARGS}
+	    ;;
+	denyurl)
+	    manage-rweb-denyurl ${ALLARGS}
+	    ;;
+	generic)
+	    manage-rweb-generic ${ALLARGS}
+	    ;;
+	
+	'')
+	    manage-rweb-audit
+	    manage-rweb-bypass
+	    manage-rweb-http-errors
+	    manage-rweb-custom
+	    manage-rweb-denyurl
+	    manage-rweb-generic
+	    ;;
+	*)
+	    return 1
+	    ;;
+    esac
+}
+
+show-dos1()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    test -n "${3}" || return 3
+    local counter=${1}
+    local slice=${2}
+    local timeout=${3}
+
+    echo-value "${counter} ${slice}s ${timeout}s"
+}
+
+show-dos()
+{
+    echo-begin-show
+    echo-command-form "waf dos"
+    echo-mark-cur
+    show-dos1 ${CURRENT_WAF_DOS_LIMIT}
+    if test "${CURRENT_WAF_DOS_LIMIT}" != "${WAF_DOS_LIMIT}" ; then
+	echo-command-form "waf dos"
+	echo-mark-new
+	show-dos1 ${WAF_DOS_LIMIT}
+    fi
+    echo-end-show
+}
+
+manage-waf-dos()
+{
+    if test -z "${1}" ; then
+	show-dos
+	return 0
+    fi
+
+    test -n "${1}" || return 1
+    test -n "${2}" || return 1
+    test -n "${3}" || return 1
+    local counter=${1}
+    local slice=${2}
+    local timeout=${3}
+
+    check-digit ${counter} || return 190
+    check-digit ${slice} || return 190
+    check-digit ${timeout} || return 190
+
+    test ${counter} -le ${WAF_DOS_COUNTER_MAX} -a ${slice} -le ${WAF_DOS_SLICE_MAX} -a ${timeout} -le ${WAF_DOS_TIMEOUT_MAX} || return 159
+
+    WAF_DOS_LIMIT="${counter} ${slice} ${timeout}"
+    SAVENV=1
+}
+
+run()
+{
+    contextual-command-is-allowed || return 207
+
+    WAF_BYPASS_COL=$[${PRINT_COL} + 6]
+    WAF_GENERIC_COL=$[${PRINT_COL} + 13]
+
+    local waf_type
+
+    if test -n "${ARGS[1]}" ; then
+	waf_type=${ARGS[1]}
+	shift-args
+    fi
+
+    set-generic-rule-table
+
+    case "${waf_type}" in
+	level)
+	    manage-waf-level ${ALLARGS}
+	    ;;
+	score)
+	    manage-waf-score ${ALLARGS}
+	    ;;
+	generic)
+	    manage-waf-generic ${ALLARGS}
+	    ;;
+	reputation)
+	    manage-waf-reputation ${ALLARGS}
+	    ;;
+	imethods)
+	    manage-waf-imethods ${ALLARGS}
+	    ;;	    
+	limit)
+	    manage-waf-limits ${ALLARGS}
+	    ;;
+	errors)
+	    manage-waf-http-errors ${ALLARGS}
+	    ;;
+	rweb)
+	    local rweb_waf=${ARGS[1]}
+
+	    if test -z "${rweb_waf}" ; then
+		manage-waf-rweb
+		return 0
+	    fi
+
+	    shift-args
+	    manage-waf-rweb ${rweb_waf}
+	    ;;
+	dos)
+	    manage-waf-dos ${ALLARGS}
+	    ;;
+	bypass)
+	    manage-waf-bypass ${ALLARGS}
+	    ;;
+	'')
+	    manage-waf-level
+	    manage-waf-score
+	    manage-waf-generic
+	    manage-waf-reputation
+	    manage-waf-imethods
+	    manage-waf-limits
+	    manage-waf-http-errors
+	    manage-waf-rweb
+	    manage-waf-dos
+	    ;;
+	*)
+	    return 1
+	    ;;
+    esac
+}
+
+main "${@}"

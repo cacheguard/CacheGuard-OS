@@ -1,0 +1,917 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       Commands
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+__complete-admin()
+{
+    test -n "${COMP_CWORD-1}" || return 1
+    
+    case ${COMP_CWORD} in
+	1)
+	    case ${COMP_WORDS[1]} in
+		2|2f|2fa)
+		    COMPREPLY=(2fa)
+		    ;;
+		s)
+		    COMPREPLY=('' snmp ssh)
+		    ;;
+		sn|snm|snmp)
+		    COMPREPLY=(snmp)
+		    ;;
+		ss|ssh)
+		    COMPREPLY=(ssh)
+		    ;;
+		w|wa)
+		    COMPREPLY=('' '<RET>' wadmin waudit)
+		    ;;
+		wad|wadm|wadmi|wadmin)
+		    COMPREPLY=(wadmin)
+		    ;;
+		wau|waud|waudi|waudit)
+		    COMPREPLY=(waudit)
+		    ;;
+		t|tl|tls)
+		    COMPREPLY=(tls)
+		    ;;
+		t|to|top|topo|topol|topolo|topolog|topology)
+		    COMPREPLY=(topology)
+		    ;;
+		u|us|use|user)
+		    COMPREPLY=(user)
+		    ;;
+		'')
+		    COMPREPLY=('' '<RET>' 2fa snmp ssh wadmin waudit tls topology user)
+		    ;;
+		*)
+		    COMPREPLY=()
+		    ;;
+	    esac
+	    ;;
+	2)
+	    case ${COMP_WORDS[1]} in
+		user)
+		    case ${COMP_WORDS[2]} in
+			r|ra|raz)
+			    COMPREPLY=(raz)
+			    ;;
+			a|ad|add)
+			    COMPREPLY=(add)
+			    ;;
+			d|de|del)
+			    COMPREPLY=(del)
+			    ;;
+			'')
+			    COMPREPLY=('' '<RET>' raz add del)
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		snmp)
+		    case ${COMP_WORDS[2]} in
+			m|mo|mod|mode)
+			    COMPREPLY=(mode)
+			    ;;
+			e|en|eng|engi|engin|engine)
+			    COMPREPLY=(engine)
+			    ;;
+			o)
+			    COMPREPLY=('' on off)
+			    ;;
+			of|off)
+			    COMPREPLY=(off)
+			    ;;
+			on)
+			    COMPREPLY=(on)
+			    ;;
+			c|co|com|comm|commu|commun|communi|communit|community)
+			    COMPREPLY=(community)
+			    ;;
+			p|pr|pri|priv|priva|privac|privacy)
+			    COMPREPLY=(privacy)
+			    ;;
+			u)
+			    COMPREPLY=('' udp user)
+			    ;;
+			us|use|user)
+			    COMPREPLY=(user)
+			    ;;
+			u|ud|udpp)
+			    COMPREPLY=(udp)
+			    ;;
+			t)
+			    COMPREPLY=('' tcp tls trap)
+			    ;;
+			tl|tls)
+			    COMPREPLY=(tls)
+			    ;;
+			tc|tcp)
+			    COMPREPLY=(tcp)
+			    ;;
+			tr|tra|"trap")
+			    COMPREPLY=("trap")
+			    ;;
+			c|ce|cer|cert|certi|certif|certifi|certific|certifica|certificate|certificate)
+			    COMPREPLY=(certificate)
+			    ;;
+			'')
+			    COMPREPLY=('' '<RET>' mode on engine off user community privacy udp tcp tls trap certificate)
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		wadmin|waudit|2fa)
+		    case ${COMP_WORDS[2]} in
+			o)
+			    COMPREPLY=('' on off)
+			    ;;
+			of|off)
+			    COMPREPLY=(off)
+			    ;;
+			on)
+			    COMPREPLY=(on)
+			    ;;
+			'')
+			    COMPREPLY=('' '<RET>' on off)
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		ssh)
+		    case ${COMP_WORDS[2]} in
+			f|'fi'|fin|fing|finge|finger|fingerp|fingerpr|fingerpri|fingerprin|fingerprint)
+			    COMPREPLY=(fingerprint)
+			    ;;
+			g|ge|gen|gene|gener|genera|generat|generate)
+			    COMPREPLY=(generate)
+			    ;;
+			k|ke|key)
+			    COMPREPLY=(key)
+			    ;;
+			o)
+			    COMPREPLY=('' on off)
+			    ;;
+			of|off)
+			    COMPREPLY=(off)
+			    ;;
+			on)
+			    COMPREPLY=(on)
+			    ;;
+			p|pa|pas|pass|passw|passwo|passwor|password)
+			    COMPREPLY=(password)
+			    ;;
+
+			'')
+			    COMPREPLY=('' fingerprint generate key on off password)
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		tls)
+		    COMPREPLY=('' '<RET>' '<tls-id>[:<ca-id>]')
+		    ;;
+		topology)
+		    case ${COMP_WORDS[2]} in
+			i|'in'|int|inte|inter|intern|interna|internal)
+			    COMPREPLY=(internal)
+			    ;;
+			e|ex|ext|exte|exter|extern|externa|external)
+			    COMPREPLY=(external)
+			    ;;
+			a|au|aux|auxi|auxil|auxili|auxilia|auxiliar|auxiliary)
+			    COMPREPLY=(auxiliary)
+			    ;;
+			v|vp|vpn|vpni|vpnip|vpnips|vpnipse|vpnipsec)
+			    COMPREPLY=(vpnipsec)
+			    ;;
+			'')
+			    COMPREPLY=('' '<RET>' internal external auxiliary vpnipsec)
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		*)
+		    COMPREPLY=()
+		    ;;
+	    esac
+	    ;;
+	3)
+	    case ${COMP_WORDS[1]} in
+		user)
+		    case ${COMP_WORDS[2]} in
+			raz)
+			    COMPREPLY=()
+			    ;;
+			add|del)
+			    COMPREPLY=('' '<admin-name>')
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		snmp)
+		    case ${COMP_WORDS[2]} in
+			mode)
+			    case ${COMP_WORDS[3]} in
+				o)
+				    COMPREPLY=('' on off)
+				    ;;
+				of|off)
+				    COMPREPLY=(off)
+				    ;;
+				on)
+				    COMPREPLY=(on)
+				    ;;
+				'')
+				    COMPREPLY=('' '<RET>' on off)
+				    ;;
+				*)
+				    ;;
+			    esac
+			    ;;
+			user)
+			    COMPREPLY=('' '<RET>' '<user-name>')
+			    ;;
+			community)
+			    COMPREPLY=('' '<RET>' '<community-string>')
+			    ;;
+			udp|tcp|tls)
+			    case ${COMP_WORDS[3]} in
+				o)
+				    COMPREPLY=('' on off)
+				    ;;
+				of|off)
+				    COMPREPLY=(off)
+				    ;;
+				on)
+				    COMPREPLY=(on)
+				    ;;
+				'')
+				    COMPREPLY=('' '<RET>' on off)
+				    ;;
+				*)
+				    ;;
+			    esac
+			    ;;
+			certificate)
+			    case ${COMP_WORDS[3]} in
+				r|ra|raz)
+				    COMPREPLY=(raz)
+				    ;;
+				l|lo|loa|load)
+				    COMPREPLY=(load)
+				    ;;
+				'')
+				    COMPREPLY=('' '<RET>' raz load)
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			'trap')
+			    case ${COMP_WORDS[3]} in
+				r|ra|raz)
+				    COMPREPLY=(raz)
+				    ;;
+				a|ad|add)
+				    COMPREPLY=(add)
+				    ;;
+				d|de|del)
+				    COMPREPLY=(del)
+				    ;;
+				t|te|tes|"test")
+				    COMPREPLY=("test")
+				    ;;
+				'')
+				    COMPREPLY=('' '<RET>' raz add del test)
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		ssh)
+		    case ${COMP_WORDS[2]} in
+			key)
+			    case ${COMP_WORDS[3]} in
+				r|ra|raz)
+				    COMPREPLY=(raz)
+				    ;;
+				a|ad|add)
+				    COMPREPLY=(add)
+				    ;;
+				d|de|del)
+				    COMPREPLY=(del)
+				    ;;
+				l|lo|loa|load)
+				    COMPREPLY=(load)
+				    ;;
+				s|sh|sho|show)
+				    COMPREPLY=(show)
+				    ;;
+				'')
+				    COMPREPLY=('' '<RET>' raz add del load show)
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			generate|password)
+			    case ${COMP_WORDS[3]} in
+				o)
+				    COMPREPLY=('' on off)
+				    ;;
+				of|off)
+				    COMPREPLY=(off)
+				    ;;
+				on)
+				    COMPREPLY=(on)
+				    ;;
+				'')
+				    COMPREPLY=('' '<RET>' on off)
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		topology)
+		    case ${COMP_WORDS[2]} in
+			internal|external|auxiliary|vpnipsec)
+			    case ${COMP_WORDS[3]} in
+				o)
+				    COMPREPLY=('' on off)
+				    ;;
+				of|off)
+				    COMPREPLY=(off)
+				    ;;
+				on)
+				    COMPREPLY=(on)
+				    ;;
+				'')
+				    COMPREPLY=('' '<RET>' on off)
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		*)
+		    COMPREPLY=()
+		    ;;
+	    esac
+	    ;;
+	4)
+	    case ${COMP_WORDS[1]} in
+		user)
+		    case ${COMP_WORDS[2]} in
+			add)
+			    COMPREPLY=('' '<RET>' '<admin-password>')
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		ssh)
+		    case ${COMP_WORDS[2]} in
+			key)
+			    case ${COMP_WORDS[3]} in
+				add|del|load|show)
+				    COMPREPLY=('' '<key-id>')
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		snmp)
+		    case ${COMP_WORDS[2]} in
+			"trap")
+			    case ${COMP_WORDS[3]} in
+				add|del)
+				    case ${COMP_WORDS[4]} in
+					v)
+					    COMPREPLY=('' v1 v2c v3)
+					    ;;
+					v1)
+					    COMPREPLY=(v1)
+					    ;;
+					v2|v2c)
+					    COMPREPLY=(v2c)
+					    ;;
+					v3)
+					    COMPREPLY=(v3)
+					    ;;
+					'')
+					    COMPREPLY=('' v1 v2c v3)
+					    ;;
+					*)
+					    COMPREPLY=()
+					    ;;
+				    esac
+				    ;;
+				raz)
+				    COMPREPLY=()
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			certificate)
+			    case ${COMP_WORDS[3]} in
+				load)
+				    case ${COMP_WORDS[4]} in
+					f|ft|ftp)
+					    COMPREPLY=(ftp)
+					    ;;
+					s|sf|sft|sftp)
+					    COMPREPLY=(sftp)
+					    ;;
+					t|tf|tft|tftp)
+					    COMPREPLY=(tftp)
+					    ;;
+					'')
+					    COMPREPLY=('' ftp sftp tftp)
+					    ;;
+					*)
+					    COMPREPLY=()
+					    ;;
+				    esac
+				    ;;
+				del)
+				    COMPREPLY=('' '<certificate-number>')
+				    ;;
+				raz)
+				    COMPREPLY=()
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+
+			    ;;
+			*)
+			    ;;
+		    esac
+		    ;;
+		*)
+		    COMPREPLY=()
+		    ;;
+	    esac
+	    ;;
+	5)
+	    case ${COMP_WORDS[1]} in
+		ssh)
+		    case ${COMP_WORDS[2]} in
+			key)
+			    case ${COMP_WORDS[3]} in
+				load)
+				    case ${COMP_WORDS[5]} in
+					f|ft|ftp)
+					    COMPREPLY=(ftp)
+					    ;;
+					t|tf|tft|tftp)
+					    COMPREPLY=(tftp)
+					    ;;
+					s|sf|sft|sftp)
+					    COMPREPLY=(sftp)
+					    ;;
+					'')
+					    COMPREPLY=('' ftp sftp tftp)
+					    ;;
+					*)
+					    COMPREPLY=()
+					    ;;
+				    esac
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		snmp)
+		    case ${COMP_WORDS[2]} in
+			"trap")
+			    case ${COMP_WORDS[3]} in
+				add|del)
+				    case ${COMP_WORDS[4]} in
+					v1|v2c|v3)
+					    COMPREPLY=('' '<receiver-server>')
+					    ;;
+					*)
+					    COMPREPLY=()
+					    ;;
+				    esac
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			certificate)
+			    case ${COMP_WORDS[3]} in
+				load)
+				    case ${COMP_WORDS[4]} in
+					ftp|sftp|tftp)
+					    COMPREPLY=('' '<file-server>')
+					    ;;
+					*)
+					    COMPREPLY=()
+					    ;;
+				    esac
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		*)
+		    COMPREPLY=()
+		    ;;
+	    esac
+	    ;;
+	6)
+	    case ${COMP_WORDS[1]} in
+		ssh)
+		    case ${COMP_WORDS[2]} in
+			key)
+			    case ${COMP_WORDS[3]} in
+				load)
+				    case ${COMP_WORDS[5]} in
+					ftp|sftp|tftp)
+					    COMPREPLY=('' '<file-server>')
+					    ;;
+					*)
+					    COMPREPLY=()
+					    ;;
+				    esac
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		snmp)
+		    case ${COMP_WORDS[2]} in
+			"trap")
+			    case ${COMP_WORDS[3]} in
+				add|del)
+				    case ${COMP_WORDS[4]} in
+					v1|v2c)
+					    COMPREPLY=('' '<RET>' '<port-number>')
+					    ;;
+					v3)
+					    COMPREPLY=('' '<port-number>')
+					    ;;
+					*)
+					    COMPREPLY=()
+					    ;;
+				    esac
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			certificate)
+			    case ${COMP_WORDS[3]} in
+				load)
+				    case ${COMP_WORDS[4]} in
+					ftp|sftp|tftp)
+					    COMPREPLY=('' '<file-path>')
+					    ;;
+					*)
+					    COMPREPLY=()
+					    ;;
+				    esac
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		*)
+		    COMPREPLY=()
+		    ;;
+	    esac
+	    ;;
+	7)
+	    case ${COMP_WORDS[1]} in
+		snmp)
+		    case ${COMP_WORDS[2]} in
+			"trap")
+			    case ${COMP_WORDS[3]} in
+				add)
+				    case ${COMP_WORDS[4]} in
+					v1|v2c)
+					    COMPREPLY=('' '<RET>' '<community-string>')
+					    ;;
+					v3)
+					    COMPREPLY=('' '<user-name>')
+					    ;;
+					*)
+					    COMPREPLY=()
+					    ;;
+				    esac
+				    ;;
+				del)
+				    case ${COMP_WORDS[4]} in
+					v3)
+					    COMPREPLY=('' '<user-name>')
+					    ;;
+					*)
+					    COMPREPLY=()
+					    ;;
+				    esac
+				    ;;
+
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		ssh)
+		    case ${COMP_WORDS[2]} in
+			key)
+			    case ${COMP_WORDS[3]} in
+				load)
+				    case ${COMP_WORDS[5]} in
+					ftp|sftp|tftp)
+					    COMPREPLY=('' '<file-path>')
+					    ;;
+					*)
+					    COMPREPLY=()
+					    ;;
+				    esac
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		*)
+		    COMPREPLY=()
+		    ;;
+	    esac
+	    ;;
+	8)
+	    case ${COMP_WORDS[1]} in
+		snmp)
+		    case ${COMP_WORDS[2]} in
+			"trap")
+			    case ${COMP_WORDS[3]} in
+				add)
+				    case ${COMP_WORDS[4]} in
+					v3)
+					    COMPREPLY=('' sha256 sha384 sha512)
+					    ;;
+					*)
+					    COMPREPLY=()
+					    ;;
+				    esac
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		*)
+		    COMPREPLY=()
+		    ;;
+	    esac
+	    ;;
+	9)
+	    case ${COMP_WORDS[1]} in
+		snmp)
+		    case ${COMP_WORDS[2]} in
+			"trap")
+			    case ${COMP_WORDS[3]} in
+				add)
+				    case ${COMP_WORDS[4]} in
+					v3)
+					    case ${COMP_WORDS[8]} in
+						sha256|sha384|sha512)
+						    case ${COMP_WORDS[9]} in
+							d|de|des)
+							    COMPREPLY=(des)
+							    ;;
+							a|ae|aes)
+							    COMPREPLY=(aes)
+							    ;;
+							'')
+							    COMPREPLY=('' des aes)
+							    ;;
+							*)
+							    COMPREPLY=()
+							    ;;
+						    esac
+						    ;;
+						*)
+						    COMPREPLY=()
+						    ;;
+					    esac
+					    ;;
+					*)
+					    COMPREPLY=()
+					    ;;
+				    esac
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		*)
+		    COMPREPLY=()
+		    ;;
+	    esac
+	    ;;
+	10)
+	    case ${COMP_WORDS[1]} in
+		snmp)
+		    case ${COMP_WORDS[2]} in
+			"trap")
+			    case ${COMP_WORDS[3]} in
+				add)
+				    case ${COMP_WORDS[4]} in
+					v3)
+					    case ${COMP_WORDS[8]} in
+						sha256|sha384|sha512)
+						    case ${COMP_WORDS[9]} in
+							des|aes)
+							    COMPREPLY=('' '<RET>' '<auth-password>')
+							    ;;
+							*)
+							    COMPREPLY=()
+							    ;;
+						    esac
+						    ;;
+						*)
+						    COMPREPLY=()
+						    ;;
+					    esac
+					    ;;
+					*)
+					    COMPREPLY=()
+					    ;;
+				    esac
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		*)
+		    COMPREPLY=()
+		    ;;
+	    esac
+	    ;;
+	11)
+	    case ${COMP_WORDS[1]} in
+		snmp)
+		    case ${COMP_WORDS[2]} in
+			"trap")
+			    case ${COMP_WORDS[3]} in
+				add)
+				    case ${COMP_WORDS[4]} in
+					v3)
+					    case ${COMP_WORDS[8]} in
+						sha256|sha384|sha512)
+						    case ${COMP_WORDS[9]} in
+							des|aes)
+							    COMPREPLY=('' '<RET>' '<enc-password>')
+							    ;;
+							*)
+							    COMPREPLY=()
+							    ;;
+						    esac
+						    ;;
+						*)
+						    COMPREPLY=()
+						    ;;
+					    esac
+					    ;;
+					*)
+					    COMPREPLY=()
+					    ;;
+				    esac
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		*)
+		    COMPREPLY=()
+		    ;;
+	    esac
+	    ;;
+	*)
+	    COMPREPLY=()
+	    ;;
+    esac
+}

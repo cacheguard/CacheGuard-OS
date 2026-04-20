@@ -1,0 +1,336 @@
+#!/bin/bash
+
+gen-unlinked-library-list()
+{
+    test -n "${1}" || return 1
+    local unlinked_libraries_file=${1}
+
+    test -f ${unlinked_libraries_file} || return 0
+
+    local cur_dir=${PWD}
+    local libraries_file=/tmp/unlinked.libraries.${$}
+    local library
+
+    cd /
+    while read library
+    do
+	test -n "${library}" || continue
+	test "${library:0:1}" != '#' || continue
+	ls -1r ${library} 2> /dev/null
+    done < ${unlinked_libraries_file} > ${libraries_file}
+
+    while read library
+    do
+	test ${SYS_ARCHITECTURE} != x86_64 -o "${library:0:7}" != /lib64/ || library=${library/\/lib64\//\/lib\/}
+	test "${library:0:5}" != /lib/ || library=/usr${library}
+
+	echo ${library}
+    done < ${libraries_file}
+    rm -f ${libraries_file}
+    cd ${cur_dir}
+}
+
+gen-library-list()
+{
+    test -n "${1}" || return 1
+    local bianries_file=${1}
+    local unlinked_libraries_file=${2}
+
+    test -f ${bianries_file} || return 11
+
+    local binary
+    local library_name dumy library_path address
+    local link base dir
+    local libraries_file=/tmp/libraries.${$}
+
+    while read binary
+    do
+	test -n "${binary}" || continue
+	test "${binary:0:1}" != '#' || continue
+
+	ldd ${binary} 2> /dev/null
+    done < ${bianries_file} | sort -u > ${libraries_file}.1
+
+    while read library_name dumy library_path address
+    do
+	case ${SYS_ARCHITECTURE} in
+	    x86_64)
+		test "${library_name}" != linux-vdso.so.1 || continue
+		test "${library_name:0:7}" != /lib64/ || library_path=${library_name/\/lib64\//\/lib\/}
+		test "${library_path:0:5}" != /lib/ || library_path=/usr${library_path}
+		test "${library_path:0:7}" != /lib64/ || continue
+		;;
+	    *)
+		test "${library_name}" != linux-gate.so.1 || continue
+		test "${library_name}" != /lib/ld-linux.so.2 || continue
+		;;
+	esac
+
+	test -n "${library_path}" || continue
+
+	link=$(readlink ${library_path})
+
+	if test ${?} -eq 0 ; then
+
+	    dir=$(file-dirname ${library_path})
+	    base=${link/.so.*}
+
+	    echo ${dir:1}/${link}
+	    echo ${library_path:1}
+	    test ! -f ${dir}/${base}.so || echo ${dir:1}/${base}.so
+	else
+	    echo ${library_path:1}
+	fi
+    done < ${libraries_file}.1 > ${libraries_file}.2
+    rm -f ${libraries_file}.1
+
+    case ${SYS_ARCHITECTURE} in
+	    x86_64)
+		;;
+	    *)
+		echo usr/lib/ld-linux.so.2 >> ${libraries_file}.2
+		;;
+    esac
+
+    gen-unlinked-library-list ${unlinked_libraries_file} >> ${libraries_file}.2
+
+    sort -u ${libraries_file}.2
+    rm -f ${libraries_file}.2
+
+    if test ${SYS_ARCHITECTURE} == x86_64 ; then
+	echo lib64
+	echo usr/lib64
+    fi
+}
+
+copy-files()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+
+    local dst_dir=${1}
+    local os_archive=${2}
+
+    shift ; shift ; files=${@}
+
+    test -f ${os_archive} || return 1
+
+    local cur_dir=$(pwd)
+    cd ${dst_dir}
+
+    local excludes patten
+
+    for pattern in ${EXCLUDE_PATTERNS}
+    do
+	excludes="${excludes} --exclude=${pattern}"
+    done
+
+    sudo tar --wildcards ${excludes} -xpf ${os_archive} ${files}
+    local ret=${?}
+
+    cd ${cur_dir}
+    return ${ret}
+}
+
+gen-root-fs-error-cb()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    test -n "${3}" || return 3
+    local root_dir=${1}
+    local mnt_rdir=${2}
+    local loopdev=${3}
+
+    mnt_dir=${root_dir}/${mnt_rdir}
+    cd ${root_dir}
+
+    test -d ${mnt_dir} || return 11
+    mountpoint --quiet ${mnt_dir}  > /dev/null 2>&1 || return 13
+
+    sudo umount ${mnt_dir} || return 21
+    sudo losetup -d ${loopdev} || return 23
+}
+
+custom-ramdisk()
+{
+    test -n "${1}" || return 1
+    local dst_rdir=${1}
+}
+
+gen-root-fs()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    test -n "${3}" || return 3
+    test -n "${4}" || return 4
+    test -n "${5}" || return 5
+
+    local fstype=${1}
+    local gen_dir=${2}
+    local root_fs=${3}
+    local os_archive=${4}
+    local os_size=${5}
+
+    shift 5
+    local files=${*}
+
+    test -d ${gen_dir} || return 11
+
+    local cur_dir=${PWD}
+    local loopdev=/dev/loop3
+    local mnt_dir=${gen_dir}/LoopMount
+    local root_fs_file=${gen_dir}/${root_fs}
+
+    sudo modprobe loop && sleep 1 || return 13
+    test -b ${loopdev} || return 15
+
+    rm -vf ${root_fs_file} || return 17
+    mkdir -vp ${mnt_dir} || return 19
+
+    trap "gen-root-fs-error-cb ${cur_dir} ${mnt_dir} ${loopdev}" ERR
+
+    sudo dd if=/dev/zero of=${root_fs_file} bs=1k count=${os_size} || return 21
+    sudo losetup ${loopdev} ${root_fs_file} || return 23
+
+    sudo mkfs.${fstype} ${loopdev} ${os_size} || return 25
+    sudo tune2fs -i0 -c0 ${loopdev} || return 27
+    sudo mount -t ${fstype} ${loopdev} ${mnt_dir} || return 31
+
+    copy-files ${mnt_dir} ${os_archive} ${files}
+    if test ${?} -ne 0 ; then
+	gen-root-fs-error-cb ${cur_dir} ${mnt_dir} ${loopdev}
+	return 33
+    fi
+
+    custom-ramdisk ${mnt_dir}
+    if test ${?} -ne 0 ; then
+	gen-root-fs-error-cb ${cur_dir} ${mnt_dir} ${loopdev}
+	return 35
+    fi
+
+    sudo umount ${mnt_dir} || return 37
+    sudo rmdir ${mnt_dir}
+    sudo losetup -d ${loopdev} || return 39
+    sudo chown ${USER}:${USER} ${root_fs_file}
+
+    trap - ERR
+}
+
+file-basename()
+{
+    test -n "${1}" || return 1
+    local name=${1}
+
+    local base=${name##*/}
+    if test -n "${2}" ; then
+	base=${base/${2}/}
+    fi
+    echo ${base}
+}
+
+file-dirname()
+{
+    test -n "${1}" || return 1
+    local name=${1}
+
+    local len=${#name} ; ((len--))
+    test ${name:${len}:1} != '/' || name=${name:0:${len}}
+    
+    local dir=${name%\/*}
+
+    if test "${dir}" == "${name}" ; then
+	echo .
+    else
+	echo ${dir}
+    fi
+}
+
+member()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 1
+    local list=${1}
+    local elt=${2}
+
+    local exp="^${elt}$|[ ]${elt}$|^${elt}[ ]|[ ]${elt}[ ]"
+    [[ "${list}" =~ ${exp} ]]
+}
+
+max-value()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    local val1=${1}
+    local val2=${2}
+
+    echo $((val1 > val2 ? val1 : val2))
+}
+
+min-value()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    local val1=${1}
+    local val2=${2}
+
+    echo $((val1 < val2 ? val1 : val2))
+}
+
+get-size-of-files-in-dir()
+{
+    if test -z "${1}" ; then
+	echo 0
+	return 1
+    elif test -z "${2}" ; then
+	echo 0
+	return 2
+    fi
+
+    local dir=${1}
+    local files=${2}
+
+    local sz total=0 sz_file=/tmp/sz_file.${$}
+
+    for file in ${files}
+    do
+	sudo du -ks ${dir}/${file}
+    done > ${sz_file}
+
+    while read sz file
+    do
+	((total += sz))
+    done < ${sz_file}
+
+    rm -f ${sz_file}
+
+    echo ${total}
+    return 0
+}
+
+get-cpu-nb()
+{
+    if test ! -f /proc/cpuinfo ; then
+	echo 1
+	return 11
+    fi
+
+    local cpu rest i=0
+
+    while read cpu rest
+    do
+	test "${cpu}" != processor || ((i++))
+    done < /proc/cpuinfo
+
+    echo ${i}
+    return 0
+}
+
+get-max-working-cpu()
+{
+    local cpu_nb=$(get-cpu-nb)
+
+    ((cpu_nb /= 2))
+    test ${cpu_nb} -ge 1 || cpu_nb=1
+
+    echo ${cpu_nb}
+}

@@ -1,0 +1,7 @@
+bin/avscan
+bin/htpasswd
+bin/logger
+share/cgi-bin/access-warning.cgi
+share/cgi-bin/forbiddenurl-warning.cgi
+share/cgi-bin/gateway-message.cgi
+share/cgi-bin/malware-warning.cgi

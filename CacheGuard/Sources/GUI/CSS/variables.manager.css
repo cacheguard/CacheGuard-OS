@@ -1,0 +1,6 @@
+:root {
+    --itemcolor:SeaGreen;
+    --itemcolorlight:rgba(46,139,87,0.3);
+    --itembg:var(--itemcolorlight) url(/image/titlebar.png) repeat-x center left;
+    --itemactivebg:SeaGreen url(/image/titlebar-green.png) repeat-x center left;
+}

@@ -1,0 +1,298 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       Commands
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+source functions
+
+check-port-name()
+{
+    test -n "${1}" || return 1
+    
+    case "${1}" in
+	wadmin)
+	    return 0
+	    ;;
+	proxy|thttp|thttps|antivirus|ocsp|isakmp|natt|icppeer|httppeer|htcppeer|dhcp|waudit)
+	    contextual-command-is-allowed || return 207
+	    return 0
+	    ;;
+	*)
+	    return 84
+	    ;;
+    esac
+}
+
+show-port-proxy()
+{
+    echo-command-form "port proxy"
+    echo-mark-cur
+    echo-value "${CURRENT_PROXY_PORT}"
+    if test "${CURRENT_PROXY_PORT}" != "${PROXY_PORT}" ; then
+	echo-command-form "port proxy"
+	echo-mark-new
+	echo-value "${PROXY_PORT}"
+    fi
+}
+
+show-port-thttp()
+{
+    echo-command-form "port thttp"
+    echo-mark-cur
+    echo-value "${CURRENT_THTTP_PORT}"
+    if test "${CURRENT_THTTP_PORT}" != "${THTTP_PORT}" ; then
+	echo-command-form "port thttp"
+	echo-mark-new
+	echo-value "${THTTP_PORT}"
+    fi
+}
+
+show-port-thttps()
+{
+    echo-command-form "port thttps"
+    echo-mark-cur
+    echo-value "${CURRENT_THTTPS_PORT}"
+    if test "${CURRENT_THTTPS_PORT}" != "${THTTPS_PORT}" ; then
+	echo-command-form "port thttps"
+	echo-mark-new
+	echo-value "${THTTPS_PORT}"
+    fi
+}
+
+show-port-antivirus()
+{
+    echo-command-form "port antivirus"
+    echo-mark-cur
+    echo-value "${CURRENT_AV_PORT}"
+    if test "${CURRENT_AV_PORT}" != "${AV_PORT}" ; then
+	echo-command-form "port antivirus"
+	echo-mark-new
+	echo-value "${AV_PORT}"
+    fi
+}
+
+show-port-ocsp()
+{
+    echo-command-form "port ocsp"
+    echo-mark-cur
+    echo-value "${CURRENT_OCSP_PORT}"
+    if test "${CURRENT_OCSP_PORT}" != "${OCSP_PORT}" ; then
+	echo-command-form "port ocsp"
+	echo-mark-new
+	echo-value "${OCSP_PORT}"
+    fi
+}
+
+show-port-isakmp()
+{
+    echo-command-form "port isakmp"
+    echo-mark-cur
+    echo-value "${CURRENT_ISAKMP_PORT}"
+    if test "${CURRENT_ISAKMP_PORT}" != "${ISAKMP_PORT}" ; then
+	echo-command-form "port isakmp"
+	echo-mark-new
+	echo-value "${ISAKMP_PORT}"
+    fi
+}
+
+show-port-natt()
+{
+    echo-command-form "port natt"
+    echo-mark-cur
+    echo-value "${CURRENT_NATT_PORT}"
+    if test "${CURRENT_NATT_PORT}" != "${NATT_PORT}" ; then
+	echo-command-form "port natt"
+	echo-mark-new
+	echo-value "${NATT_PORT}"
+    fi
+}
+
+show-port-httppeer()
+{
+    echo-command-form "port httppeer"
+    echo-mark-cur
+    echo-value "${CURRENT_PEER_HTTP_PORT}"
+    if test "${CURRENT_PEER_HTTP_PORT}" != "${PEER_HTTP_PORT}" ; then
+	echo-command-form "port httppeer"
+	echo-mark-new
+	echo-value "${PEER_HTTP_PORT}"
+    fi
+}
+
+show-port-htcppeer()
+{
+    echo-command-form "port htcppeer"
+    echo-mark-cur
+    echo-value "${CURRENT_PEER_HTCP_PORT}"
+    if test "${CURRENT_PEER_HTCP_PORT}" != "${PEER_HTCP_PORT}" ; then
+	echo-command-form "port htcppeer"
+	echo-mark-new
+	echo-value "${PEER_HTCP_PORT}"
+    fi
+}
+
+show-port-dhcp()
+{
+    echo-command-form "port dhcp"
+    echo-mark-cur
+    echo-value "${CURRENT_DHCP_PEER_PORT}"
+    if test "${CURRENT_DHCP_PEER_PORT}" != "${DHCP_PEER_PORT}" ; then
+	echo-command-form "port dhcp"
+	echo-mark-new
+	echo-value "${DHCP_PEER_PORT}"
+    fi
+}
+
+show-port-wadmin()
+{
+    echo-command-form "port wadmin"
+    echo-mark-cur
+    echo-value "${CURRENT_WADMIN_PORT}"
+    if test "${CURRENT_WADMIN_PORT}" != "${WADMIN_PORT}" ; then
+	echo-command-form "port wadmin"
+	echo-mark-new
+	echo-value "${WADMIN_PORT}"
+    fi
+}
+
+show-port-waudit()
+{
+    echo-command-form "port waudit"
+    echo-mark-cur
+    echo-value "${CURRENT_WAUDIT_PORT}"
+    if test "${CURRENT_WAUDIT_PORT}" != "${WAUDIT_PORT}" ; then
+	echo-command-form "port waudit"
+	echo-mark-new
+	echo-value "${WAUDIT_PORT}"
+    fi
+}
+
+show-port()
+{
+    echo-begin-show
+    case "${1}" in
+	proxy|thttp|thttps|ocsp|isakmp|natt|antivirus|httppeer|htcppeer|dhcp|wadmin|waudit)
+	    show-port-${1}
+	    ;;
+	"")
+	    show-port-wadmin
+
+	    if contextual-command-is-allowed ; then
+		show-port-proxy
+		show-port-thttp
+		show-port-thttps
+		show-port-antivirus
+		show-port-ocsp
+		show-port-isakmp
+		show-port-natt
+		show-port-httppeer
+		show-port-htcppeer
+		show-port-dhcp
+		show-port-waudit
+	    fi
+	    ;;
+	
+	*)
+	    error 255
+	    ;;
+    esac
+    echo-end-show
+}
+
+run()
+{
+    if test -z "${ARGS[1]}" ; then show-port ; return 0 ; fi
+
+    local pt=${ARGS[1]}
+    check-port-name ${pt} || return ${?}
+
+    if test -z "${ARGS[2]}" ; then
+	show-port ${pt}
+	return 0
+    fi
+
+    local pr=${ARGS[2]}
+    pr=$(remove-leading-zeros ${pr})
+
+    case "${pt}" in
+	proxy|thttp|thttps|antivirus|ocsp|natt|icppeer|httppeer|htcppeer|dhcp|wadmin|waudit)
+	    check-high-port-nb ${pr} || return 20
+	    check-snmp-tls-port-nb ${pr} || return 115
+	    ;;
+	isakmp)
+	    check-snmp-tls-port-nb ${pr} || return 115
+	    check-service-port-nb ${pr} || return 61
+	    ;;
+	*)
+	    return 255
+	    ;;
+    esac
+    
+    case "${pt}" in
+	proxy)
+	    export PROXY_PORT=${pr}
+	    ;;
+	thttp)
+	    export THTTP_PORT=${pr}
+	    ;;
+	thttps)
+	    export THTTPS_PORT=${pr}
+	    ;;
+	antivirus)
+	    export AV_PORT=${pr}
+	    ;;
+	ocsp)
+	    export OCSP_PORT=${pr}
+	    ;;
+	isakmp)
+	    export ISAKMP_PORT=${pr}
+	    ;;
+	natt)
+	    export NATT_PORT=${pr}
+	    ;;
+	icppeer)
+	    export PEER_ICP_PORT=${pr}
+	    ;;
+	httppeer)
+	    export PEER_HTTP_PORT=${pr}
+	    ;;
+	htcppeer)
+	    export PEER_HTCP_PORT=${pr}
+	    ;;
+	dhcp)
+	    export DHCP_PEER_PORT=${pr}
+	    ;;
+	wadmin)
+	    export WADMIN_PORT=${pr}
+	    ;;
+	waudit)
+	    export WAUDIT_PORT=${pr}
+	    ;;
+	*)
+	    error 255
+	    ;;
+    esac
+
+    SAVENV=1
+}
+
+main "${@}"

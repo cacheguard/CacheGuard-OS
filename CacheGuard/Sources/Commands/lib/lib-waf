@@ -1,0 +1,149 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       Commands
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+waf-external-form()
+{
+    test -n "${1}" || return 1
+    
+    case "${1}" in
+	1)
+	    echo -n "on"
+	    return 0
+	    ;;
+	0)
+	    echo -n "off"
+	    return 0
+	    ;;
+	*)
+	    echo -n "Error"
+	    return 1
+	    ;;
+    esac
+}
+
+waf-internal-form()
+{
+    test -n "${1}" || return 1
+    
+    case "${1}" in
+	on)
+	    echo -n "1"
+	    return 0
+	    ;;
+	off)
+	    echo -n "0"
+	    return 0
+	    ;;
+	*)
+	    echo -n "Error"
+	    return 1
+	    ;;
+    esac
+}
+
+get-generic-waf-id()
+{
+    test -n "${1}" || return 1
+    local pos=${1}
+
+    echo "${WAF_GENERIC_FILTER_ID[${pos}]}"
+}
+
+rweb-denyurl-remove()
+{
+    test -n "${1}" || return 1
+    local in_name="${1}"
+
+    local out_list=""
+    local name url
+    local elt i=0 rang
+
+    for elt in ${RWEB_SITE_DENYURL_LIST}
+    do
+      rang=$[${i} % 2]
+      case ${rang} in
+	  0)
+	      name=${elt}
+	      ;;
+	  1)
+	      url=${elt}
+	      test "${in_name}" == "${name}" || out_list="${out_list} ${name} ${url}"
+	      ;;
+	  *)
+	      return 1
+	      ;;
+      esac
+      ((i++))
+    done
+
+    echo "${out_list}"
+    return 0
+}
+
+remove-waf-generic()
+{
+    test -n "${1}" || return 1
+    local in_name=${1}
+
+    local i=0 elt range
+    local name filter filters
+
+    local list
+
+    for elt in ${WAF_RWEB_GENERIC}
+    do
+	range=$[${i} % 2]
+	case ${range} in
+	    0)
+		name=${elt}
+		;;
+	    1)
+		filters=${elt}
+		test ${name} == ${in_name} || list="${list} ${name} ${filters}"
+		;;
+	    *)
+		return 1
+		;;
+	esac
+	((i++))
+    done
+    
+    WAF_RWEB_GENERIC=${list:1}
+}
+
+remove-waf-bypass-rule()
+{
+    test -n "${1}" || return 1
+    local in_name=${1}
+
+    WAF_RWEB_BYPASS_RULE_LIST=$(remove-record-from-list 2 1 "${in_name}" "${WAF_RWEB_BYPASS_RULE_LIST}")
+}
+
+remove-waf-bypass-application()
+{
+    test -n "${1}" || return 1
+    local in_name=${1}
+
+    WAF_RWEB_BYPASS_APPLICATION_LIST=$(remove-record-from-list 2 1 "${in_name}" "${WAF_RWEB_BYPASS_APPLICATION_LIST}")
+}

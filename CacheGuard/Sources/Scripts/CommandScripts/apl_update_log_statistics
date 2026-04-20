@@ -1,0 +1,93 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       Scripts
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+test ! -f /var/lock/apl_update_log_statistics || exit 1
+touch /var/lock/apl_update_log_statistics
+
+CACHEGUARD_DIR=/etc/sysconfig/cacheguard
+source ${CACHEGUARD_DIR}/constant
+source ${APPLIANCE_DIR}/etc/role
+source ${LOCAL_DIR}/lib/apl_common
+
+clean-exit()
+{
+    trap "" USR1 INT QUIT TERM
+
+    local code=${1}
+    wait
+    rm -f /var/lock/apl_update_log_statistics
+    exit ${code}
+}
+
+update-log-statistics()
+{
+    test -n "${1}" || return 1
+    local log=${1}
+    test -f ${log} || return 11
+
+    local nb old_nb
+    local base cfile
+    local update_dfile
+
+    nb=$(wc -l ${log} 2> /dev/null)
+    nb=${nb/ *}
+
+    check-digit ${nb} || return 21
+
+    base=$(file-basename ${log})
+    cfile=${RUN_DIR}/${base}.${COUNTER_POSTFIX}
+
+    if test -f ${cfile} ; then
+	read old_nb < ${cfile}
+	check-digit ${old_nb} || return 23
+	test ${old_nb} -ne 0 || update_dfile=yes
+	((nb += old_nb))
+    else
+	touch ${cfile}
+	chown ${ADMIN_NAME} ${cfile}
+	update_dfile=yes
+    fi
+
+    echo -n ${nb} > ${cfile}
+
+    if test -n "${update_dfile}" ; then
+	local dfile=${RUN_DIR}/${base}.${COUNTER_DATE_POSTFIX}
+	local date=$(date +"%s" 2> /dev/null)
+	((date -= 86400))
+	echo -n ${date} > ${dfile}
+	chown ${ADMIN_NAME} ${dfile}
+    fi
+}
+
+main()
+{
+    trap "clean-exit" USR1 INT QUIT TERM
+
+    update-log-statistics "${@}"
+    clean-exit 0
+}
+
+# Main()
+
+main "${@}"

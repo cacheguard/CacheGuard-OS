@@ -1,0 +1,1127 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       Configurator
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+log-patch-change()
+{
+    test -n "${1}" || return 1
+    local message=${1}
+
+    logger -p local0.info -t "apl_apply (patch)" -- "${message}"
+}
+
+check-cpu-architecture()
+{
+    test -n "${1}" || return 1
+    local in_arch=${1}
+
+    local arch
+
+    case ${CPU_ARCHITECTURE} in
+	i386|i686|x86)
+	    arch=x86
+	    ;;
+	x86_64)
+	    arch=x64
+	    ;;
+	*)
+	    return 11
+	    ;;
+    esac
+
+    test ${arch} == ${in_arch}
+}
+
+check-os-version()
+{
+    test -n "${1}" || return 1
+    local version_needed=${1}
+
+    local version=$(cat ${HARD_DIR}/os-version)
+
+    version=${version//\.}
+    version_needed=${version_needed//\.}
+
+    check-digit ${version} || return 11
+    check-digit ${version_needed} || return 13
+
+    test ${version} -eq ${version_needed} || return 15
+}
+
+clean-patch()
+{
+    rm -f ${TMP_DIR}/${LOADED}.os*
+    rm -rf ${TMP_DIR}/${PATCH_DIR_NAME}
+    rm -rf /root/apply-patch
+    rm -f ${LOCK_DIR}/apl_patch
+}
+
+unpack-patch()
+{
+    test -n "${1}" || return 255
+    local file2unpack="${1}"
+
+    test -f ${file2unpack}.tar.compressed || return 11
+
+    local tmp_file compressed uncompress
+
+    rm -f ${file2unpack}.tar
+    if check-xz-file ${file2unpack}.tar.compressed ; then
+	compressed=xz
+	uncompress=unxz
+    elif check-gzip-file ${file2unpack}.tar.compressed ; then
+	compressed=gz
+	uncompress=gunzip
+    else
+	return 13
+    fi
+
+    mv -f ${file2unpack}.tar.compressed ${file2unpack}.tar.${compressed}
+    ${uncompress} ${file2unpack}.tar.${compressed} || return 15
+
+    test -f ${file2unpack}.tar || return 17
+    check-tar-file ${file2unpack}.tar || return 19
+
+    cd ${TMP_DIR}
+    tar --same-owner \
+	--preserve-permissions \
+	--extract --file ${file2unpack}.tar \
+	${PATCH_DIR_NAME} 2> /dev/null || return 21
+
+    test -f ${PATCH_DIR_NAME}/signature || return 23
+    test -f ${PATCH_DIR_NAME}/patch.tar.${compressed} || return 25
+
+    openssl dgst \
+	    -sha1 \
+	    -verify /etc/patch-public-key.pem \
+	    -signature ${PATCH_DIR_NAME}/signature \
+	    ${PATCH_DIR_NAME}/patch.tar.${compressed} > /dev/null 2>&1 || return 27
+
+    rm -f ${PATCH_DIR_NAME}/patch.tar
+    ${uncompress} ${PATCH_DIR_NAME}/patch.tar.${compressed} || return 29
+
+    test -f ${PATCH_DIR_NAME}/patch.tar || return 31
+    check-tar-file ${PATCH_DIR_NAME}/patch.tar || return 33
+
+    cd /root
+    tar --same-owner \
+	--preserve-permissions \
+	--extract --file ${TMP_DIR}/${PATCH_DIR_NAME}/patch.tar \
+	apply-patch 2> /dev/null || return 35
+
+    test -f apply-patch/PATCH.env || return 37
+    source apply-patch/PATCH.env || return 39
+
+    check-cpu-architecture ${PATCH_ARCHITECTURE} || return 41
+
+    test ! -f apply-patch/pre-start.bash || chmod 700 apply-patch/pre-start.bash
+    test ! -f apply-patch/post-start.bash || chmod 700 apply-patch/post-start.bash
+    test ! -f apply-patch/pre-install.bash || chmod 700 apply-patch/pre-install.bash
+    test ! -f apply-patch/post-install.bash || chmod 700 apply-patch/post-install.bash
+    test ! -f apply-patch/pre-reboot.bash || chmod 700 apply-patch/pre-reboot.bash
+    test ! -f apply-patch/post-reboot.bash || chmod 700 apply-patch/post-reboot.bash
+
+    return 0
+}
+
+remove-unused-files()
+{
+    local unused=/root/apply-patch/removed-files
+    test -s ${unused} || return 0
+
+    local file exist content
+
+    while read file
+    do
+	test -n "${file}" || continue
+
+	if test -d ${file} ; then
+	    content=$(ls ${file} 2> /dev/null)
+	    if test -z "${content}" ; then
+		log-patch-change "removing the empty ${file} directory"
+		rmdir ${file}
+	    fi
+	else
+	    if test -L ${file} ; then
+		log-patch-change "removing the symbolic link ${file}"
+		rm -f ${file}
+	    elif test -f ${file} ; then
+		log-patch-change "removing the regular file ${file}"
+		rm -f ${file}
+	    else
+		exist=$(ls ${file} 2> /dev/null)
+		if test -n "${exist}" ; then
+		    log-patch-change "removing the special ${file}"
+		    rm -f ${file}
+		fi
+	    fi
+	fi
+    done < ${unused}
+
+    rm -f ${unused}
+}
+
+pre-install()
+{
+    unlock-os ${CPU_ARCHITECTURE} /
+
+    test ! -x /root/apply-patch/pre-install.bash || /root/apply-patch/pre-install.bash
+    if test ${?} -ne 0 ; then lock-os ${CPU_ARCHITECTURE} / ; return 11 ; fi
+
+    apl_pre_install ${PATCH_OS_NEW_VERSION} 2> /dev/null < /dev/console
+    test ${?} -eq 0 || return 13
+    return 0
+}
+
+post-install()
+{
+    test ! -x /root/apply-patch/post-install.bash || /root/apply-patch/post-install.bash
+    if test ${?} -ne 0 ; then lock-os ${CPU_ARCHITECTURE} / ; return 21 ; fi
+
+    apl_post_install ${PATCH_OS_NEW_VERSION} < /dev/console
+    if test ${?} -ne 0 ; then lock-os ${CPU_ARCHITECTURE} / ; return 23 ; fi
+
+    apl_update_initrd grub
+    if test ${?} -ne 0 ; then lock-os ${CPU_ARCHITECTURE} / ; return 25 ; fi
+
+    lock-os ${CPU_ARCHITECTURE} /
+}
+
+remove-sha1-file()
+{
+    local architecture_id os_generation=${OS_GENERATION,,}
+
+    test ${CPU_ARCHITECTURE} != x86_64 || architecture_id="-64"
+    local sha1_file=${TECHNICAL_NAME}-${os_generation}${architecture_id}-${PATCH_OS_NEW_VERSION}.sha1
+
+    rm -f ${LOCAL_DIR}/etc/${sha1_file}
+    log-patch-change "removing the file ${LOCAL_DIR}/etc/${sha1_file}"
+}
+
+install-patch()
+{
+    pre-install
+    test ${?} -eq 0 || return 11
+
+    remove-sha1-file
+    cd /
+    tar --strip-components=1 \
+	--same-owner \
+	--preserve-permissions \
+	--extract --file ${TMP_DIR}/${PATCH_DIR_NAME}/patch.tar \
+	${PATCH_DIR_NAME} 2> /dev/null
+
+    test ${?} -eq 0 || return 13
+
+    local files=$(tar --strip-components=1 --list --file ${TMP_DIR}/${PATCH_DIR_NAME}/patch.tar ${PATCH_DIR_NAME} 2> /dev/null) file
+    for file in ${files}
+    do
+	log-patch-change "extracting ${file}"
+    done
+
+    remove-unused-files
+
+    post-install
+}
+
+patch-userenv-file()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    local env_file=${1}
+    local diff_file=${2}
+    local current=${3}
+
+    test -z "${current}" || current=CURRENT_
+
+    local line_diff variable_diff
+    local assertion variable found
+    local operation base_file export
+    local added_position_assertion added_position new_assertion position=1
+
+    base_file=$(file-basename ${env_file})
+
+    while read -r export assertion
+    do
+	test -n "${export}" || continue
+	test "${export:0:1}" != '#' || continue
+
+	variable=${assertion/=*}
+	test "${variable}" != "${current}USERENV_VARS" || continue
+
+	found=0
+
+	while read -r line_diff
+	do
+	    operation=${line_diff:0:1}
+	    case ${operation} in
+		-)
+		    variable_diff=${line_diff:1}
+		    if test "${current}${variable_diff}" == "${variable}" ; then
+			found=1
+			break
+		    fi
+		    ;;
+		+)
+		    ;;
+		*)
+		    ;;
+	    esac
+	done < ${diff_file}
+
+	test ${found} -eq 1 || echo "export ${assertion}"
+    done < ${env_file} > /tmp/${base_file}.1.new
+
+    while read -r export assertion
+    do
+	test -n "${export}" || continue
+	test "${export:0:1}" != '#' || continue
+
+	variable=${assertion/=*/}
+
+	while read -r line_diff
+	do
+	    operation=${line_diff:0:1}
+	    case ${operation} in
+		-)
+		    ;;
+		+)
+		    added_position_assertion=${line_diff:1}
+		    added_position=${added_position_assertion/:*}
+
+		    if test ${added_position} -eq ${position} ; then
+			new_assertion=${added_position_assertion#*:}
+			variable_diff=${new_assertion/=*}
+			if test ${current}${variable_diff} != ${variable} ; then
+			    echo "export ${current}${new_assertion}"
+			    ((position++))
+			fi
+		    fi
+		    ;;
+		*)
+		    ;;
+	    esac
+	done < ${diff_file}
+
+	echo "export ${assertion}"
+	((position++))
+
+    done < /tmp/${base_file}.1.new > /tmp/${base_file}.2.new
+
+    line_diff=$(tail -1 ${diff_file} 2> /dev/null)
+    added_position_assertion=${line_diff:1}
+    new_assertion=${added_position_assertion/*:}
+    echo "export ${current}${new_assertion}" >> /tmp/${base_file}.2.new
+
+    rm -f /tmp/${base_file}.1.new
+    mv -f /tmp/${base_file}.2.new ${env_file}
+    chown ${ADMIN_NAME}:${GROUP_NAME} ${env_file}
+}
+
+wait-until-user-unlock()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 1
+    local user=${1}
+    local file=${2}
+
+    local base=$(file-basename ${file})
+    local i=0 loops=10 timeout=200000
+    
+    while true
+    do
+	test ${i} -lt ${loops} || break
+	test -f ${LOCK_DIR}/${user}.${base} || break
+	usleep ${timeout}
+	((i++))
+    done
+
+    test ${i} -lt ${loops}
+}
+
+patch-userenv-manager-templates()
+{
+    test -n "${1}" || return 1
+    local diff_file=${1}
+
+    local rdir=$(get-manager-context-rdir template)
+    local dir=${ABASE_DIR}/${rdir}
+    local templates=$(ls -1 ${dir} 2> /dev/null)
+
+    test -n "${templates}" || return 0
+
+    local id env_file ret
+
+    for id in ${templates}
+    do
+	log "Patching the '${id}' template configuration DB"
+	env_file=${dir}/${id}/${ENV_NAME}
+	ret=0
+
+	patch-userenv-file ${env_file} ${diff_file} || ((ret++))
+	patch-userenv-file ${env_file}.cancel ${diff_file} || ((ret++))
+	patch-userenv-file ${env_file}.current ${diff_file} current || ((ret++))
+
+	log-result ${ret}
+    done
+}
+
+patch-userenv-manager-gateways()
+{
+    test -n "${1}" || return 1
+    local diff_file=${1}
+
+    test -s ${ABASE_DIR}/${MANAGER_GATEWAY_INDEX} || return 0
+
+    local rdir=$(get-manager-context-rdir gateway)
+    local dir=${ABASE_DIR}/${rdir}
+
+    local uuid domain id ip
+    local env_file ret
+
+    while read uuid domain id ip
+    do
+	test -n "${ip}" || continue
+	log "Patching the '${id}' gateway configuration DB"
+	env_file=${dir}/${id}/${ENV_NAME}
+	ret=0
+
+	patch-userenv-file ${env_file} ${diff_file} || ((ret++))
+	patch-userenv-file ${env_file}.cancel ${diff_file} || ((ret++))
+	patch-userenv-file ${env_file}.current ${diff_file} current || ((ret++))
+
+	log-result ${ret}
+    done < ${ABASE_DIR}/${MANAGER_GATEWAY_INDEX}
+}
+
+patch-userenv()
+{
+    local diff_file=/root/apply-patch/userenv.diff
+    test -s ${diff_file} || return 0
+
+    log "Patching the main configuration DB"
+    local env_file=${USERENV_DIR}/${ENV_NAME}
+    local ret=0
+
+    patch-userenv-file ${env_file} ${diff_file} || ((ret++))
+    patch-userenv-file ${env_file}.cancel ${diff_file} || ((ret++))
+    patch-userenv-file ${env_file}.current ${diff_file} current || ((ret++))
+    
+    log-result ${ret}
+
+    test ${ret} -eq 0 || return 11
+
+    test ${APL_ROLE} == manager || return 0
+
+    patch-userenv-manager-templates ${diff_file}
+    patch-userenv-manager-gateways ${diff_file}
+}
+
+update-os-version-manager-gateways()
+{
+    test -n "${1}" || return 1
+    local version=${1}
+
+    test -s ${ABASE_DIR}/${MANAGER_GATEWAY_INDEX} || return 0
+
+        local rdir=$(get-manager-context-rdir gateway)
+    local dir=${ABASE_DIR}/${rdir}
+
+    local uuid domain id ip
+    local version_file
+
+    while read uuid domain id ip
+    do
+	test -n "${ip}" || continue
+
+	version_file=${dir}/${id}/${HARD_DIR_NAME}/os-version
+	echo "${version}" > ${version_file}
+
+    done < ${ABASE_DIR}/${MANAGER_GATEWAY_INDEX}
+}
+
+update-os-version()
+{
+    test -n "${1}" || return 1
+    local version=${1}
+
+    if test -n "${PATCH_PRE_RELEASE}" ; then
+	test "${PATCH_PRE_RELEASE}" != yes || return 3
+    fi
+
+    echo "${version}" > ${HARD_DIR}/os-version
+
+    test ${APL_ROLE} == manager || return 0
+
+    update-os-version-manager-gateways ${version}
+}
+
+apl-manage-patch()
+{
+    test -f ${TMP_DIR}/${LOADED}.os.tar.compressed || return 0
+
+    local ret install_ret
+
+    touch ${LOCK_DIR}/apl_patch
+    trap "" INT QUIT TERM
+
+    log "Updating the latest OS version"
+    update-latest-os-version
+    log-result ${?}
+
+    log "Unpacking the patch"
+    unpack-patch ${TMP_DIR}/${LOADED}.os
+    ret=${?}
+    log-result ${ret}
+    if test ${ret} -ne 0 ; then clean-patch ; return ${ret} ; fi
+
+    log "Checking patch version matching"
+    check-os-version "${PATCH_OS_VERSION_NEEDED}"
+    ret=${?}
+    log-result ${ret}
+    if test ${ret} -ne 0 ; then clean-patch ; return ${ret} ; fi
+
+    local services service service_name
+
+    if test -f /root/apply-patch/services ; then
+	ret=0
+	while read service
+	do
+	    test -n "${service}" || continue
+	    is-service-active ${service} || continue
+	    service_name=$(get-external-service-name ${service})
+	    log "Stopping the ${service_name} service"
+	    /etc/rc.d/init.d/${service} stop < /dev/console
+	    ret=${?}
+	    log-result ${ret}
+	    services="${service} ${services}"
+	done < /root/apply-patch/services
+    else
+	log "Stopping all services (may take some time)"
+	apl_services stop < /dev/console
+	ret=${?}
+	log-result ${ret}
+    fi
+
+    log "Updating health checks"
+    apl_health_check < /dev/console
+    log-result ${?}
+
+    log "Installing the patch"
+    install-patch
+    install_ret=${?}
+    log-result ${install_ret}
+
+    if test ${install_ret} -eq 0 ; then
+	patch-userenv
+	ret=${?}
+    fi
+    ((install_ret += ret))
+
+    if test ${install_ret} -eq 0 ; then
+	if test "${PATCH_RETUNE}" == 'yes' ; then
+	    log "Retuning the machine"
+	    apl_model_retune
+	    ret=${?}
+	    log-result ${ret}
+	fi
+
+	bash -c "
+source /usr/local/lib/apl_functions
+init-account-environment ${1}
+apl-configure-core"
+	update-os-version "${PATCH_OS_NEW_VERSION}"
+	set-waudit-env-file ${ADMIN_WAUDIT} "${PATCH_OS_NEW_VERSION}"
+    fi
+
+    test ! -x /root/apply-patch/pre-start.bash || /root/apply-patch/pre-start.bash
+
+    if test -f /root/apply-patch/services ; then
+	ret=0
+	for service in ${services}
+	do
+	    is-service-active ${service} || continue
+	    service_name=$(get-external-service-name ${service})
+	    log "Starting the ${service_name} service"
+	    /etc/rc.d/init.d/${service} start < /dev/console
+	    ret=${?}
+	    log-result ${ret}
+	done
+    else
+	log "Starting all services (may take some time)"
+	apl_services start < /dev/console
+	ret=${?}
+	log-result ${ret}
+    fi
+
+    test ! -x /root/apply-patch/post-start.bash || /root/apply-patch/post-start.bash
+
+    if test ${install_ret} -eq 0 ; then
+	if test "${PATCH_REBOOT_APPLIANCE}" == yes ; then
+	    log "Rebooting the system"
+	    log-result 0
+	    conf-unlock-apl-file
+	    manage-appliance-lock apl_reboot
+	    apl-reboot-core
+	else
+	    clean-patch
+	fi
+    else
+	clean-patch
+    fi
+}
+
+reset-backup-log()
+{
+    echo -n > ${BACKUP_LOG}
+    chmod 640 ${BACKUP_LOG}
+    chown ${ADMIN_NAME}:${GROUP_NAME} ${BACKUP_LOG}
+}
+
+backup-log()
+{
+    test -n "${1}" || return 1
+    local message=${1}
+
+    local date=$(date +"%Y/%m/%d-%T")
+    echo -n "0 ${date} ${message}" >> ${BACKUP_LOG}
+}
+
+backup-log-abort()
+{
+    echo >> ${BACKUP_LOG}
+}
+
+backup-log-ret()
+{
+    test -n "${1}" || return 1
+    local err_code=${1}
+
+    if test ${err_code} -eq 0 ; then
+	echo "[OK]" >> ${BACKUP_LOG}
+    else
+	echo "[KO]" >> ${BACKUP_LOG}
+    fi
+}
+
+backup-system-files()
+{
+    local backup_archive=${TMP_DIR}/${SAVED}.backup
+    local tmp_backup_archive=${backup_archive}.${$}
+    local backup_files=$(cat ${LOCAL_DIR}/${TECHNICAL_NAME}/etc/backup-files)
+    local files2save file ret
+
+    backup_files=$(eval echo ${backup_files})
+
+    for file in ${backup_files}
+    do
+	test -n "${file}" || continue
+	test ${file:0:1} != "#" || continue
+	test ! -e ${file} || files2save="${files2save} ${file}"
+    done
+    files2save=${files2save:1}
+
+    local users_dir=$(ls -1d ${HOME_DIR}/* 2> /dev/null) user_dir user
+    for user_dir in ${users_dir}
+    do
+	user=$(file-basename ${user_dir})
+	test ${user} != ${ADMIN_NAME} || continue
+	files2save="${files2save} ${user_dir}"
+    done
+
+    test ! -e ${ADMIN_DIR}/${TWO_FACTOR_GOOGLE_AUTHENTICATOR} || \
+	files2save="${files2save} ${ADMIN_DIR}/${TWO_FACTOR_GOOGLE_AUTHENTICATOR}"
+
+    backup-log "Backup in progress"
+    rm -f \
+       ${backup_archive} \
+       ${tmp_backup_archive} \
+       ${tmp_backup_archive}.tar \
+       ${tmp_backup_archive}.tar.xz &&
+	tar \
+	    --create --file ${tmp_backup_archive}.tar \
+	    ${files2save} 2> /dev/null ; ret=${?}
+
+    backup-log-ret ${ret}
+    test ${ret} -eq 0 || return 11
+
+    backup-log "Backup compression in progress"
+    xz ${tmp_backup_archive}.tar 2> /dev/null ; ret=${?}
+    backup-log-ret ${ret}
+    test ${ret} -eq 0 || return 13
+
+    backup-log "Backup encryption in progress"
+    openssl enc \
+	-pbkdf2 -aes-256-cbc -salt -pass file:${PRIVATE_DIR}/.${BACKUP_PASSWD} \
+	-in ${tmp_backup_archive}.tar.xz \
+	-out ${tmp_backup_archive} 2>/dev/null ; ret=${?}
+    backup-log-ret ${ret}
+    test ${ret} -eq 0 || return 15
+
+    backup-log "Archiving the backup"
+
+    rm -f ${tmp_backup_archive}.tar.xz
+    local date=$(date +"%Y/%m/%d-%T")
+
+    cat << EOF > ${TMP_DIR}/README.${$}
+################################################################################
+#
+# Backup of the appliance ${CURRENT_SHOSTNAME}.${CURRENT_DOMAIN_NAME}
+# Backup date: ${date}
+#
+# Please note the present backup file can only be restored on a freshly
+# installed CacheGuard Appliance as follows:
+#
+EOF
+    echo-appliance-information-header ${APL_ROLE} >> ${TMP_DIR}/README.${$}
+
+    cat << EOF >> ${TMP_DIR}/README.${$}
+#
+################################################################################
+EOF
+
+    chown ${ADMIN_NAME}:${GROUP_NAME} ${tmp_backup_archive}
+    mv -f ${tmp_backup_archive} ${backup_archive}.enc
+
+    cd ${TMP_DIR} &&
+	tar \
+	    --transform="s/README.${$}/README/" \
+	    --create --file ${tmp_backup_archive}.tar \
+	    ${SAVED}.backup.enc \
+	    README.${$} 2>/dev/null ; ret=${?}
+
+    rm -f ${SAVED}.backup.enc
+    chown ${ADMIN_NAME}:${GROUP_NAME} ${tmp_backup_archive}.tar
+    mv -f ${tmp_backup_archive}.tar ${backup_archive}
+    rm -f README.${$}
+
+    backup-log-ret ${ret}
+    test ${ret} -eq 0 || return 17
+    return 0
+}
+
+clean-backup-files()
+{
+    local backup_archive=${TMP_DIR}/${SAVED}.backup
+    local tmp_backup_archive=${backup_archive}.${$}
+    local readme=${TMP_DIR}/README.${$}
+    
+    rm -f \
+       ${readme} \
+       ${tmp_backup_archive} \
+       ${tmp_backup_archive}.enc \
+       ${tmp_backup_archive}.tar \
+       ${tmp_backup_archive}.tar.xz \
+       ${backup_archive}
+}
+
+is-role-compatible()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+
+    local role_file1=${1}
+    local role_file2=${2}
+
+    test -s ${role_file1} || return 11
+    test -s ${role_file2} || return 13
+
+    local assertion1 variable1 value1
+    local assertion2 variable2 value2
+
+    while read assertion1
+    do
+        test -n "${assertion1}" || continue
+	test ${assertion1:0:1} != '#' || continue
+
+	variable1=${assertion1/=*}
+	value1=${assertion1/*=}
+
+	test ${variable1} != "${value1}" || return 21
+
+	unset assertion2 variable2 value2
+
+	while read assertion2
+	do
+            test -n "${assertion2}" || continue
+	    test ${assertion2:0:1} != '#' || continue
+
+	    variable2=${assertion2/=*}
+	    value2=${assertion2/*=}
+
+	    test ${variable2} != "${value2}" || return 23
+
+	    test ${variable2} != ${variable1} || break
+
+	done < ${role_file2}
+
+	test "${variable2}" == "${variable1}" || return 25
+
+	case ${variable1} in
+	    APL_ROLE)
+		test "${value1}" == "${value2}" || return 31
+		;;
+	    *)
+		;;
+	esac
+
+	case ${APL_ROLE} in
+	    manager)
+		case ${variable1} in
+		    MANAGER_TOTAL_USERS_NB|MANAGER_TOTAL_RWEB_NB)
+			test "${value1}" == "${value2}" || return 41
+			;;
+		    *)
+			;;
+		esac
+		;;
+	    gateway)
+		;;
+	    *)
+		;;
+	esac
+    done < ${role_file1}
+
+    return 0
+}
+
+is-model-compatible()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+
+    local model_file1=${1}
+    local model_file2=${2}
+
+    test -s ${model_file1} || return 11
+    test -s ${model_file2} || return 13
+
+    local assertion1 variable1 value1
+    local assertion2 variable2 value2
+
+    while read assertion1
+    do
+        test -n "${assertion1}" || continue
+	test ${assertion1:0:1} != '#' || continue
+
+	variable1=${assertion1/=*}
+	value1=${assertion1/*=}
+
+	test ${variable1} != "${value1}" || return 21
+
+	unset assertion2 variable2 value2
+
+	while read assertion2
+	do
+            test -n "${assertion2}" || continue
+	    test ${assertion2:0:1} != '#' || continue
+
+	    variable2=${assertion2/=*}
+	    value2=${assertion2/*=}
+
+	    test ${variable2} != "${value2}" || return 23
+
+	    test ${variable2} != ${variable1} || break
+
+	done < ${model_file2}
+
+	test "${variable2}" == "${variable1}" || return 25
+
+	case ${APL_ROLE} in
+	    gateway)
+		case ${variable1} in
+		    USERS_NB|RUSERS_NB|RWEB_NB|URLLIST_RECORDS_NB|LOGROTATE_NB)
+			test "${value1}" == "${value2}" || return 31
+			;;
+		    RWEB_CACHE_SZ)
+			test "${value1}" == "${value2}" || return 33
+			;;
+		    NETWORK_DEVICES)
+			test "${value1}" == "${value2}" || return 35
+			;;
+		    CPU_ARCHITECTURE)
+			test "${value1}" == "${value2}" || return 37
+			;;
+		    PERSISTENT_CACHE|PERSISTENT_WEB_LOG|PERSISTENT_RWEB_LOG)
+			test "${value1}" == "${value2}" || return 39
+			;;
+		    *)
+			;;
+		esac
+		;;
+	    manager)
+		case ${variable1} in
+		    MANAGER_GATEWAY_NB|MANAGER_TEMPLATE_NB|URLLIST_RECORDS_NB)
+			test "${value1}" == "${value2}" || return 41
+			;;
+		    NETWORK_DEVICES)
+			test "${value1}" == "${value2}" || return 43
+			;;
+		    CPU_ARCHITECTURE)
+			test "${value1}" == "${value2}" || return 45
+			;;
+		    *)
+			;;
+		esac
+		;;
+	    *)
+		;;
+	esac
+    done < ${model_file1}
+
+    return 0
+}
+
+restore-system-files()
+{
+    test -f ${TMP_DIR}/${LOADED}.backup || return 1
+
+    local backup_archive=${TMP_DIR}/${LOADED}.backup
+
+    check-tar-file ${backup_archive} || return 11
+    tar --to-stdout \
+	--same-owner \
+	--preserve-permissions \
+	--extract --file ${backup_archive} \
+	${SAVED}.backup.enc > ${backup_archive}.enc 2>/dev/null || return 13
+
+    rm -f ${backup_archive}
+
+    rm -f ${backup_archive}.tar.xz ${backup_archive}.tar
+    openssl enc -d \
+	-pbkdf2 -aes-256-cbc -salt -pass file:${PRIVATE_DIR}/.${BACKUP_PASSWD} \
+	-in ${backup_archive}.enc \
+	-out ${backup_archive}.tar.xz 2>/dev/null || return 15
+    rm -f ${backup_archive}.enc
+
+    check-xz-file ${backup_archive}.tar.xz || return 17
+    unxz ${backup_archive}.tar.xz || return 19
+    check-tar-file ${backup_archive}.tar || return 21
+
+    tar --to-stdout \
+	--same-owner \
+	--preserve-permissions \
+	--extract --file ${backup_archive}.tar \
+	${HARD_DIR:1}/os-name > /tmp/os-name 2> /dev/null
+
+    diff --brief ${HARD_DIR}/os-name /tmp/os-name > /dev/null
+    if test ${?} -ne 0 ; then
+	rm -f /tmp/os-name
+	return 23
+    fi
+
+    tar --to-stdout \
+	--same-owner \
+	--preserve-permissions \
+	--extract --file ${backup_archive}.tar \
+	${HARD_DIR:1}/os-version > /tmp/os-version 2> /dev/null
+
+    diff --brief ${HARD_DIR}/os-version /tmp/os-version > /dev/null
+    if test ${?} -ne 0 ; then
+	rm -f /tmp/{os-name,os-version}
+	return 25
+    fi
+
+    tar --to-stdout \
+	--same-owner \
+	--preserve-permissions \
+	--extract --file ${backup_archive}.tar \
+	${APPLIANCE_DIR:1}/etc/role > /root/role 2> /dev/null
+
+    if ! is-role-compatible ${APPLIANCE_DIR}/etc/role /root/role ; then
+	rm -f /tmp/{os-name,os-version} /root/role
+	return 27
+    fi
+
+    tar --to-stdout \
+	--same-owner \
+	--preserve-permissions \
+	--extract --file ${backup_archive}.tar \
+	${HARD_DIR:1}/model.conf > /root/model.conf 2> /dev/null
+
+    if ! is-model-compatible ${HARD_DIR}/model.conf /root/model.conf ; then
+	rm -f /tmp/{os-name,os-version} /root/role /root/model.conf
+	return 29
+    fi
+
+    local backup_files=$(cat ${LOCAL_DIR}/${TECHNICAL_NAME}/etc/backup-files) file user
+    backup_files=$(eval echo ${backup_files})
+
+    chattr -i ${HARD_DIR}/${INSTALL_DATE}
+
+    for file in ${backup_files}
+    do
+        test -d ${file} || continue
+	test ${file} != ${BASE_DIR} || continue
+        find ${file} -type f -exec rm -f {} \;
+        find ${file} -type l -exec rm -f {} \;
+    done
+
+    rm -f \
+       /tmp/{os-name,os-version} \
+       /root/model.conf \
+       /root/role
+
+    for user in ${CURRENT_ADMIN_USER_LIST}
+    do
+	killall -u ${user}
+	file=${HOME_DIR}/${user}
+	rm -rf ${file}
+    done
+
+    backup_files=$(find ${BASE_DIR} -maxdepth 1 -type d)
+    for file in ${backup_files}
+    do
+        test ${file} != ${BASE_DIR} || continue
+        test ${file} == ${ABASE_DIR} || rm -rf ${file}
+    done
+
+    cd /
+    tar \
+	--exclude=${APPLIANCE_DIR:1}/etc/role \
+	--exclude=${ABASE_DIR:1}* \
+	--same-owner \
+	--preserve-permissions \
+	--extract --file \
+	${backup_archive}.tar 2> /dev/null || return 31
+
+    chattr +i ${HARD_DIR}/${INSTALL_DATE}
+
+    local only_slashes=${ABASE_DIR//[^\/]/}
+    local depth=${#only_slashes} ; test ${depth} -ne 0 || ((depth--))
+
+    find ${ABASE_DIR} -type f -exec rm -f {} \;
+
+    cd ${ABASE_DIR}
+    find . -type l -exec rm -f {} \;
+    tar \
+	--strip-components=${depth} \
+	--exclude=${VAR_DIR:1}/${SUPERVISOR_FIFO} \
+	--same-owner \
+	--preserve-permissions \
+	--extract --file ${backup_archive}.tar \
+	${ABASE_DIR:1} 2> /dev/null || return 33
+}
+
+clean-restore-files()
+{
+    local backup_archive=${TMP_DIR}/${LOADED}.backup
+    rm -f \
+       ${backup_archive} \
+       ${backup_archive}.enc \
+       ${backup_archive}.tar \
+       ${backup_archive}.tar.xz \
+       ${backup_archive}.${PROGRESS}
+}
+
+restore-system-before-gateway()
+{
+    :
+}
+
+restore-system-before-manager()
+{
+    ROOT_DIR=${ABASE_DIR}/ raz-manager-context template
+    ROOT_DIR=${ABASE_DIR}/ raz-manager-context gateway
+}
+
+restore-system-before()
+{
+    case ${APL_ROLE} in
+	gateway)
+	    restore-system-before-gateway
+	    ;;
+	manager)
+	    restore-system-before-manager
+	    ;;
+	*)
+	    return 255
+	    ;;
+    esac
+}
+
+restore-system-after-gateway()
+{
+    :
+}
+
+restore-system-after-manager-template()
+{
+    local rdir=$(get-manager-context-rdir template)
+    local dir=${ABASE_DIR}/${rdir}
+    local templates=$(ls -1 ${dir} 2> /dev/null)
+
+    test -n "${templates}" || return 0
+
+    local tmp_base_dir=$(get-manager-context-tmp-dir template)
+
+    local template
+
+    for template in ${templates}
+    do
+	template=$(file-basename ${template})
+	install -d -m 755 -o ${ADMIN_NAME} -g ${GROUP_NAME} ${tmp_base_dir}/${template}
+    done
+}
+
+restore-system-after-manager-gateway()
+{
+    test -s ${ABASE_DIR}/${MANAGER_GATEWAY_INDEX} || return 0
+    
+    local tmp_base_dir=$(get-manager-context-tmp-dir gateway)
+    local uuid domain id ip
+
+    while read uuid domain id ip
+    do
+	test -n "${ip}" || continue
+	install -d -m 755 -o ${ADMIN_NAME} -g ${GROUP_NAME} ${tmp_base_dir}/${id}
+    done < ${ABASE_DIR}/${MANAGER_GATEWAY_INDEX}
+}
+
+restore-system-after-manager()
+{
+    restore-system-after-manager-template
+    restore-system-after-manager-gateway
+}
+
+restore-system-after()
+{
+    case ${APL_ROLE} in
+	gateway)
+	    restore-system-after-gateway
+	    ;;
+	manager)
+	    restore-system-after-manager
+	    ;;
+	*)
+	    return 255
+	    ;;
+    esac
+}
+
+check-new-restore()
+{
+    test -f ${TMP_DIR}/${LOADED}.backup
+}
+
+LIB_APL_SYSTEM=Yes

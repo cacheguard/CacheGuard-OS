@@ -1,0 +1,48 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       Scripts
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+get-swapped-process()
+{
+    local proc all_proc=$(find /proc/ -maxdepth 1 -type d -regex "^/proc/[0-9]+" 2> /dev/null)
+    local pid program swap
+
+    for proc in ${all_proc}
+    do
+	pid=${proc/*\/}
+
+	test -f ${proc}/status || continue
+	swap=$(grep VmSwap: ${proc}/status 2> /dev/null)
+
+	test -n "${swap}" || continue
+	swap=${swap/VmSwap:}
+	test -n "${swap/*0 kB}" || continue
+
+	program=$(ps -p ${pid} -o comm --no-headers 2> /dev/null)
+	echo "${program} (pid ${pid}) ${swap}"
+    done | sort --key=4 --numeric-sort
+}
+
+# Main()
+
+get-swapped-process "${@}"

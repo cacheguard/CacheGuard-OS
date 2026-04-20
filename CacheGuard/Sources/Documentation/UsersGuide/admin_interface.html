@@ -1,0 +1,73 @@
+<a name='main' class='doc-title'></a>
+<h1>Administration Interfaces</h1>
+
+This section describes how to connect to a CacheGuard appliance in order to configure and administrate it. Three configuration and administration interfaces are available in a CacheGuard appliance:
+<ul>
+  <li>The console port</li>
+  <li>The HTTPS interface (Web Administration GUI)</li>
+  <li>Secure Shell (SSH)</li>
+</ul>
+
+Each interface is detailed below.
+
+<a name='console' class='doc-title'></a><h2>Console Port</h2>
+
+The console port is the main interface of a CacheGuard appliance. It can either be a serial port (male DB9 RS232) or a screen and keyboard directly connected to the appliance. To use the serial port, connect the CacheGuard appliance serial port to your workstation’s serial port using a crossed serial cable. You can then use your preferred terminal emulator (PuTTY, Minicom, Screen, etc.) to connect to the CacheGuard appliance. Serial communication with a CacheGuard appliance should use the following settings: 115200 8N1 (115200 baud rate, 8 data bits, no parity, 1 stop bit).
+<p>
+The console port is the most secure and reliable administration interface of a CacheGuard appliance. After installation, the only available administration interface is the console port. To grant remote administration access to an administrator for the first time, you must use the console port (<i>access admin</i> command).
+<p>
+An administrator must be authenticated before connecting to the system. The "<i>admin</i>" user is the main administrator with the highest administration level. Other administrator users with fewer privileges can be added to the system using the <a href="/doc/command/admin.html">admin user</a> command. You must log in as the "<i>admin</i>" user for the first connection to the CacheGuard appliance. The password to use is the one set during installation (the default password for pre-installed CacheGuard appliances is "<i>admin</i>"). Please refer to the <a href="admin_user.html">Administrator Users</a> section of this documentation for more information on administrator users.
+<p>
+The administration and configuration process via a character interface (console port or SSH) is carried out using the CLI (Command Line Interface). To see the list of all available commands, use the <a href="/doc/command/help.html">help</a> command without arguments. To obtain help on how to use a specific command, use the <a href="/doc/command/help.html">help</a> command followed by the command name. If you forget the syntax of a command, the completion feature can help you find the correct syntax. Completion is available by pressing the &lt;TAB&gt; key.
+<p>
+When using a character interface, the administrator has the ability to create mini-programmes using a lightweight "<i>bash</i>" environment (an open-source scripting language). You can use the <a href="/doc/command/history.html">history</a> command to display a list of previously entered commands. To disconnect from the console port, use the <a href="/doc/command/exit.html">exit</a> command. The connection is also automatically closed if no command is entered for a certain period of time.
+
+<a name='wadmin' class='doc-title'></a><h2>Web Administration GUI</h2>
+
+For administrators who are not familiar with a CLI (Command Line Interface) or who simply prefer a GUI (Graphical User Interface), a Web Administration GUI is available. To connect to the Web Administration GUI, you need a Web browser. The CacheGuard appliance supports almost all modern Web browsers, including (but not limited to) Firefox, Chrome, Safari, Opera and Edge. Before connecting to a CacheGuard appliance via a Web browser, the Web Administration GUI must be activated on the appliance, and the remote administrator’s IP address must be allowed to connect.
+<p>
+To activate the Web Administration GUI on the appliance and allow remote administrators in the network "<i>10.20.0.0 255.255.255.0</i>" to connect to the appliance via its internal network interface, use the following commands:
+<ul>
+  <li><i>admin wadmin on</i></li>
+  <li><i>access admin add internal 10.20.0.0 255.255.255.0</i></li>
+  <li><i>apply</i></li>
+</ul>
+
+<center><img src="/doc/image/webadmin_screenshot.png" class="schema" /></center>
+
+Once the <a href="/doc/command/apply.html">apply</a> operation is completed, the CacheGuard appliance can be administrated using a Web browser. To connect to the Web Administration GUI, use the following URL: "<i><strong>https</strong>://10.20.0.254:8090</i>", where 10.20.0.254 is the internal IP address of the CacheGuard appliance. Note that the protocol used is <u>HTTP<strong>S</strong></u> (not HTTP). The default Web Administration GUI port number is 8090. To modify this value, use the <strong>port wadmin</strong> command. By default, the password for the Web Administration GUI is the same as the one used to log in via the console port. It is recommended to create a separate password for the Web Administration GUI instead of using the same one as for character interfaces (using the <strong>password wadmin</strong> command).
+
+<center><img src="/doc/image/dashboard_screenshot.png" class="schema" /></center>
+
+The Web Administration GUI is a graphical front end to the CLI and can either replace or complement it. Using the Web Administration GUI is straightforward: first, you build a configuration using the various Web pages accessible through menus, and then you activate it by performing an apply operation (as with the CLI).
+<p>
+When the running (active) configuration differs from a newly built configuration, a blinking down-arrow button appears in the title bar, inviting you to click it. Clicking that icon redirects you to the <u>Apply New Configuration</u> page, where you can proceed with the apply operation by pressing the SUBMIT button (or the green check icon in the title bar). The Web Administration GUI is not described in detail in the User’s Guide, as its usage is designed to be intuitive enough not to require extensive documentation.
+
+<a name='ssh' class='doc-title'></a><h2>Secure Shell (SSH)</h2>
+
+The CacheGuard appliance can also be remotely administrated using an SSH client. When logged in via an SSH client, the administrator can use the CLI to administrate and configure the CacheGuard appliance. To use the SSH administration interface, you should use an SSH client installed on your workstation (for example, the Linux <i>ssh</i> command or the <i>PuTTY</i> application).
+<p>
+To use the SSH administration interface, remote administrators must be allowed to access the CacheGuard appliance, and the SSH service must be activated on the appliance. To activate the SSH service and allow remote administrators in the network <i>10.20.0.0 255.255.255.0</i> to connect via the internal network interface, use the following commands:
+<ul>
+  <li><i>admin ssh on</i></li>
+  <li><i>access admin add internal 10.20.0.0 255.255.255.0</i></li>
+  <li><i>apply</i></li>
+</ul>
+
+<center><img width='600' src="/doc/image/configuration.png" class="schema" /></center>
+
+Once the apply operation is complete, the CacheGuard appliance can be administrated using an SSH client. To connect to a remote CacheGuard appliance from a Linux system, use the "<i>ssh admin@10.20.0.254</i>" command, where 10.20.0.254 is the internal IP address of the remote CacheGuard appliance. The SSH password to use is the same as the one used to log in via the console port. It is also possible to import a public SSH key into a CacheGuard appliance to allow passwordless login for administrators. Using SSH keys also enables the automation of periodic tasks, such as system backups (see the <strong>system backup</strong> command).
+<p>
+The process of generating SSH keys depends on the remote workstation used. For instance, to generate an SSH key pair (public and private) on a Linux system, you can use the "<i>ssh-keygen</i>" command. To import a public SSH key into a CacheGuard appliance, first copy it to a file server supporting the TFTP, FTP or SFTP protocols, and then load it into your CacheGuard appliance from that file server (which can also be hosted on your workstation). Only trusted file servers are permitted to exchange files with a CacheGuard appliance. To add the file server with the IP address <i>10.20.0.1</i> to the list of trusted file servers and allow it to exchange files via the internal network interface, use the following commands:
+<ul>
+  <li><i>access file add internal 10.20.0.1</i></li>
+  <li><i>apply</i></li>
+</ul>
+Each SSH key must be identified with a unique identifier specified before importing it into a CacheGuard appliance. To add an SSH key identified by the <i>john</i> identifier and import it into your CacheGuard appliance from a trusted TFTP file server, use the following commands:
+<ul>
+  <li><i>admin ssh key add john</i></li>
+  <li><i>admin ssh key load john tftp 10.20.0.1 id_rsa.pub</i></li>
+</ul>
+Here, <i>10.20.0.1</i> and <i>id_rsa.pub</i> represent the file server IP address and the SSH key filename on that trusted file server, respectively. After importing a public SSH key into a CacheGuard appliance, an authorised remote administrator possessing the private SSH key associated with that public key can log in without entering a password.
+<p>
+To disconnect an SSH session, use the <a href="/doc/command/exit.html">exit</a> command. The SSH session is also automatically closed if no command is entered for a certain period of time.

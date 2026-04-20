@@ -1,0 +1,35 @@
+<a name='main' class='doc-title'></a>
+<h1>Transparent Mode</h1>
+
+CacheGuard appliance integrates a Web proxy that can be explicitly used by Web clients (users or machines). In an explicit implementation, Web users must configure their browsers to use the CacheGuard appliance as an HTTP/HTTPS proxy by specifying its <strong>internal</strong> IP address (<strong>web</strong> address in VLAN mode) and proxy port (8080 by default). If modifying browser configurations is not an option in your network, you can implement CacheGuard in transparent mode. In transparent mode, HTTP traffic (and optionally HTTPS traffic) is transparently intercepted by the appliance and can then be processed by the various integrated services that the CacheGuard appliance offers (such as URL filtering, antivirus protection, Web caching, and more).
+<p>
+To function as a transparent Web gateway (proxy), the CacheGuard appliance must be positioned along the Web traffic path — meaning that all Web traffic must pass through it. The simplest method to achieve this is to use the CacheGuard appliance as the default gateway for your LAN. If using CacheGuard as the default gateway for all Internet traffic is not desirable, a Layer 4 (L4) switch may be employed to implement policy-based routing, ensuring that only Web traffic is routed through the CacheGuard appliance. To activate the transparent mode, use the <a href="/doc/command/mode.html">mode tweb on</a> (or <a href="/doc/command/mode.html">mode transparent on</a>) command.
+
+<center><img width='600' src="/doc/image/classic_usage.png" class="schema" /></center>
+
+Please note that transparent interception of HTTPS traffic requires the SSL mediation feature to be enabled on your CacheGuard appliance. Implementing SSL mediation also requires the deployment of the CacheGuard appliance CA certificate on all Web client devices. Please refer to the <a href="ssl_mediation.html">SSL Mediation</a> section for guidance on implementing this functionality.
+
+<a name='switchl4' class='doc-title'></a><h2>Using a Layer 4 Switch</h2>
+A Layer 4 (L4) switch allows routing of IP traffic based not only on IP addresses but also on TCP/UDP headers. To ensure that only Web traffic is routed through the CacheGuard appliance while other traffic is directed through a different gateway, your policy-based routes on the L4 switch should route all traffic destined for TCP port 80 (HTTP) and, optionally, TCP port 443 (HTTPS) via the CacheGuard appliance, while all other traffic continues via your standard Internet gateway.
+
+<center><img width='600' src="/doc/image/transparent_switch_l4.png" class="schema" /></center>
+
+If you are familiar with Linux, you can also use a Linux machine to implement this type of policy-based routing. Numerous examples and tutorials are available online describing this configuration. As an introduction, the following example demonstrates how to implement policy-based routing on a Linux machine:
+<ul>
+  <li type='circle'>iptables -t mangle -A PREROUTING -p tcp --dport 80 -j MARK --set-mark 5</li>
+  <li type='circle'>echo "100 transparent-proxy" &gt;&gt; /etc/iproute2/rt_tables</li>
+  <li type='circle'>ip route add default via &lt;cacheguard-internal-ip&gt; table transparent-proxy</li>
+  <li type='circle'>ip rule add fwmark 5 table transparent-proxy</li>
+</ul>
+In the example above, &lt;cacheguard-internal-ip&gt; should be replaced with the internal IP address of your CacheGuard appliance. Please refer to the <u>ip</u> and <u>iptables</u> manual pages on a Linux system for further information on these commands.
+
+<a name='selective' class='doc-title'></a><h2>Selective Transparency</h2>
+
+Once transparent mode is activated on a CacheGuard appliance, all Web traffic routed through it is intercepted, regardless of source or destination IP addresses. This behaviour may be restrictive for users who require more control over their Web traffic (for example, administrators). To address this, Web traffic interception can be limited to specific networks using the <a href="/doc/command/transparent.html">transparent</a> (or <a href="/doc/command/tweb.html">tweb</a>) command. For instance, to limit transparent mode to Web clients within the <i>172.18.2.0 255.255.255.0</i> or <i>10.26.0.0 255.255.0.0</i> networks that are routed via the <strong>internal</strong> network interface, use the following commands:
+<ul>
+  <li><i>mode transparent on</i></li>
+  <li><i>transparent raz</i></li>
+  <li><i>transparent add internal 172.18.2.0 255.255.255.0</i></li>
+  <li><i>transparent add internal 10.26.0.0 255.255.0.0</i></li>
+  <li><i>apply</i></li>
+</ul>

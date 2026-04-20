@@ -1,0 +1,463 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       Configurator
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+get-external-service-name()
+{
+    test -n "${1}" || return 1
+    local service=${1}
+
+    local i
+
+    for ((i=0 ; i<SERVICE_NAME_NB ; i++))
+    do
+	test ${service} != ${SERVICE_NAME_KEY[${i}]} || break
+    done
+
+    local name=${SERVICE_NAME_VALUE[${i}]}
+    test -n "${name}" || name="Unknown"
+    echo ${name}
+}
+
+set-global-parameters()
+{
+    if test -z "${APPLIANCE_DEBUG_LEVEL}" ; then
+	APPLIANCE_DEBUG_LEVEL=0
+    else
+	case ${APPLIANCE_DEBUG_LEVEL} in
+	    0|1|2|3|4|5)
+		APPLIANCE_DEBUG_LEVEL=${APPLIANCE_DEBUG_LEVEL}
+		;;
+	    *)
+		APPLIANCE_DEBUG_LEVEL=0
+		;;
+	esac
+    fi
+}
+
+get-apache-log-level()
+{
+    case ${APPLIANCE_DEBUG_LEVEL} in
+	0)
+	    echo emerg
+	    ;;
+	1)
+	    echo alert
+	    ;;
+	2)
+	    echo crit
+	    ;;
+	3)
+	    echo error
+	    ;;
+	4)
+	    echo warn
+	    ;;
+	5)
+	    echo debug
+	    ;;
+	*)
+	    echo emerg
+	    ;;
+    esac
+}
+
+network-is-configured()
+{
+    case ${APL_ROLE} in
+	gateway)
+	    test "${IP_EXTERNAL_IP}" != "0.0.0.0" -a "${IP_EXTERNAL_MASK}" != "0.0.0.0" -a -n "${IP_ROUTE_LIST}"
+	    ;;
+	manager)
+	    test "${IP_INTERNAL_IP}" != "0.0.0.0" -a "${IP_INTERNAL_MASK}" != "0.0.0.0" -a -n "${IP_ROUTE_LIST}"
+	    ;;
+	*)
+	    ;;
+    esac
+}
+
+get-admin-relative-dir()
+{
+    local dir=${1}
+    
+    local len=${#ADMIN_DIR}
+    echo ${dir:${len}}
+}
+
+min()
+{
+    if test ${1} -lt ${2} ; then echo ${1} ; else echo ${2} ; fi
+}
+
+getpids()
+{
+    local base=${1##*/}
+    pidof -o ${$} -o ${PPID} -x ${base}
+}
+
+check-elf-file()
+{
+    test -n "${1}" || return 1
+    local file="${1}"
+
+    test -f ${file} || return 1
+
+    local type=$(file ${file})
+    type=${type/*: /}
+    type=${type/,*/}
+    test "${type}" == "ELF 32-bit LSB executable"
+}
+
+check-tar-file()
+{
+    test -n "${1}" || return 1
+    local file="${1}"
+
+    test -f ${file} || return 1
+
+    local type=$(file -i ${file})
+    type=${type/*: /}
+    type=${type/;*/}
+    type=${type/,*/}
+    test "${type}" == "application/x-tar"
+}
+
+check-empty-file()
+{
+    test -n "${1}" || return 1
+    local file="${1}"
+
+    test -f ${file} || return 1
+
+    local type=$(file -i ${file})
+    type=${type/*: /}
+    type=${type/;*/}
+    test "${type}" == "inode/x-empty"
+}
+
+format-regexp()
+{
+    test -n "${1}" || return 1
+    local regexp=${1}
+
+    local len=${#regexp}
+    test ${len} -ge 2 || return 0
+    ((len-=2))
+    regexp=${regexp:1:${len}}
+    regexp=${regexp//\"/\\\"}
+    echo ${regexp}
+}
+
+gen-msg-html-begin()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 1
+    test -n "${3}" || return 1
+    local title1=${1}
+    local title2=${2}
+    local message=${3}
+
+    echo "<html>"
+    echo "<head>"
+    echo "<link rel='stylesheet' type='text/css' href='http://${IP_WEB_IP}/apl.css' />"
+    echo "<title>${title1}</title>"
+    echo "</head>"
+    echo '<body>'
+    echo '<div id="wrap"><div id="content">'    
+    echo '<table>'
+    echo '<tr>'
+    echo "<td width=25% bgcolor='#9f0000'>"
+    echo "<center><span style='color:white; font-size:110%; font-weight:bold;'>${title2}</span></center>"
+    echo "</td>"
+    echo '<td width="75%" bgcolor="white">'
+    echo "<center><span style='color:#9f0000; font-size:150%; font-weight:bold;'>${message}</span></center>"
+    echo '</td>'
+    echo '</tr>'
+
+    echo '<tr>'
+    echo "<td width='20%' bgcolor='#cccccc'></td>"
+    echo "<td width='80%' bgcolor='#cccccc'>"
+}
+
+gen-msg-html-item()
+{
+    test -n "${1}" || return 1
+    local item=${1}
+    
+    echo "${item}.<p />"
+}
+
+gen-msg-html-end()
+{
+    echo "</td>"
+    echo '</tr>'
+    echo '</table>'
+    echo '</div></div>'
+    echo '</body>'
+    echo '</html>'
+}
+
+gen-ldap-ip-name()
+{
+    local elt i=0 rang
+    local name ip
+
+    for elt in ${LDAP_SERVER_LIST}
+    do
+	rang=$[${i} % 4]
+	case ${rang} in
+	    0)
+		;;
+	    1)
+		name=${elt}
+		;;
+	    2)
+		ip=${elt}
+		;;
+	    3)
+		echo "${ip} ${name}"
+		;;
+	    *)
+		;;
+	esac
+	((i++))
+    done
+}
+
+get-hardware-id()
+{
+    local eth mac info
+    local i=0 id0 id1
+
+    if test -s ${HARD_DIR}/hw-links ; then
+	while read eth mac info
+	do
+	    case ${i} in
+		0)
+		    id0=${mac}
+		    ;;
+		1)
+		    id1=${mac}
+		    ;;
+		*)
+		    break
+		    ;;
+	    esac
+	    ((i++))
+	done < ${HARD_DIR}/hw-links
+    fi
+
+    test -n "${id0}" || id0='00:00:00:00:00:00'
+    test -n "${id1}" || id1='00:00:00:00:00:00'
+
+    id0=${id0//:/}
+    id1=${id1//:/}
+
+    echo "${id0},${id1}"
+    return 0
+}
+
+get-real-mac-address()
+{
+    test -n "${1}" || return 1
+    local dev=${1}
+
+    local mac=$(ip link show dev ${dev})
+    mac=${mac/*link\/ether /}
+    mac=${mac/ brd*/}
+    echo ${mac}
+}
+
+gen-passphrase()
+{
+    local array=(a b c d e f g h i j k l m n o p q r s t u v w x y z A B C D E F G H I J K L M N O P Q R S T U V W X Y Z 0 1 2 3 4 5 6 7 8 9)
+    local len_array=${#array[*]}
+
+    local i=0 pos len=16 pass
+    while test ${i} -lt ${len}
+    do
+	pos=$[${RANDOM} % ${len_array}]
+	pass="${pass}${array[${pos}]}"
+	((i++))
+    done
+
+    echo ${pass}
+}
+
+manage-all-but-apply-lock()
+{
+    local caller_program=${1}
+    test -n "${caller_program}" || caller_program=$(file-basename ${0})
+
+    test ! -f ${LOCK_DIR}/apl_apply_cancel || exit 21
+    test ! -f ${LOCK_DIR}/apl_reboot || exit 23
+    test ! -f ${LOCK_DIR}/apl_halt || exit 25
+    test ! -f ${LOCK_DIR}/apl_rollback || exit 27
+    test ! -f ${LOCK_DIR}/apl_configure || exit 29
+    test ! -f ${LOCK_DIR}/apl_cache_reconfigure || exit 31
+    test ! -f ${LOCK_DIR}/apl_cache_clear || exit 33
+    test ! -f ${LOCK_DIR}/apl_av_create || exit 35
+    test ! -f ${LOCK_DIR}/apl_av_update || exit 37
+    test ! -f ${LOCK_DIR}/apl_verify_usage || exit 39
+    test ! -f ${LOCK_DIR}/apl_alive_check || exit 41
+    test ! -f ${LOCK_DIR}/apl_backup || exit 43
+    test ! -f ${LOCK_DIR}/apl_urllist_update || exit 45
+    test ! -f ${LOCK_DIR}/apl_ha || exit 47
+    test ! -f ${LOCK_DIR}/apl_kerberos_create || exit 49
+    test ! -f ${LOCK_DIR}/apl_usb_notify || exit 51
+
+    touch ${LOCK_DIR}/${caller_program}
+}
+
+manage-appliance-lock()
+{
+    local caller_program=${1}
+    test -n "${caller_program}" || caller_program=$(file-basename ${0})
+
+    test ! -f ${LOCK_DIR}/apl_apply || exit 11
+    manage-all-but-apply-lock "${caller_program}"
+}
+
+manage-appliance-unlock()
+{
+    local caller_program=${1}
+    test -n "${caller_program}" || caller_program=$(file-basename ${0})
+
+    rm -f ${LOCK_DIR}/${caller_program}
+}
+
+check-vloaded-signature()
+{
+    test -n "${1}" || return 1
+    local file=${1}
+
+    local sig_file=${file}.${SIGNATURE}
+
+    test -f ${sig_file} || return 0
+    test -s ${sig_file} || return 1
+
+    openssl dgst -sha1 -verify /etc/guard-public-key.pem -signature ${sig_file} ${file} > /dev/null 2>&1
+}
+
+backup-ethernet-file()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    local source_file=${1}
+    local backup_file=${2}
+
+    test -f ${source_file} || return 11
+    cp -f ${source_file} ${backup_file}
+    echo ${source_file} ${backup_file} >> ${STARTUP_BACKUP_DIR}/${ETHERNET_BACKUP_INDEX_FILENAME}
+}
+
+restore-ethernet-files()
+{
+    test -f ${STARTUP_BACKUP_DIR}/${ETHERNET_BACKUP_INDEX_FILENAME} || return 0
+
+    local source_file
+    local backup_file
+
+    while read source_file backup_file
+    do
+	test -n "${backup_file}" || continue
+	test -f "${backup_file}" || continue
+	mv -f ${backup_file} ${source_file}
+    done < ${STARTUP_BACKUP_DIR}/${ETHERNET_BACKUP_INDEX_FILENAME}
+
+    rm -f ${STARTUP_BACKUP_DIR}/${ETHERNET_BACKUP_INDEX_FILENAME}
+}
+
+remove-ethernet-backup-files()
+{
+    test -f ${STARTUP_BACKUP_DIR}/${ETHERNET_BACKUP_INDEX_FILENAME} || return 0
+
+    local source_file
+    local backup_file
+
+    while read source_file backup_file
+    do
+	test -n "${backup_file}" || continue
+	rm -f ${backup_file}
+    done < ${STARTUP_BACKUP_DIR}/${ETHERNET_BACKUP_INDEX_FILENAME}
+
+    rm -f ${STARTUP_BACKUP_DIR}/${ETHERNET_BACKUP_INDEX_FILENAME}
+}
+
+is-connected-to-internet()
+{
+    local gw_wt gw ret
+    local dev=${IF_EXTERNAL}
+
+    for gw_wt in ${DEFAULT_GATEWAY_WEIGHTS}
+    do
+	gw=${gw_wt/:*}
+
+	nping \
+  	    -q1 --hide-sent \
+	    --icmp \
+	    --count 1 --delay 200ms --data-length 32 \
+	    --interface ${dev} \
+	    --dest-ip ${gw} 2> /dev/null > /tmp/nping.${$}
+
+	ret=${?}
+	rm -f /tmp/nping.${$}
+
+	test ${ret} -ne 0 || return 0
+
+	grep --quiet "Lost: 0" /tmp/nping.${$} > /dev/null 2>&1
+
+	ret=${?}
+	rm -f /tmp/nping.${$}
+
+	test ${ret} -ne 0 || return 0
+    done
+
+    return 1
+}
+
+chattr-copy()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    local src_file=${1}
+    local dst_file=${2}
+
+    test -f ${src_file} || return 11
+    local dst_dir
+
+    if test -f ${dst_file} ; then
+	chattr -i ${dst_file}
+    else
+	dst_dir=$(file-dirname ${dst_file})
+	test -d ${dst_dir} || return 13
+	chattr -i ${dst_dir}
+    fi
+
+    cp -f ${src_file} ${dst_file}
+    chattr +i ${dst_file}
+
+    test -z "${dst_dir}" || chattr +i ${dst_dir}
+}
+
+LIB_APL_TOOLS=Yes

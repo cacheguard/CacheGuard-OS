@@ -1,0 +1,3 @@
+408
+Request time-out
+The Web Gateway closed the network connection because the browser didn't finish the request within the specified time

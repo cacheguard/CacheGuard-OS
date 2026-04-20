@@ -1,0 +1,65 @@
+Manage the persistent Web cache
+.SH SYNOPSIS
+
+[1] \fBcache [object\fR [\fI<min-size>\fR \fI<max-size>\fR]]
+
+[2] \fBcache  [bigobject\fR [\fBoff\fR | \fBon\fR \fI<min-size>\fR \fI<max-size>\fR]]
+
+[3] \fBcache\fR  [\fBclear\fR [\fBreport\fR | \fBforce\fR [\fBwait\fR]]]
+
+[4] \fBcache  [loadurl\fR \fI<url>\fR]
+
+[5] \fBcache  [report\fR [\fBsize\fR | \fBrsize\fR | \fBbigsize\fR | \fBmeanobject\fR | \fBused\fR | \fBrused\fR | \fBhit\fR]]
+
+.SH DESCRIPTION
+
+The first [1] usage form is used to modify the maximum cached object size in the persistent memory. Higher values save more bandwidth but may rapidly saturate the persistent cache memory.  Lower values cache smaller objects and therefore increase performance. The size is specified in kilobytes. 
+
+The minimum size for cached object should be greater than or equal to 0 KB and less than or equal to the configured maximum size. The maximum size for cached object should be greater than or equal to 1024 KB and less than or equal to 262144 KB (256 MB). We suggest leaving these limits at their default values that are 1 KB for the minimum and 51200 KB (50 megabytes) for the maximum.
+
+Objects smaller than or greater than those limits are not cached unless you activate the caching for big objects. When this type of caching is activated the system reserves an area its persistent cache to store objects bigger than the upper limit for common objects. This feature allows you to cache very big objects like smartphone OS without the disadvantage of having your total cache saturated by very big objects. The second [2] usage form allows you to manage big objects caching.
+
+The third [3] usage form allows you to activate or deactivate the caching of very big objects. To activate this type of caching use the keyword \fBon\fR followed by the minim and maximum sizes for very big objects expressed in KB. The given minimum size should be greater or equal to the maximum object size for common objects and lesser than or equal to the size of the area reserved on the persistent cache for very big objects. To deactivate it, use the keyword \fBoff\fR. When the caching for very big objects is deactivated, the cache is totally used to store common objects.
+
+The size of the area reserved on the persistent cache for very big objects varies depending on the size of your hard drive(s) and other parameters given during the installation (the fifth usage form described later allows you to get this size).
+
+In some circumstances you may need to clear the entire persistent cache. The third [3] usage form allows you to clear the entire persistent Web cache and the SSL certificate cache used in SSL mediation mode (see the command \fBmode\fR). The cache clearing operation runs in background unless the \fBforce wait\fR keywords are used.
+
+The fourth [4] usage form is used to force the system to reload a given URL. A valid URL value must be in the form: 
+
+.I <protocole>://<domainname>[/<path>]
+in which
+.I <protocole> is
+.B http, https
+.B ftp.
+See the command
+.B domainname
+for a valid domain name format. The last optional part
+.I <path>,
+is a path to a regular filename on the remote server.
+
+This command is useful for automating the loading of specific URLs using the ssh programmed command and a remote task scheduler.
+
+The third usage form allows you to clear the entire persistent Web cache. When this command is invoked, the user is invited to confirm the clearing execution. The optional argument \fBforce\fR, allows you to bypass this confirmation. The optional argument \fBreport\fR, allows you to display a system report of the last
+.B cache clear
+command. Clearing operation is an asynchronous command and is executed in background. Note that you have to wait for the termination of other asynchronous commands before running this command.
+
+The fifth [5] usage form allows you to display a \fBreport\fR on the cache size and activity. The keyword \fBsize\fR displays the total cache capacity in Kilo Byte while the keyword \fBused\fR displays the percentage of the main cache filled by Web objects. The keyword \fBbigsize\fR displays the cache size for big objects. The keyword \fBmeanobject\fR displays the mean object size in the persistent cache. The keyword \fBhit\fR displays the main cache usage. It expresses how much data and requests are retrieved from the main cache compared to all data and requests passing through the system since the last cache initialization (or clearing).
+
+In some particular configurations, reverse websites use a cache space other than the main cache space. This cache space is called the rWeb cache and should have been reserved during the appliance installation. The rWeb cache is activated in one of the following configurations:
+
+* The WAF mode is activated.
+
+* At least one rWeb site uses a sticky load balancing  over more than one backend Web server.
+
+* At least one rWeb site uses a load balancing method other than the round robin over more than one backend Web server. 
+
+Keywords \fBrsize\fR and \fBrused\fR display respectively the rWeb cache size and the the percentage of the rWeb cache filled by Web objects. Without any keyword, the command \fBcache report\fR displays all these values. The limitation is that the caching of very big objects is not possible in those configuration for reverse websites.
+
+.SH SEE ALSO
+.B admin
+(1)
+.B apply
+(1)
+.B mode
+(1)

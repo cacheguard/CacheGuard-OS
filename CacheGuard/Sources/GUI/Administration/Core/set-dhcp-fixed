@@ -1,0 +1,61 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       GUI
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+set-dhcp-fixed-ips()
+{
+    local pos=0 entry_pos del_pos
+    local hostname_pos mac_pos ip_pos
+
+    local transaction=/tmp/${TRANSACTION_FILE}.wadmin.${REMOTE_USER}.${$}
+    rm -f ${transaction}
+
+    while test ${pos} -lt ${ATTRIBUTE_NB}
+    do
+	entry_pos=${pos}
+	hostname_pos=$[${pos} + 1]
+	mac_pos=$[${pos} + 2]
+	ip_pos=$[${pos} + 3]
+	del_pos=$[${pos} + 4]
+	
+	[[ "${ATTRIBUTES[${del_pos}]}" =~ ^del_[0-9]+$ ]]
+	if test ${?} -ne 0 ; then
+	    if test "${VALUES[${entry_pos}]}" == anew -a \
+		    -n "${VALUES[${hostname_pos}]}" -a \
+		    -n "${VALUES[${mac_pos}]}" -a \
+		    -n "${VALUES[${ip_pos}]}" ; then
+		echo "dhcp fixed add '${VALUES[${hostname_pos}]}' '${VALUES[${mac_pos}]}' '${VALUES[${ip_pos}]}'" >> ${transaction}
+	    fi
+	    pos=$[${pos} + 4]
+	else
+	    echo "dhcp fixed del '${VALUES[${hostname_pos}]}'" >> ${transaction}
+	    pos=$[${pos} + 5]
+	fi
+    done
+    
+    execute-transaction ${transaction}
+}
+
+# Main()
+
+set-dhcp-fixed-ips

@@ -1,0 +1,3 @@
+The requested URL could not be retrieved
+This Web Gateway limits your time online with a quota. Your time budget is now empty but will be refilled when the configured time period starts again
+These limits have been established by the internet Service Provider who operates this Web Gateway. Please contact them directly if you feel this is an error.

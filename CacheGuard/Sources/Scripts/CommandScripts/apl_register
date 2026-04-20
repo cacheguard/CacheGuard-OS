@@ -1,0 +1,91 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       Scripts
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+source /usr/local/lib/apl_functions
+
+print-usage()
+{
+    echo "Usage: apl_register appliance (new <otp> <email> | old <password>)"
+    echo "Usage: apl_register appliance cld (<email>)?"
+    echo "Usage: apl_register (serial | check)"
+}
+
+main()
+{
+    local register=${1}
+
+    local ret=0 msg
+
+    case "${register}" in
+	appliance)
+	    shift
+	    case "${1}" in
+		new)
+		    if test -n "${2}" -a -n "${3}" ; then
+			msg=$(register-appliance "${@}")
+			ret=${?}
+		    else
+			print-usage
+			ret=101
+		    fi
+		    ;;
+
+		old)
+		    if test -n "${2}" ; then
+			msg=$(register-appliance "${@}")
+			ret=${?}
+		    else
+			print-usage
+			ret=103
+		    fi
+		    ;;
+		cld)
+		    msg=$(register-appliance "${@}")
+		    ret=${?}
+		    ;;
+		*)
+		    print-usage
+		    ret=111
+		    ;;
+	    esac
+	    ;;
+	serial)
+	    msg=$(register-serial)
+	    ret=${?}
+	    ;;
+	check)
+	    msg=$(register-check)
+	    ret=${?}
+	    ;;
+	*)
+	    print-usage
+	    ret=201
+	    ;;
+    esac
+
+    test ${ret} -ne 0 || echo ${msg}
+    return ${ret}
+}
+
+main "${@}"

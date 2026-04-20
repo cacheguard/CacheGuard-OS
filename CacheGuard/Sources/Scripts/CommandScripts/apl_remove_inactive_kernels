@@ -1,0 +1,72 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       Scripts
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+remove-immutable-file()
+{
+    test -n "${1}" || return 1
+    local file=${1}
+
+    test -f ${file} || return 11
+
+    chattr -i ${file}
+    rm -f ${file}
+}
+
+remove-inactive-kernels()
+{
+    local active_kernel=$(uname -r 2> /dev/null) file
+
+    chattr -i /usr/lib/modules /boot
+
+    cd /usr/lib/modules
+    local kernels=$(ls -1 2> /dev/null) kernel
+
+    for kernel in ${kernels}
+    do
+	test ${kernel} != ${active_kernel} || continue
+
+	chattr -R -i ${kernel}
+	rm -rf ${kernel}
+
+	for file in System.map \
+		    config \
+		    kernel
+	do
+	    remove-immutable-file /boot/${file}-${kernel}
+	done
+
+	remove-immutable-file /boot/initrd-${kernel}.img
+    done
+
+    chattr +i /usr/lib/modules /boot
+}
+
+main()
+{
+    remove-inactive-kernels
+}
+
+# Main
+
+main "${@}"

@@ -1,0 +1,657 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       Configurator
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+set-av-parameters()
+{
+    local state=${1}
+    test -n "${state}" || state=new
+
+    case ${state} in
+	new|cur)
+	    ;;
+	*)
+	    return 11
+	    ;;
+    esac
+
+    local av_full_name=$(freshclam --version 2>/dev/null)
+    local av_full_version=${av_full_name#* }
+    local av_version=${av_full_version/\/*}
+    
+    case ${state} in
+	cur)
+	    CURRENT_AV_MAX_SCAN=$[${CURRENT_AV_MAX_OBJECT_SZ} * 4]
+	    ;;
+	new)
+	    AV_MAX_SCAN=$[${AV_MAX_OBJECT_SZ} * 4]
+	    ;;
+
+	*)
+	    return 255
+	    ;;
+    esac
+
+    ICAP_LOCAL_IP=127.0.0.3
+    AV_LOCAL_IP=127.0.0.3
+    AV_AGENT=clamav/${av_version}
+}
+
+set-av-extended-parameters()
+{
+    local state=${1}
+    case ${state} in
+	new|cur|"")
+	    ;;
+	*)
+	    return 1
+	    ;;
+    esac
+
+    if test -z "${state}" -o "${state}" == new ; then
+
+	local av_extended_protocol_server_path=$(get-protocol-server-path-from-url "${AV_EXTENDED_URL}")
+	AV_EXTENDED_PROTOCOL=$(get-record-field "${av_extended_protocol_server_path}" 1)
+	AV_EXTENDED_SERVER=$(get-record-field "${av_extended_protocol_server_path}" 2)
+	AV_EXTENDED_PATH=$(get-record-field "${av_extended_protocol_server_path}" 3)
+
+	if is-av-extended-enabled new ${AV_EXTENDED_PROTOCOL} ${AV_EXTENDED_SERVER} ; then
+	    AV_EXTENDED_MODE=True
+	else
+	    AV_EXTENDED_MODE=False
+	fi
+    fi
+
+    if test -z "${state}" -o "${state}" == cur ; then
+
+	local av_extended_protocol_server_path=$(get-protocol-server-path-from-url "${CURRENT_AV_EXTENDED_URL}")
+	CURRENT_AV_EXTENDED_PROTOCOL=$(get-record-field "${av_extended_protocol_server_path}" 1)
+	CURRENT_AV_EXTENDED_SERVER=$(get-record-field "${av_extended_protocol_server_path}" 2)
+	CURRENT_AV_EXTENDED_PATH=$(get-record-field "${av_extended_protocol_server_path}" 3)
+	
+	if is-av-extended-enabled cur ${CURRENT_AV_EXTENDED_PROTOCOL} ${CURRENT_AV_EXTENDED_SERVER} ; then
+	    CURRENT_AV_EXTENDED_MODE=True
+	else
+	    CURRENT_AV_EXTENDED_MODE=False
+	fi
+    fi
+}
+
+purge-loaded-av-extended-index()
+{
+    local index_file=/var/tmp/${AV_EXTENDED_INDEX_FILENAME}
+
+    rm -f \
+       ${index_file} \
+       ${index_file}.${SIGNATURE}
+}
+
+commit-loaded-av-extended-index()
+{
+    local index_file=/var/tmp/${AV_EXTENDED_INDEX_FILENAME}
+
+    test ! -f ${index_file} || \
+	install -m 664 -o ${MANAGER_NAME} -g ${GROUP_NAME} ${index_file} ${AV_EXTENDED_CACHE_DIR}
+
+    test ! -f ${index_file}.${SIGNATURE} || \
+	install -m 664 -o ${MANAGER_NAME} -g ${GROUP_NAME} ${index_file}.${SIGNATURE} ${AV_EXTENDED_CACHE_DIR}
+
+    purge-loaded-av-extended-index
+}
+
+download-av-extended-index-retry()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    test -n "${3}" || return 3
+    test -n "${4}" || return 4
+    test -n "${5}" || return 5
+    local protocol=${1}
+    local ftp_passive_mode=${2}
+    local server=${3}
+    local url=${4}
+    local target=${5}
+
+    local ret usleep=10000000
+    local curl_command=$(get-curl-command ${protocol} ${ftp_passive_mode})
+
+    curl_command="${curl_command} --connect-timeout 10 --max-time 15 --silent --url ${url} -o ${target}"
+    
+    ${curl_command} 2> /dev/null
+    ret=${?}
+
+    case ${ret} in
+	0)
+	    ;;
+	68|78)
+	    # The case where the update is done during the index publication by the central server
+	    usleep ${sleep}
+	    ${curl_command} 2> /dev/null
+	    ret=${?}
+	    ;;
+	*)
+	    ;;
+    esac
+
+    return ${ret}
+}
+
+download-av-extended-index()
+{
+    test -n "${1}" || return 1
+    local state=${1}
+
+    case ${state} in
+	new)
+	    local av_extended_url=${AV_EXTENDED_URL}
+	    local av_protocol=${AV_EXTENDED_PROTOCOL}
+	    local av_server=${AV_EXTENDED_SERVER}
+	    local av_extended_method=${AV_EXTENDED_METHOD}
+	    local ftp_passive_mode=${FTP_PASSIVE_MODE}
+	    ;;
+	cur)
+	    local av_extended_url=${CURRENT_AV_EXTENDED_URL}
+	    local av_protocol=${CURRENT_AV_EXTENDED_PROTOCOL}
+	    local av_server=${CURRENT_AV_EXTENDED_SERVER}
+	    local av_extended_method=${CURRENT_AV_EXTENDED_METHOD}
+	    local ftp_passive_mode=${CURRENT_FTP_PASSIVE_MODE}
+	    ;;
+	*)
+	    return 1
+	    ;;
+    esac
+
+    local ret ret1 ret2=0
+    local index_file=/var/tmp/${AV_EXTENDED_INDEX_FILENAME}
+
+    case ${av_protocol} in
+	ftp|sftp)
+	    DOWNLOAD_ACCOUNT_DIR=${ABASE_DIR} gen-netrc ${av_server} ${av_protocol} > ${HOME}/.netrc
+	    ;;
+	*)
+	    ;;
+    esac
+    download-av-extended-index-retry ${av_protocol} ${ftp_passive_mode} ${av_server} ${av_extended_url}/index ${index_file}
+    ret1=${?}
+
+    if test ${ret1} -eq 0 ; then
+	if test ${av_extended_method} == vload ; then
+	    download-av-extended-index-retry ${av_protocol} ${ftp_passive_mode} ${av_server} ${av_extended_url}/index.${SIGNATURE} ${index_file}.${SIGNATURE}
+	    ret2=${?}
+	fi
+    fi
+
+    ret=$(max-value ${ret1} ${ret2})
+
+    case ${av_protocol} in
+	ftp|sftp)
+	    echo -n > ${HOME}/.netrc
+	    ;;
+	*)
+	    ;;
+    esac
+
+    if test ${ret} -ne 0 ; then
+	purge-loaded-av-extended-index
+	return ${ret}
+    fi
+
+    if test ${av_extended_method} == vload ; then
+	check-vloaded-signature ${index_file}
+	ret=${?}
+	if test ${ret} -ne 0 ; then
+	    purge-loaded-av-extended-index
+	    return 101
+	fi
+    fi
+
+    commit-loaded-av-extended-index
+}
+
+get-db-sig-sz()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    local db_name=${1}
+    local db_location=${2}
+
+    local db_file sz
+
+    if test ${db_location} == "local" ; then
+	if test -f ${AV_DB_DIR}/${db_name}.cld ; then
+	    db_file=${AV_DB_DIR}/${db_name}.cld
+	else
+	    db_file=${AV_DB_DIR}/${db_name}.cvd
+	fi
+	local ls_info=$(ls -l ${db_file} 2> /dev/null)
+	if test -z "${ls_info}" ; then sz=0 ; else sz=$(get-record-field "${ls_info}" 5) ; fi
+    else
+	local dig_options="+noall +short +ignore +timeout=5 +tries=2"
+	local av_name=$(dig ${dig_options} ${AV_DOMAIN_NAME} cname 2> /dev/null)
+	if test "${av_name:0:2}" == ';;' ; then
+	    sz=0
+	else
+	    local len=${#av_name}
+	    if test ${len} -gt 1 ; then
+		((len--))
+		av_name=${av_name:0:${len}}
+		sz=$(get-sz-from-http-header https://${av_name}/${db_name}.cvd 2 3 "${AV_AGENT}")
+	    else
+		sz=0
+	    fi
+	fi
+    fi
+
+    echo -n "${sz}"
+}
+
+reset-av-extended-dbs()
+{
+    test -f ${AV_EXTENDED_CACHE_DIR}/${AV_EXTENDED_INDEX_FILENAME} || return 0
+
+    local db_name db_file
+    local db sz md5
+    local ret
+
+    rm -f ${AV_VAR_DIR}/${AV_EXTENDED_LAST_UPDATE_FILENAME}
+    ret=${?}
+    
+    while read db sz md5
+    do
+	test -n "${md5}" || continue
+	test ${db:0:1} != '#' || continue
+	db_name=${db%\.gz}
+
+	case ${APL_ROLE} in
+	    gateway)
+		db_file=${AV_DB_DIR}/${db_name}
+		;;
+	    manager)
+		db_file=${AV_EXTENDED_CACHE_DB_DIR}/${db_name}.gz
+		;;
+	    *)
+		;;
+	esac
+
+	rm -f ${db_file} || ((ret++))
+    done < ${AV_EXTENDED_CACHE_DIR}/${AV_EXTENDED_INDEX_FILENAME}
+
+    rm -f \
+       ${AV_EXTENDED_CACHE_DB_DIR}/* \
+       ${AV_EXTENDED_CACHE_DIR}/${AV_EXTENDED_INDEX_FILENAME} \
+       ${AV_EXTENDED_CACHE_DIR}/${AV_EXTENDED_INDEX_FILENAME}.${SIGNATURE}
+
+    return ${ret}
+}
+
+reset-av-extended-db-sz()
+{
+    echo -n 0 > ${RUN_DIR}/${AV_EXTENDED_DB_SZ_FILENAME}
+    echo -n 0 > ${RUN_DIR}/${AV_EXTENDED_DB_DOWNLOADED_SZ_FILENAME}
+}
+
+refresh-av-regular-db-sz()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    local main_location=${1}
+    local daily_location=${2}
+
+    local main_sz=$(get-db-sig-sz main ${main_location})
+    local daily_sz=$(get-db-sig-sz daily ${daily_location})
+    local total_sz=$[${main_sz} + ${daily_sz}]
+    local downloaded_sz=0
+
+    test ${main_location} != "local" || ((downloaded_sz += main_sz))
+    test ${daily_location} != "local" || ((downloaded_sz += daily_sz))
+
+    echo -n ${total_sz} > ${RUN_DIR}/${AV_REGULAR_DB_SZ_FILENAME}
+    echo -n ${downloaded_sz} > ${RUN_DIR}/${AV_REGULAR_DB_DOWNLOADED_SZ_FILENAME}
+}
+
+gen-clamd-conf()
+{
+    cat clamd.conf-constant
+    cat clamd.conf-tuned
+
+    if test "${AV_PUA}" == True ; then
+	echo "DetectPUA yes"
+    else
+	echo "DetectPUA no"
+    fi
+
+    if test "${LOG_TYPE_ANTIVIRUS_SERVER/:*}" == True ; then
+
+	local log
+
+	test ${AV_INTERNAL} == False -a ${AV_EXTERNAL} == False -a ${AV_AUXILIARY} == False || log='yes'
+	test ${VPN_IPSEC_MODE} == False -o ${AV_VPN_IPSEC} == False || log='yes'
+
+	if test -n "${log}" ; then
+	    echo "LogSyslog yes"
+	else
+	    echo "LogSyslog no"
+	fi
+    else
+	echo "LogSyslog no"
+    fi
+
+    echo "MaxFileSize ${AV_MAX_OBJECT_SZ}K"
+    echo "MaxScanSize ${AV_MAX_SCAN}K"
+    echo "StreamMaxLength ${AV_MAX_SCAN}K"
+    echo "MaxFiles 10000"
+    echo "TCPSocket ${AV_PORT}"
+    echo "TCPAddr ${AV_LOCAL_IP}"
+
+    local listen
+
+    test ${AV_INTERNAL} == False  || listen='yes'
+    test ${VPN_IPSEC_MODE} == False -o ${AV_VPN_IPSEC} == False || listen='yes'
+
+    if test -n "${listen}" ; then
+	if test ${HA_MODE} == True ; then
+	    for ip in ${VRRP_AV_IP_LIST}
+	    do
+		test "${ip}" ==  "0.0.0.0" || echo "TCPAddr ${ip}"
+	    done
+	else
+	    test "${IP_AV_IP}" ==  "0.0.0.0" || echo "TCPAddr ${IP_AV_IP}"
+	fi
+    fi
+
+    if test ${AV_EXTERNAL} == True ; then
+	if test ${HA_MODE} == True ; then
+	    for ip in ${VRRP_EXTERNAL_IP_LIST}
+	    do
+		test "${ip}" ==  "0.0.0.0" || echo "TCPAddr ${ip}"
+	    done
+	else
+	    test "${IP_EXTERNAL_IP}" ==  "0.0.0.0" || echo "TCPAddr ${IP_EXTERNAL_IP}"
+	fi
+    fi
+
+    if test -n "${IF_AUXILIARY}" -a ${IP_AUXILIARY_IP} != 0.0.0.0 -a ${AV_AUXILIARY} == True ; then
+	if test ${HA_MODE} == True ; then
+	    for ip in ${VRRP_AUXILIARY_IP_LIST}
+	    do
+		test "${ip}" ==  "0.0.0.0" || echo "TCPAddr ${ip}"
+	    done
+	else
+	    test "${IP_AUXILIARY_IP}" ==  "0.0.0.0" || echo "TCPAddr ${IP_AUXILIARY_IP}"
+	fi
+    fi
+}
+
+gen-freshclam-conf()
+{
+    cat freshclam.conf-constant
+}
+
+gen-c-icap-conf()
+{
+    cat c-icap.conf-constant
+    cat c-icap.conf-tuned
+
+    echo "Port ${ICAP_LOCAL_IP}:${ICAP_PORT}"
+    echo "ServerAdmin ${ADMINISTRATOR_EMAIL}"
+    echo "Include virus_scan.conf"
+}
+
+build-av-whitelist()
+{
+    if test ${APL_ROLE} == manager ; then
+
+	if test -f ${TMP_DIR}/${AV_WHITELIST_SIG}.2del ; then
+	    log "Clearing the Antivirus white list"
+	    rm -f \
+	       ${TMP_DIR}/${AV_WHITELIST_SIG}.2del \
+	       ${AV_VAR_DIR}/${AV_WHITELIST_SIG}
+	    log-result ${?}
+
+	elif test -f ${TMP_DIR}/${LOADED}.${AV_WHITELIST_SIG} ; then
+	    log "Committing the Antivirus White List"
+	    mv -f ${TMP_DIR}/${LOADED}.${AV_WHITELIST_SIG} ${AV_VAR_DIR}/${AV_WHITELIST_SIG}
+	    log-result ${?}
+	fi
+	return 0
+    fi
+
+    local ret
+
+    if test -f ${TMP_DIR}/${AV_WHITELIST_SIG}.2del ; then
+	log "Clearing the Antivirus white list"
+	rm -f \
+	   ${TMP_DIR}/${AV_WHITELIST_SIG}.2del \
+	   ${AV_VAR_DIR}/${AV_WHITELIST_SIG} \
+	   ${AV_DB_DIR}/local_whitelist.ign2
+	ret=${?}
+	log-result ${ret}
+
+	test ${CURRENT_AV_MODE} == True || return ${ret}
+	/etc/rc.d/init.d/clamd reload < /dev/console
+	return ${ret}
+    fi
+    
+    local wl_file=${TMP_DIR}/${LOADED}.${AV_WHITELIST_SIG}
+    test -f ${wl_file} || return 0
+    
+    log "Integrating the Antivirus White List"
+
+    mv -f ${wl_file} /var/tmp/local_whitelist.ign2.work1 &&
+
+    local virus_name
+    
+    while read virus_name
+    do
+	virus_name=${virus_name%\.UNOFFICIAL}
+	echo ${virus_name}
+    done < /var/tmp/local_whitelist.ign2.work1 > /var/tmp/local_whitelist.ign2.work2
+
+    if test ${?} -ne 0 ; then
+	ret=11
+	rm -f \
+	   /var/tmp/local_whitelist.ign2.work1 \
+	   /var/tmp/local_whitelist.ign2.work2
+	log-result ${ret}
+	return ${ret}
+    fi
+
+    install -m 644 -o av -g av /var/tmp/local_whitelist.ign2.work2 ${AV_DB_DIR}/local_whitelist.ign2 &&
+	mv -f /var/tmp/local_whitelist.ign2.work1 ${AV_VAR_DIR}/${AV_WHITELIST_SIG}
+
+    if test ${?} -ne 0 ; then
+	ret=13
+	rm -f \
+	   /var/tmp/local_whitelist.ign2.work1 \
+	   /var/tmp/local_whitelist.ign2.work2 \
+	   ${AV_VAR_DIR}/${AV_WHITELIST_SIG} \
+	   ${AV_DB_DIR}/local_whitelist.ign2
+	log-result ${ret}
+	return ${ret}
+    fi
+
+    log-result 0
+    
+    test ${CURRENT_AV_MODE} == True || return 0
+
+    /etc/rc.d/init.d/clamd reload < /dev/console
+
+    if test ${?} -ne 0 ; then
+	ret=15
+	rm  ${AV_DB_DIR}/local_whitelist.ign2
+	log-result ${ret}
+	return ${ret}
+    fi
+}
+
+gen-virus-scan-conf()
+{
+    cat virus_scan.conf-constant
+
+    test ${LOG_MODE} == False -o ${LOG_TYPE_ANTIVIRUS/:*} == False || echo "Logger sys_logger"
+    echo
+    echo "clamd_mod.ClamdHost ${AV_LOCAL_IP}"
+    echo "clamd_mod.ClamdPort ${AV_PORT}"
+    echo "virus_scan.StartSendPercentDataAfter ${AV_MAX_OBJECT_SZ}"
+    echo "# virus_scan.VirHTTPUrl http://${WEB_SERVER}/${AV_DENIED_URI}?url=%f&source=&user=&virus="
+}
+
+gen-clamav-extended-cron()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    local state=${1}
+    local minutes=${2}
+
+    if test ${state} == True ; then
+	unset state
+    else
+	state="# "
+    fi
+
+    test ${APL_ROLE} != manager || minutes='*/30'
+
+    echo "SHELL=/bin/bash"
+    echo "PATH=${PATH}"
+    echo "MAILTO=''"
+    echo
+    echo "${state}${minutes} * * * * root [ -x ${LOCAL_DIR}/bin/apl_av_extended_update ] && apl_av_extended_update cur update index"
+}
+
+activate-clamav-extended-cron()
+{
+    if test -f ${AV_VAR_DIR}/${AV_EXTENDED_LAST_UPDATE_FILENAME} ; then
+	local seconds=$(cat ${AV_VAR_DIR}/${AV_EXTENDED_LAST_UPDATE_FILENAME} 2> /dev/null)
+	check-digit ${seconds} || seconds=$(date +"%s" 2> /dev/null)
+	local minutes=$(date --date="1970-01-01 00:00:00 UTC +${seconds} seconds" +"%M" 2> /dev/null)
+    else
+	local minutes=$(date +"%M" 2> /dev/null)
+    fi
+
+    test ${minutes:0:1} != 0 || minutes=${minutes:1}
+    ((minutes--))
+    test ${minutes} -ge 0 || minutes=59	
+
+    gen-clamav-extended-cron True ${minutes} > /etc/cron.d/${AV_EXTENDED_CRON_FILENAME}
+}
+
+deactivate-clamav-extended-cron()
+{
+    local minutes=$[(RANDOM % 59) + 1]
+
+    gen-clamav-extended-cron False ${minutes} > /etc/cron.d/${AV_EXTENDED_CRON_FILENAME}
+}
+
+commit-clamav-extended()
+{
+    test -n "${1}" || return 1
+    local mode=${1}
+
+    if test ${mode} != force ; then
+	if test "${AV_EXTENDED_MODE}" == "${CURRENT_AV_EXTENDED_MODE}" ; then
+	    case ${APL_ROLE} in
+		gateway)
+		    test "${AV_MODE}" != "${CURRENT_AV_MODE}" || return 0
+		    ;;
+		manager)
+		    return 0
+		    ;;
+		*)
+		    ;;
+	    esac
+	fi
+    fi
+
+    local condition
+
+    case ${APL_ROLE} in
+	    gateway)
+		condition=${AV_MODE}
+		;;
+	    manager)
+		condition=True
+		;;
+	    *)
+		;;
+    esac
+
+    if test "${condition}" == True -a "${AV_EXTENDED_MODE}" == True ; then
+	activate-clamav-extended-cron
+    else
+	deactivate-clamav-extended-cron
+	reset-av-extended-db-sz
+    fi
+
+    test "${AV_EXTENDED_MODE}" == True -a ${mode} != force || reset-av-extended-dbs
+}
+
+restore-clamav-extended()
+{
+    if test "${AV_EXTENDED_MODE}" == "${CURRENT_AV_EXTENDED_MODE}" ; then
+	case ${APL_ROLE} in
+	    gateway)
+		test "${AV_MODE}" != "${CURRENT_AV_MODE}" || return 0
+		;;
+	    manager)
+		return 0
+		;;
+	    *)
+		;;
+	esac
+    fi
+
+    local condition
+
+    case ${APL_ROLE} in
+	    gateway)
+		condition=${CURRENT_AV_MODE}
+		;;
+	    manager)
+		condition=True
+		;;
+	    *)
+		;;
+    esac
+
+    if test "${condition}" == True -a "${CURRENT_AV_EXTENDED_MODE}" == True ; then
+	activate-clamav-extended-cron
+    else
+	deactivate-clamav-extended-cron
+	reset-av-extended-db-sz
+    fi
+    test "${CURRENT_AV_EXTENDED_MODE}" == True || reset-av-extended-dbs
+}
+
+verify-av-signature()
+{
+    test -n "${1}" || return 1
+    local db=${1}
+
+    if test -f ${AV_DB_DIR}/${db}.cld ; then
+	sigtool --quiet -i ${AV_DB_DIR}/${db}.cld 2> /dev/null
+    else
+	sigtool --quiet -i ${AV_DB_DIR}/${db}.cvd 2> /dev/null
+    fi
+}
+
+LIB_APL_AV=Yes

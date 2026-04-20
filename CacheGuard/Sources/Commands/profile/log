@@ -1,0 +1,451 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       Commands
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+__complete-log()
+{
+    test -n "${COMP_CWORD-1}" || return 1
+
+    case ${COMP_CWORD} in
+	1)
+	    case ${COMP_WORDS[1]} in
+		r|ro|rot|rota|rotat|rotate)
+		    COMPREPLY=(rotate)
+		    ;;
+		s)
+		    COMPREPLY=('' save syslog)
+		    ;;
+		sa|sav|save)
+		    COMPREPLY=(save)
+		    ;;
+		sy|sys|sysl|syslo|syslog)
+		    COMPREPLY=(syslog)
+		    ;;
+		t|ty|typ|'type')
+		    COMPREPLY=('type')
+		    ;;
+		'')
+		    COMPREPLY=('' '<RET>' rotate save syslog type)
+		    ;;
+		*)
+		    COMPREPLY=()
+		    ;;
+	    esac
+	    ;;
+	2)
+	    case ${COMP_WORDS[1]} in
+		save)
+		    case ${COMP_WORDS[2]} in
+			f|"fi"|fir|fire|firew|firewa|firewal|firewall)
+			    COMPREPLY=(firewall)
+			    ;;
+			g|gu|gua|guar|guard)
+			    COMPREPLY=(guard)
+			    ;;
+			a)
+			    COMPREPLY=('' antivirus avserver)
+			    ;;
+			an|ant|anti|antiv|antivi|antivir|antiviru|antivirus)
+			    COMPREPLY=(antivirus)
+			    ;;
+			av|avs|avse|avser|avserv|avserve|avserver)
+			    COMPREPLY=(avserver)
+			    ;;
+			w)
+			    COMPREPLY=('' web waf)
+			    ;;
+			wa|waf)
+			    COMPREPLY=(waf)
+			    ;;
+			we|web)
+			    COMPREPLY=(web)
+			    ;;
+			r|rw|rwe|rweb)
+			    COMPREPLY=(rweb)
+			    ;;
+			v|vp|vpn|vpni|vpnip|vpnips|vpnipse|vpnipsec)
+			    COMPREPLY=(vpnipsec)
+			    ;;
+			s|sy|sys|syst|syste|system)
+			    COMPREPLY=(system)
+			    ;;
+			'')
+			    COMPREPLY=('' firewall web rweb guard antivirus avserver waf vpnipsec system)
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		syslog)
+		    case ${COMP_WORDS[2]} in
+			r|ra|raz)
+			    COMPREPLY=(raz)
+			    ;;
+			a|ad|add)
+			    COMPREPLY=(add)
+			    ;;
+			d|de|del)
+			    COMPREPLY=(del)
+			    ;;
+			t|te|tes|'test')
+			    COMPREPLY=('test')
+			    ;;
+			c|ca)
+			    COMPREPLY=(ca)
+			    ;;			    
+			'')
+			    COMPREPLY=('' '<RET>' raz add del test ca)
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		'type')
+		    case ${COMP_WORDS[2]} in
+			f|"fi"|fir|fire|firew|firewa|firewal|firewall)
+			    COMPREPLY=(firewall)
+			    ;;
+			g|gu|gua|guar|guard)
+			    COMPREPLY=(guard)
+			    ;;
+			a)
+			    COMPREPLY=('' antivirus avserver)
+			    ;;
+			an|ant|anti|antiv|antivi|antivir|antiviru|antivirus)
+			    COMPREPLY=(antivirus)
+			    ;;
+			av|avs|avse|avser|avserv|avserve|avserver)
+			    COMPREPLY=(avserver)
+			    ;;
+			w)
+			    COMPREPLY=('' web waf)
+			    ;;
+			wa|waf)
+			    COMPREPLY=(waf)
+			    ;;
+			we|web)
+			    COMPREPLY=(web)
+			    ;;
+			r|rw|rwe|rweb)
+			    COMPREPLY=(rweb)
+			    ;;
+			'')
+			    COMPREPLY=('' firewall web rweb guard antivirus avserver waf)
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		rotate)
+		    case ${COMP_WORDS[2]} in
+			r|re|rep|repo|repor|report)
+			    COMPREPLY=(report)
+			    ;;
+			f|fo|"for"|forc|force)
+			    COMPREPLY=(force)
+			    ;;
+			'')
+			    COMPREPLY=('' '<RET>' force report)
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		*)
+		    COMPREPLY=()
+		    ;;
+	    esac
+	    ;;
+	3)
+	    case ${COMP_WORDS[1]} in
+		save)
+		    case ${COMP_WORDS[2]} in
+			firewall|system|web|rweb|guard|waf|antivirus|avserver|vpnipsec)
+			    COMPREPLY=('' '<serial>')
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		syslog)
+		    case ${COMP_WORDS[2]} in
+			add|del)
+			    case ${COMP_WORDS[3]} in
+				t)
+				    COMPREPLY=('' tcp tls)
+				    ;;
+				tc|tcp)
+				    COMPREPLY=(tcp)
+				    ;;
+				u|ud|udp)
+				    COMPREPLY=(udp)
+				    ;;
+				tl|tls)
+				    COMPREPLY=(tls)
+				    ;;
+				'')
+				    COMPREPLY=('' tcp tls udp)
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			ca)
+			    case ${COMP_WORDS[3]} in
+				r|ra|raz)
+				    COMPREPLY=(raz)
+				    ;;
+				s|se|'set')
+				    COMPREPLY=('set')
+				    ;;
+				'')
+				    COMPREPLY=('' '<RET>' set raz)
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		'type')
+		    case ${COMP_WORDS[2]} in
+			firewall|web|rweb|guard|waf|antivirus|avserver)
+			    case ${COMP_WORDS[3]} in
+				o)
+				    COMPREPLY=('' on off)
+				    ;;
+				of|off)
+				    COMPREPLY=(off)
+				    ;;
+				on)
+				    COMPREPLY=(on)
+				    ;;
+				'')
+				    COMPREPLY=('' '<RET>' on off)
+				    ;;
+			    esac
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		rotate)
+		    case ${COMP_WORDS[2]} in
+			force)
+			    case ${COMP_WORDS[3]} in
+				w|wa|wai|wait)
+				    COMPREPLY=(wait)
+				    ;;
+				'')
+				    COMPREPLY=('' '<RET>' wait)
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		*)
+		    COMPREPLY=()
+		    ;;
+	    esac
+	    ;;
+	4)
+	    case ${COMP_WORDS[1]} in
+		save)
+		    case ${COMP_WORDS[2]} in
+			firewall|system|web|rweb|guard|waf|antivirus|avserver|vpnipsec)
+			    case ${COMP_WORDS[4]} in
+				f|ft|ftp)
+				    COMPREPLY=(ftp)
+				    ;;
+				s|sf|sft|sftp)
+				    COMPREPLY=(sftp)
+				    ;;
+				t|tf|tft|tftp)
+				    COMPREPLY=(tftp)
+				    ;;
+				'')
+				    COMPREPLY=('' ftp sftp tftp)
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		syslog)
+		    case ${COMP_WORDS[2]} in
+			add|del)
+			    case ${COMP_WORDS[3]} in
+				udp|tcp|tls)
+				    COMPREPLY=('' '<syslog-server>')
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			ca)
+			    case ${COMP_WORDS[3]} in
+				'set')
+				    COMPREPLY=('' '<RET>' '<ca-id>')
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		'type')
+		    case ${COMP_WORDS[2]} in
+			firewall|web|rweb|guard|waf|antivirus|avserver)
+			    case ${COMP_WORDS[3]} in
+				on)
+				    case ${COMP_WORDS[4]} in
+					o)
+					    COMPREPLY=('' on off)
+					    ;;
+					of|off)
+					    COMPREPLY=(off)
+					    ;;
+					on)
+					    COMPREPLY=(on)
+					    ;;
+					'')
+					    COMPREPLY=('' '<RET>' on off)
+					    ;;
+					*)
+					    COMPREPLY=()
+					    ;;
+				    esac
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;				
+		*)
+		    
+		    COMPREPLY=()
+		    ;;
+	    esac
+	    ;;
+	5)
+	    case ${COMP_WORDS[1]} in
+		save)
+		    case ${COMP_WORDS[2]} in
+			firewall|system|web|rweb|guard|waf|antivirus|avserver|vpnipsec)
+			    case ${COMP_WORDS[4]} in
+				ftp|sftp|tftp)
+				    COMPREPLY=('' '<ip>')
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		syslog)
+		    case ${COMP_WORDS[2]} in
+			add|del)
+			    case ${COMP_WORDS[3]} in
+				udp|tcp|tls)
+				    COMPREPLY=('' '<RET>' '<port>')
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		*)
+		    COMPREPLY=()
+		    ;;
+	    esac
+	    ;;
+	6)
+	    case ${COMP_WORDS[1]} in
+		save)
+		    case ${COMP_WORDS[2]} in
+			firewall|system|web|rweb|guard|waf|antivirus|avserver|vpnipsec)
+			    case ${COMP_WORDS[4]} in
+				ftp|sftp|tftp)
+				    COMPREPLY=('' '<file-path>')
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		*)
+		    COMPREPLY=()
+		    ;;
+	    esac
+	    ;;
+	*)
+	    COMPREPLY=()
+	    ;;
+    esac
+}

@@ -1,0 +1,42 @@
+<a name='main' class='doc-title'></a>
+<h1>URL Guarding</h1>
+
+URL guarding (or filtering) allows you to control Web browsing within your organisation. You can activate URL guarding using the <a href="/doc/command/mode.html">mode guard on</a> command. This feature is based on blacklists (denied) and whitelists (allowed) of domain names and URLs that can be managed using the <a href="/doc/command/urllist.html">urllist</a> command. You also have the possibility to use regular expressions in addition to URL lists. In this way, you can either permit access only to websites included in your whitelists or block access to URLs appearing in your blacklists. The <a href="/doc/command/guard.html">guard</a> command allows you to configure URL guarding by creating filters, policies, and rules.
+<center><img width='600' src="/doc/image/url_filtering.png" class="schema" /></center>
+A URL guard rule denies access to a set of blacklists or allows access to a set of whitelists according to filters associated with a policy. Each rule is associated with exactly one policy, identified by a unique name. A policy can be associated with one or more filters. A filter can specify a source IP address, an LDAP request, or a time specification. A policy named <strong>default</strong> allows you to define a default rule applied to all Web clients for which no other policy is matched. In the example below, a default rule is created to block access to Advertising and Malware websites for all Web clients:
+<ul>
+  <li><i>mode guard on</i></li>
+  <li><i>urllist add Advertising</i></li>
+  <li><i>urllist add Malware</i></li>
+  <li><i>urllist load create Advertising tftp 172.18.2.1 Advertising domains urls</i></li>
+  <li><i>urllist load create Malware tftp 172.18.2.1 Malware domains urls</i></li>
+  <li><i>guard rule add default deny Advertising Malware</i></li>
+  <li><i>apply</i></li>
+</ul>
+
+In the example above, two URL list categories named <i>Advertising</i> and <i>Malware</i> are first created and then populated with lists of domain names and URLs stored on a remote TFTP file server with the IP address <i>172.18.2.1</i>. Please note that before being able to exchange files with a file server (TFTP, FTP, or SFTP), the file server must be declared as trusted. You can refer to the <a href="/doc/command/access.html">access file</a> command to learn how to add a file server to the list of trusted servers. The sixth argument in the <i>urllist load...</i> command specifies the base name (<i>Advertising</i> or <i>Malware</i>) of files expected on the specified file server, and the <a href="/doc/command/urllist.html">urllist</a> command expects to find files with the <i>.domains.gz</i> and <i>.urls.gz</i> extensions. As you can deduce, URL list files must be in gzip-compressed format (loading uncompressed URL list files is not supported).
+<p>
+Domain name files (<i>.domains.gz</i>) must contain a list of domain <u>base</u> names (one per line). A domain base name is a domain name without any prefix. For instance, <i>example.com</i> is considered a domain base name, whereas <i>www.example.com</i> is not. To specify a domain name with a prefix, you should include it in a URL file (<i>.urls.gz</i>). URL files (<i>.urls.gz</i>) must contain a list of content specifications (one per line) similar to a URL without the protocol part, in the form &lt;domain-name&gt;/&lt;path&gt;, where &lt;domain-name&gt; is a fully qualified domain name and &lt;path&gt; is a path specification. For example, <i>www.example.com/foo/bar/zoo.html</i> is a valid URL in this context, while <i>http://www.example.com:81/foo/bar/zoo.html?id=1</i> is not.
+
+<a name='urllist' class='doc-title'></a><h2>URL Lists</h2>
+URL guarding is primarily based on URL lists that should be kept updated, as thousands of new websites appear on the Web every day. Daily updated URL lists are offered as an optional service by CacheGuard Technologies, which you can easily subscribe to. However, you also have the option to use your own URL lists and keep them automatically updated on your CacheGuard appliance. To update a URL list, you can either recreate it entirely by loading its full content from a URL list file or simply load a difference file (preferred method). For example, to automatically update the URL list named <i>WebMail</i> from <i>ftp://172.18.2.1/DF/WebMail</i> on a daily basis, use the following commands:
+<ul>
+  <li><i>password file add ftp 172.18.2.1 john</i></li>
+  <li><i>urllist auto WebMail on load update daily ftp 172.18.2.1 DF/WebMail</i></li>
+  <li><i>apply</i></li>
+</ul>
+
+Difference URL list files must comply with the syntax described in the <a href="/doc/command/urllist.html">urllist</a> command manual. Please refer to that manual for further information.
+
+<a name='policy_filter' class='doc-title'></a><h2>Policies & Filters</h2>
+Guard policies allow you to apply URL guarding to specific groups of Web clients matching certain criteria. For instance, you may wish to block Advertising websites for users in the <i>10.0.10.0 255.255.255.0</i> network who belong to the LDAP group <i>cn=support,ou=groups,dc=example,dc=com</i> between 12:30 and 13:30 (1:30 PM). To achieve this, you must first create three guard filters, then associate them with a policy, and finally create a guard rule based on that policy. The following commands define such a guarding policy:
+<ul>
+  <li><i>guard filter ip add london network 10.0.10.0 255.255.255.0</i></li>
+  <li><i>guard filter time add lunchHours slot 12:30-13:30</i></li>
+  <li><i>guard filter ldap add supportTeam 'cn=support,ou=groups,dc=example,dc=com' memberUid 'objectclass=posixGroup'</i></li>
+  <li><i>guard policy add londonSupport ip london time lunchHours ldap supportTeam</i></li>
+  <li><i>guard rule add londonSupport deny Advertising</i></li>
+  <li><i>apply</i></li>
+</ul>
+
+Please note that LDAP filters can only be used when Web authentication mode is activated. Refer to the <a href="authentication.html">Web Authentication</a> section and the <a href="/doc/command/authenticate.html">authenticate</a> command manual for more information on LDAP authentication. <strong>LDAP Filter Note</strong>: in the example above, the <i>memberUid</i> parameter specifies the LDAP attribute used to store the login name provided by users during authentication. The <i>objectclass=posixGroup</i> defines the request used to retrieve the user information from the LDAP server.

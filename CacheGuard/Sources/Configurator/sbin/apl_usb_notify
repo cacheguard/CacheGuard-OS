@@ -1,0 +1,405 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       Configurator
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+CACHEGUARD_DIR=/etc/sysconfig/cacheguard
+source ${CACHEGUARD_DIR}/constant
+source ${APPLIANCE_DIR}/etc/role
+source /usr/local/lib/apl_common
+source /usr/local/lib/apl_tools
+
+set-environment()
+{
+    export PATH="/usr/local/sbin:/usr/sbin:/sbin:/usr/local/bin:/usr/bin:/bin"
+    export RUN_LEVEL=$(runlevel 2> /dev/null) ; RUN_LEVEL=${RUN_LEVEL/* }
+    export NETWORK_PATH=/etc/sysconfig/ifconfig.
+    export NETWORK_PATH_LEN=${#NETWORK_PATH}
+}
+
+clean-exit()
+{
+    trap "" USR1 INT QUIT TERM
+
+    local code=${1}
+    restore-ethernet-files
+    manage-appliance-unlock
+    exit ${code}
+}
+
+get-free-eth()
+{
+    local i=0
+
+    while true
+    do
+	test -L /sys/class/net/eth${i} || break
+	((i++))
+    done
+    echo "eth${i}"
+}
+
+get-module-name()
+{
+    test -n "${1}" || return 0
+    local module_id=${1}
+
+    local insmod_module module
+
+    insmod_module=$(modprobe --show-depends ${module_id} 2> /dev/null | tail -1)
+    module=${insmod_module/insmod /}
+    module=$(file-basename ${module} .ko.xz)
+    echo ${module}
+}
+
+usb-notify-update-sys-persistent-rules()
+{
+    test -n "${1}" || return 1
+    local mac=${1}
+
+    local eth=$(get-free-eth)
+    test -n "${eth}" || return 11
+
+    backup-ethernet-file /etc/udev/rules.d/70-persistent-net.rules ${STARTUP_BACKUP_DIR}/70-persistent-net.rules.save
+
+    cp -f /etc/udev/rules.d/70-persistent-net.rules /tmp/persistent-net.rules.${$} &&
+	echo "SUBSYSTEM==\"net\", ACTION==\"add\", DRIVERS==\"?*\", ATTR{address}==\"${mac}\", ATTR{dev_id}==\"0x0\", ATTR{type}==\"1\", KERNEL==\"eth*\", NAME=\"${eth}\"" >> /tmp/persistent-net.rules.${$} &&
+	mv -f /tmp/persistent-net.rules.${$} /etc/udev/rules.d/70-persistent-net.rules
+    echo ${eth}
+}
+
+usb-notify-update-sys-modules-conf()
+{
+    test -n "${1}" || return 1
+    local module_in=${1}
+
+    local module found=0
+    local tmp_network_modules=/tmp/sysconfig.network-modules.${$}
+    local tmp_modules=/tmp/sysconfig.modules.${$}
+
+    backup-ethernet-file /etc/sysconfig/modules-network ${STARTUP_BACKUP_DIR}/modules-network.save
+    backup-ethernet-file /etc/sysconfig/modules ${STARTUP_BACKUP_DIR}/modules.save
+
+    cp /etc/sysconfig/modules-network ${tmp_network_modules}
+
+    while read module
+    do
+	test ${module} == ${module_in} || continue
+	found=1
+	break
+    done < /etc/sysconfig/modules-network
+    test ${found} -eq 1 || echo ${module_in} >> ${tmp_network_modules}
+    
+    cat /etc/sysconfig/modules-constant ${tmp_network_modules} > ${tmp_modules}
+
+    mv -f ${tmp_network_modules} /etc/sysconfig/modules-network &&
+	mv -f ${tmp_modules} /etc/sysconfig/modules
+}
+
+usb-notify-update-apl-model-conf()
+{
+    test -n "${1}" || return 1
+    local eth=${1}
+
+    backup-ethernet-file ${HARD_DIR}/model.conf ${STARTUP_BACKUP_DIR}/model.conf.save
+
+    local line value len_value
+    local variable="NETWORK_DEVICES="
+    local len_variable=${#variable}
+
+    while read line
+    do
+	if test "${line:0:${len_variable}}" == ${variable} ; then
+	    value=${line:${len_variable}}
+	    len_value=${#value} ; ((len_value -= 2))
+	    value=${value:1:${len_value}}
+	    echo "${variable}\"${value} ${eth}\""
+	else
+	    echo ${line}
+	fi
+    done < ${HARD_DIR}/model.conf > /tmp/model.conf.${$}
+
+    mv -f /tmp/model.conf.${$} ${HARD_DIR}/model.conf
+}
+
+usb-notify-update-apl-links()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    test -n "${3}" || return 3
+    test -n "${4}" || return 4
+    local eth=${1}
+    local mac=${2}
+    local usb_bus_num=${3}
+    local usb_dev_num=${4}
+
+    backup-ethernet-file ${HARD_DIR}/hw-links ${STARTUP_BACKUP_DIR}/hw-links.save
+
+    lsusb -s ${usb_bus_num}:${usb_dev_num} 2> /dev/null > /tmp/usb-net.${$}
+    if test ! -s /tmp/usb-net.${$} ; then
+	rm -f  /tmp/usb-net.${$}
+	return 11
+    fi
+
+    local dummy usb_bus usb_dev usb_id product_info
+    read  dummy usb_bus dummy usb_dev dummy usb_id product_info < /tmp/usb-net.${$}
+    rm -f /tmp/usb-net.${$}
+
+    echo "${eth} ${mac} USB ${product_info}" > /tmp/hw-links.${eth}.${$}
+    cat ${HARD_DIR}/hw-links /tmp/hw-links.${eth}.${$} > /tmp/hw-links.${$}
+    rm -f /tmp/hw-links.${eth}.${$}
+    
+    mv -f /tmp/hw-links.${$} ${HARD_DIR}/hw-links
+}
+
+apl-usb-net-notify()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    local action=${1}
+    local dev_name=${2}
+
+    apl_ethernet_monitor ${action} usb ${dev_name}
+}
+
+usb-net-bond-up()
+{
+    test -n "${1}" || return 1
+    local dev_name=${1}
+
+    local bonds=$(ls -1 ${NETWORK_PATH}bond[0-9] ${NETWORK_PATH}bond[0-9][0-9] 2> /dev/null)
+    test -n "${bonds}" || return 0
+
+    local master bond ret=0
+
+    for bond in ${bonds}
+    do
+	egrep --silent "BONDING=\".*${dev_name}.*\"" ${bond}
+	test ${?} -eq 0 || continue
+	master=${bond:${NETWORK_PATH_LEN}}
+	ip link set ${dev_name} down || ((ret++))
+	ip link set dev ${dev_name} master ${master} || ((ret++))
+	ip link set ${dev_name} up || ((ret++))
+	break
+    done
+
+    if test ${ret} -gt 0 ; then
+	return 31
+    else
+	return 0
+    fi
+}
+
+usb-net-if-up()
+{
+    test -n "${1}" || return 1
+    local dev_name=${1}
+
+    test -f ${NETWORK_PATH}${dev_name} || return 0
+    ifup ${dev_name} || return 41
+
+    local dev_aliases=$(ls -1 ${NETWORK_PATH}${dev_name}:[0-9] ${NETWORK_PATH}${dev_name}:[0-9][0-9] 2> /dev/null)
+    test -n "${dev_aliases}" || return 0
+
+    local dev_alias dev_alias_name ret=0
+
+    for dev_alias in ${dev_aliases}
+    do
+	dev_alias_name=${dev_alias:${NETWORK_PATH_LEN}}
+	ifup ${dev_alias_name} || ((ret++))
+    done
+
+    if test ${ret} -gt 0 ; then
+	return 43
+    else
+	return 0
+    fi
+}
+
+usb-net-8021q-up()
+{
+    test -n "${1}" || return 1
+    local dev_name=${1}
+
+    local pseudo_devs=$(ls -1 ${NETWORK_PATH}${dev_name}.[0-9] ${NETWORK_PATH}${dev_name}.[0-9][0-9] 2> /dev/null)
+    test -n "${pseudo_devs}" || return 0
+
+    local pseudo_dev pseudo_dev_name ret=0
+
+    for pseudo_dev in ${pseudo_devs}
+    do
+	pseudo_dev_name=${pseudo_dev:${NETWORK_PATH_LEN}}
+	ifup ${pseudo_dev_name} || ((ret++))
+    done
+
+    if test ${ret} -gt 0 ; then
+	return 51
+    else
+	return 0
+    fi
+}
+
+usb-net-add-routes()
+{
+    test -n "${1}" || return 1
+    local dev_name=${1}
+
+    local routes=$(ls -1 ${NETWORK_PATH}route[0-9] ${NETWORK_PATH}route[0-9][0-9] 2> /dev/null)
+    test -n "${routes}" || return 0
+
+    local route route_name
+
+    for route in ${routes}
+    do
+	egrep --silent "IFACE=${dev_name}(.[0-9]+)?" ${route}
+	test ${?} -eq 0 || continue
+	route_name=${route:${NETWORK_PATH_LEN}}
+	test -n "${route_name}" || return 61
+	ifup ${route_name} || return 63
+    done
+}
+
+usb-net-action()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    local action=${1}
+    local dev_name=${2}
+
+    case ${action} in
+	add)
+	    usb-net-bond-up ${dev_name} || return ${?}
+	    usb-net-if-up ${dev_name} || return ${?}
+	    usb-net-8021q-up ${dev_name} || return ${?}
+	    usb-net-add-routes ${dev_name} || return ${?}
+	    apl-usb-net-notify add ${dev_name}
+	    return 0
+	    ;;
+	del)
+	    apl-usb-net-notify del ${dev_name}
+	    return 0
+	    ;;
+	*)
+	    return 21
+	    ;;
+    esac
+
+    /etc/rc.d/init.d/tc restart < /dev/console > /dev/null 2>&1
+
+    return 0
+}
+
+usb-net-notify()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    test -n "${3}" || return 3
+    test -n "${4}" || return 4
+    local action=${1}
+    local dev_path=${2}
+    local usb_bus_num=${3}
+    local usb_dev_num=${4}
+
+    local net_path=${dev_path/*\/net\/}
+    test ${net_path} != ${dev_path} || return 11
+    test ${net_path//\/} == ${net_path} || return 0
+    local dev_name=${net_path}
+
+    case ${action} in
+	add)
+	    if test ${dev_name:0:3} != eth ; then
+		test -f /sys/${dev_path}/device/modalias || return 13
+		test -f /sys/${dev_path}/address || return 15
+
+		local module_id=$(cat /sys/${dev_path}/device/modalias 2> /dev/null)
+		test -n "${module_id}" || return 21
+		local module_name=$(get-module-name ${module_id})
+		test -n "${module_name}" || return 22
+		local mac=$(cat /sys/${dev_path}/address 2> /dev/null)
+		test -n "${mac}" || return 25
+
+		manage-appliance-lock
+
+		local eth=$(usb-notify-update-sys-persistent-rules ${mac})
+		test -n "${eth}" || clean-exit 101
+		usb-notify-update-sys-modules-conf ${module_name} || clean-exit 103
+		usb-notify-update-apl-model-conf ${eth} || clean-exit 105
+		usb-notify-update-apl-links ${eth} ${mac} ${usb_bus_num} ${usb_dev_num} || clean-exit 107
+		
+		# As the present program is called as the udev callback, it is ESSENTIAL to do not use
+		# the 'udevadm' command in it but call an external program in background in which
+		# the usage of the 'udevadm' command is allowed.
+		apl_handle_usbnet_module ${module_id} < /dev/console > /dev/null 2>&1 &
+
+		manage-appliance-unlock
+	    else
+		usb-net-action add ${dev_name} || clean-exit 125
+	    fi
+	    ;;
+
+	del)
+	    test ${dev_name:0:3} == eth || return 0
+	    usb-net-action del ${dev_name} || clean-exit 133
+	    ;;
+	*)
+	    return 255
+	    ;;
+    esac
+
+    return 0
+}
+
+usb-notify()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    test -n "${3}" || return 3
+    test -n "${4}" || return 4
+    local action=${1}
+    local dev_path=${2}
+    local usb_bus_num=${3}
+    local usb_dev_num=${4}
+
+    case ${action} in
+	add|del)
+	    usb-net-notify ${action} ${dev_path} ${usb_bus_num} ${usb_dev_num} || return 0
+	    ;;
+	*)
+	    return 11
+	    ;;
+    esac
+}
+
+main()
+{
+    set-environment
+    test "${RUN_LEVEL}" != "unknown" || return 0
+    test "${RUN_LEVEL}" == "3" || return 0
+    trap "clean-exit 100" USR1 INT QUIT TERM
+    restore-ethernet-files
+    usb-notify "${@}"
+    remove-ethernet-backup-files
+}
+
+# Main( )
+
+main "${@}"

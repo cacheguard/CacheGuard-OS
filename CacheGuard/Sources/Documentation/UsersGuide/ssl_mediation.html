@@ -1,0 +1,43 @@
+<a name='main' class='doc-title'></a>
+<h1>SSL Mediation</h1>
+
+CacheGuard appliance can decrypt HTTPS (encrypted) traffic to enable inspection of its content. After inspection, the encrypted Web traffic may be cached or blocked if malware is detected. In this way, bandwidth-intensive content such as video segments can be cached, and malicious content blocked, even when encrypted. Without SSL mediation, such traffic handling would not be possible, as caching or inspecting encrypted data cannot be performed. The purified and/or cached traffic is then re-encrypted by CacheGuard-OS before being sent to Web clients. This feature is referred to as SSL mediation on a CacheGuard appliance.
+<p>
+Please note that decrypting and re-encrypting HTTPS traffic can be regarded as a MITM (Man-in-the-Middle) attack. You should therefore ensure that enabling SSL mediation complies with the laws and regulations applicable in your country and/or organisation. It is also important to understand that enabling SSL mediation is entirely at your own responsibility. You are invited to read the <a href="/doc/command/license.html">CacheGuard-OS Licence Agreement</a> for further information.
+
+<center><img width='600' src="/doc/image/ssl_mediation.png" class="schema" /></center>
+
+When SSL mediation is enabled, decrypted traffic is re-encrypted before being sent to Web clients. To transmit re-encrypted traffic, the Web proxy uses dynamically generated SSL certificates signed by a private CA (Certificate Authority) certificate. As Web clients must trust the private CA certificate (referred to as the system CA certificate), it must be imported into client browsers prior to enabling SSL mediation. Otherwise, HTTPS communication will fail. You can configure whether HTTPS traffic is intercepted transparently using the <a href="/doc/command/sslmediate.html">sslmediate</a> command. To enable SSL mediation and configure it to transparently intercept HTTPS traffic, use the following commands:
+<ul>
+  <li><i>mode transparent on</i></li>
+  <li><i>mode sslmediate on</i></li>
+  <li><i>sslmediate transparent on</i></li>
+  <li><i>apply</i></li>
+</ul>
+
+<a name='ca' class='doc-title'></a><h2>The System CA</h2>
+The CacheGuard CA certificate is referred to as the system CA certificate and is accessible at <i>http://&lt;cacheguard-internal-ip&gt;/</i>, where <i>&lt;cacheguard-internal-ip&gt;</i> represents the internal IP address of your CacheGuard appliance. A default system CA certificate is automatically generated the first time you start your CacheGuard appliance. It is recommended that you regenerate this CA certificate or import your own CA certificate and configure it as the system CA. You can use the following commands to generate a system CA certificate and its associated private RSA key:
+<ul>
+  <li><i>tls ca system generate</i></li>
+  <li><i>apply</i></li>
+</ul>
+
+To import a CA certificate and its associated private RSA key into your CacheGuard appliance and set it as the system CA certificate, you must first place them on a trusted file server. A trusted file server is one that is authorised to exchange files with the CacheGuard appliance (refer to the <a href="/doc/command/access.html">access</a> command for instructions on declaring a trusted file server). You can then load them into your CacheGuard appliance from that trusted file server. Assuming that your CA certificate and its associated private key are named <i>cg-ca.certificate</i> and <i>cg-ca.key</i> respectively, and are stored on a trusted SFTP file server with the IP address <i>172.18.2.1</i>, the following commands will import them into your CacheGuard appliance:
+<ul>
+  <li><i>password file add sftp 172.18.2.1 john</i></li>
+  <li><i>tls ca system load certificate sftp 172.18.2.1 cg-ca.certificate</i></li>
+  <li><i>tls ca system load key sftp 172.18.2.1 cg-ca.key</i></li>
+  <li><i>apply</i></li>
+</ul>
+
+<a name='exception' class='doc-title'></a><h2>Exception Lists</h2>
+To prevent MITM attacks, some HTTPS websites use a technique known as SSL pinning. SSL pinning embeds the HTTPS certificate directly into the Web application, thereby preventing any MITM actions — and consequently preventing SSL mediation.
+<p>
+Fortunately, CacheGuard appliance can be configured to bypass SSL mediation for certain predefined domain names (<strong>deny</strong> policy) or to operate exclusively on a predefined list of domain names (<strong>allow</strong> policy). You can create exceptions by directly specifying domain names (the quick method) or by using URL lists. To manage URL lists, refer to the <a href="/doc/command/urllist.html">urllist</a> command. For example, to enable SSL mediation for the <i>example.com</i> domain name only, you may use the following commands:
+<ul>
+  <li><i>sslmediate policy allow</i></li>
+  <li><i>sslmediate exception urllist raz</i></li>
+  <li><i>sslmediate exception domainname raz</i></li>
+  <li><i>sslmediate exception domainname add example.com</i></li>
+  <li><i>apply</i></li>
+</ul>

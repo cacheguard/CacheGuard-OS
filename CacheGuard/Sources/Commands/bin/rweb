@@ -1,0 +1,1615 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       Commands
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+source functions
+
+check-lb-algorithm()
+{
+    test -n "${1}" || return 1
+    local algorithm=${1}
+
+    case ${algorithm} in
+	robin|traffic|pending)
+	    return 0
+	    ;;
+	*)
+	    return 11
+	    ;;
+    esac
+}
+
+check-lb-cookie()
+{
+    test -n "${1}" || return 1
+    local cookie=${1}
+    local len=${#cookie}
+
+    test ${len} -le ${MAX_COOKIE_LEN} || return 2
+    [[ "${cookie}" =~ ^[a-zA-Z][a-zA-Z0-9]*$ ]]
+}
+
+is-https-site()
+{
+    test -n "${1}" || return 1
+    local in_name=${1}
+
+    local elt i=0 range
+    local name protocol
+
+    for elt in ${RWEB_SITE_LIST}
+    do
+	range=$[${i} % 5]
+	case ${range} in
+	    0)
+		name=${elt}
+		;;
+	    1)
+		protocol=${elt}
+		if test ${name} == ${in_name} ; then
+		    if test ${protocol} == https ; then
+			return 0
+		    fi
+		fi
+		;;
+	    2|3|4)
+		;;
+	    *)
+		return 1
+		;;
+	esac
+	((i++))
+    done
+    
+    return 1
+}
+
+show-site1()
+{
+    local sites=${2}
+
+    echo-command-form "rweb site"
+    if test "${1}" == "new" ; then
+	echo-mark-new
+    else
+	echo-mark-cur
+    fi
+
+    if test -z "${sites}" ; then
+	echo-value-null
+	return 0
+    fi
+
+    local elt range i=0 n=0
+    local name protocol tls ip qos
+
+    for elt in ${sites}
+    do
+	range=$[${i} % 5]
+	case ${range} in
+	    0)
+		name=${elt}
+		;;
+	    1)
+		protocol=${elt}
+		;;
+	    2)
+		ip=${elt}
+		;;
+	    3)
+		tls=${elt}
+		;;
+	    4)
+		qos=${elt}
+		qos=$(remove-leading-zeros ${qos})
+
+		test ${n} -eq 0 || echo-blank-command
+
+		case ${protocol} in
+		    http)
+			echo-value "${name} ${protocol} ${ip} ${qos}%"
+			;;
+		    https)
+			echo-value "${name} ${protocol} ${tls} ${ip} ${qos}%"
+			;;
+		    *)
+			;;
+		esac
+		((n++))
+		;;
+	    *)
+		return 1
+		;;
+	esac
+	((i++))
+    done
+}
+
+show-site()
+{
+    echo-begin-show
+    show-site1 current "${CURRENT_RWEB_SITE_LIST}"
+    if test "${CURRENT_RWEB_SITE_LIST}" != "${RWEB_SITE_LIST}" ; then
+	show-site1 new "${RWEB_SITE_LIST}"
+    fi
+    echo-end-show
+}
+
+show-host2()
+{
+    local name=${1}
+    local hosts=${2}
+
+    if test -z "${hosts}" ; then
+	echo-value-null
+	return 0
+    fi
+
+    local host
+    local interface protocol ip port weight qos
+
+    echo-highlighted-value "${name}"
+
+    for host in ${hosts}
+    do
+	host=${host//_/ }
+
+	interface=$(get-nth-arg 1 ${host})
+	protocol=$(get-nth-arg 2 ${host})
+	ip=$(get-nth-arg 3 ${host})
+	port=$(get-nth-arg 4 ${host})
+	weight=$(get-nth-arg 5 ${host})
+	qos=$(get-nth-arg 6 ${host})
+
+	echo-blank-command
+	echo-value "${interface} ${protocol} ${ip} ${port} ${weight} ${qos}%"
+    done
+}
+
+show-host1()
+{
+    local sites=${2}
+
+    echo-command-form "rweb host"
+    if test "${1}" == "new" ; then
+	echo-mark-new
+    else
+	echo-mark-cur
+    fi
+
+    if test -z "${sites}" ; then
+	echo-value-null
+    else
+	local i=0 n=0 elt range
+	local name hosts
+
+	for elt in ${sites}
+	do
+	    range=$[${i} % 2]
+	    case ${range} in
+		0)
+		    name=${elt}
+		    ;;
+		1)
+		    test ${n} -eq 0 || echo-blank-command
+		    hosts=$(colon2space ${elt})
+		    show-host2 ${name} "${hosts}"
+		    ((n++))
+		    ;;
+		*)
+		    return 1
+		    ;;
+	    esac
+	    ((i++))
+	done
+    fi
+}
+
+show-host()
+{
+    echo-begin-show
+    if test -z "${1}" ; then
+	show-host1 'current' "${CURRENT_RWEB_SITE_HOSTS_LIST}"
+	test "${CURRENT_RWEB_SITE_HOSTS_LIST}" == "${RWEB_SITE_HOSTS_LIST}" || show-host1 'new' "${RWEB_SITE_HOSTS_LIST}"
+    else
+	local name=${1}
+	local cur_hosts=$(get-site-hosts "${CURRENT_RWEB_SITE_HOSTS_LIST}" ${name})
+	local new_hosts=$(get-site-hosts "${RWEB_SITE_HOSTS_LIST}" ${name})
+	echo-command-form "rweb host"
+	echo-mark-cur
+	show-host2 ${name} "${cur_hosts}"
+	if test "${cur_hosts}" != "${new_hosts}" ; then
+	    echo-command-form "rweb host"
+	    echo-mark-new
+	    show-host2 ${name} "${new_hosts}"
+	fi
+    fi
+    echo-end-show
+}
+
+site-remove()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    test -n "${3}" || return 3
+    local in_name=${1}
+    local in_protocol=${2}
+    local in_ip=${3}
+
+    local record="${in_name} ${in_protocol} ${in_ip}"
+
+    local out_list
+    local name protocol tls ip qos
+    local elt range i=0
+
+    local found=0
+
+    for elt in ${RWEB_SITE_LIST}
+    do
+	range=$[${i} % 5]
+	case ${range} in
+	    0)
+		name=${elt}
+		;;
+	    1)
+		protocol=${elt}
+		;;
+	    2)
+		ip=${elt}
+		;;
+	    3)
+		tls=${elt}
+		;;
+	    4)
+		qos=${elt}
+
+		if test "${name} ${protocol} ${ip}" == "${record}" ; then
+		    found=11
+		else
+		    out_list="${out_list} ${name} ${protocol} ${ip} ${tls} ${qos}"
+		fi
+		;;
+	    *)
+		return 255
+		;;
+	esac
+	((i++))
+    done
+    echo "${out_list:1}"
+
+    return ${found}
+}
+
+host-remove()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 1
+
+    local in_list=${1}
+    local record="${2}"
+
+    local out_list
+    local f1 f2
+    local elt i=0 range
+
+    for elt in ${in_list}
+    do
+	range=$[${i} % 2]
+	case ${range} in
+	    0)
+		f1=${elt}
+		;;
+	    1)
+		f2=${elt}
+		test "${f1}" == "${record}" || out_list="${out_list} ${f1} ${f2}"
+		;;
+	    *)
+		return 1
+		;;
+	esac
+	((i++))
+    done
+    echo "${out_list:1}"
+    return 0
+}
+
+remove-ip-port()
+{
+    test -n "${1}" || return 0
+    if test -z "${2}" ; then echo "${1}" ;  return 0 ; fi
+    
+    local in_list=${1}
+    local in_ip=${2}
+    local in_port=${3}
+
+    local host
+    local ip port
+
+    local out_list
+
+    for host in ${in_list}
+    do
+	host=${host//_/ }
+	
+	ip=$(get-nth-arg 3 ${host})
+	port=$(get-nth-arg 4 ${host})
+
+	test "${ip}" == "${in_ip}" -a "${port}" == "${in_port}" || out_list="${out_list} ${host// /_}"
+    done
+
+    echo ${out_list:1}
+    return 0
+}
+
+remove-site-balancer()
+{
+    test -n "${1}" || return 1
+    local in_name=${1}
+
+    local rweb_site_balancer_list
+    local i=0 elt range
+    local name algorithm sticky mode cookie
+
+    for elt in ${RWEB_SITE_BALANCER_LIST}
+    do
+	range=$[${i} % 5]
+	case ${range} in
+	    0)
+		name=${elt}
+		;;
+	    1)
+		algorithm=${elt}
+		;;
+	    2)
+		sticky=${elt}
+		;;
+	    3)
+		mode=${elt}
+		;;
+	    4)
+		cookie=${elt}
+		test ${name} == ${in_name} || rweb_site_balancer_list="${rweb_site_balancer_list} ${name} ${algorithm} ${sticky} ${mode} ${cookie}"
+		;;
+	    
+	    *)
+		return 1
+		;;
+	esac
+	((i++))
+    done
+    rweb_site_balancer_list="${rweb_site_balancer_list:1}"
+
+    RWEB_SITE_BALANCER_LIST=${rweb_site_balancer_list}
+}
+
+get-rweb-external-ip()
+{
+    local ip
+
+    if test ${HA_MODE} == False ; then
+	ip=${IP_EXTERNAL_IP}
+    else
+	ip=$(get-prefered-vrrp-ip "${VRRP_EXTERNAL_LIST}")
+	test -n "${ip}" || ip=${IP_EXTERNAL_IP}
+    fi
+
+    echo ${ip}
+}
+
+manage-site()
+{
+    if test -z "${1}" ; then
+	show-site
+	return 0
+    fi
+
+    local action=${1}
+    check-action ${action} || return 122
+
+    case ${action} in
+	add|del)
+	    test "${action}" != "add" || check-rweb-nb || return 90
+
+	    test -n "${2}" || return 1
+	    local name=${2}
+	    name=${name^^}
+	    name=${name~~}
+	    check-sitename ${name} || return 78
+
+	    if test -z "${3}" ; then
+		local protocol=http
+		local tls=nil
+		local ip=$(get-rweb-external-ip)
+		local qos=100
+	    else
+		local protocol=${3}
+		check-web-protocol ${protocol} || return 59
+
+		case ${protocol} in
+		    http)
+			local tls=nil
+			;;
+		    https)
+			if test ${action} == add ; then
+			    test -n "${4}" || return 1
+			    local tls=${4}
+
+			    local level=$(tls-get-ca-chain-level "${tls}")
+			    test ${level} -le 2 || return 28
+
+			    local id
+
+			    for id in ${tls//:/ }
+			    do
+				check-tls-id ${id} || return 213
+			    done
+			    shift
+			fi
+			;;
+		    *)
+			;;
+		esac
+		
+		if test -z "${4}" ; then
+		    local ip=$(get-rweb-external-ip)
+		    local qos=100
+		else
+		    local ip=${4}
+		    check-ip ${ip} || return 12
+
+		    if test -z "${5}" ; then
+			local qos=100
+		    else
+			local qos=${5}
+			qos=$(remove-leading-zeros ${qos})
+			qos=$(get-percent-value ${qos})
+			check-percentage ${qos} || return 11
+		    fi
+		fi
+	    fi
+
+	    case ${action} in
+		add)
+		    set-site-balancer ${name} 1 robin nosticky nil nil
+		    export RWEB_SITE_LIST=$(insert-record-in-slist 5 3 "${name} ${protocol} ${ip} ${tls} ${qos}" "${RWEB_SITE_LIST}")
+		    ;;
+		del)
+		    local rweb_site_list
+		    rweb_site_list=$(site-remove ${name} ${protocol} ${ip})
+
+		    if test ${?} -eq 11 ; then
+
+			export RWEB_SITE_LIST=${rweb_site_list}
+			export RWEB_SITE_HTTPX_LIST=$(remove "${RWEB_SITE_HTTPX_LIST}" ${name})
+
+			if ! site-name-exist ${name} ; then
+			    export RWEB_SITE_HOSTS_LIST=$(host-remove "${RWEB_SITE_HOSTS_LIST}" ${name})
+			    export KERBEROS_RWEB_LIST=$(remove-record-from-list 2 1 "${name}" "${KERBEROS_RWEB_LIST}")
+			    export WAF_RWEB_AUDIT_LIST=$(remove "${WAF_RWEB_AUDIT_LIST}" ${name})
+			    export RWEB_SITE_DENYURL_LIST=$(rweb-denyurl-remove ${name})
+			    export RWEB_SITE_STANDBY_LIST=$(standby-remove ${name})
+
+			    remove-waf-generic ${name}
+			    remove-waf-bypass-rule ${name}
+			    remove-waf-bypass-application ${name}
+			    remove-site-balancer ${name}
+			fi
+
+			if ! site-name-ip-exist ${name} ${ip} ; then
+			    export RWEB_SITE_VIA_LIST=$(remove-record-from-list 3 2 "${name} ${ip}" "${RWEB_SITE_VIA_LIST}")
+			fi
+		    fi
+		    ;;
+		*)
+		    error 255
+		    ;;
+	    esac
+	    SAVENV=1
+	    ;;
+	raz)
+	    unset RWEB_SITE_LIST
+	    unset RWEB_SITE_HTTPX_LIST
+	    unset RWEB_SITE_HOSTS_LIST
+	    unset KERBEROS_RWEB_LIST
+	    unset RWEB_SITE_BALANCER_LIST
+	    unset RWEB_SITE_VIA_LIST
+	    unset RWEB_SITE_DENYURL_LIST
+	    unset RWEB_SITE_STANDBY_LIST
+	    unset WAF_RWEB_GENERIC
+	    unset WAF_RWEB_AUDIT_LIST
+	    unset WAF_RWEB_BYPASS_RULE_LIST
+	    unset WAF_RWEB_BYPASS_APPLICATION_LIST
+	    SAVENV=1
+	    ;;
+	
+	*)
+	    error 255
+	;;
+    esac
+}
+
+set-site-hosts()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+
+    local act=${1}
+    local in_name=${2}
+    local interface=${3}
+    local protocol=${4}
+    local ip=${5}
+    local port=${6}
+    local weight=${7}
+    local qos=${8}
+
+    local new_list
+
+    local elt range i=0
+    local name hosts host
+    local found=0
+
+    for elt in ${RWEB_SITE_HOSTS_LIST}
+    do
+	range=$[${i} % 2]
+	case ${range} in
+	    0)
+		name=${elt}
+		;;
+	    1)
+		hosts=${elt}
+		if test ${name} == ${in_name} ; then
+		    found=1
+		    
+		    case ${act} in
+			add|del)
+			    hosts=$(colon2space ${hosts})
+			    hosts=$(remove-ip-port "${hosts}" ${ip} ${port})
+
+			    if test ${act} == add ; then
+				if test -z "${hosts}" ; then
+				    hosts="${interface}_${protocol}_${ip}_${port}_${weight}_${qos}"
+				else
+				    hosts="${hosts} ${interface}_${protocol}_${ip}_${port}_${weight}_${qos}"
+				fi
+			    fi
+
+			    hosts=$(space2colon "${hosts}")
+			    test -z "${hosts}" || new_list="${new_list} ${name} ${hosts}"
+			    ;;
+			raz)
+			    ;;
+			*)
+			    ;;
+		    esac
+		else
+		    new_list="${new_list} ${name} ${hosts}"
+		fi
+		;;
+	    *)
+		return 255
+		;;
+	esac
+	((i++))
+    done
+
+    if test ${found} -eq 0 -a ${act} == add ; then
+	new_list="${new_list} ${in_name} ${interface}_${protocol}_${ip}_${port}_${weight}_${qos}"
+    fi
+
+    RWEB_SITE_HOSTS_LIST=${new_list:1}
+}
+
+show-rhttp1()
+{
+    test -n "${1}" || return 1
+    local name=${1}
+
+    local state1 state2
+
+    echo-command-form "rweb rhttp"
+    echo-mark-cur
+    if member "${CURRENT_RWEB_SITE_HTTPX_LIST}" ${name} ; then
+	echo-value "${name} off"
+	state1=0
+    else
+	echo-value "${name} on"
+	state1=1
+    fi
+
+    member "${RWEB_SITE_HTTPX_LIST}" ${name}
+    state2=${?}
+    test ${state1} -ne ${state2} || return 0
+
+    echo-command-form "rweb rhttp"
+    echo-mark-new
+    if test ${state2} -eq 0 ; then
+	echo-value "${name} off"
+    else
+	echo-value "${name} on"
+    fi
+}
+
+show-all-rhttp()
+{
+    if test -z "${RWEB_SITE_LIST}" ; then
+	echo-command-form "rweb rhttp"
+	echo-mark-cur
+	echo-value-null
+	return 0
+    fi
+
+    local name names=$(get-https-site-name-list "${RWEB_SITE_LIST}")
+
+    for name in ${names}
+    do
+	show-rhttp1 ${name}
+    done
+}
+
+show-rhttp()
+{
+    echo-begin-show
+
+    if test -z "${1}" ; then
+	show-all-rhttp
+    else
+	show-rhttp1 ${1}
+    fi
+
+    echo-end-show
+}
+
+manage-rhttp()
+{
+    local name=${1}
+    local value=${2}
+
+    if test -z "${name}" ; then
+	show-rhttp
+	return 0
+    fi
+
+    check-sitename ${name} || return 78
+    site-name-exist ${name} || return 72
+
+    if test -z "${value}" ; then
+	show-rhttp ${name}
+	return 0
+    fi
+
+    check-boolean ${value} || return 18
+
+    case ${value} in
+	off)
+	    ! member "${RWEB_SITE_HTTPX_LIST}" ${name} || return 0
+	    if test -z "${RWEB_SITE_HTTPX_LIST}" ; then
+		export RWEB_SITE_HTTPX_LIST=${name}
+	    else
+		export RWEB_SITE_HTTPX_LIST="${RWEB_SITE_HTTPX_LIST} ${name}"
+	    fi
+	    SAVENV=1
+	    ;;
+	on)
+	    export RWEB_SITE_HTTPX_LIST=$(remove "${RWEB_SITE_HTTPX_LIST}" ${name})
+	    SAVENV=1
+	    ;;
+	*)
+	    error 255
+	    ;;
+    esac
+}
+
+manage-host()
+{
+    if test -z "${1}" ; then
+	show-host
+	return 0
+    fi
+
+    local name=${1}
+    check-sitename ${name} || return 78
+    site-name-exist ${name} || return 72
+
+    if test -z "${2}" ; then
+	show-host ${name}
+	return 0
+    fi
+
+    local action=${2}
+    check-action ${action} || return 122
+
+    case "${action}" in
+	add|del)
+	    if test "${action}" == 'add' ; then
+		local hosts=$(get-site-hosts "${RWEB_SITE_HOSTS_LIST}" ${name})
+		local len=$(length-list "${hosts}")
+		test ${len} -lt ${MAX_RWEB_HOST_NB} || return 90
+	    fi
+
+	    test -n "${3}" || return 1
+	    local interface=${3}
+
+	    case ${interface} in
+		rweb|external|vpnipsec)
+		    ;;
+		*)
+		    return 179
+		    ;;
+	    esac
+
+	    test -n "${4}" || return 1
+	    local protocol=${4}
+	    check-web-protocol ${protocol} || return 59
+
+	    test -n "${5}" || return 1
+	    local ip=${5}
+	    check-ip ${ip} || return 12
+	    test ${ip:0:4} != '127.' || return 204
+
+	    if test -z "${6}" ; then
+		local port
+		case ${protocol} in
+		    http)
+			local port=80
+			;;
+		    https)
+			local port=443
+			;;
+		    *)
+			return 255
+			;;
+		esac
+		local weight=50
+		local qos=100
+
+	    else
+		local port=${6}
+		port=$(remove-leading-zeros ${port})
+		check-service-port-nb ${port} || return 61
+	    fi
+
+	    if test ${action} == add ; then
+		if test -z "${7}" ; then
+		    local weight=50
+		    local qos=100
+		else
+		    local weight=${7}
+		    check-weight ${weight} || return 137
+		    if test -z "${8}" ; then
+			local qos=100
+		    else
+			local qos=${8}
+			qos=$(remove-leading-zeros ${qos})
+			qos=$(get-percent-value ${qos})
+			check-percentage ${qos} || return 11
+		    fi
+		fi
+		set-site-hosts add ${name} ${interface} ${protocol} ${ip} ${port} ${weight} ${qos}
+	    else
+		set-site-hosts del ${name} ${interface} ${protocol} ${ip} ${port}
+	    fi
+	    SAVENV=1
+	    ;;
+	
+	raz)
+	    set-site-hosts raz ${name}
+	    SAVENV=1
+	    ;;
+	
+	*)
+	    error 255
+	;;
+    esac
+}
+
+echo-value-balancer()
+{
+    test -n "${1}" || return 1
+    local name=${1}
+    local algorithm=${2}
+    local sticky=${3}
+    local mode=${4}
+    local cookie=${5}
+
+    if test -n "${algorithm}" ; then
+	if test "${sticky}" == sticky ; then
+	    echo-value "${name} ${algorithm} ${sticky} ${mode} ${cookie}"
+	else
+	    echo-value "${name} ${algorithm} ${sticky}"
+	fi
+    else
+	echo-value "${name} $(get-null-value)" ${PRINT_COL}
+    fi
+}
+
+
+show-site-balancer1()
+{
+    local list=${2}
+
+    echo-command-form "rweb balancer"
+    if test "${1}" == "new" ; then
+	echo-mark-new
+    else
+	echo-mark-cur
+    fi
+
+    if test -z "${list}" ; then
+	echo-value-null
+	return 0
+    fi
+
+    local i=0 n=0 elt range
+    local name algorithm sticky mode cookie
+
+    for elt in ${list}
+    do
+	range=$[${i} % 5]
+	case ${range} in
+	    0)
+		name=${elt}
+		;;
+	    1)
+		algorithm=${elt}
+		;;
+	    2)
+		sticky=${elt}
+		;;
+	    3)
+		mode=${elt}
+		;;
+	    4)
+		cookie=${elt}
+		test ${n} -eq 0 || echo-blank-command
+		echo-value-balancer ${name} ${algorithm} ${sticky} ${mode} ${cookie}
+		((n++))
+		;;
+	    *)
+		return 1
+		;;
+	esac
+	((i++))
+    done
+}
+
+show-site-balancer()
+{
+    echo-begin-show
+
+    if test -z "${1}" ; then
+	show-site-balancer1 'current' "${CURRENT_RWEB_SITE_BALANCER_LIST}"
+	if test "${CURRENT_RWEB_SITE_BALANCER_LIST}" != "${RWEB_SITE_BALANCER_LIST}" ; then
+	    show-site-balancer1 'new' "${RWEB_SITE_BALANCER_LIST}"
+	fi
+    else
+	local name=${1}
+	local cur_balancer=$(get-site-balancer ${name} cur)
+	local new_balancer=$(get-site-balancer ${name} new)
+	echo-mark-cur
+	echo-command-form "rweb balancer"
+	echo-value-balancer ${name} ${cur_balancer}
+	if test "${cur_balancer}" != "${new_balancer}" ; then
+	    echo-command-form "rweb balancer"
+	    echo-mark-new
+	    echo-value-balancer ${name} ${new_balancer}
+	fi
+    fi
+
+    echo-end-show
+}
+
+set-site-balancer()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    test -n "${3}" || return 3
+    test -n "${4}" || return 4
+    test -n "${5}" || return 5
+    test -n "${6}" || return 6
+    local in_name=${1}
+    local in_condition=${2}
+    local in_algorithm=${3}
+    local in_sticky=${4}
+    local in_mode=${5}
+    local in_cookie=${6}
+
+    local rweb_site_balancer_list
+    local i=0 elt range found=0
+    local name algorithm sticky mode cookie
+
+    for elt in ${RWEB_SITE_BALANCER_LIST}
+    do
+	range=$[${i} % 5]
+	case ${range} in
+	    0)
+		name=${elt}
+		;;
+	    1)
+		algorithm=${elt}
+		;;
+	    2)
+		sticky=${elt}
+		;;
+	    3)
+		mode=${elt}
+		;;
+	    4)
+		cookie=${elt}
+		if test ${name} != ${in_name} ; then
+		    rweb_site_balancer_list="${rweb_site_balancer_list} ${name} ${algorithm} ${sticky} ${mode} ${cookie}"
+		else
+		    found=1
+		    if test ${in_condition} -eq 0 ; then
+			rweb_site_balancer_list="${rweb_site_balancer_list} ${in_name} ${in_algorithm} ${in_sticky} ${in_mode} ${in_cookie}"
+		    else
+			rweb_site_balancer_list="${rweb_site_balancer_list} ${name} ${algorithm} ${sticky} ${mode} ${cookie}"
+		    fi
+		fi
+		;;
+
+	    *)
+		return 1
+		;;
+	esac
+	((i++))
+    done
+    rweb_site_balancer_list="${rweb_site_balancer_list:1}"
+
+    test ${found} -eq 1 || rweb_site_balancer_list="${rweb_site_balancer_list} ${in_name} ${in_algorithm} ${in_sticky} ${in_mode} ${in_cookie}"
+
+    RWEB_SITE_BALANCER_LIST=${rweb_site_balancer_list}
+}
+
+manage-balancer()
+{
+    if test -z "${1}" ; then
+	show-site-balancer
+	return 0
+    fi
+    
+    local name=${1}
+    check-sitename ${name} || return 78
+    site-name-exist ${name} || return 72
+
+    if test -z "${2}" ; then
+	show-site-balancer ${name}
+	return 0
+    fi
+
+    local algorithm=${2}
+    check-lb-algorithm ${algorithm} || return 138
+
+    if test -z "${3}" ; then
+	local sticky="nosticky"
+	local mode='nil'
+	local cookie='nil'
+    else
+	local sticky=${3}
+	case ${sticky} in
+	    nosticky)
+		local mode='nil'
+		local cookie='nil'
+		;;
+	    sticky)
+		if test -z "${4}" ; then
+		    local mode="insert"
+		    local cookie="WGICPATHID"
+		else
+		    local mode=${4}
+		    case ${mode} in
+			insert)
+			    if test -z "${5}" ; then
+				local cookie="WGICPATHID"
+			    else
+				local cookie=${5}
+				check-lb-cookie ${cookie} || return 140
+			    fi
+			    ;;
+			use)
+			    if test -z "${5}" ; then
+				local cookie="JSESSIONID"
+			    else
+				local cookie=${5}
+				check-lb-cookie ${cookie} || return 140
+			    fi
+			    ;;
+			*)
+			    return 173
+			    ;;
+		    esac
+		fi
+		;;
+	    *)
+		return 139
+	    ;;
+	esac
+    fi
+
+    set-site-balancer ${name} 0 ${algorithm} ${sticky} ${mode} ${cookie}
+    SAVENV=1
+}
+
+get-rweb-vias()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    local in_site_name=${1}
+    local in_site_ip=${2}
+
+    local elt range i=0
+    local site_name site_ip vias
+
+    for elt in ${RWEB_SITE_VIA_LIST}
+    do
+	range=$[${i} % 3]
+	case ${range} in
+	    0)
+		site_name=${elt}
+		;;
+	    1)
+		site_ip=${elt}
+		;;
+	    2)
+		vias=${elt}
+
+		if test ${site_name} == ${in_site_name} -a ${site_ip} == ${in_site_ip} ; then
+		    colon2space ${vias}
+		    return 0
+		fi
+		;;
+	    *)
+		return 255
+		;;
+	esac
+	((i++))
+    done
+
+    return 11
+}
+
+echo-rweb-vias()
+{
+    local vias=${@}
+
+    if test -z "${vias}" ; then
+	echo-value-null
+	return 0
+    fi
+
+    local via gateway role_prio role prio
+
+    for via in ${vias}
+    do
+	gateway=${via/_*}
+	role_prio=${via#*_}
+	role=${role_prio/_*}
+	prio=${role_prio/*_}
+
+	echo-blank-command
+	echo-value "${gateway} ${role} ${prio}"
+    done
+}
+
+show-rweb-via-all1()
+{
+    local rwebs=${2}
+
+    echo-command-form "rweb via"
+    if test "${1}" == "new" ; then
+	echo-mark-new
+    else
+	echo-mark-cur
+    fi
+
+    if test -z "${rwebs}" ; then
+	echo-value-null
+	return 0
+    fi
+
+    local elt range i=0
+    local site_name ip vias
+    local n=0
+
+    for elt in ${rwebs}
+    do
+	range=$[${i} % 3]
+	case ${range} in
+	    0)
+		site_name=${elt}
+		;;
+	    1)
+		ip=${elt}
+		;;
+	    2)
+		vias=$(colon2space ${elt})
+		test ${n} -eq 0 || echo-blank-command
+		echo-highlighted-value "${site_name} ${ip}"
+		echo-rweb-vias ${vias}
+		((n++))
+		;;
+	    *)
+		return 255
+		;;
+	esac
+	((i++))
+    done
+}
+
+show-rweb-via-all()
+{
+    echo-begin-show
+    show-rweb-via-all1 current "${CURRENT_RWEB_SITE_VIA_LIST}"
+    test "${CURRENT_RWEB_SITE_VIA_LIST}" == "${RWEB_SITE_VIA_LIST}" || show-rweb-via-all1 new "${RWEB_SITE_VIA_LIST}"
+    echo-end-show
+}
+
+show-rweb-via()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    local in_site_name=${1}
+    local in_ip=${2}
+
+    echo-begin-show
+    echo-command-form "rweb via"
+    echo-mark-cur
+    echo-value "${in_site_name} ${in_ip}:"
+
+    local elt range i=0
+    local site_name ip vias
+    local new_vias
+
+    for elt in ${CURRENT_RWEB_SITE_VIA_LIST}
+    do
+	range=$[${i} % 3]
+	case ${range} in
+	    0)
+		site_name=${elt}
+		;;
+	    1)
+		ip=${elt}
+		;;
+	    2)
+		vias=${elt}
+
+		if test ${site_name} == ${in_site_name} -a ${ip} == ${in_ip} ; then
+		    vias=$(colon2space ${vias})
+		    echo-rweb-vias ${vias}
+
+		    new_vias=$(get-rweb-vias ${in_site_name} ${in_ip})
+
+		    if test "${new_vias}" != "${vias}" ; then
+			echo-command-form "rweb via"
+			echo-mark-new
+			echo-value "${site_name} ${ip}:"
+			echo-rweb-vias ${new_vias}
+		    fi
+		    break
+		fi
+		;;
+	    *)
+		return 255
+		;;
+	esac
+	((i++))
+    done
+
+    if test "${site_name}" != ${in_site_name} -o "${ip}" != ${in_ip} ; then
+
+	echo-value-null
+	new_vias=$(get-rweb-vias ${in_site_name} ${in_ip})
+
+	if test -n "${new_vias}" ; then
+	    echo-command-form "rweb via"
+	    echo-mark-new
+	    echo-value "${in_site_name} ${in_ip}:"
+	    echo-rweb-vias ${new_vias}
+	fi
+    fi
+
+    echo-end-show
+}
+
+manage-via()
+{
+    if test -z "${1}" ; then
+	show-rweb-via-all
+	return 0
+    fi
+
+    local in_site_name=${1}
+    check-sitename ${in_site_name} || return 78
+
+    test -n "${2}" || return 1
+    local in_ip=${2}
+    check-ip ${in_ip} || return 12
+
+    site-ip-exist ${in_site_name} ${in_ip} || return 203
+
+    if test -z "${3}" ; then
+	show-rweb-via ${in_site_name} ${in_ip}
+	return 0
+    fi
+
+    local action=${3}
+    check-action ${action} || return 122
+
+    if test ${action} == raz ; then
+	RWEB_SITE_VIA_LIST=$(remove-record-from-list 3 2 "${in_site_name} ${in_ip}" "${RWEB_SITE_VIA_LIST}")
+	SAVENV=1
+	return 0
+    fi
+
+    test -n "${4}" || return 1
+    local in_gateway=${4}
+    check-ip ${in_gateway} || return 12
+
+    if test ${action} == add ; then
+	test -n "${5}" || return 1
+	local in_role=${5}
+	check-ha-role ${in_role} || return 48
+
+	local in_prio
+
+	if test -z "${6}" ; then
+	    case ${in_role} in
+		master)
+		    in_prio=110
+		    ;;
+		backup)
+		    in_prio=100
+		    ;;
+		*)
+		    return 255
+		    ;;
+	    esac
+	else
+	    in_prio=${6}
+	    check-priority ${in_prio} || return 47
+	fi
+    fi
+
+    local elt i=0 range
+    local site_name ip vias
+
+    for elt in ${RWEB_SITE_VIA_LIST}
+    do
+	range=$[${i} % 3]
+	case ${range} in
+	    0)
+		site_name=${elt}
+		;;
+	    1)
+		ip=${elt}
+		;;
+	    2)
+		vias=${elt}
+		test ${site_name} != ${in_site_name} -o ${ip} != ${in_ip} || break
+		;;
+	    *)
+		return 1
+		;;
+	esac
+	((i++))
+    done
+
+    if test "${site_name}" != ${in_site_name} -o "${ip}" != ${in_ip} ; then
+
+	test ${action} == add || return 0
+
+	if test -z "${RWEB_SITE_VIA_LIST}" ; then
+	    RWEB_SITE_VIA_LIST="${in_site_name} ${in_ip} ${in_gateway}_${in_role}_${in_prio}"
+	else
+	    RWEB_SITE_VIA_LIST=$(insert-record-in-slist 3 2 "${in_site_name} ${in_ip} ${in_gateway}_${in_role}_${in_prio}" "${RWEB_SITE_VIA_LIST}")
+	fi
+	SAVENV=1
+	return 0
+    fi
+
+    local vias_out via gateway
+    vias=$(colon2space ${elt})
+
+    for via in ${vias}
+    do
+	gateway=${via/_*}
+	test ${gateway} == ${in_gateway} || vias_out="${vias_out} ${via}"
+    done
+    vias_out="${vias_out:1}"
+
+    test ${action} == del || vias_out=$(insert-record-in-slist 2 1 "${in_gateway}_${in_role}_${in_prio}" "${vias_out}")
+    
+    vias_out="${vias_out// /:}"
+
+    RWEB_SITE_VIA_LIST=$(remove-record-from-list 3 2 "${in_site_name} ${in_ip}" "${RWEB_SITE_VIA_LIST}")
+
+    test -z "${vias_out}" || RWEB_SITE_VIA_LIST=$(insert-record-in-slist 3 2 "${in_site_name} ${in_ip} ${vias_out}" "${RWEB_SITE_VIA_LIST}")
+
+    SAVENV=1
+}
+
+show-standby1()
+{
+    local list=${2}
+
+    echo-command-form "rweb standby"
+    if test "${1}" == "new" ; then
+	echo-mark-new
+    else
+	echo-mark-cur
+    fi
+
+    if test -z "${list}" ; then
+	echo-value-null
+	return 0
+    fi
+
+    local i=0 n=0 elt range
+    local name protocol url
+
+    for elt in ${list}
+    do
+	range=$[${i} % 3]
+	case ${range} in
+	    0)
+		name=${elt}
+		;;
+	    1)
+		protocol=${elt}
+		;;
+	    2)
+		url=${elt}
+		test ${n} -eq 0 || echo-blank-command
+		case ${protocol} in
+		    none)
+			echo-value "${name} on"
+			;;
+		    *)
+			echo-value "${name} on ${protocol}://${url}"
+			;;
+		esac
+		((n++))
+		;;
+	    *)
+		return 1
+		;;
+	esac
+	((i++))
+    done
+}
+
+show-standby()
+{
+    echo-begin-show
+    show-standby1 'current' "${CURRENT_RWEB_SITE_STANDBY_LIST}"
+    if test "${CURRENT_RWEB_SITE_STANDBY_LIST}" != "${RWEB_SITE_STANDBY_LIST}" ; then
+	show-standby1 'new' "${RWEB_SITE_STANDBY_LIST}"
+    fi
+    echo-end-show
+}
+
+show-standby-site1()
+{
+    test -n "${1}" || return 1
+    local name=${1}
+    local url=${2}
+
+    if test -n "${url}" ; then
+	case ${url} in
+	    self)
+		echo-value "${name} on"
+		;;
+	    *)
+		echo-value "${name} on ${url}"
+		;;
+	esac
+    else
+	echo-value "${name} off"
+    fi
+
+}
+
+show-standby-site()
+{
+    test -n "${1}" || return 1
+    local name=${1}
+
+    echo-begin-show
+
+    local cur_url=$(get-rweb-standby-url ${name} "${CURRENT_RWEB_SITE_STANDBY_LIST}")
+    local new_url=$(get-rweb-standby-url ${name} "${RWEB_SITE_STANDBY_LIST}")
+
+    echo-command-form "rweb standby"
+    echo-mark-cur
+    show-standby-site1 ${name} "${cur_url}"
+    if test "${cur_url}" != "${new_url}" ; then
+	echo-command-form "rweb standby"
+	echo-mark-new
+	show-standby-site1 ${name} "${new_url}"
+    fi
+    
+    echo-end-show
+}
+
+standby-remove()
+{
+    test -n "${1}" || return 1
+    local in_name=${1}
+
+    local out_list
+    local name protocol url
+    local elt i=0 range
+
+    for elt in ${RWEB_SITE_STANDBY_LIST}
+    do
+	range=$[${i} % 3]
+	case ${range} in
+	    0)
+		name=${elt}
+		;;
+	    1)
+		protocol=${elt}
+		;;
+	    2)
+		url=${elt}
+		test "${name}" == "${in_name}" || out_list="${out_list} ${name} ${protocol} ${url}"
+		;;
+	    *)
+		return 1
+		;;
+	esac
+	((i++))
+    done
+
+    echo "${out_list:1}"
+}
+
+standby-add()
+{
+    test -n "${1}" || return 1
+    local in_name=${1}
+    local in_url=${2}
+    local in_protocol
+
+    if test -z "${in_url}" ; then
+	in_protocol="none"
+	in_url="self"
+    else
+	in_protocol="${in_url/:*}"
+	in_url="${in_url#*:\/\/}"
+    fi
+
+    local out_list found=0
+    local name url protocol
+    local elt i=0 range
+
+
+    for elt in ${RWEB_SITE_STANDBY_LIST}
+    do
+	range=$[${i} % 3]
+	case ${range} in
+	    0)
+		name=${elt}
+		;;
+	    1)
+		protocol=${elt}
+		;;
+	    2)
+		url=${elt}
+		if test "${name}" != "${in_name}" ; then
+		    out_list="${out_list} ${name} ${protocol} ${url}"
+		else
+		    out_list="${out_list} ${in_name} ${in_protocol} ${in_url}"
+		    found=1
+		fi
+		;;
+	    *)
+		return 1
+		;;
+	esac
+	((i++))
+    done
+
+    test ${found} -eq 1 || out_list="${out_list} ${in_name} ${in_protocol} ${in_url}"
+
+    echo "${out_list:1}"
+}
+
+manage-standby()
+{
+    if test -z "${1}" ; then
+	show-standby
+	return 0
+    fi
+
+    local name=${1}
+    check-sitename ${name} || return 78
+    site-name-exist ${name} || return 72
+
+    if test -z "${2}" ; then
+	show-standby-site ${name}
+	return 0
+    fi
+
+    local state=${2}
+    check-boolean ${state} || return 18
+    
+    case ${state} in
+	on)
+	    local url=${3}
+	    test -z "${url}" || check-url "${url}" || return 21
+	    export RWEB_SITE_STANDBY_LIST=$(standby-add ${name} "${url}")
+	    SAVENV=1
+	    ;;
+	off)
+	    export RWEB_SITE_STANDBY_LIST=$(standby-remove ${name})
+	    SAVENV=1
+	    ;;
+	*)
+	    return 255
+	    ;;
+    esac
+}
+
+run()
+{
+    contextual-command-is-allowed || return 207
+
+    if test -n "${ARGS[1]}" ; then
+	local op=${ARGS[1]}
+	shift-args
+    fi
+    
+    case ${op} in
+	site)
+	    manage-site ${ALLARGS}
+	    ;;
+	rhttp)
+	    manage-rhttp ${ALLARGS}
+	    ;;
+	host)
+	    manage-host ${ALLARGS}
+	    ;;
+	balancer)
+	    manage-balancer ${ALLARGS}
+	    ;;
+	via)
+	    manage-via ${ALLARGS}
+	    ;;
+	standby)
+	    manage-standby ${ALLARGS}
+	    ;;
+	'')
+	    manage-site
+	    manage-rhttp
+	    manage-host
+	    manage-balancer
+	    manage-via
+	    manage-standby
+	    ;;
+	*)
+	    return 1
+	    ;;
+    esac
+}
+
+main "${@}"

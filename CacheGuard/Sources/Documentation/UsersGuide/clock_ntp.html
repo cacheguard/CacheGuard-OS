@@ -1,0 +1,31 @@
+<a name='main' class='doc-title'></a>
+<h1>Date & Time</h1>
+
+Many services in CacheGuard-OS, such as (but not limited to) Web caching, antivirus, and URL guarding, depend on the CacheGuard appliance’s internal clock. In addition, certain periodic tasks should run during off-peak hours to avoid affecting end users during business hours. That is why setting the correct date and time is essential for operating CacheGuard-OS efficiently.
+<p>
+It is also important to note that the current real time on a CacheGuard appliance depends on the time zone in which it operates. For example, to set the time zone to Berlin (Germany), use the following commands:
+<ul>
+  <li><i>timezone Europe/Berlin</i></li>
+  <li><i>apply</i></li>
+</ul>
+You can use the <a href="/doc/command/timezonelist.html">timezonelist</a> command to display the list of all available time zones. The internal clock can be manually configured using the <a href="/doc/command/clock.html">clock</a> command or automatically synchronised using remote NTP (Network Time Protocol) servers.
+
+<a name='manual' class='doc-title'></a><h2>Manual Setting</h2>
+To manually set the date and time, use the <a href="/doc/command/clock.html">clock <i>&lt;YYYY/MM/DD-hh:mm:ss&gt;</i></a> command, where <i>&lt;YYYY/MM/DD-hh:mm:ss&gt;</i> is defined as follows:
+<ul>
+  <li>YYYY – a 4-digit year</li>
+  <li>MM – a 2-digit month</li>
+  <li>DD – a 2-digit day</li>
+  <li>hh – a 2-digit hour</li>
+  <li>mm – a 2-digit minute</li>
+  <li>ss – a 2-digit second</li>
+</ul>
+
+For example, a valid date and time specification is: <i>2024/03/20-03:06:26</i>.
+
+<a name='ntp' class='doc-title'></a><h2>NTP Servers</h2>
+To maintain an accurate clock on a CacheGuard appliance, it is highly recommended to use secure and reliable NTP servers. For security and redundancy, it is best to rely on at least three NTP servers and always use an odd number of servers from different providers. The <a href="/doc/command/ntp.html">ntp</a> command allows you to manage NTP servers. For example, to add an NTP server with the IP address <i>192.168.0.1</i>, use the following commands:
+<ul>
+  <li><i>ntp add 192.168.0.1</i></li>
+  <li><i>apply</i></li>
+</ul>

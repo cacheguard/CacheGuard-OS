@@ -1,0 +1,92 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       Commands
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+source functions
+
+show-timezone()
+{
+    echo-begin-show
+    echo-command-form "timezone"
+    echo-mark-cur
+    echo-value "${CURRENT_TIMEZONE}"
+    if test "${TIMEZONE}" != "${CURRENT_TIMEZONE}" ; then
+	echo-command-form "timezone"
+	echo-mark-new
+	echo-value "${TIMEZONE}"
+    fi
+    echo-end-show
+}
+
+check-timezone-code()
+{
+    test -n "${1}" || return 1
+    code=${1}
+
+    load-timezones
+
+    test ${code} -lt ${TIMEZONES_NB} || return 1
+
+    local tz=${TIMEZONES[${code}]}
+    test -n "${tz}" || return 1
+    return 0
+}
+
+check-timezone()
+{
+    test -n "${1}" || return 1
+    local tz=${1}
+
+    test ${#tz} -le ${MAX_LEN} || return 3
+
+    load-timezones
+
+    local i
+
+    for ((i=0 ; i<${TIMEZONES_NB} ; i++))
+    do
+	test ${TIMEZONES[${i}]} != ${tz} || return 0
+    done
+
+    return 5
+}
+
+run()
+{
+    if test -z "${ARGS[1]}" ; then show-timezone ; return 0 ; fi
+    
+    local tz=${ARGS[1]}
+    
+    check-integer ${tz}
+    if test ${?} -eq 0 ; then
+	check-timezone-code ${tz} || (echo ; return 23)
+	export TIMEZONE=${TIMEZONES[${tz}]}
+    else
+	check-timezone ${tz} || return 52
+	export TIMEZONE=${tz}
+    fi
+    
+    SAVENV=1
+}
+
+main "${@}"

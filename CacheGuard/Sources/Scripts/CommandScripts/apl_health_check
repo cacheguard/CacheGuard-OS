@@ -1,0 +1,898 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       Scripts
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+test ! -f /var/lock/apl_health_check || exit 1
+touch /var/lock/apl_health_check
+
+CACHEGUARD_DIR=/etc/sysconfig/cacheguard
+source ${CACHEGUARD_DIR}/constant
+source ${APPLIANCE_DIR}/etc/role
+source ${HARD_DIR}/model.conf
+source ${HARD_DIR}/cloud.conf
+source ${LOCAL_DIR}/lib/apl_common
+
+source ${ABASE_DIR}/${ENV_RDIR}/${ENV_CURRENT_NAME}
+
+export CHECK_LINKS_DONE='no'
+
+health-check-logger()
+{
+    test -n "${1}" || return 1
+    local message=${1}
+
+    logger -p daemon.alert -t apl_health_check -- ${message}
+    ${LOCAL_DIR}/bin/apl_rlogger "${message}"
+}
+
+health-check-notification()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    test -n "${3}" || return 3
+    local event=${1}
+    local service=${2}
+    local message=${3}
+
+    health-check-logger "Service ${service}: ${message}"
+    test "${CURRENT_ADMIN_SNMP}" == True || return 0
+    ${LOCAL_DIR}/bin/apl_snmp_trap 11 "${event}" "${service}" "${message}"
+}
+
+snmp-av-trap()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    local event=${1}
+    local value=${2}
+
+    local description
+
+    case ${event} in
+	OutDated)
+	    value=$(get-date-from-epoch-seconds ${value})
+	    description="The antivirus data base signature is outdated by more than one day."
+	    ;;
+	*)
+	    return 10
+	    ;;
+    esac
+
+    health-check-logger "Antivirus outdated (${value}): ${description}"
+    test "${CURRENT_ADMIN_SNMP}" == True || return 0
+    ${LOCAL_DIR}/bin/apl_snmp_trap 21 "${event}" "${value}" "${description}"
+}
+
+check-supervisor-fifo()
+{
+    test ! -p ${RUN_DIR}/${SUPERVISOR_FIFO} || return 0
+    /etc/rc.d/init.d/supervisor restart > /dev/null 2>&1
+    local message="The Health Checker has restarted the supervisor service"
+    health-check-notification 2 supervisor "${message}"
+    test ${HC_INTERRUPT} -eq 0 || clean-exit 10
+}
+
+check-service()
+{
+    test -n "${1}" || return 1
+    local service=${1}
+
+    local process
+
+    case ${service} in
+	ocspd)
+	    process=$(get-ocsp-process)
+	    test -n "${process}" || return 1
+	    ;;
+	iked)
+	    process=$(get-ike-process)
+	    test -n "${process}" || return 1
+	    ;;
+	rlogger)
+	    process=$(get-rlogger-process)
+	    test -n "${process}" || return 1
+	    ;;
+	smanager)
+	    process=$(get-smanager-process)
+	    test -n "${process}" || return 1
+	    ;;
+	*)
+	    getpids ${service} > /dev/null
+	    test ${?} -eq 0 || return 1
+	    ;;
+    esac
+
+    if test -n "${2}" ; then
+	test -n "${3}" || return 1
+	local ip=${2} ; test ${ip} != '-' || unset ip
+	local port=${3}
+	local socket=$(ss -lHntu | grep ${ip}:${port} 2> /dev/null)
+	test -n "${socket}"
+    fi
+}
+
+check-services-start()
+{
+    local mode
+
+    case "${1}" in
+	active|passive)
+	    mode=${1}
+	    ;;
+	*)
+	    mode=passvie
+	    ;;
+    esac
+
+    test -f ${CONF_DIR}/${SERVICES_HEALTH_FILENAME} || return 11
+
+    local ret i=0 states message
+    declare -a states
+    local srv severity ip port
+
+    local state_file=${RUN_DIR}/${SERVICES_STATE_FILENAME}
+    local tmp_file=/tmp/${SERVICES_STATE_FILENAME}.${$}
+
+    while read srv severity ip port
+    do
+	test -n "${srv}" || continue
+	test "${srv:0:1}" != "#" || continue
+	test -n "${severity}" || continue
+
+	check-service ${srv} ${ip} ${port}
+	ret=${?}
+	states[${i}]=${ret}
+	echo ${srv} ${ret}
+	((i++))
+    done < ${CONF_DIR}/${SERVICES_HEALTH_FILENAME} > ${tmp_file}
+    mv -f ${tmp_file} ${state_file}
+
+    test ${mode} == active || return 0
+
+    i=0
+    while read srv severity ip port
+    do
+	test ${HC_INTERRUPT} -eq 0 || clean-exit 20
+	test -n "${srv}" || continue
+	test "${srv:0:1}" != "#" || continue
+	test -n "${severity}" || continue
+
+	if test ${states[${i}]} -eq 0 ; then
+	    ((i++))
+	    continue
+	fi
+
+	/etc/rc.d/init.d/${srv} stop > /dev/null 2>&1
+	sleep 1
+	test ${HC_INTERRUPT} -eq 0 || clean-exit 21
+
+	/etc/rc.d/init.d/${srv} start > /dev/null 2>&1
+	sleep 1
+	message="The Health Checker has tried to restart the ${srv} service"
+	health-check-notification 1 "${srv}" "${message}"
+
+	check-service ${srv} ${ip} ${port}
+	if test ${?} -eq 0 ; then
+	    message="The Health Checker has restarted the ${srv} service"
+	    health-check-notification 2 "${srv}" "${message}"
+	    ((i++))
+	    continue
+	else
+	    message="The Health Checker has failed to restart the ${srv} service"
+	    health-check-notification 3 "${srv}" "${message}"
+	fi
+
+	test ${HC_INTERRUPT} -eq 0 || clean-exit 22
+
+	if test ${CURRENT_HA_MODE} == False ; then
+	    ((i++))
+	    continue
+	fi
+
+	case ${severity} in
+	    critical|major)
+		;;
+	    minor|warning|info)
+		((i++))
+		continue
+		;;
+	    *)
+		((i++))
+		continue
+		;;
+	esac
+
+        # This down VRRP IPs => Fail over!
+	/etc/rc.d/init.d/keepalived stop > /dev/null 2>&1
+        # Now No more Health Checking
+	echo -n "off" > ${RUN_DIR}/${HEALTH_STATE_FILENAME}
+	/etc/rc.d/init.d/health stop > /dev/null 2>&1
+	message="The Health Checker cannot restart vital services. The HA manager has forced a fail over"
+	health-check-notification 4 "${srv}" "${message}"
+	((i++))
+    done < ${CONF_DIR}/${SERVICES_HEALTH_FILENAME}
+}
+
+report-disks-io()
+{
+    local tmp_file=/tmp/diskstats.${$}
+    local io_tmp_file=/tmp/${DISKS_STATS_IO_FILENAME}.${$}
+    local time_io_tmp_file=/tmp/${DISKS_STATS_TIME_IO_FILENAME}.${$}
+    local avg_time_io_tmp_file=/tmp/${DISKS_STATS_AVG_FILENAME}.${$}
+
+    cat /proc/diskstats > ${tmp_file}
+
+    local major minor device
+    local reads reads_merged sector_reads time_reads
+    local writes writes_merged sector_writes time_writes
+    local rest
+
+    local total_reads=0 total_writes=0
+    local total_time_reads=0 total_time_writes=0
+
+    while read major minor device \
+	  reads reads_merged sector_reads time_reads \
+	  writes writes_merged sector_writes time_writes \
+	  rest
+    do
+	[[ "${device}" =~ ^(sd|hd|ubd)[a-z][a-z]?$ ]] || continue
+
+	total_reads=$[${total_reads} + ${reads}]
+	total_writes=$[${total_writes} + ${writes}]
+
+	total_time_reads=$[${total_time_reads} + ${time_reads}]
+	total_time_writes=$[${total_time_writes} + ${time_writes}]
+
+    done < ${tmp_file}
+
+    local total_time_io=$[${total_time_reads} + ${total_time_writes}]
+    local total_io=$[${total_reads} + ${total_writes}]
+
+    echo ${total_time_io}	> ${time_io_tmp_file}
+    echo ${total_io}		> ${io_tmp_file}
+
+    if test -f ${RUN_DIR}/${DISKS_STATS_IO_FILENAME} -a -f ${RUN_DIR}/${DISKS_STATS_TIME_IO_FILENAME} ; then
+
+	local last_total_time_io=$(cat ${RUN_DIR}/${DISKS_STATS_TIME_IO_FILENAME})
+	local last_total_io=$(cat ${RUN_DIR}/${DISKS_STATS_IO_FILENAME})
+
+	total_time_io=$[${total_time_io} - ${last_total_time_io}]
+	total_io=$[${total_io} - ${last_total_io}]
+    fi
+
+    if test ${total_io} -eq 0 ; then
+	local average_time_io=0
+    else
+	local average_time_io=$[${total_time_io} / ${total_io}]
+    fi
+
+    echo ${average_time_io} > ${avg_time_io_tmp_file}
+
+    test ! -f ${RUN_DIR}/${DISKS_STATS_AVG_FILENAME}.date2 || cp -f ${RUN_DIR}/${DISKS_STATS_AVG_FILENAME}.date2 ${RUN_DIR}/${DISKS_STATS_AVG_FILENAME}.date1
+    date +"%s" 2> /dev/null > ${RUN_DIR}/${DISKS_STATS_AVG_FILENAME}.date2
+
+    mv -f ${io_tmp_file}		${RUN_DIR}/${DISKS_STATS_IO_FILENAME}
+    mv -f ${time_io_tmp_file}		${RUN_DIR}/${DISKS_STATS_TIME_IO_FILENAME}
+    mv -f ${avg_time_io_tmp_file}	${RUN_DIR}/${DISKS_STATS_AVG_FILENAME}
+
+    rm -f ${tmp_file}
+}
+
+report-disks-health()
+{
+    test -s /usr/etc/smartd.conf || return 0
+
+    local disk type_option state
+    local id attribute_name flag value worst thresh type updated when_failed raw_value
+    local found
+
+    local health_tmp_file=/tmp/disks.health.${$}
+    local attributes_tmp_file=/tmp/disk.attributes.${$}
+
+    rm -f ${health_tmp_file}
+
+    while read disk type_option
+    do
+	test "${disk:0:5}" == "/dev/" || continue
+	type_option=${type_option/ */}
+	smartctl --health ${type_option} ${disk} > /dev/null 2>&1
+	state=$((${?} & 8))
+
+	found=0
+	smartctl --attributes ${disk} > ${attributes_tmp_file} 2> /dev/null
+	while read id attribute_name flag value worst thresh type updated when_failed raw_value
+	do
+	    if test \
+		   "${attribute_name}" == "SSD_Life_Left" -o \
+		   "${attribute_name}" == "Wear_Leveling_Count" -o \
+		   "${attribute_name}" == "Remaining_Lifetime_Perc" -o \
+		   "${attribute_name}" == "Media_Wearout_Indicator"
+	    then
+		found=1
+		break
+	    fi
+
+	    continue
+	done < ${attributes_tmp_file}
+	rm -f ${attributes_tmp_file}
+
+	if test ${found} -eq 1 ; then
+	    value=" ${value}"
+	else
+	    unset value
+	fi
+	echo "${disk} ${state}${value}" >> ${health_tmp_file}
+	((i++))
+    done < /usr/etc/smartd.conf
+
+    mv -f ${health_tmp_file} ${RUN_DIR}/${DISKS_HEALTH_FILENAME}
+}
+
+report-raid-health()
+{
+    test -s /etc/mdadm.conf || return 0
+    test -f /proc/mdstat || return 0
+
+    local raid_dev=/dev/md1
+    local tmp_file=/tmp/mdadm_detail.${$}
+    local health_tmp_file=/tmp/${RAID_HEALTH_FILENAME}.${$}
+
+    local key key1 key2 colon value
+    local raid_level array_size build_status raid_devices total_devices spare_devices working_devices failed_devices raid_state
+    local hdd
+
+    while read key colon value
+    do
+	test -n "${key}" || continue
+	test ${key} == md1 || continue
+	value=${value#* }
+	value=${value#* }
+	value=${value//${RAID_ROOT_PARTITION_NB}\[/\[}
+	for hdd in ${value}
+	do
+	    echo ${hdd//\[/ \[}
+	done > /tmp/hdd.${$}
+	break
+    done < /proc/mdstat
+
+    sort /tmp/hdd.${$} > /tmp/hdd-sorted.${$}
+
+    while read hdd
+    do
+	echo "Raid_HDD ${hdd}"
+    done < /tmp/hdd-sorted.${$} > ${health_tmp_file}
+
+    rm -f \
+	/tmp/hdd.${$} \
+	/tmp/hdd-sorted.${$}
+
+    mdadm --detail ${raid_dev} > ${tmp_file} 2> /dev/null
+
+    while read key1 key2 colon value
+    do
+	key="${key1} ${key2}"
+	case "${key}" in
+	    "Raid Level")
+		raid_level=${value}
+		raid_level=${raid_level:4}
+		case ${raid_level} in
+		    0)
+			raid_level="${raid_level} (striping)"
+			;;
+		    1)
+			raid_level="${raid_level} (mirroring)"
+			;;
+		    5|6)
+			raid_level="${raid_level} (striping & checksum)"
+			;;
+		    10)
+			raid_level="${raid_level} (mirroring & striping)"
+			;;
+		    *)
+			;;
+		esac
+
+		echo "${key// /_} ${raid_level}" >> ${health_tmp_file}
+		;;
+	    "Array Size")
+		array_size=${value}
+		array_size=${array_size/ *}
+		array_size=$[${array_size} / 1024 / 1024]
+		echo "${key// /_} ${array_size} GB" >> ${health_tmp_file}
+		;;
+	    "Rebuild Status"|"Resync Status")
+		build_status=${value}
+		build_status=${build_status/\% *}
+		echo "Build_Status ${build_status}" >> ${health_tmp_file}
+		;;
+	    "Raid Devices")
+		raid_devices=${value}
+		echo "${key// /_} ${raid_devices}" >> ${health_tmp_file}
+		;;
+	    "Total Devices")
+		total_devices=${value}
+		echo "${key// /_} ${total_devices}" >> ${health_tmp_file}
+		;;
+	    "Spare Devices")
+		spare_devices=${value}
+		echo "${key// /_} ${spare_devices}" >> ${health_tmp_file}
+		;;
+	    "Working Devices")
+		working_devices=${value}
+		echo "${key// /_} ${working_devices}" >> ${health_tmp_file}
+		;;
+	    "Failed Devices")
+		failed_devices=${value}
+		echo "${key// /_} ${failed_devices}" >> ${health_tmp_file}
+		;;
+	    *)
+		;;
+	esac
+
+	case "${key1}" in
+	    "State")
+		if test -z "${value}" ; then
+		    raid_state="${colon}"
+		else
+		    raid_state="${colon} ${value}"
+		fi
+		echo "Raid_State ${raid_state}" >> ${health_tmp_file}
+		;;
+	    *)
+		;;
+	esac
+
+    done < ${tmp_file}
+    rm -f ${tmp_file}
+
+    if test -z "${build_status}" ; then
+	case "${raid_state}" in
+	    clean|active)
+		build_status=100
+		;;
+	    *)
+		build_status=0
+		;;
+	esac
+	echo "Build_Status ${build_status}" >> ${health_tmp_file}
+    fi
+
+    mv -f ${health_tmp_file} ${RUN_DIR}/${RAID_HEALTH_FILENAME}
+    cp -f ${RUN_DIR}/${RAID_HEALTH_FILENAME} ${HARD_DIR}/hw-raid
+}
+
+nic-state-is-up()
+{
+    test -n "${1}" || return 1
+    local state=${1}
+
+    if test -n "${CLOUD_NAME}" ; then
+	test ${state:0:34} != "<NO-CARRIER,BROADCAST,MULTICAST,UP" || return 0
+	test ${state:0:23} != "<BROADCAST,MULTICAST,UP" || return 0
+	return 11
+    fi
+
+    if test ${state} == "<BROADCAST,MULTICAST>" ; then
+	return 0
+    elif test ${state:0:11} == "<NO-CARRIER" ; then
+	return 21
+    elif test ${state:0:23} == "<BROADCAST,MULTICAST,UP" ; then
+	return 0
+    elif test ${state:0:29} == "<BROADCAST,MULTICAST,SLAVE,UP" ; then
+	return 0
+    elif test ${state:0:30} == "<BROADCAST,MULTICAST,MASTER,UP" ; then
+	return 0
+    fi
+
+    return 31
+}
+
+check-links()
+{
+    local tmp_file_in=/tmp/ip.address.${$}
+    local tmp_file_out=/tmp/${LINKS_STATE_FILENAME}.${$}
+
+    ip address show > ${tmp_file_in}
+    rm -f ${tmp_file_out}
+
+    local arg1 arg2 arg3 arg4
+    local dev link state ip len i=0
+
+    while read arg1 arg2 arg3 arg4
+    do
+	if [[ "${arg1}" =~ ^[1-9][0-9]*[:]$ ]] ; then
+	    len=${#arg2} ; ((len--))
+	    dev=${arg2:0:${len}}
+	    dev=${dev/@*/}
+	    test "${dev:0:3}" == "eth" -o "${dev:0:4}" == "bond" || continue
+
+	    state=${arg3}
+
+	    if nic-state-is-up "${state}" ; then
+		state=OK
+	    else
+		state=K0
+	    fi
+
+	    test ${i} -eq 0 || echo
+	    echo -n ${dev} ${state}
+	    ((i++))
+	else
+	    case "${arg1}" in
+		link/ether)
+		    continue
+		    ;;
+		inet)
+		    test "${dev:0:3}" == "eth" -o "${dev:0:4}" == "bond" || continue
+		    echo -n " ${arg2}"
+		    ;;
+		*)
+		    ;;
+	    esac
+	fi
+    done < ${tmp_file_in} > ${tmp_file_out}
+    echo >> ${tmp_file_out}
+
+    for dev in ${NETWORK_DEVICES}
+    do
+	link=$(ip link show dev ${dev} 2> /dev/null)
+	test ${?} -eq 0 || echo ${dev} KO
+    done >> ${tmp_file_out}
+
+    rm -f ${tmp_file_in}
+    mv -f ${tmp_file_out} ${RUN_DIR}/${LINKS_STATE_FILENAME}
+
+    CHECK_LINKS_DONE='yes'
+}
+
+check-vpnipsec()
+{
+    if test ${CURRENT_VPN_IPSEC_MODE} == False ; then
+	echo -n > ${RUN_DIR}/${VPN_IPSEC_SITE_STATE_FILENAME}
+	return 0
+    fi
+
+    local access_mode=${CURRENT_VPN_IPSEC_ACCESS/ *}
+
+    if test ${access_mode} == 'on' ; then
+	echo -n > ${RUN_DIR}/${VPN_IPSEC_SITE_STATE_FILENAME}
+	return 0
+    fi
+
+    local mode
+
+    case "${1}" in
+	active|passive)
+	    mode=${1}
+	    ;;
+	*)
+	    mode=passvie
+	    ;;
+    esac
+
+    apl_vpnipsec_report ${$}
+
+    test -f ${RUN_DIR}/${VPN_IPSEC_STATUS_FILENAME} || return 13
+
+    local connection status remote_address remote_id duration
+
+    while read connection status remote_address remote_id duration
+    do
+	case ${status} in
+	    ESTABLISHED)
+		echo "${connection#site-} ${remote_address} OK"
+		;;
+	    *)
+		echo "${connection#site-} ${remote_address} KO"
+		test ${mode} == passvie || ipsec up ${connection} > /dev/null 2>&1
+		;;
+	esac
+    done < ${RUN_DIR}/${VPN_IPSEC_STATUS_FILENAME} > ${RUN_DIR}/${VPN_IPSEC_SITE_STATE_FILENAME}
+}
+
+update-connections()
+{
+    test ${CHECK_LINKS_DONE} == 'yes' || check-links
+    test -s ${RUN_DIR}/${LINKS_STATE_FILENAME} || return 0
+
+    local connections_tmp_file=/tmp/${CONNECTION_FILENAME}.${$}
+    local summary_tmp_file=/tmp/${CONNECTION_SUMMARY_FILENAME}.${$}
+    local dev state ips ip
+    local i n
+
+    while read dev state ips
+    do
+	if test -z "${ips}" -o ${state} == 'KO' ; then
+	    echo ${dev} 0
+	    continue
+	fi
+
+	n=0
+	for ip in ${ips}
+	do
+	    ip=${ip/\/*}
+	    i=$(ss --oneline --numeric --ipv4 --tcp state established src ${ip}/32 | wc -l 2> /dev/null)
+	    ((i--))
+	    ((n += i))
+	done
+
+	echo ${dev} ${n}
+    done < ${RUN_DIR}/${LINKS_STATE_FILENAME} > ${connections_tmp_file}
+
+    local total_type='all'
+    local total_type='all-tcp'
+
+    case ${total_type} in
+	'all-tcp')
+	    n=$(ss --oneline --numeric --ipv4 --tcp state all | wc -l 2> /dev/null)
+	    ((n--))
+	    ;;
+	*)
+	    n=$(ss --summary | head -1 2> /dev/null)
+	    n=${n/*: }
+	    ;;
+    esac
+
+    echo "${n}" > ${summary_tmp_file}
+
+    mv -f ${connections_tmp_file} ${RUN_DIR}/${CONNECTION_FILENAME}
+    mv -f ${summary_tmp_file} ${RUN_DIR}/${CONNECTION_SUMMARY_FILENAME}
+}
+
+report-rcache()
+{
+    test ${APL_ROLE} == 'gateway' || return 0
+
+    local health_tmp_file=/tmp/${USED_RCACHE_FILENAME}.${$}
+    local used_sz=$(du -ks ${WEB_RCACHE_DIR}/ 2> /dev/null | expand) used_pct=0
+
+    used_sz=${used_sz/ *}
+
+    if test -n "${used_sz}" ; then
+        used_sz=$[${used_sz} / 1024]
+        used_pct=$[${used_sz} * 10000 / ${RWEB_CACHE_SZ}]
+	case ${#used_pct} in
+	    1)
+		used_pct="0.0${used_pct}"
+		;;
+	    2)
+		used_pct="0.${used_pct}"
+		;;
+	    3)
+		used_pct="${used_pct:0:1}.${used_pct:1}"
+		;;
+	    4)
+		used_pct="${used_pct:0:2}.${used_pct:2}"
+		;;
+	    *)
+		used_pct=100
+		;;
+	esac
+    fi
+
+    echo ${used_pct} > ${health_tmp_file}
+    mv -f ${health_tmp_file} ${RUN_DIR}/${USED_RCACHE_FILENAME}
+}
+
+report-disks()
+{
+    local checks=${1}
+
+    if test -z "${checks}" ; then
+	report-disks-io
+	report-disks-health
+	report-raid-health
+	report-rcache
+	return 0
+    fi
+
+    local check
+    checks=${checks//:/ }
+
+    for check in ${checks}
+    do
+	case ${check} in
+	    io)
+		report-disks-io
+		;;
+	    health)
+		report-disks-health
+		;;
+	    raid)
+		report-raid-health
+		;;
+	    rcache)
+		report-rcache
+		;;
+	    *)
+		;;
+	esac
+    done
+}
+
+report-av-update()
+{
+    local program=freshclam
+
+    test -f /var/lock/${program} || return 0
+    test -s /var/log/${program}.log || return 0
+    local date=$(date --reference=/var/log/${program}.log +"%s" 2> /dev/null)
+    echo ${date} > ${AV_AUTO_UPDATE_FILE}
+    test ${CURRENT_AV_MODE} == True || return 0
+    local today=$(date +"%s" 2> /dev/null)
+    test $[${date} + (3600*24)] -ge ${today} || snmp-av-trap OutDated ${date}
+}
+
+check-tls()
+{
+    local elt i=0 range
+    local tls cert_file line
+    local current_epoch=$(date +"%s" 2> /dev/null)
+
+    local tmp_file_out=/tmp/${TLS_SYSTEM_CA_STATE_FILENAME}.${$}
+    local state_file=${RUN_DIR}/${TLS_SYSTEM_CA_STATE_FILENAME}
+    local cert_file=${SSL_CA_DIR}/${SYSTEM_CA}.certificate
+    rm -f ${tmp_file_out}
+    check-tls-cert-validity SystemCA ${current_epoch} ${cert_file} > ${tmp_file_out}
+    mv -f ${tmp_file_out} ${state_file}
+
+    # ---
+
+    tmp_file_out=/tmp/${TLS_THIRD_CA_STATE_FILENAME}.${$}
+    state_file=${RUN_DIR}/${TLS_THIRD_CA_STATE_FILENAME}
+
+    for elt in ${CURRENT_TLS_CA_LIST}
+    do
+	range=$[${i} % 2]
+	case ${range} in
+	    0)
+		tls=${elt}
+		;;
+	    1)
+		cert_file=${SSL_LOCAL_CA_DIR}/${tls}.certificate
+		check-tls-cert-validity ${tls} ${current_epoch} ${cert_file}
+		;;
+	    *)
+		return 255
+		;;
+	esac
+	((i++))
+    done > ${tmp_file_out}
+    mv -f ${tmp_file_out} ${state_file}
+
+    # ---
+
+    tmp_file_out=/tmp/${TLS_SERVER_STATE_FILENAME}.${$}
+    state_file=${RUN_DIR}/${TLS_SERVER_STATE_FILENAME}
+    for tls in ${CURRENT_TLS_SERVER_LIST}
+    do
+	cert_file=${SSL_SERVER_DIR}/${tls}.certificate
+	check-tls-cert-validity ${tls} ${current_epoch} ${cert_file}
+    done > ${tmp_file_out}
+    mv -f ${tmp_file_out} ${state_file}
+
+    # ---
+
+    tmp_file_out=/tmp/${TLS_CLIENT_STATE_FILENAME}.${$}
+    state_file=${RUN_DIR}/${TLS_CLIENT_STATE_FILENAME}
+    cd ${SSL_CLIENT_DIR}
+    local curs=$(ls -1d *.cur 2> /dev/null) cur
+    for cur in ${curs}
+    do
+	tls=${cur%\.cur}
+	cert_file=${tls}.cur/${tls}.certificate
+	check-tls-cert-validity ${tls} ${current_epoch} ${cert_file}
+    done > ${tmp_file_out}
+    mv -f ${tmp_file_out} ${state_file}
+    cd - > /dev/null 2>&1
+}
+
+clean-exit()
+{
+    trap "" USR1 INT QUIT TERM
+
+    local code=${1}
+
+    rm -f /var/lock/apl_health_check
+    rm -f ${RUN_DIR}/${WAITING_PROCESS}.${CALLER_PID}
+
+    exit ${code}
+}
+
+clean-end-cb()
+{
+    HC_INTERRUPT=1
+}
+
+init-clean-end-trap()
+{
+    HC_INTERRUPT=0
+    trap "clean-end-cb" USR1 INT QUIT TERM
+    touch ${RUN_DIR}/${WAITING_PROCESS}.${CALLER_PID}
+}
+
+main()
+{
+    local reports mode
+
+    if test -n "${1}" ; then
+	CALLER_PID=${1}
+	reports=${2}
+	mode=${3}
+    else
+	CALLER_PID=${$}
+    fi
+
+    init-clean-end-trap
+
+    if test -z "${reports}" ; then
+	check-links
+	check-vpnipsec
+	report-disks
+	check-services-start
+	update-connections
+	report-av-update
+	check-tls
+    else
+	local report_major
+	reports=${reports//:/ }
+
+	for report_major in ${reports}
+	do
+	    case ${report_major} in
+		link)
+		    check-links
+		    ;;
+		vpnipsec)
+		    check-vpnipsec ${mode}
+		    ;;
+		disk)
+		    report-disks ${mode}
+		    ;;
+		service)
+		    check-services-start ${mode}
+		    ;;
+		connection)
+		    update-connections
+		    ;;
+		av-update)
+		    report-av-update
+		    ;;
+		tls)
+		    check-tls
+		    ;;
+		supervisor)
+		    check-supervisor-fifo
+		    ;;
+		*)
+		    ;;
+	    esac
+	done
+    fi
+
+    clean-exit 0
+}
+
+# Main()
+
+main "${@}"

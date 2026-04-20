@@ -1,0 +1,628 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       Commands
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+source functions
+
+check-access-list-nb()
+{
+    test -n "${1}" || return 1
+
+    local access_type=${1}
+    local list len
+
+    case ${access_type} in
+	web)
+	    list="${ACCESS_WEB_LIST}"
+	    ;;
+	file)
+	    list="${ACCESS_FILE_LIST}"
+	    ;;
+	admin)
+	    list="${ACCESS_ADMIN_LIST}"
+	    ;;
+	mon)
+	    list="${ACCESS_MON_LIST}"
+	    ;;
+	antivirus)
+	    list="${ACCESS_AV_LIST}"
+	    ;;
+	manager)
+	    list="${ACCESS_MANAGER_LIST}"
+	    ;;
+	*)
+	    error 255
+	    ;;
+    esac
+
+    case ${access_type} in
+	manager)
+	    len=$(record3-length-list "${list}")
+	    ;;
+	*)
+	    len=$(record4-length-list "${list}")
+	    ;;
+    esac
+
+    case ${access_type} in
+	web)
+	    test ${len} -lt ${MAX_ACL_WEB_NB}
+	    ;;
+	file)
+	    test ${len} -lt ${MAX_ACL_FILE_NB}
+	    ;;
+	admin)
+	    test ${len} -lt ${MAX_ACL_ADMIN_NB}
+	    ;;
+	mon)
+	    test ${len} -lt ${MAX_ACL_MON_NB}
+	    ;;
+	antivirus)
+	    test ${len} -lt ${MAX_ACL_AV_NB}
+	    ;;
+	manager)
+	    ;;
+	*)
+	    error 255
+	    ;;
+    esac
+}
+
+access-remove()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 1
+
+    local in_list=${1}
+    local record=${2}
+
+    local out_list
+    local f0 f1 f2 f3
+    local elt i=0 range
+
+    for elt in ${in_list}
+    do
+	range=$[${i} % 4]
+	case ${range} in
+	    0)
+		f0=${elt}
+		;;
+	    1)
+		f1=${elt}
+		;;
+	    2)
+		f2=${elt}
+		;;
+	    3)
+		f3=${elt}
+		if test "${f0} ${f1} ${f2}" != "${record}" ; then
+		    out_list="${out_list} ${f0} ${f1} ${f2} ${f3}"
+		fi
+		;;
+	    *)
+		return 1
+		;;
+	esac
+	((i++))
+    done
+    echo "${out_list:1}"
+}
+
+show-access-list1()
+{
+    local access_type=${2}
+    local access=${3}
+
+    echo-command-form "access ${access_type}"
+    if test "${1}" == "new" ; then
+	echo-mark-new
+    else
+	echo-mark-cur
+    fi
+
+
+    if test -z "${access}" ; then
+	echo-value-null
+	return 0
+    fi
+
+    local interface ip netmask qos login
+    local elt range i=0 n=0
+
+    for elt in ${access}
+    do
+	range=$[${i} % 4]
+	case ${range} in
+	    0)
+		interface=${elt}
+		;;
+	    1)
+		ip=${elt}
+		;;
+	    2)
+		netmask=${elt}
+		;;
+	    3)
+		qos=${elt}
+		test ${n} -eq 0 || echo-blank-command
+		case ${access_type} in
+		    web|antivirus)
+			echo-value "${interface} ${ip} ${netmask} ${qos}%"
+			;;
+		    admin)
+			echo-value "${interface} ${ip} ${netmask}"
+			;;
+		    mon|file)
+			echo-value "${interface} ${ip}"
+			;;
+		    *)
+			;;
+		esac
+		((n++))
+		;;
+	    *)
+		return 255
+		;;
+	esac
+	((i++))
+    done
+}
+
+show-access-list()
+{
+    local access_type=${1}
+    local current_access_list=${2}
+    local access_list=${3}
+
+    show-access-list1 'current' "${access_type}" "${current_access_list}"
+    if test "${current_access_list}" != "${access_list}" ; then
+	show-access-list1 'new' "${access_type}" "${access_list}"
+    fi
+}
+
+show-access-web()
+{
+    show-access-list web "${CURRENT_ACCESS_WEB_LIST}" "${ACCESS_WEB_LIST}"
+}
+
+show-access-file()
+{
+
+    show-access-list file "${CURRENT_ACCESS_FILE_LIST}" "${ACCESS_FILE_LIST}"
+}
+
+show-access-admin()
+{
+    show-access-list 'admin' "${CURRENT_ACCESS_ADMIN_LIST}" "${ACCESS_ADMIN_LIST}"
+}
+
+show-access-mon()
+{
+    show-access-list 'mon' "${CURRENT_ACCESS_MON_LIST}" "${ACCESS_MON_LIST}"
+}
+
+show-access-av()
+{
+    show-access-list 'antivirus' "${CURRENT_ACCESS_AV_LIST}" "${ACCESS_AV_LIST}"
+}
+
+show-access-manager1()
+{
+    local access=${2}
+
+    echo-command-form "access manager"
+    if test "${1}" == "new" ; then
+	echo-mark-new
+    else
+	echo-mark-cur
+    fi
+
+    if test -z "${access}" ; then
+	echo-value-null
+	return 0
+    fi
+
+    local interface role ip
+    local ssh_key ssh_key_file ssh_key_id
+    local elt range i=0 n=0
+
+    for elt in ${access}
+    do
+	range=$[${i} % 3]
+	case ${range} in
+	    0)
+		role=${elt}
+		;;
+	    1)
+		interface=${elt}
+		;;
+	    2)
+		ip=${elt}
+
+		test ${n} -eq 0 || echo-blank-command
+		echo-value "${role} ${interface} ${ip} ..."
+		((n++))
+		;;
+	    *)
+		return 255
+		;;
+	esac
+	((i++))
+    done
+}
+
+show-access-manager()
+{
+    show-access-manager1 'cur' "${CURRENT_ACCESS_MANAGER_LIST}"
+    test "${CURRENT_ACCESS_MANAGER_LIST}" == "${ACCESS_MANAGER_LIST}" || show-access-manager1 'new' "${ACCESS_MANAGER_LIST}"
+}
+
+show-access()
+{
+    echo-begin-show
+    case "${1}" in
+	web)
+	    ! contextual-command-is-allowed || show-access-web
+	    ;;
+	antivirus)
+	    ! contextual-command-is-allowed || show-access-av
+	    ;;
+	file)
+	    show-access-file
+	    ;;
+	admin)
+	    show-access-admin
+	    ;;
+	mon)
+	    show-access-mon
+	    ;;
+	manager)
+	    ! contextual-command-is-allowed || show-access-manager
+	    ;;
+	'')
+	    local role=$(get-contextual-role)
+
+	    case ${role} in
+		gateway)
+		    show-access-web
+		    show-access-av
+		    show-access-file
+		    show-access-admin
+		    show-access-mon
+		    show-access-manager
+		    ;;
+		manager)
+		    show-access-file
+		    show-access-admin
+		    show-access-mon
+		    ;;
+		*)
+		    return 255
+		    ;;
+	    esac
+	    ;;
+	*)
+	    error 255
+	    ;;
+    esac
+    echo-end-show
+}
+
+check-access()
+{
+    test -n "${1}" || return 1
+
+    case "${1}" in
+	admin|antivirus|file|manager|mon|web)
+	    return 0
+	    ;;
+	*)
+	    return 1
+	    ;;
+    esac
+}
+
+check-access-interface()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    local as=${1}
+    local interface=${2}
+    
+    if test ${as} == web ; then
+	! check-interface ${interface} || return 0
+	case ${interface} in
+	    admin|antivirus|file|mon|rweb|web)
+		return 0
+		;;
+	    *)
+		return 13
+		;;
+	esac
+    else
+	check-interface ${interface}
+    fi
+}
+
+run()
+{
+    if test -z "${ARGS[1]}" ; then show-access ; return 0 ; fi
+    
+    local as=${ARGS[1]}
+
+    check-access ${as} || return 45
+
+    case "${as}" in
+	admin|file|mon)
+	    ;;
+	*)
+	    contextual-command-is-allowed || return 207
+	    ;;
+    esac
+    
+    if test -z "${ARGS[2]}" ; then show-access ${as}; return 0 ; fi
+
+    user-has-admin-rights || return 31
+
+    local act=${ARGS[2]}
+    
+    local file_protocol file_login file_password
+    local access
+
+    case ${act} in
+	raz)
+	    case ${as} in
+		web)
+		    unset ACCESS_WEB_LIST
+		    ;;
+		file)
+		    unset ACCESS_FILE_LIST
+		    raz-file-password
+		    ;;
+		admin)
+		    unset ACCESS_ADMIN_LIST
+		    ;;
+		mon)
+		    unset ACCESS_MON_LIST
+		    ;;
+		antivirus)
+		    unset ACCESS_AV_LIST
+		    ;;
+		manager)
+		    unset ACCESS_MANAGER_LIST
+		    rm -f \
+		       ${TMP_DIR}/${LOADED}.${SSH_KEY}.${MASTER_MANAGER_NAME} \
+		       ${TMP_DIR}/${LOADED}.${SSH_KEY}.${BACKUP_MANAGER_NAME}
+		    ;;
+		*)
+		    error 255
+		    ;;
+	    esac
+	    ;;
+
+	add|add:encrypted|del)
+
+	    test -n "${ARGS[3]}" || return 1
+
+	    test ${act} == del || check-access-list-nb ${as} || return 90
+
+	    if test ${as} == 'manager' ; then
+		local manager_role=${ARGS[3]}
+		check-manager-role ${manager_role} || return 208
+		if test ${act} == add ; then
+		    local interface=${ARGS[4]}
+		    check-interface ${interface} || return 43
+		    contextual-command-is-allowed || check-manager-interface ${interface} || return 209
+		    test -n "${ARGS[5]}" || return 1
+		    local ip=${ARGS[5]}
+		fi
+	    else
+		local interface=${ARGS[3]}
+		check-access-interface ${as} ${interface} || return 43
+		contextual-command-is-allowed || check-manager-interface ${interface} || return 209
+		test ${as} != web -o ${interface} != external || return 43
+		test -n "${ARGS[4]}" || return 1
+		local ip=${ARGS[4]}
+	    fi
+
+	    case ${as} in
+		file|mon)
+		    check-ip-name ${ip} || return 113
+		    ;;
+		manager)
+		    test ${act} == del || check-ip ${ip} || return 12
+		    ;;
+		*)
+		    local px=${ip/*\/}
+		    local mk
+
+		    if test ${ip} != ${px} ; then
+			check-prefix ${px} || return 158
+			ip=${ip/\/*}
+		    else
+			unset px
+		    fi
+
+		    check-ip ${ip} || return 12
+
+		    if test -z "${px}" ; then
+			if test -n "${ARGS[5]}" ; then
+			    mk=${ARGS[5]}
+			    check-mask ${mk} || return 13
+			else
+			    mk=255.255.255.0
+			fi
+		    else
+			if test ${px} == 32 ; then
+			    mk='255.255.255.255'
+			elif test ${px} == 0 ; then
+			    mk='0.0.0.0'
+			else
+			    mk=$(ipcalc -s ${ip}/${px} -m)
+			    mk=${mk/NETMASK=/}
+			fi
+		    fi
+		    check-net-ip-address ${ip} ${mk} || return 70
+		    ;;
+	    esac
+
+	    case ${as} in
+		web|antivirus)
+		    if test -z "${px}" ; then
+			local qos=${ARGS[6]}
+		    else
+			local qos=${ARGS[5]}
+		    fi
+		    if test -z "${qos}" ; then
+			qos=100
+		    else
+			qos=$(remove-leading-zeros ${qos})
+			qos=$(get-percent-value ${qos})
+			check-percentage ${qos} || return 11
+		    fi
+
+		    access="${interface} ${ip} ${mk}"
+
+		    case ${as} in
+			web)
+			    export ACCESS_WEB_LIST=$(access-remove "${ACCESS_WEB_LIST}" "${access}")
+			    if test ${act} == add ; then
+				export ACCESS_WEB_LIST="${ACCESS_WEB_LIST} ${access} ${qos}"
+			    fi
+			    ;;
+			antivirus)
+			    export ACCESS_AV_LIST=$(access-remove "${ACCESS_AV_LIST}" "${access}")
+			    if test ${act} == add ; then
+				export ACCESS_AV_LIST="${ACCESS_AV_LIST} ${access} ${qos}"
+			    fi
+			    ;;
+			*)
+			    return 255
+			    ;;
+		    esac
+		    ;;
+
+		file)
+		    file_protocol=${ARGS[5]}
+		    file_login=${ARGS[6]}
+
+		    case ${act} in
+			add|add:encrypted)
+			    if test -n "${file_protocol}" ; then
+				check-file-password-protocol ${file_protocol} || return 59
+				if test -n "${file_login}" ; then
+				    check-ftp-login-name ${file_login} || return 162
+				    case ${act} in
+					add)
+					    if test -n "${ARGS[7]}" ; then
+						file_password="${ARGS[7]}"
+					    else
+						test ${TERM} != ${WADMIN_TERM} || return 0
+						test "${__BATCH_MODE}" != yes || error 111
+
+						echo -n "Please specify the password: "
+						stty -echo
+						read file_password
+						stty echo
+						echo
+						test -n "${file_password}" || return 51
+						file_password="clear:${file_password}"
+						check-file-password "${file_password}" || return 163
+					    fi
+					    ;;
+					add:encrypted)
+					    test -n "${ARGS[7]}" || return 1
+					    file_password="encrypted:${ARGS[7]}"
+					    ;;
+					*)
+					    ;;
+				    esac
+
+				    add-file-password ${file_protocol} ${ip} ${file_login} "${file_password}"
+				else
+				    return 1
+				fi
+			    else
+				test -z "${file_login}" || return 1
+			    fi
+			    ;;
+			*)
+			    ;;
+		    esac
+
+		    access="${interface} ${ip} 255.255.255.255"
+		    export ACCESS_FILE_LIST=$(access-remove "${ACCESS_FILE_LIST}" "${access}")
+		    case ${act} in
+			add|add:encrypted)
+			    export ACCESS_FILE_LIST="${ACCESS_FILE_LIST} ${access} 100"
+			    ;;
+			*)
+			    ;;
+		    esac
+		    ;;
+		
+		admin)
+		    access="${interface} ${ip} ${mk}"
+		    export ACCESS_ADMIN_LIST=$(access-remove "${ACCESS_ADMIN_LIST}" "${access}")
+		    test ${act} != add || export ACCESS_ADMIN_LIST="${ACCESS_ADMIN_LIST} ${access} 100"
+		    ;;
+		mon)
+		    access="${interface} ${ip} 255.255.255.255"
+		    export ACCESS_MON_LIST=$(access-remove "${ACCESS_MON_LIST}" "${access}")
+		    test ${act} != add || export ACCESS_MON_LIST="${ACCESS_MON_LIST} ${access} 100"
+		    ;;
+		manager)
+		    local ssh_key_id=$(get-manager-key-id ${manager_role})
+		    export ACCESS_MANAGER_LIST=$(remove-record-from-list 3 1 "${manager_role}" "${ACCESS_MANAGER_LIST}")
+
+		    if test ${act} == add ; then
+
+			local ssh_key=${ARGS[6]}
+
+			access="${manager_role} ${interface} ${ip}"
+			export ACCESS_MANAGER_LIST=$(add-record-to-list "${access}" "${ACCESS_MANAGER_LIST}")
+
+			if test -n "${ssh_key}" ; then
+			    echo ${ssh_key} > ${TMP_DIR}/work.${LOADED}.${SSH_KEY}.${ssh_key_id}
+			    load-ssh-public-key-commit ${TMP_DIR}/work.${LOADED}.${SSH_KEY}.${ssh_key_id}
+			else
+			    rm -f ${TMP_DIR}/work.${LOADED}.${SSH_KEY}.${ssh_key_id}
+			fi
+		    else
+			rm -f ${TMP_DIR}/${LOADED}.${SSH_KEY}.${ssh_key_id}
+		    fi
+		    ;;
+		*)
+		    return 255
+		    ;;
+	    esac
+	    ;;
+	*)
+	    return 1
+	    ;;
+    esac
+    
+    SAVENV=1
+}
+
+main "${@}"

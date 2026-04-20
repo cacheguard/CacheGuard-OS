@@ -1,0 +1,118 @@
+Manage the reverse Web mode (reverse proxy)
+.SH SYNOPSIS
+
+[1] \fBrweb\fR [site\fR [\fBraz\fR | \fBadd\fR \fI<site-name>\fR [(\fBhttp\fR | \fBhttps\fR \fI<tls-id>\fR[:\fI<ca-id>\fR]) [\fI<exposed-ip>\fR [\fI<qos>\fR]]] | \fBdel \fI<site-name>\fR [(\fBhttp\fR | \fBhttps\fR) [\fI<ip>\fR]]]]
+
+[2] \fBrweb\fR [\fBrhttp\fR [\fI<site-name>\fR [(\fBon\fR | \fBoff\fR)]]]
+
+[3] \fBrweb\fR [\fBhost\fR [\fI<site-name>\fR [\fBraz\fR | (\fBadd\fR (\fBrweb\fR | \fBvpnipsec\fR | \fBexternal\fR) (\fBhttp\fR | \fBhttps\fR) \fI<ip>\fR [\fI<port>\fR [\fI<balance-weight>\fR [\fI<qos>\fR]]]) | (\fBdel\fR (\fBrweb\fR | \fBvpnipsec\fR | \fBexternal\fR) (\fBhttp\fR | \fBhttps\fR) \fI<ip>\fR [\fI<port>\fR])]]]
+
+[4] \fBrweb\fR [\fBbalancer\fR [\fI<site-name>\fR [(\fBrobin\fR | \fBtraffic\fR | \fBpending\fR) [\fBnosticky\fR | \fBsticky\fR [(\fBinsert\fR | \fBuse\fR) [\fI<cookie-name>\fR]]]]]]
+
+[5] \fBrweb\fR [\fBvia\fR [\fI<site-name>\fR \fI<exposed-ip>\fR [\fBraz\fR | (\fBadd\fR | \fBdel\fR) \fI<gateway-ip>\fR (\fBmaster\fR \fBbackup\fR) [\fI<priority>\fR]]]]
+
+[6] \fBrweb [standby\fR [\fI<site-name>\fR [\fBoff\fR | \fBon\fR \fI<url>\fR]]]
+
+.SH DESCRIPTION
+
+This command is used to configure the reverse Web (or reverse proxy) mode. The reverse Web proxy acts as a virtual Web server between Web clients and Web servers and allows you to do not expose real Web servers to Web clients. Websites for which the system acts as a reverse Web proxy, are called reverse websites and protected (or cloaked) real Web servers are called hosts in the system.
+
+The first [1] usage form allows you to add, delete or erase websites. To add a website use the keyword \fBadd\fR followed by the website name, the used protocol (\fBhttp\fR or \fBhttps\fR), a TLS server identifier (only for HTTPS) and the external IP address (accessed by Web clients) for the defined website. An optional final argument may be used to customise the QoS (Quality of Service) for the given reverse website. For HTTPS websites, you have the possibility to specify a TLS server identifier and optionally an intermediate CA certificate identifier separated by the colon (:) character.
+
+To delete a website use the keyword \fBdel\fR followed by the website name, the protocol and the associated external IP address. If no protocol and external IP address are given, it is assumed that the used protocol is HTTP and the IP address is the external IP address of the appliance. To erase all defined websites, use the keyword \fBraz\fR. Without any arguments, the first usage form displays the list of all reverse websites.
+
+The website external IP address can be the external IP address of the appliance, an external VRRP IP address (in HA mode) or an IP address belonging to the external network. In the latter case the IP address is added to the external network interface device as an alias IP address. Distinct HTTP website names can always share the same external IP address but sharing the same external IP address by distinct HTTPS website names is only supported when the WAF mode is activated (see the \fBmode\fR command). If activating the WAF mode is not required, an alternative solution can be the usage of wildcard or SAN certificates for HTTPS websites that share the same external IP address. It is important to note that only Web clients that support TLS SNI (Server Name Indication) can properly access distinct HTTPS websites that share the same external IP address.
+
+If the same website is configured to support both HTTP and HTTPS, all HTTP traffic will be redirected to HTTPS by default. In this case, it is important notice that in order to avoid endless redirection loops, real Web servers should not froward HTTP traffic to HTTPS in turn. In case where real Web servers are configured to redirect HTTP traffic HTTPS and that redirection can't be deactivated, the HTTP to HTTPS redirection can be deactivated for a website (see the second usage form).
+
+The \fI<qos>\fR value in this usage form represents the percentage of the total bandwidth defined for reverse Web traffic allocated by the command \fBqos\fR (see the usage form \fBqos shape rweb external\fR). The \fI<qos>\fR value here should be an integer between 1 and 100. If no \fI<qos>\fR is given, the value of 100 is used by default. Please note that the QoS configured here is based on the given external IP address and protocol only (and not the given website name). So if two reverse websites share the same external IP address and protocol, the applied QoS will be the QoS configured first. To configure different QoS for distinct websites that share the same IP address and protocol, you have the possibility to associate them to distinct real Web servers and configure different QoS to access those real Web servers (see the third usage form).
+
+A reverse website acts as a virtual website that forward its traffic to hosts (or real Web servers) using HTTP or HTTPS. For HTTPS reverse websites, if the used protocol to forward the traffic to hosts is HTTP, the appliance acts as an SSL offloader. In this case, as communications between the appliance and real hosts are in unencrypted format (HTTP), it is highly important to use an end to end secure network to interconnect them. In addition, real hosts should be placed in a network that benefit from a restricted access. Recommended implementation are as follows:
+
+  \(bu Real hosts are placed in the internal network directly connected to the appliance. In this case, the appliance should be exclusively used as a reverse proxy (\fBweb\fR and \fBweb\fR are disabled) and the internal network should be exclusively used to connect real Web servers.
+
+  \(bu The \fBvlan\fR mode is activated and real hosts are placed in the \fBrweb\fR VLAN directly connected to the appliance. In this case, the \fBrweb\fR VLAN should be exclusively used to connect real Web servers.
+
+  \(bu The \fBvpnipsec\fR mode is activated, the IPsec VPN is in site to site mode (the IPsec VPN \fBaccess\fR mode is disabled) and real hosts are placed in a remote private network connected via a site to site IPsec VPN tunnel established with the appliance. In this case, that remote private network should be exclusively used to connect real hosts.
+
+In any case, real hosts can only be accessed via the following network interfaces:
+
+  \(bu The internal network interface (called \fBrweb\fR in this context).
+
+  \(bu The \fBrweb\fR network interface in case where the \fBvlan\fR mode activated.
+
+  \(bu The \fBvpnipsec\fR network interface in case where the \fBvpnipsec\fR mode is activated and the IPsec VPN is in site to site mode (the IPsec VPN \fBaccess\fR mode is disabled).
+
+  \(bu The \fBexternal\fR network interface (with the limitation that real hosts associated to HTTPS reverse websites are configured to use HTTPS only).
+
+The second [2] usage form allows you to activate or deactivate the HTTP to HTTPS redirection for reverse websites that support both HTTP to HTTPS protocols. To activate the HTTP to HTTPS redirection for reverse websites use the keyword \fBrhttp\fR followed by the reverse website name and the keyword \fBon\fR. To deactivate the redirection, use the keyword \fBoff\fR instead. Without any arguments, the second usage form displays the state of HTTP to HTTPS redirection for all HTTPS reverse websites.
+
+The third [3] usage form allows you to associate real hosts to virtual websites. To associate a host to a virtual website, give the website name followed by the keyword \fBadd\fR, the network interface via which the host is accessed (\fBrweb\fR, \fBvpnipsec\fR or \fBexternal\fR), the used protocol (\fBhttp\fR or \fBhttps\fR), the IP address of the real host and the port number on which the Web application on that host is listening (80 for HTTP and 443 for HTTPS by default). If more than one host is associated to the same website, the website load is distributed over those hosts. In this case, the optional balance weight allows you to balance the load more or less on a host. The balance weight should be an integer between 1 and 100. By default this value is set to 50. Traffic bandwidths can also be customised for a host using the optional \fI<qos%>\fR parameter. The \fI<qos%>\fR value is a percentage of the ingress or egress bandwidth allocated to \fBrweb\fR traffic and should be an integer between 1 and 100. Ingress and egress bandwidth values to which the percentage is applied are as follows:
+
+  \(bu For hosts accessed via the native \fBinternal\fR network interface or the 802.1q pseudo network interface called \fBrweb\fR (in \fBvlan\fR mode), the ingress and egress bandwidths to consider are defined with the command usage form \fBqos shape rweb internal\fR.
+
+  \(bu For hosts accessed via the external network interface, the ingress and egress bandwidths to consider are defined with the command usage form \fBqos shape rweb external\fR.
+
+  \(bu For hosts accessed via the \fBvpnipsec\fR virtual network interface, the ingress bandwidth to consider is defined with the command usage form \fBqos shape vpnipsec external ingress\fR. The egress bandwidth for hosts accessed via the \fBvpnipsec\fR virtual network interface can't be customised.
+
+If no \fI<qos%>\fR is given, the value of 100% is used by default. If the same host represented by an IP address and port number is used for more than one reverse website name, the effective QoS will be the highest defined QoS.
+
+Please note that a real host can exclusively be accessed via a unique network interface. This means that if a host is added with an IP address that already exists via a distinct network interface, the existing host is automatically removed. It is also important to note that real hosts should host website names to which they are associated and in case where the used protocol is HTTPS, they should use valid certificates. In this context, a valid certificate is a certificate signed by a CA (Certificate Authority) or by the system's CA certificate (see the  \fBtls\fR command).
+
+To delete a host use the keyword \fBdel\fR followed by the network interface via which the host is accessed (\fBrweb\fR or \fBvpnipsec\fR), the used protocol (\fBhttp\fR | \fBhttps\fR), the IP address of that host and optionally the port number on which the Web application on that host is listening (80 for HTTP and 443 for HTTPS by default). To erase all hosts associated to a reverse website use the keyword \fBraz\fR. Without any arguments, the third usage form displays the list of all hosts.
+
+The fourth [4] usage form allows you to configure the load balancing policy over hosts. To configure the load balancing policy for a given website you must specify a load balancing method and the stickiness of connections. Three load balancing methods are available:
+
+  \(bu \fBrobin\fR: load balance real Web servers in a round-robin fashion based on the number of requests.
+
+  \(bu \fBtraffic\fR:load balance real Web servers according to the generated traffic. With this method, real Web servers generating less traffic are requested more.
+
+  \(bu \fBpending\fR: load balance real Web servers according to the number of pending requests. With this method, real Web servers having more pending requests are requested less.
+
+The stickiness allows the same Web client to be always redirected to the same host. This ensures that the application context running on a host is preserved for a given Web client. Sticky connections are based on HTTP session cookies. Session cookies are either generated by the Web application running on host or are inserted by the appliance into the Web traffic. By default the session cookie is inserted by the appliance. Please note that if your real Web servers use a deterministic algorithm to redirect the traffic in turn to other servers, you probably do not need to activate the stickiness here.
+
+To activate the stickiness based on an inserted cookie, use the keyword \fBsticky\fR followed by the keyword \fBinsert\fR and the cookie name prefix. The default prefix for an inserted cookie name is \fIWGICPATHID\fR. The inserted cookie name for a given website will be the concatenation of the cookie prefix and the range number of that website. To activate the stickiness based on a cookie generated by the Web application running on real Web servers use the keyword \fBsticky\fR followed by the keyword \fBuse\fR and the cookie name. The default cookie name is \fIJSESSIONID\fR. To completely deactivate the stickiness use the keyword \fBnosticky\fR.
+
+The default load balancing method is "\fBrobin nosticky\fR". Without any arguments, the fourth usage form displays the list of all load balancing policies.
+
+In a load balancing configuration, an automatic health checking is performed on real Web servers. If one Web server fails, it is removed from the load balancing pool and will be automatically restored to the load balancing pool when the failure is fixed. Real Web servers must be accessible on their listening IP address and port 80.
+
+When the appliance is configured to use multiple external gateways (connected to the external interface), each potentially having a distinct public IP address (with each gateway performing source NAT on all outgoing traffic to the Internet using its own public IP), you should explicitly specify the gateways through which external users can access the reverse proxy. The fifth [5] usage form allows you to specify (via) gateways to use for a given website. Via gateways can have two roles: the \fBmaster\fR role and the \fBbackup\fR role. Please note that specifying backup via gateways is meaningful only if the external gateways share the same public IP address.
+
+When all gateways are available, a master gateway with the highest priority is elected to route Web traffic for a given website (identified by its \fI<site-name>\fR and \fI<exposed-ip>\fR). The elected gateway is then activated for that website. Please note that at a given point, one and only one gateway is considered as active for a given website. In case of a failure on the active gateway, a backup gateway (with the highest priority) is then elected to be activated. In case where a faulty gateway becomes operational again, the process of electing and activating via gateways is performed again.
+
+To add a master via gateway to a given website, use the keyword \fBvia\fR followed by the name and exposed IP address of that website (\fI<site-name>\fR \fI<exposed-ip>\fR), the keyword \fBadd\fR, the gateway IP address to use, the keyword \fBmaster\fR and optionally the priority associated to the specified gateway. To add a backup gateway, use the keyword \fBbackup\fR instead of the \fBmaster\fR keyword. To delete a gateway, use the keyword \fBdel\fR instead of \fBadd\fR. To erase the list of all \fBvia\fR gateways for a given website, use the keywords \fBraz\fR. The priority is a numeric value between 0 and 255. If no priority is specified, the priority is set to 110 for a master gateway and to 100 for a backup gateway. Without any arguments, the fifth usage form displays the list of all via gateways.
+
+The sixth [6] usage form allows you to temporarily put a reverse website in standby mode. When a reverse website is in standby mode, all requests to it are redirected to an information page provided by the appliance or to a given URL. The standby mode may be useful during maintenance period. If a URL is given it should be in the form: (http|https|ftp)://<domain-name>[/<URI>] where an URI may contain an alphanumeric or any of the following characters: \fI-._~:/?#[]@!$&()*+,;=\fR. Any other character needs to be encoded with the percent-encoding. A percent-encoding is in the form \fI%(a-fA-F0-9)(a-fA-F0-9)\fR (use %27 for the quote character). Without any arguments, the sixth usage form displays the list of all reverse websites in standby mode.
+
+.SH HTTP HEADERS
+The "X-Forwarded-Proto" and "X-Forwarded-For" headers are added to HTTP requests sent to real Web servers in order to indicate the initial protocol and source IP address used by the end-user.
+
+.SH LIMITATION
+The QoS defined here for a HTTP website is based on the IP address associated to that website. To define distinct QoS for two HTTP websites, distinct IP addresses must be configured for those HTTP websites.
+
+The TLS SNI for reverse websites is supported only if the WAF mode is activated or if at least one reverse website is configured with sticky load balancing on more than one real Web server.
+
+.SH SEE ALSO
+.B access
+(1)
+.B apply
+(1)
+.B dynamicdns
+(1)
+.B ip
+(1)
+.B mode
+(1)
+.B qos
+(1)
+.B system
+(1)
+.B tls
+(1)
+.B vlan
+(1)
+.B vpnipsec
+(1)
+.B waf
+(1)

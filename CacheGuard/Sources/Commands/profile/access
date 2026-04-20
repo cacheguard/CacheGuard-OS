@@ -1,0 +1,435 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       Commands
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+__complete-access()
+{
+    test -n "${COMP_CWORD-1}" || return 1
+
+    case ${COMP_CWORD} in
+	1)
+	    case ${COMP_WORDS[1]} in
+		a)
+		    COMPREPLY=('' admin antivirus)
+		    ;;
+		ad|ad|adm|admi|admin)
+		    COMPREPLY=(admin)
+		    ;;
+		an|ant|anti|antiv|antivi|antivir|antiviru|antivirus)
+		    COMPREPLY=(antivirus)		    
+		    ;;
+		f|'fi'|fil|file)
+		    COMPREPLY=(file)
+		    ;;
+		m)
+		    COMPREPLY=('' manager mon)
+		    ;;
+		ma|man|mana|manag|manage|manager)
+		    COMPREPLY=(manager)
+		    ;;
+		mo|mon)
+		    COMPREPLY=(mon)
+		    ;;
+		w|we|web)
+		    COMPREPLY=(web)
+		    ;;
+		'')
+		    COMPREPLY=('' '<RET>' admin antivirus file mon manager web)
+		    ;;
+		*)
+		    COMPREPLY=()
+		    ;;
+	    esac
+	    ;;
+	2)
+	    case ${COMP_WORDS[1]} in
+		admin|antivirus|file|mon|manager|web)
+		    case ${COMP_WORDS[2]} in
+			r|ra|raz)
+			    COMPREPLY=(raz)
+			    ;;
+			a|ad|add)
+			    COMPREPLY=(add)
+			    ;;
+			d|de|del)
+			    COMPREPLY=(del)
+			    ;;
+			'')
+			    COMPREPLY=('' '<RET>' raz add del)
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		*)
+		    COMPREPLY=()
+		    ;;
+	    esac
+	    ;;
+	3)
+	    case ${COMP_WORDS[2]} in
+		add|del)
+		    case ${COMP_WORDS[1]} in
+			web)
+			    case ${COMP_WORDS[3]} in
+				i|'in'|int|inte|inter|intern|interna|internal)
+				    COMPREPLY=(internal)
+				    ;;
+				a)
+				    COMPREPLY=('' admin antivirus auxiliary)
+				    ;;
+				au|aux|auxi|auxil|auxili|auxilia|auxiliar|auxiliary)
+				    COMPREPLY=(auxiliary)
+				    ;;
+				ad|adm|admi|admin)
+				    COMPREPLY=(admin)
+				    ;;
+				an|ant|anti|antiv|antivi|antivir|antiviru|antivirus)
+				    COMPREPLY=(antivirus)
+				    ;;
+				f|fi|fil|file)
+				    COMPREPLY=(file)
+				    ;;
+				m|mo|mon)
+				    COMPREPLY=(mon)
+				    ;;
+				r|rw|rwe|rweb)
+				    COMPREPLY=(rweb)
+				    ;;
+				w|we|web)
+				    COMPREPLY=(web)
+				    ;;
+				v|vp|vpn|vpni|vpnip|vpnips|vpnipse|vpnipsec)
+				    COMPREPLY=(vpnipsec)
+				    ;;
+				'')
+				    COMPREPLY=('' '<RET>' auxiliary admin antivirus file internal mon rweb vpnipsec web)
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			admin|antivirus|file|mon)
+			    case ${COMP_WORDS[3]} in
+				i|'in'|int|inte|inter|intern|interna|internal)
+				    COMPREPLY=(internal)
+				    ;;
+				e|ex|ext|exte|exter|extern|externa|external)
+				    COMPREPLY=(external)
+				    ;;
+				a|au|aux|auxi|auxil|auxili|auxilia|auxiliar|auxiliary)
+				    COMPREPLY=(auxiliary)
+				    ;;
+				v|vp|vpn|vpni|vpnip|vpnips|vpnipse|vpnipsec)
+				    COMPREPLY=(vpnipsec)
+				    ;;
+				'')
+				    COMPREPLY=('' '<RET>' internal external auxiliary vpnipsec)
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			manager)
+			    case ${COMP_WORDS[3]} in
+				m|ma|mas|mast|maste|master)
+				    COMPREPLY=(master)
+				    ;;
+				b|ba|bac|back|backu|backup)
+				    COMPREPLY=(backup)
+				    ;;
+				'')
+				    COMPREPLY=('' 'master' 'backup')
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+	    esac
+	    ;;
+	4)
+	    case ${COMP_WORDS[2]} in
+		add|del)
+		    case ${COMP_WORDS[1]} in
+			admin|antivirus|file|mon)
+			    case ${COMP_WORDS[3]} in
+				internal|external|auxiliary|vpnipsec)
+				    case ${COMP_WORDS[1]} in
+					admin|antivirus)
+					    COMPREPLY=('' '<network-ip>')
+					    ;;
+					file|mon)
+					    COMPREPLY=('' '<host-ip>' '<name>')
+					    ;;
+					*)
+					    COMPREPLY=()
+					    ;;
+				    esac
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			web)
+			    case ${COMP_WORDS[3]} in
+				internal|auxiliary|vpnipsec|admin|antivirus|file|mon|rweb|web)
+				    COMPREPLY=('' '<network-ip>')
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			manager)
+			    if test ${COMP_WORDS[2]} == add ; then
+				case ${COMP_WORDS[3]} in
+				    backup|master)
+					case ${COMP_WORDS[4]} in
+					    i|'in'|int|inte|inter|intern|interna|internal)
+						COMPREPLY=(internal)
+						;;
+					    e|ex|ext|exte|exter|extern|externa|external)
+						COMPREPLY=(external)
+						;;
+					    a|au|aux|auxi|auxil|auxili|auxilia|auxiliar|auxiliary)
+						COMPREPLY=(auxiliary)
+						;;
+					    '')
+						COMPREPLY=('' '<RET>' internal external auxiliary)
+						;;
+					    *)
+						COMPREPLY=()
+						;;
+					esac
+					;;
+				    *)
+					COMPREPLY=()
+					;;
+				esac
+			    else
+				COMPREPLY=()
+			    fi
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		*)
+		    COMPREPLY=()
+		    ;;
+	    esac
+	    ;;
+	5)
+	    case ${COMP_WORDS[2]} in
+		add|del)
+		    case ${COMP_WORDS[1]} in
+			admin|antivirus|file)
+			    case ${COMP_WORDS[3]} in
+				internal|external|auxiliary|vpnipsec)
+				    case ${COMP_WORDS[1]} in
+					admin|antivirus)
+					    COMPREPLY=('' '<RET>' '<network-mask>')
+					    ;;
+					file)
+					    if test ${COMP_WORDS[2]} = add ; then
+						case ${COMP_WORDS[5]} in
+						    f|ft|ftp)
+							COMPREPLY=(ftp)
+							;;
+						    s|sf|sft|sftp)
+							COMPREPLY=(sftp)
+							;;
+						    '')
+							COMPREPLY=('' '<RET>' ftp sftp)
+							;;
+						    *)
+							COMPREPLY=()
+							;;
+						esac
+					    else
+						COMPREPLY=()
+					    fi
+					    ;;
+					*)
+					    COMPREPLY=()
+					    ;;
+				    esac
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			web)
+			    case ${COMP_WORDS[3]} in
+				internal|auxiliary|vpnipsec|admin|antivirus|file|mon|rweb|web)
+				    COMPREPLY=('' '<RET>' '<network-mask>')
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			manager)
+			    if test ${COMP_WORDS[2]} == add ; then
+				case ${COMP_WORDS[3]} in
+				    backup|master)
+					case ${COMP_WORDS[4]} in
+					    internal|external|auxiliary)
+						COMPREPLY=('' '<manager-ip>')
+						;;
+					    *)
+						COMPREPLY=()
+						;;
+					esac
+					;;
+				    *)
+					COMPREPLY=()
+					;;
+				esac
+			    else
+				COMPREPLY=()
+			    fi
+			    ;;
+		    esac
+		    ;;
+		*)
+		    COMPREPLY=()
+		    ;;
+	    esac
+	    ;;
+	6)
+	    case ${COMP_WORDS[2]} in
+		add)
+		    case ${COMP_WORDS[1]} in
+			admin|antivirus|file)
+			    case ${COMP_WORDS[3]} in
+				internal|external|auxiliary|vpnipsec)
+				    case ${COMP_WORDS[1]} in
+					file)
+					    case ${COMP_WORDS[5]} in
+						ftp|sftp)
+						    COMPREPLY=('' '<login>')
+						    ;;
+						*)
+						    COMPREPLY=()
+						    ;;
+					    esac
+					    ;;
+					antivirus)
+					    COMPREPLY=('' '<RET>' '<qos%>')
+					    ;;
+					*)
+					    COMPREPLY=()
+					    ;;
+				    esac
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			web)
+			    case ${COMP_WORDS[3]} in
+				internal|auxiliary|vpnipsec|admin|antivirus|file|mon|rweb|web)
+				    COMPREPLY=('' '<RET>' '<qos%>')
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			manager)
+			    case ${COMP_WORDS[3]} in
+				backup|master)
+				    case ${COMP_WORDS[4]} in
+					internal|external|auxiliary)
+					    COMPREPLY=('' '<RET>' "'<manager-public-ssh-key>'")
+					    ;;
+					*)
+					    COMPREPLY=()
+					    ;;
+				    esac
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		*)
+		    COMPREPLY=()
+		    ;;
+	    esac
+	    ;;
+	7)
+	    case ${COMP_WORDS[2]} in
+		add)
+		    case ${COMP_WORDS[3]} in
+			internal|external|auxiliary|vpnipsec)
+			    case ${COMP_WORDS[1]} in
+				file)
+				    case ${COMP_WORDS[5]} in
+					ftp|sftp)
+					    COMPREPLY=('' '<RET>' '<password>')
+					    ;;
+					*)
+					    COMPREPLY=()
+					    ;;
+				    esac
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		*)
+		    COMPREPLY=()
+		    ;;
+	    esac
+	    ;;
+	*)
+	    COMPREPLY=()
+	    ;;
+    esac
+}

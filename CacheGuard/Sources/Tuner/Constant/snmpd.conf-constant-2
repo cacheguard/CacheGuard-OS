@@ -1,0 +1,25 @@
+sysObjectID .1.3.6.1.4.1.8072.3.2.10
+sysServices 72
+agentgroup snmp
+agentuser snmp
+maxGetbulkRepeats 64
+maxGetbulkResponses 100
+leave_pidfile no
+interface_replace_old no
+diskio_exclude_fd yes
+diskio_exclude_loop yes
+diskio_exclude_ram yes
+strictDisman yes
+interface_fadeout 180
+ignoreDisk /dev/fd*
+skipNFSInHostResources true
+storageUseNFS 1
+authtrapenable 2
+monitor -S -r 300 -o prNames -o prErrMessage "Applicance Service" prErrorFlag != 0
+monitor -r 600 -o memErrorName -o memSwapErrorMsg "Swap Memory" memSwapError != 0
+monitor -r 900 -o dskPath -o dskErrorMsg "Hard Drives" dskErrorFlag != 0
+monitor -r 300 -o laNames -o laErrMessage  "CPU Load" laErrorFlag != 0
+monitor -r 600 -o fileName -o fileErrorMsg  "Log Files" fileErrorFlag != 0
+load 0 99 95
+linkUpDownNotifications yes
+includeAllDisks 5%

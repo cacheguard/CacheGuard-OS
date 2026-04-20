@@ -1,0 +1,112 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       InitScript
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+source /lib/lsb/init-functions
+
+CACHEGUARD_DIR=/etc/sysconfig/cacheguard
+source ${CACHEGUARD_DIR}/constant
+source ${APPLIANCE_DIR}/etc/role
+
+RETVAL=0
+SERV="Cron Jobs"
+PROG="cronjobs"
+PATH=${PATH}:/usr/local/bin
+
+stop-cron-jobs()
+{
+    local job dead_jobs=0
+    local i=0 j=0 retry=20
+    local cronjobs cronjobs_status
+    declare -a cronjobs cronjobs_status
+    
+    cronjobs[${i}]="apl_urllist_update" ; ((i++))
+    cronjobs[${i}]="apl_av_extended_update" ; ((i++))
+    cronjobs[${i}]="apl_logrotate" ; ((i++))
+    cronjobs[${i}]="apl_backup" ; ((i++))
+    cronjobs[${i}]="apl_ha" ; ((i++))
+    cronjobs[${i}]="apl_cache_clear" ; ((i++))
+    cronjobs[${i}]="apl_av_create" ; ((i++))
+    cronjobs[${i}]="apl_av_update" ; ((i++))
+
+    local job_nb=${i}
+
+    for ((i=0 ; i<job_nb ; i++))
+    do
+	job=${cronjobs[${i}]}
+	killall -s USR1 ${job} 2> /dev/null
+
+	if test ${?} -eq 0 ; then
+	    cronjobs_status[${i}]=alive
+	else
+	    ((dead_jobs++))
+	    cronjobs_status[${i}]=dead
+	fi
+    done
+
+    test ${dead_jobs} -ne ${job_nb} || return 0
+
+    usleep 500000
+
+    while true
+    do	
+	for ((i=0 ; i<job_nb ; i++))
+	do
+	    job=${cronjobs[${i}]}	    
+	    test ${cronjobs_status[${i}]} == alive || continue
+	    if test ! -f ${LOCK_DIR}/${job} ; then
+		cronjobs_status[${i}]=dead
+		((dead_jobs++))
+	    fi
+	done
+
+	test ${dead_jobs} -ne ${job_nb} || break
+
+	test ${j} -lt ${retry} || break
+	usleep 500000
+	((j++))
+    done
+
+    test ${dead_jobs} -eq ${job_nb}
+}
+
+# Main()
+
+case "${1}" in
+    stop)
+	log_info_msg "Stopping ${SERV}... "
+	stop-cron-jobs
+	RETVAL=${?}
+	[ ${RETVAL} -eq 0 ]
+	evaluate_retval
+	exit ${RETVAL}
+	;;
+
+    start)
+	;;
+
+    *)
+	echo "Usage: ${0} {stop}"
+	exit 1
+	;;
+esac

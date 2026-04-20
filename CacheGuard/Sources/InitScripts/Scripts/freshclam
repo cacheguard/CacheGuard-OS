@@ -1,0 +1,340 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       InitScript
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+source /lib/lsb/init-functions
+
+CACHEGUARD_DIR=/etc/sysconfig/cacheguard
+source ${CACHEGUARD_DIR}/constant
+source ${APPLIANCE_DIR}/etc/role
+
+check-ip()
+{
+    [[ "${1}" =~ (^[1-9][0-9]{0,2}|^0)[.]([1-9][0-9]{0,2}|0)[.]([1-9][0-9]{0,2}|0)[.]([1-9][0-9]{0,2}|0)$ ]]
+}
+
+init-environment()
+{
+    LAST_DATE_FILE=${RUN_DIR}/${AV_UPDATE_DATE}
+    CURRENT_DATE=$(date +"%s" 2> /dev/null)
+
+    local min_elapsed_time=3660
+    local last_date elapsed_time
+    unset UPDATE_ALLOWED
+
+    PROG="freshclam"
+    FPROG="${LOCAL_DIR}/bin/${PROG}"
+    RETVAL=0
+    SERV="AV Updater"
+
+    [ -x ${FPROG} ] || exit 0
+    [ -f ${LOCAL_DIR}/etc/${PROG}.conf ] || exit 0
+    [ -f /etc/sysconfig/${PROG} ] && source /etc/sysconfig/${PROG}
+
+    AV_DEBUG=${AV_DEBUG-no}
+    AV_USER=${AV_USER-root}
+    AV_GROUP=${AV_GROUP-root}
+    AV_DB_DIR=${AV_DB_DIR-/var/clamav}
+
+    if test ${AV_DEBUG} == yes ; then
+	VERBOSITY_OPTION=' --debug'
+    else
+	VERBOSITY_OPTION=' --quiet'
+    fi
+
+    if test -s ${LAST_DATE_FILE} ; then
+	last_date=$(cat ${LAST_DATE_FILE} 2> /dev/null)
+    else
+	last_date=${CURRENT_DATE}
+	echo ${last_date} > ${LAST_DATE_FILE}
+    fi
+
+    elapsed_time=$((CURRENT_DATE - last_date))
+    test ${elapsed_time} -le ${min_elapsed_time} || UPDATE_ALLOWED=yes
+
+    install -d -m 755 -o ${AV_USER} -g ${AV_GROUP} /run/clamav
+
+    rm -f /var/log/freshclam-*.log
+}
+
+update-last-date()
+{
+    test -n "${1}" || return 1
+    local retval=${1}
+
+    test ${retval} -eq 0 || return 11
+    test -n "${UPDATE_ALLOWED}" || return 13
+
+    echo ${CURRENT_DATE} > ${LAST_DATE_FILE}
+
+    return 0
+}
+
+reset-clamav-tmp-db()
+{
+    rm -rf ${AV_DB_DIR}/${CLAMAV_TMP_DIR_PREFIX}*
+    rm -f  ${AV_DB_DIR}/{mirrors.dat,freshclam.dat}
+}
+
+reset-clamav-db()
+{
+    log_info_msg "Clearing AV Signatures..."
+
+    if test -z "${UPDATE_ALLOWED}" ; then
+	evaluate_retval
+	return 0
+    fi
+
+    local db
+
+    reset-clamav-tmp-db ; local ret=${?}
+
+    for db in main daily bytecode
+    do
+	rm -f ${AV_DB_DIR}/${db}.{cvd,cld}
+	ret=$[${ret} + ${?}]
+    done
+
+    [ ${ret} -eq 0 ]
+    evaluate_retval
+    return ${ret}
+}
+
+verify-av-signature()
+{
+    test -n "${1}" || return 1
+    local db=${1}
+
+    local sigtool_tmp_file=/tmp/sigtool-output.${$}
+    local extension ret
+
+    if test -f ${AV_DB_DIR}/${db}.cld ; then
+	extension=cld
+    elif test -f ${AV_DB_DIR}/${db}.cvd ; then
+	extension=cvd
+    else
+	return 0
+    fi
+
+    sigtool --quiet --info ${AV_DB_DIR}/${db}.${extension} > /dev/null 2> ${sigtool_tmp_file}
+    ret=${?}
+
+    if test ${ret} -ne 0 ; then
+	ret=11
+    else
+	test -s ${sigtool_tmp_file}
+	if test ${?} -ne 0 ; then
+	    ret=0
+	else
+	    ret=13
+	fi
+    fi
+
+    rm -f ${sigtool_tmp_file}
+
+    return ${ret}
+}
+
+sanitize-clamav-db()
+{
+    reset-clamav-tmp-db
+
+    local db
+
+    for db in main bytecode daily
+    do
+	verify-av-signature ${db} || rm -f ${AV_DB_DIR}/${db}.{cvd,cld}
+    done
+}
+
+check-clamav-names-resolution()
+{
+    local key value
+    local names ip ips av_ip_list
+    local dig_opts="+short +timeout=5 +tries=3"
+
+    dig_opts=( ${dig_opts} )
+
+    dig -t TXT current.cvd.clamav.net "${dig_opts[@]}" > /dev/null 2>&1
+    test ${?} -eq 0 || return 101
+
+    while read key value
+    do
+	test ${key} == DatabaseMirror || continue
+	names="${names} ${value}"
+    done < ${LOCAL_DIR}/etc/${PROG}.conf
+    names=${names:1}
+    test -n "${names}" || return 103
+    
+    ips=$(dig ${names} +noall "${dig_opts[@]}" 2> /dev/null)
+    test ${?} -eq 0 || return 105
+    test -n "${ips}" || return 107
+
+    for ip in ${ips}
+    do
+	! check-ip "${ip}" || av_ip_list="${av_ip_list} ${ip}"
+    done
+    av_ip_list=${av_ip_list:1}
+    test -n "${av_ip_list}" || return 109
+}
+
+update-clamav-db()
+{
+    log_info_msg "Updating AV Signatures..."
+
+    if test -z "${UPDATE_ALLOWED}" ; then
+	evaluate_retval
+	return 0
+    fi
+
+    local check_names=yes
+    local retval
+
+    sanitize-clamav-db
+
+    if test -n "${check_names}" ; then
+
+	check-clamav-names-resolution
+	retval=${?}
+
+	if test ${retval} -ne 0 ; then
+	    [ 0 -eq 1 ]
+	    evaluate_retval
+	    return ${retval}
+	fi
+    fi
+
+    if test ${AV_DEBUG} == yes ; then
+	${FPROG}${VERBOSITY_OPTION} --user ${AV_USER} --foreground
+    else
+	${FPROG}${VERBOSITY_OPTION} --user ${AV_USER} --foreground > /dev/null 2>&1
+    fi
+    retval=${?}
+
+    update-last-date ${retval}
+
+    [ ${retval} -eq 0 ]
+    evaluate_retval
+    return ${retval}
+}
+
+start-clamav-updater-daemon()
+{
+    log_info_msg "Starting ${SERV}..."
+
+    local i=0 retval retry=5
+    local pid_file=/var/run/clamav/${PROG}.pid
+
+    reset-clamav-tmp-db
+
+    # Start daemons.
+    if test ${AV_DEBUG} == yes ; then
+	start_daemon ${FPROG}${VERBOSITY_OPTION} --user ${AV_USER} --daemon
+    else
+	start_daemon ${FPROG}${VERBOSITY_OPTION} --user ${AV_USER} --daemon 2> /dev/null
+    fi
+    retval=${?}
+
+    while true
+    do
+	test ! -f ${pid_file} || break
+	test ${i} -lt ${retry} || break
+	usleep 500000
+	((i++))
+    done
+
+    if test ${retval} -eq 0 -a -f ${pid_file} ; then
+	touch /var/lock/${PROG}
+    else
+	rm -f /var/lock/${PROG}
+    fi
+
+    evaluate_retval
+    return ${retval}
+}
+
+# Main()
+
+init-environment
+
+case "${1}" in
+    start)
+	if [ -n "$(pidof ${PROG})" ] ; then
+	    echo "${PROG}: already running"
+	    exit 11
+	fi
+
+	test -n "${RUNLEVEL}" || \
+	    update-clamav-db || exit ${?}
+
+	start-clamav-updater-daemon
+	;;
+
+    stop)
+	# Stop daemons.
+	log_info_msg "Stopping ${SERV}..."
+	killproc ${FPROG}
+	RETVAL=${?}
+	usleep 300000
+	[ ${RETVAL} -eq 0 ] && rm -f /var/lock/${PROG} /var/run/clamav/${PROG}.pid
+	evaluate_retval
+	exit ${RETVAL}
+	;;
+
+    update)
+	RETVAL=$(pidof ${PROG})
+	test -z "${RETVAL}" || ${0} stop
+	update-clamav-db || exit ${?}
+	test -z "${RETVAL}" || start-clamav-updater-daemon
+	;;
+
+    create)
+	RETVAL=$(pidof ${PROG})
+	test -z "${RETVAL}" || ${0} stop
+
+	reset-clamav-db
+	update-clamav-db
+
+	test -z "${RETVAL}" || ${0} start
+	;;
+
+    clear)
+	RETVAL=$(pidof ${PROG})
+	test -z "${RETVAL}" || ${0} stop
+	reset-clamav-db
+	;;
+
+    restart)
+	${0} stop
+	${0} start
+	;;
+    
+    status)
+	statusproc ${PROG}
+	;;
+
+    *)
+	echo "Usage: ${0} {start|stop|restart|status|update|create|clear}"
+	exit 13
+	;;
+esac

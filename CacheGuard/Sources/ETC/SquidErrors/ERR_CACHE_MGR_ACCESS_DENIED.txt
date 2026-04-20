@@ -1,0 +1,2 @@
+Cache manager access refused
+The access is refused until you have authenticated yourself as a cache manager

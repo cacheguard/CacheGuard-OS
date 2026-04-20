@@ -1,0 +1,4059 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       Commands
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+source functions
+
+make-ip_vlan_list-ip()
+{
+    local ip_list=""
+
+    local elt range i=0
+    local ip
+
+    for elt in ${IP_VLAN_LIST}
+    do
+	range=$[${i} % 3]
+	case ${range} in
+	    0)
+		;;
+	    1)
+		ip=${elt}
+		;;
+	    2)
+		working-sign
+		ip_list="${ip_list} ${ip}"
+		;;
+	    *)
+		return 255
+		;;
+	esac
+	((i++))
+    done
+    
+    _VIP_LIST=${ip_list}
+}
+
+vlan-connected-network()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 1
+    local in_net=${1}
+    local in_mk=${2}
+
+    local elt range i=0
+    local net mk
+
+    for elt in ${_VLAN_NET_MK_BRD}
+    do
+	range=$[${i} % 3]
+	case ${range} in
+	    0)
+		net=${elt}
+		;;
+	    1)
+		mk=${elt}
+		;;
+	    2)
+		if test ${net} != 0.0.0.0 -o ${mk} != 0.0.0.0 ; then
+		    test ${net} != ${in_net} -o ${mk} != ${in_mk} || return 1
+		fi
+		;;
+	    *)
+		return 255
+		;;
+	esac
+	((i++))
+    done
+
+    return 0
+}
+
+member-ip-vlan-list-ip()
+{
+    test -n "${1}" || return 1
+    local ip=${1}
+
+    member "${_VIP_LIST}" ${ip}
+}
+
+check-port-integrity()
+{
+    local ports="${PROXY_PORT} ${THTTP_PORT} ${THTTPS_PORT} ${AV_PORT} ${OCSP_PORT} ${ISAKMP_PORT} ${NATT_PORT} ${PEER_HTTP_PORT} ${PEER_HTCP_PORT} ${DHCP_PEER_PORT} ${WADMIN_PORT} ${WAUDIT_PORT}"
+
+    local port1 port2 i1=0 i2=0
+
+    working-sign
+
+    for port1 in ${ports}
+    do
+	i2=0
+	for port2 in ${ports}
+	do
+	    if test ${i2} -gt ${i1} ; then
+		test ${port1} != ${port2} || return 1
+	    fi
+	    ((i2++))
+	done
+	((i1++))
+    done
+    
+    return 0
+}
+
+check-objects-integrity()
+{
+    test -n "${1}" || return 0
+    local ip_list="${1}"
+
+    local elt i range ip
+
+    ! member "${ip_list}" "${IP_EXTERNAL_IP}" || return 1
+
+    if test ${VLAN_MODE} == False ; then
+	! member "${ip_list}" "${IP_INTERNAL_IP}" || return 1
+    else
+	for ip in ${ip_list}
+	do
+	    working-sign
+	    ! member-ip-vlan-list-ip ${ip} || return 1
+	done
+    fi
+    return 0
+}
+
+check-ns-integrity()
+{
+    check-objects-integrity "${NAME_SERVER_LIST}"
+}
+
+check-ntp-integrity()
+{
+    check-objects-integrity "${NTP_SERVER_LIST}"
+}
+
+check-peer-integrity-ip()
+{
+    local i elt range
+    local ip
+
+    i=0
+    for elt in ${PEER_SHARE_LIST} ${PEER_HA_LIST} ${PEER_NEXT_LIST} ${PEER_PREVIOUS_LIST}
+    do
+	range=$[${i} % 2]
+	case ${range} in
+	    0)
+		ip=${elt}
+		;;
+	    1)
+		working-sign
+		if test ${VLAN_MODE} == False
+		then
+		    test "${ip}" != "${IP_INTERNAL_IP}" || return 1
+		    test "${ip}" != "${IP_EXTERNAL_IP}" || return 1
+		else
+		    ! member-ip-vlan-list-ip ${ip} || return 1
+		fi
+		;;
+	    *)
+		;;
+	esac
+	((i++))
+    done
+    
+    return 0
+}
+
+peer-member()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 1
+
+    local list=${1}
+    local in_ip=${2}
+
+    local ip
+    local elt range i=0
+
+    for elt in ${list}
+    do
+	range=$[${i} % 2]
+	case ${range} in
+	    0)
+		ip=${elt}
+		;;
+	    1)
+		working-sign
+		test "${in_ip}" != "${ip}" || return 0
+		;;
+	    *)
+		return 255
+		;;
+	esac
+	((i++))
+    done
+    return 1
+}
+
+peer-disjunctive()
+{
+    test -n "${1}" || return 0
+    test -n "${2}" || return 0
+
+    local l1="${1}"
+    local l2="${2}"
+
+    local ip
+    local elt range i=0
+
+    for elt in ${l1}
+    do
+	range=$[${i} % 2]
+	case ${range} in
+	    0)
+		ip=${elt}
+		;;
+	    1)
+		working-sign
+		
+		! peer-member "${l2}" "${ip}" || return 1
+		;;
+	    *)
+		return 255
+		;;
+	esac
+	((i++))
+    done
+    return 0
+}
+
+check-peer-integrity-uniq()
+{
+    peer-disjunctive "${PEER_SHARE_LIST}" "${PEER_HA_LIST} ${PEER_NEXT_LIST} ${PEER_PREVIOUS_LIST}" && \
+    peer-disjunctive "${PEER_HA_LIST}" "${PEER_SHARE_LIST} ${PEER_NEXT_LIST} ${PEER_PREVIOUS_LIST}" && \
+    peer-disjunctive "${PEER_NEXT_LIST}" "${PEER_SHARE_LIST} ${PEER_HA_LIST} ${PEER_PREVIOUS_LIST}" && \
+    peer-disjunctive "${PEER_PREVIOUS_LIST}" "${PEER_SHARE_LIST} ${PEER_HA_LIST} ${PEER_NEXT_LIST}"
+}
+
+check-vrrp-integrity1()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    test -n "${3}" || return 3
+    test -n "${4}" || return 4
+    test -n "${5}" || return 0
+    local rip=${1}
+    local net=${2}
+    local brd=${3}
+    local mk=${4}
+    local vrrps=${5}
+
+    local elt range i=0
+    local vip net_brd
+
+    for elt in ${vrrps}
+    do
+	range=$[${i} % 4]
+	case ${range} in
+	    0)
+		vip=${elt}
+		;;
+	    1|2)
+		;;
+	    3)
+		working-sign
+		test ${vip} != ${rip} || return 11
+		test ${vip} != ${net} -a ${vip} != ${brd} || return 13
+		net_brd=$(ip-is-included-in-valid-boradcast ${rip} ${net} ${brd} ${mk}) || return 15
+		;;
+	    *)
+		return 1
+		;;
+	esac
+	((i++))
+    done
+    return 0
+}
+
+check-vrrp-integrity()
+{
+    test ${HA_MODE} == True || return 0
+
+    check-vrrp-integrity1 ${IP_EXTERNAL_IP} ${_EXT_NET} ${_EXT_BRD} ${IP_EXTERNAL_MASK} "${VRRP_EXTERNAL_LIST}" || return 1
+    test -z "${BOND_AUXILIARIES}" -o ${IP_AUXILIARY_IP} == 0.0.0.0 || check-vrrp-integrity1 ${IP_AUXILIARY_IP} ${_AUX_NET} ${_AUX_BRD} ${IP_AUXILIARY_MASK} "${VRRP_AUXILIARY_LIST}" || return 3
+
+    if test ${VLAN_MODE} == True ; then
+	check-vrrp-integrity1 ${_WEB_IP} ${_WEB_NET} ${_WEB_BRD} ${_WEB_MASK} "${VRRP_WEB_LIST}" || return 5
+	check-vrrp-integrity1 ${_RWEB_IP} ${_RWEB_NET} ${_RWEB_BRD} ${_RWEB_MASK} "${VRRP_RWEB_LIST}" || return 7
+	check-vrrp-integrity1 ${_AV_IP} ${_AV_NET} ${_AV_BRD} ${_AV_MASK} "${VRRP_AV_LIST}" || return 7
+    else
+	check-vrrp-integrity1 ${_WEB_IP} ${_WEB_NET} ${_WEB_BRD} ${_WEB_MASK} "${VRRP_INTERNAL_LIST}" || return 11
+    fi
+
+    return 0
+}
+
+disjunctive-vlan-network()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    test -n "${3}" || return 3
+    test -n "${4}" || return 4
+
+    local in_nb=${1}
+    local in_ip=${2}
+    local in_mk=${3}
+    local in_vlan_list=${4}
+
+    test ${in_ip} != 0.0.0.0 || return 0
+
+    local elt range i=0 nb=0
+    local ip mk net2 brd2
+
+    local net1=$(ipcalc -s ${in_ip} ${in_mk} -n)
+    local brd1=$(ipcalc -s ${in_ip} ${in_mk} -b)
+
+    net1=${net1/NETWORK=/}
+    brd1=${brd1/BROADCAST=/}
+
+    for elt in ${in_vlan_list}
+    do
+	range=$[${i} % 3]
+	case ${range} in
+	    0)
+		;;
+	    1)
+		ip=${elt}
+		;;
+	    2)
+		mk=${elt}
+		
+		working-sign
+		((nb++))
+		
+		if test ${ip} != 0.0.0.0 ; then
+		    if test ${in_nb} -lt ${nb} ; then
+			net2=$(ipcalc -s ${ip} ${mk} -n)
+			brd2=$(ipcalc -s ${ip} ${mk} -b)
+			
+			net2=${net2/NETWORK=/}
+			brd2=${brd2/BROADCAST=/}
+			
+			ip-lt ${brd1} ${net2} || ip-lt ${brd2} ${net1} || return 11
+		    fi
+		fi
+		;;
+	    *)
+		return 255
+		;;
+	esac
+	((i++))
+    done
+    
+    return 0
+}
+
+check-ip-integrity()
+{
+    if test ${VLAN_MODE} == False ; then
+	if test ${IP_INTERNAL_IP} != 0.0.0.0 -a ${IP_EXTERNAL_IP} != 0.0.0.0 ; then
+	    ip-lt ${_EXT_BRD} ${_WEB_NET} || ip-lt ${_WEB_BRD} ${_EXT_NET} || return 11
+	fi
+
+	if test -n "${BOND_AUXILIARIES}" ; then
+
+	    if test ${IP_INTERNAL_IP} != 0.0.0.0 -a ${IP_AUXILIARY_IP} != 0.0.0.0 ; then
+		ip-lt ${_AUX_BRD} ${_WEB_NET} || ip-lt ${_WEB_BRD} ${_AUX_NET} || return 13
+	    fi
+
+	    if test ${IP_EXTERNAL_IP} != 0.0.0.0 -a ${IP_AUXILIARY_IP} != 0.0.0.0 ; then
+		ip-lt ${_AUX_BRD} ${_EXT_NET} || ip-lt ${_EXT_BRD} ${_AUX_NET} || return 15
+	    fi
+	fi
+    else
+	disjunctive-vlan-network 0 ${IP_EXTERNAL_IP} ${IP_EXTERNAL_MASK} "${IP_VLAN_LIST}" || return 21
+
+	if test -n "${BOND_AUXILIARIES}" ; then
+	    ip-lt ${_AUX_BRD} ${_EXT_NET} || ip-lt ${_EXT_BRD} ${_AUX_NET} || return 23
+	    disjunctive-vlan-network 0 ${IP_AUXILIARY_IP} ${IP_AUXILIARY_MASK} "${IP_VLAN_LIST}" || return 25
+	fi
+
+	local elt range i=0 nb=0
+	local ip mk
+
+	for elt in ${IP_VLAN_LIST}
+	do
+	    range=$[${i} % 3]
+	    case ${range} in
+		0)
+		    ;;
+		1)
+		    ip=${elt}
+		    ;;
+		2)
+		    mk=${elt}
+		    ((nb++))
+
+		    if test ${ip} != 0.0.0.0 ; then
+			disjunctive-vlan-network ${nb} ${ip} ${mk} "${IP_VLAN_LIST}" || return 27
+		    fi
+		    ;;
+		*)
+		    return 255
+		    ;;
+	    esac
+	    ((i++))
+	done
+    fi
+
+    return 0
+}
+
+make-vlan-net-mk-brd()
+{
+    local elt range i=0
+    local ip mk
+    local net brd
+    local vlan_net_mk_brd
+    local ip_8021q_list
+
+    for elt in ${IP_VLAN_LIST}
+    do
+	range=$[${i} % 3]
+	case ${range} in
+	    0)
+		;;
+	    1)
+		ip=${elt}
+		ip_8021q_list="${ip_8021q_list} ${ip}"
+		;;
+	    2)
+		working-sign
+
+		mk=${elt}		    
+		net=$(ipcalc -s ${ip} ${mk} -n)
+		brd=$(ipcalc -s ${ip} ${mk} -b)
+
+		net=${net/NETWORK=/}
+		brd=${brd/BROADCAST=/}
+
+		vlan_net_mk_brd="${vlan_net_mk_brd} ${net} ${mk} ${brd}"
+		;;
+	    *)
+		return 255
+		;;
+	esac
+	((i++))
+    done
+    _VLAN_NET_MK_BRD=${vlan_net_mk_brd:1}
+    _IP_8021Q_LIST=${ip_8021q_list:1}
+}
+
+ip-is-vrrp-ip()
+{
+    test -n "${1}" || return 1
+    local in_ip="${1}"
+    local vrrps="${2}"
+
+    local elt range i=0
+    local vip
+
+    for elt in ${vrrps}
+    do
+	range=$[${i} % 4]
+	case ${range} in
+	    0)
+		vip=${elt}
+		;;
+	    1|2)
+		;;
+	    3)
+		test ${vip} != ${in_ip} || return 0
+		working-sign
+		;;
+	    *)
+		return 1
+		;;
+	esac
+	((i++))
+    done
+
+    return 1
+}
+
+ip-is-external-vrrp-ip()
+{
+    ip-is-vrrp-ip ${1} "${VRRP_EXTERNAL_LIST}"
+}
+
+ip-is-internal-vrrp-ip()
+{
+    ip-is-vrrp-ip ${1} "${VRRP_INTERNAL_LIST}"
+}
+
+ip-is-auxiliary-vrrp-ip()
+{
+    ip-is-vrrp-ip ${1} "${VRRP_AUXILIARY_LIST}"
+}
+
+ip-is-web-vrrp-ip()
+{
+    ip-is-vrrp-ip ${1} "${VRRP_WEB_LIST}"
+}
+
+ip-is-rweb-vrrp-ip()
+{
+    ip-is-vrrp-ip ${1} "${VRRP_RWEB_LIST}"
+}
+
+ip-is-rweb-ip()
+{
+    test -n "${1}" || return 1
+    local in_ip="${1}"
+
+    local elt range i=0
+    local ip
+
+    for elt in ${RWEB_SITE_LIST}
+    do
+	range=$[${i} % 5]
+	case ${range} in
+	    0|1|3)
+	    ;;
+	    2)
+		ip=${elt}
+		;;
+	    4)
+		test ${ip} != ${in_ip} || return 0
+		working-sign		
+		;;
+	    *)
+		return 1
+		;;
+	esac
+	((i++))
+    done
+
+    return 1
+}
+
+vlan-reachable()
+{
+    test -n "${1}" || return 1
+    local ip=${1}
+
+    local elt range i=0
+    local net mk brd net_brd
+
+    for elt in ${_VLAN_NET_MK_BRD}
+    do
+	range=$[${i} % 3]
+	case ${range} in
+	    0)
+		net=${elt}
+		;;
+	    1)
+		mk=${elt}
+		;;
+	    2)
+		brd=${elt}
+		! net_brd=$(ip-is-included-in-valid-boradcast ${ip} ${net} ${brd} ${mk}) || return 0
+		;;
+	    *)
+		return 255
+		;;
+	esac
+	((i++))
+    done
+
+    return 1
+}
+
+check-ip-route-integrity1()
+{
+    local elt range i=0
+    local gateway ip mk wt_pg gw wt
+    local gw_wt_pg_list gw_wt_pg
+    local net_brd prev_net_brd
+    
+    if test ${IP_EXTERNAL_IP} == 0.0.0.0 ; then
+	local ext_net=0.0.0.0
+	local ext_brd=0.0.0.0
+    else
+	local ext_net=$(ipcalc -s ${IP_EXTERNAL_IP} ${IP_EXTERNAL_MASK} -n)
+	local ext_brd=$(ipcalc -s ${IP_EXTERNAL_IP} ${IP_EXTERNAL_MASK} -b)
+
+	ext_net=${ext_net/NETWORK=/}
+	ext_brd=${ext_brd/BROADCAST=/}
+    fi
+
+    if test ${IP_AUXILIARY_IP} == 0.0.0.0 ; then
+	local aux_net=0.0.0.0
+	local aux_brd=0.0.0.0
+    else
+	local aux_net=$(ipcalc -s ${IP_AUXILIARY_IP} ${IP_AUXILIARY_MASK} -n)
+	local aux_brd=$(ipcalc -s ${IP_AUXILIARY_IP} ${IP_AUXILIARY_MASK} -b)
+
+	aux_net=${aux_net/NETWORK=/}
+	aux_brd=${aux_brd/BROADCAST=/}
+    fi
+
+    if test ${VLAN_MODE} == False ; then
+	if test ${IP_INTERNAL_IP} == 0.0.0.0 ; then
+	    local int_net=0.0.0.0
+	    local int_brd=0.0.0.0
+	else
+	    local int_net=$(ipcalc -s ${IP_INTERNAL_IP} ${IP_INTERNAL_MASK} -n)
+	    local int_brd=$(ipcalc -s ${IP_INTERNAL_IP} ${IP_INTERNAL_MASK} -b)
+
+	    int_net=${int_net/NETWORK=/}
+	    int_brd=${int_brd/BROADCAST=/}
+	fi
+    else
+	working-sign
+	make-vlan-net-mk-brd
+    fi
+
+    for elt in ${IP_ROUTE_LIST}
+    do
+	range=$[${i} % 5]
+	case ${range} in
+	    0|1|3)
+		;;
+	    2)
+		gateway=${elt}
+		;;
+	    4)
+		working-sign
+
+		test ${IP_EXTERNAL_IP} == 0.0.0.0 || test ${gateway} != ${IP_EXTERNAL_IP} || return 11
+		test -z "${BOND_AUXILIARIES}" -o ${IP_AUXILIARY_IP} == 0.0.0.0 || test ${gateway} != ${IP_AUXILIARY_IP} || return 11
+		if test ${VLAN_MODE} == False ; then
+		    test ${IP_INTERNAL_IP} == 0.0.0.0 || test ${gateway} != ${IP_INTERNAL_IP} || return 11
+		else
+		    ! member "${_IP_8021Q_LIST}" ${gateway} || return 11
+		fi
+		test ${RWEB_MODE} == False || ! ip-is-rweb-ip ${gateway} || return 11
+		if test ${HA_MODE} == True ; then
+		    ! ip-is-external-vrrp-ip ${gateway} || return 11
+		    test -z "${BOND_AUXILIARIES}" -o ${IP_AUXILIARY_IP} == 0.0.0.0 || ! ip-is-auxiliary-vrrp-ip ${gateway} || return 11
+		    if test ${VLAN_MODE} == False ; then
+			! ip-is-internal-vrrp-ip ${gateway} || return 11
+		    else
+			! ip-is-web-vrrp-ip ${gateway} || return 11
+			! ip-is-rweb-vrrp-ip ${gateway} || return 11
+		    fi
+		fi
+		;;
+	    *)
+		return 255
+		;;
+	esac
+	((i++))
+    done
+
+    local ip_route_gw_wt_pg_list=$(get-multi-gateways-route-list "${IP_ROUTE_LIST}")
+
+    local i=0 multi_gateways=0
+    local standbys gateways
+
+    for elt in ${ip_route_gw_wt_pg_list}
+    do
+	range=$[${i} % 3]
+	case ${range} in
+	    0)
+		ip=${elt}
+		;;
+	    1)
+		mk=${elt}
+		;;
+	    2)
+		working-sign
+
+		gw_wt_pg_list=${elt//:/ }
+
+		if mono-elt ${gw_wt_pg_list} ; then
+		    wt_pg=${gw_wt_pg_list#*\/}
+		    wt=${wt_pg/\/*}
+		    test ${wt} != 0 || return 23
+		fi
+
+		test ${IP_EXTERNAL_IP} == 0.0.0.0 || test ${ip} != ${ext_net} -o ${mk} != ${IP_EXTERNAL_MASK} || return 13
+		test -z "${BOND_AUXILIARIES}" -o ${IP_AUXILIARY_IP} == 0.0.0.0 || test ${ip} != ${aux_net} -o ${mk} != ${IP_AUXILIARY_MASK} || return 13
+
+		if test ${VLAN_MODE} == False ; then
+		    test ${IP_INTERNAL_IP} == 0.0.0.0 || test ${ip} != ${int_net} -o ${mk} != ${IP_INTERNAL_MASK} || return 13
+		else
+		    vlan-connected-network ${ip} ${mk} || return 13
+		fi
+
+		unset prev_net_brd
+
+		standbys=0
+		gateways=0
+
+		for gw_wt_pg in ${gw_wt_pg_list}
+		do
+		    gw=${gw_wt_pg/\/*}
+		    wt_pg=${gw_wt_pg#*\/}
+		    wt=${wt_pg/\/*}
+
+		    test ${wt} != 0 || ((standbys++))
+
+		    net_brd=$(ip-is-included-in-valid-boradcast ${gw} ${ext_net} ${ext_brd} ${IP_EXTERNAL_MASK})
+
+		    if test ${?} -eq 0 ; then
+			_EXTERNAL_GATEWAYS="${_EXTERNAL_GATEWAYS} ${gw}"
+		    else
+			net_brd=$(ip-is-included-in-aux-valid-boradcast ${gw} ${aux_net} ${aux_brd} ${IP_AUXILIARY_MASK})
+
+			if test ${?} -ne 0 ; then
+			    if test ${VLAN_MODE} == False ; then
+				net_brd=$(ip-is-included-in-valid-boradcast ${gw} ${int_net} ${int_brd} ${IP_INTERNAL_MASK}) || return 15
+			    else
+				net_brd=$(vlan-reachable ${gw}) || return 15
+			    fi
+			fi
+		    fi
+
+		    test -z "${prev_net_brd}" || test "${net_brd}" == "${prev_net_brd}" || return 17
+		    prev_net_brd=${net_brd}
+		    ((gateways++))
+		done
+
+		((multi_gateways += gateways))
+
+		test ${multi_gateways} -lt ${MAX_MULTI_GATEWAYS} || return 19
+		test ${standbys} -le 1 || return 21
+		;;
+	    *)
+		return 255
+		;;
+	esac
+	((i++))
+    done
+
+    return 0
+}
+
+check-ip-route-integrity()
+{
+    local ret
+
+    check-ip-route-integrity1
+    ret=${?}
+
+    case ${ret} in
+	11)
+	    ERROR=301
+	    ;;
+	13)
+	    ERROR=266
+	    ;;
+	15)
+	    ERROR=261
+	    ;;
+	17)
+	    ERROR=286
+	    ;;
+	19)
+	    ERROR=315
+	    ;;	
+	21)
+	    ERROR=318
+	    ;;
+	23)
+	    ERROR=313
+	    ;;
+	*)
+	    ERROR=255
+	    ;;
+    esac
+
+    _EXTERNAL_GATEWAYS=$(uniq-elt ${_EXTERNAL_GATEWAYS:1})
+
+    if test -z "${_EXTERNAL_GATEWAYS}" ; then
+	_MULTI_EXTERNAL_GATEWAYS_MODE=False
+    else
+	mono-elt ${_EXTERNAL_GATEWAYS}
+	if test ${?} -eq 0 ; then
+	    _MULTI_EXTERNAL_GATEWAYS_MODE=False
+	else
+	    _MULTI_EXTERNAL_GATEWAYS_MODE=True
+	fi
+    fi
+    return ${ret}
+}
+
+check-if-integrity-notnull()
+{
+    test -n "${BOND_INTERNALS}" || return 1
+    ! contextual-command-is-allowed || test -n "${BOND_EXTERNALS}" || return 1
+}
+
+check-if-integrity-disjunctive()
+{
+    local dev
+
+    working-sign
+
+    for dev in ${BOND_EXTERNALS}
+    do
+	! member "${BOND_INTERNALS}" ${dev} || return 1
+	! member "${BOND_AUXILIARIES}" ${dev} || return 2
+    done
+    return 0
+
+    for dev in ${BOND_INTERNALS}
+    do
+	! member "${BOND_AUXILIARIES}" ${dev} || return 3
+    done
+    return 0
+}
+
+check-fw-integrity()
+{
+    test ${FIREWALL_MODE} == True || return 0
+    test ${ROUTER_MODE} == True || return 0
+
+    local dst_nat_ip
+    local elt range i=0
+
+    for elt in ${FW_EXTERNAL_RULE_LIST} ${FW_WEB_RULE_LIST} ${FW_RWEB_RULE_LIST} ${FW_ADMIN_RULE_LIST} ${FW_MON_RULE_LIST} ${FW_FILE_RULE_LIST} ${FW_PEER_RULE_LIST} ${FW_AUXILIARY_RULE_LIST}
+    do
+	range=$[${i} % 11]
+	case ${range} in
+	    0|1|2|3|4|5|6|7|8|10)
+		;;
+	    9)
+		dst_nat_ip=${elt}
+
+		test "${dst_nat_ip}" != "${IP_EXTERNAL_IP}" || return 1
+		test -z "${BOND_AUXILIARIES}" -o ${IP_AUXILIARY_IP} == 0.0.0.0 || test "${dst_nat_ip}" != "${IP_AUXILIARY_IP}" || return 3
+		if test ${VLAN_MODE} == False ; then
+		    test "${dst_nat_ip}" != "${IP_INTERNAL_IP}" || return 5
+		else
+		    working-sign
+		    ! member-ip-vlan-list-ip ${dst_nat_ip} || return 5
+		fi
+		test ${RWEB_MODE} == False || ! ip-is-rweb-ip ${dst_nat_ip} || return 7
+		test ${HA_MODE} == False || ! ip-is-external-vrrp-ip ${dst_nat_ip} || return 9
+		;;
+	    *)
+		return 1
+		;;
+	esac
+	((i++))
+    done
+    return 0
+}
+
+check-dhcp-fixed-net-integrity()
+{
+    test ${DHCP_MODE} == True || return 0
+
+    local ip
+    local elt range i=0
+
+    for elt in ${DHCP_FIXED_LIST}
+    do
+	range=$[${i} % 3]
+	case ${range} in
+	    0|1)
+		;;
+	    2)
+		ip=${elt}
+
+		working-sign
+
+		ip-lt ${_WEB_NET} ${ip} && ip-lt ${ip} ${_WEB_BRD} || return 1
+		;;
+	    *)
+		return 255
+		;;
+	esac
+	((i++))
+    done
+    
+    return 0
+}
+
+check-dhcp-range-net-integrity()
+{
+    test ${DHCP_MODE} == True || return 0
+
+    local ip1 ip2
+    local elt range i=0
+
+    for elt in ${DHCP_RANGE_LIST}
+    do
+	range=$[${i} % 2]
+	case ${range} in
+	    0)
+		ip1=${elt}
+		;;
+	    1)
+		ip2=${elt}
+		
+		working-sign
+		
+		ip-lt ${_WEB_NET} ${ip1} && ip-lt ${ip1} ${_WEB_BRD} || return 1
+		ip-lt ${_WEB_NET} ${ip2} && ip-lt ${ip2} ${_WEB_BRD} || return 2
+		;;
+	    *)
+		return 255
+		;;
+	esac
+	((i++))
+    done
+    
+    return 0
+}
+
+disjunctive-dhcp-range()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 1
+    test -n "${3}" || return 1
+
+    local in_nb=${1}
+    local in_ip1=${2}
+    local in_ip2=${3}
+
+    local elt range i=0 nb=0
+    local ip1 ip2
+
+    for elt in ${DHCP_RANGE_LIST}
+    do
+	range=$[${i} % 2]
+	case ${range} in
+	    0)
+		ip1=${elt}
+		;;
+	    1)
+		ip2=${elt}
+		
+		working-sign
+		((nb++))
+		
+		if test ${in_nb} -lt ${nb} ; then
+		    ip-lt ${in_ip2} ${ip1} || ip-lt ${ip2} ${in_ip1} || return 11
+		fi
+		;;
+	    *)
+		return 255
+		;;
+	esac
+	((i++))
+    done
+    
+    return 0
+}
+
+check-dhcp-range-integrity()
+{
+    test ${DHCP_MODE} == True || return 0
+
+    local elt range i=0 ip1 ip2 nb=0
+
+    for elt in ${DHCP_RANGE_LIST}
+    do
+	range=$[${i} % 2]
+	case ${range} in
+	    0)
+		ip1=${elt}
+		;;
+	    1)
+		ip2=${elt}
+		((nb++))
+		
+		disjunctive-dhcp-range ${nb} ${ip1} ${ip2} || return 11
+		;;
+	    *)
+		return 255
+		;;
+	esac
+	((i++))
+    done
+
+    return 0
+}
+
+check-dhcp-peer-integrity()
+{
+    test ${DHCP_MODE} == True || return 0
+
+    local elt range i=0
+    local ip
+
+    for elt in ${DHCP_PEER_LIST}
+    do
+	range=$[${i} % 2]
+	case ${range} in
+	    0)
+		;;
+	    1)
+		ip=${elt}
+		
+		working-sign
+		
+		test ${ip} != ${_WEB_IP} || return 1
+		;;
+	    *)
+		return 1
+		;;
+	esac
+	((i++))
+    done
+
+    return 0
+}
+
+check-dhcp-null-integrity()
+{
+    test ${DHCP_MODE} == True || return 0
+    test -n "${DHCP_FIXED_LIST}" -o -n "${DHCP_RANGE_LIST}" || return 1
+    return 0
+}
+
+check-dhcp-null-ip-integrity()
+{
+    test ${DHCP_MODE} == True || return 0
+    test "${_WEB_IP}" != 0.0.0.0 || return 1
+    return 0
+}
+
+check-dhcp-fixed-nb-integrity()
+{
+    test ${DHCP_MODE} == True || return 0
+
+    local len=$(record3-length-list "${DHCP_FIXED_LIST}")
+    local users_nb=$(get-contextual-users-nb)
+
+    test ${len} -le ${users_nb}
+}
+
+check-dhcp-range-lease-nb-integrity()
+{
+    test ${DHCP_MODE} == True || return 0
+
+    local users_nb=$(get-contextual-users-nb)
+    local max=${users_nb}
+    local elt range i=0
+    local ip1 ip2
+    local dip1 dip2 lease_nb=0
+
+    for elt in ${DHCP_RANGE_LIST}
+    do
+	range=$[${i} % 2]
+	case ${range} in
+	    0)
+		ip1=${elt}
+		;;
+	    1)
+		ip2=${elt}
+		
+		working-sign
+
+		dip1=$(digit-ip ${ip1})
+		dip2=$(digit-ip ${ip2})
+		lease_nb=$[${dip2} - ${dip1} + 1 + ${lease_nb}]
+		test ${lease_nb} -le ${max} || return 1
+		;;
+	    *)
+		return 255
+		;;
+	esac
+	((i++))
+    done
+
+    return 0
+}
+
+check-guard-proxy-integrity()
+{
+    test ${GUARD_MODE} == True || return 0
+    test ${WEB_MODE} == True -o ${TRANSPARENT_MODE} == True
+}
+
+check-compress-proxy-integrity()
+{
+    test ${COMPRESS_MODE} == True || return 0
+    test ${WEB_MODE} == True -o ${TRANSPARENT_MODE} == True -o ${RWEB_MODE} == True
+}
+
+check-cache-proxy-integrity()
+{
+    test ${CACHE_MODE} == True || return 0
+    test ${WEB_MODE} == True -o ${TRANSPARENT_MODE} == True -o ${RWEB_MODE} == True
+}
+
+check-sslmediate-proxy-integrity()
+{
+    test ${SSLMEDIATE_MODE} == True || return 0
+    test ${WEB_MODE} == True -o ${TRANSPARENT_MODE} == True
+}
+
+check-sslmediate-tproxy-integrity()
+{
+    test ${SSLMEDIATE_MODE} == True || return 0
+    test ${WEB_MODE} == False || return 0
+    test ${TRANSPARENT_MODE} == True -a ${SSLMEDIATE_TRANSPARENT} == True
+}
+
+check-transparent-integrity()
+{
+    test ${TRANSPARENT_MODE} == True || return 0
+    test ${TNAT_MODE} == False || return 0
+    test ${ROUTER_MODE} == True
+}
+
+check-signing-ca-integrity()
+{
+    local to_sign_files=$(ls -1 ${TMP_DIR}/${TLS_SERVER}.*.2sign ${SSL_CLIENT_DIR}/*.new 2> /dev/null)
+
+    test -n "${to_sign_files}" || return 0
+    test ! -f ${TMP_DIR}/${SYSTEM_CA}.conf || return 0
+
+    local cert_file
+
+    if test -f ${TMP_DIR}/${LOADED}.${SYSTEM_CA}.certificate ; then
+	cert_file=${TMP_DIR}/${LOADED}.${SYSTEM_CA}.certificate
+    else
+	cert_file=${SSL_CA_DIR}/${SYSTEM_CA}.certificate
+    fi
+
+    test -f ${cert_file} || return 0
+
+    local current_epoch=$(date +"%s" 2> /dev/null)
+    local id_epoch_state=$(check-tls-cert-validity CA ${current_epoch} ${cert_file} 2> /dev/null)
+    local state=${id_epoch_state/* }
+
+    test "${state}" == OK
+}
+
+check-rweb-tls-chain-integrity()
+{
+    test -n "${1}" || return 1
+    local tls=${1}
+
+    local tls_id ca_id ca_list
+
+    tls_id=${tls/:*}
+    tls-server-id-exist ${tls_id} || return 11
+    tls-key-exist ${tls_id} || tls-tmp-key-exist ${tls_id} || tls-tmp-conf-exist ${tls_id} || return 13
+
+    ! mono-elt ${tls//:/ } || return 0
+
+    local ca_id ca_list
+
+    ca_list=${tls#*:}
+    ca_list=${ca_list//:/ }
+
+    for ca_id in ${ca_list}
+    do
+	tls-ca-id-exist ${ca_id} || return 15
+    done
+
+    return 0
+}
+
+check-rweb-tls-integrity()
+{
+    local protocol tls
+    local elt range i=0
+
+    for elt in ${RWEB_SITE_LIST}
+    do
+	range=$[${i} % 5]
+	case ${range} in
+	    0|2)
+	        ;;
+	    1)
+		protocol=${elt}
+		;;
+	    3)
+		tls=${elt}
+		;;
+	    4)
+		working-sign
+
+		test ${protocol} != 'https' || check-rweb-tls-chain-integrity ${tls} || return ${?}
+		;;
+	    *)
+		return 1
+		;;
+	esac
+	((i++))
+    done
+
+    return 0
+}
+
+check-vpn-ipsec-auth-integrity()
+{
+    test ${VPN_IPSEC_MODE} == True || return 0
+    test ${VPN_IPSEC_AUTHENTICATE:0:3} != 'psk' || return 0
+
+    local tls
+
+    if test ${VPN_IPSEC_AUTHENTICATE:0:3} == 'tls' ; then
+	tls=${VPN_IPSEC_AUTHENTICATE:4}
+    elif test ${VPN_IPSEC_AUTHENTICATE:0:6} == 'eaptls' ; then
+	tls=${VPN_IPSEC_AUTHENTICATE:7}
+    else
+	return 255
+    fi
+
+    local tls_id=${tls/:*}
+
+    tls-server-id-exist ${tls_id} || return 11
+    tls-tmp-key-exist ${tls_id} || tls-key-exist ${tls_id} || tls-tmp-conf-exist ${tls_id} || return 13
+
+    local used_id=${tls/*:}
+    test ${used_id} == fqdn || return 0
+
+    local names name
+
+    if tls-tmp-conf-exist ${tls_id} ; then
+	names=$(tls-get-names-from-tmp-conf ${tls_id})
+    else
+	names=$(get-subject-alternative-names ${tls_id})
+    fi
+
+    test -n "${names}" || return 15
+
+    for name in ${names}
+    do
+	test "${name:0:2}" != '*.' || return 17
+    done
+
+    return 0
+}
+
+check-vpn-ipsec-site-integrity1()
+{
+    test ${ROUTER_MODE} == True || return 0
+    test ${VPN_IPSEC_MODE} == True || return 0
+    test ${_VPN_IPSEC_ACCESS_MODE} == False || return 0
+
+    test -n "${VPN_IPSEC_SITE_LIST}" || return 11
+    test -n "${VPN_IPSEC_NETWORK_LIST}" || return 13
+
+    local elt1 range1 i1=0
+    local elt2 i2 range2
+    local elt3 i3 range3
+    local vpn_id1 remote_address
+    local ipsec_type2 vpn_id2 remote_ip_mk_list
+    local remote_sites ip_mk found
+    local ip mk nt
+    local tos
+
+    for elt1 in ${VPN_IPSEC_SITE_LIST}
+    do
+	range1=$[${i1} % 12]
+	case ${range1} in
+	    0)
+ 		vpn_id1=${elt1}
+		;;
+	    1)
+		remote_address=${elt1}
+		;;
+	    2|3|4|5|6|7|8|9|10)
+		;;
+	    11)
+		test ${remote_address} != ${IP_EXTERNAL_IP} || return 15
+		! member "${remote_sites}" ${remote_address} || return 17
+		remote_sites="${remote_sites} ${remote_address}"
+		i2=0
+		unset found
+		for elt2 in ${VPN_IPSEC_NETWORK_LIST}
+		do
+		    range2=$[${i2} % 4]
+		    case ${range2} in
+			0)
+			    ipsec_type2=${elt2}
+			    ;;
+			1)
+			    vpn_id2=${elt2}
+			    ;;
+			2)
+			    ;;
+			3)
+			    remote_ip_mk_list=${elt2}
+			    
+			    if test ${ipsec_type2} == 'site' -a ${vpn_id1} == ${vpn_id2} ; then
+				test ${remote_ip_mk_list} != 'nil' || return 31
+				found='yes'
+				remote_ip_mk_list=${remote_ip_mk_list//,/ }
+				for ip_mk in ${remote_ip_mk_list}
+				do
+				    test ${ip_mk} != ${_EXT_NET}/${IP_EXTERNAL_MASK} || return 41
+				    test -z "${BOND_AUXILIARIES}" -o ${IP_AUXILIARY_IP} == 0.0.0.0 || test ${ip_mk} != ${_AUX_NET}/${IP_AUXILIARY_MASK} || return 43
+				    test ${ip_mk} != ${_WEB_NET}/${_WEB_MASK}  || return 45
+
+				    if test ${VLAN_MODE} == True ; then
+					i3=0
+					for elt3 in ${IP_VLAN_LIST}
+					do
+					    range3=$[${i3} % 3]
+					    case ${range3} in
+						0)
+						    ;;
+						1)
+						    ip=${elt3}
+						    ;;
+						2)
+						    mk=${elt3}
+
+						    if test ${ip} != 0.0.0.0 ; then
+							nt=$(ipcalc -s ${ip} ${mk} -n)
+							nt=${nt/NETWORK=/}
+							test ${ip_mk} != ${nt}/${mk} || return 51
+						    fi
+						    ;;
+						*)
+						    return 255
+						    ;;
+					    esac
+					    ((i3++))
+					done
+				    fi
+				done
+			    fi
+			    ;;
+			*)
+			    return 1
+			    ;;
+		    esac
+		    ((i2++))
+		done
+		test -n "${found}" || return 71
+
+		tos=$(get-vpn-ipsec-tos ${vpn_id1} new)
+		! member "${tos}" ${remote_address} || return 81
+
+		;;
+	    *)
+		return 1
+		;;
+	esac
+	((i1++))
+	working-sign
+    done
+
+    return 0
+}
+
+check-vpn-ipsec-site-integrity()
+{
+    local ret
+    check-vpn-ipsec-site-integrity1
+    ret=${?}
+
+    case ${ret} in
+	11)
+	    ERROR=304
+	    ;;
+	13|31|41|43|45|51|71)
+	    ERROR=305
+	    ;;
+	15)
+	    ERROR=306
+	    ;;
+	17)
+	    ERROR=307
+	    ;;
+	81)
+	    ERROR=319
+	    ;;
+	*)
+	    ERROR=255
+	    ;;
+    esac
+
+    return ${ret}
+
+}
+
+get-vpnipsec-access-remote-networks()
+{
+    local elt range i=0
+    local ipsec_type
+
+    working-sign
+
+    for elt in ${VPN_IPSEC_NETWORK_LIST}
+    do
+	range=$[${i} % 4]
+	case ${range} in
+	    0)
+		ipsec_type=${elt}
+		;;
+	    1|2)
+		;;
+	    3)
+		remote_ip_mk_list=${elt}
+			    
+		if test ${ipsec_type} == 'access' ; then
+		    echo ${remote_ip_mk_list//,/ }
+		    return 0
+		fi
+		;;
+	    *)
+		return 255
+		;;
+	esac
+	((i++))
+    done
+
+    echo ${VPN_IPSEC_REMOTE_ACCESS_DEFAULT_NETWORK}/${VPN_IPSEC_REMOTE_ACCESS_DEFAULT_NETMASK}
+}
+
+check-vpn-ipsec-access-integrity()
+{
+    test ${ROUTER_MODE} == True || return 0
+    test ${VPN_IPSEC_MODE} == True || return 0
+    test ${_VPN_IPSEC_ACCESS_MODE} == True || return 0
+
+    local elt i range
+    local ip_mk ip mk nt
+    local remote_ip_mk_list=$(get-vpnipsec-access-remote-networks)
+
+    for ip_mk in ${remote_ip_mk_list}
+    do
+	test ${ip_mk} != ${_EXT_NET}/${IP_EXTERNAL_MASK} || return 11
+	test -z "${BOND_AUXILIARIES}" -o ${IP_AUXILIARY_IP} == 0.0.0.0 || test ${ip_mk} != ${_AUX_NET}/${IP_AUXILIARY_MASK} || return 13
+	test ${ip_mk} != ${_WEB_NET}/${_WEB_MASK}  || return 15
+			
+	if test ${VLAN_MODE} == True ; then
+	    i=0
+	    for elt in ${IP_VLAN_LIST}
+	    do
+		range=$[${i} % 3]
+		case ${range} in
+		    0)
+		        ;;
+		    1)
+			ip=${elt}
+			;;
+		    2)
+			mk=${elt}
+			if test ${ip} != 0.0.0.0 ; then
+			    nt=$(ipcalc -s ${ip} ${mk} -n)
+			    nt=${nt/NETWORK=/}
+			    test ${ip_mk} != ${nt}/${mk} || return 21
+			fi
+			;;
+		    *)
+			return 255
+			;;
+		esac
+		((i++))
+		working-sign
+	    done
+	fi
+    done
+
+    return 0
+}
+
+check-vpn-ipsec-route-integrity()
+{
+    test ${ROUTER_MODE} == True || return 0
+    test ${VPN_IPSEC_MODE} == True || return 0
+
+    local elt1 range1 i1=0
+    local ipsec_type local_ip_mk_list remote_ip_mk_list
+    local ip_mk ip1 mk1
+
+    local elt2 i2 range2
+    local ip2 mk2 gw
+
+    local elt3 i3 range3
+    local ip mk nt bd found2 found3
+
+    for elt1 in ${VPN_IPSEC_NETWORK_LIST}
+    do
+	range1=$[${i1} % 4]
+	case ${range1} in
+	    0)
+		ipsec_type=${elt1}
+		;;
+	    1)
+		;;
+	    2)
+		local_ip_mk_list=${elt1}
+		;;
+	    3)
+		remote_ip_mk_list=${elt1}
+
+		case ${ipsec_type} in
+		    access)
+			if test ${_VPN_IPSEC_ACCESS_MODE} == False ; then
+			    ((i1++))
+			    continue
+			fi
+			;;
+		    site)
+			if test ${_VPN_IPSEC_ACCESS_MODE} == True ; then
+			    ((i1++))
+			    continue
+			fi
+			;;
+		    *)
+			((i1++))
+			continue
+			;;
+		esac
+
+		remote_ip_mk_list=${remote_ip_mk_list//,/ }
+		for ip_mk in ${remote_ip_mk_list}
+		do
+		    i2=0
+		    for elt2 in ${IP_ROUTE_LIST}
+		    do
+			range2=$[${i2} % 5]
+			case ${range2} in
+			    0)
+				ip2=${elt2}
+				;;
+			    1)
+				mk2=${elt2}
+				;;
+			    2|3)
+				;;
+			    4)
+				test ${ip_mk} != ${ip2}/${mk2} || return 11
+				;;
+			    *)
+				return 255
+				;;
+			esac
+			((i2++))
+		    done
+		done
+
+		if test ${local_ip_mk_list} == nil ; then
+		    ((i1++))
+		    continue
+		fi
+
+		local_ip_mk_list=${local_ip_mk_list//,/ }
+		for ip_mk in ${local_ip_mk_list}
+		do
+		    test ${ip_mk} != '0.0.0.0/0.0.0.0' || continue
+		    
+		    if test -n "${BOND_AUXILIARIES}" -a ${IP_AUXILIARY_IP} != 0.0.0.0 ; then
+			test ${ip_mk} != ${_AUX_NET}/${IP_AUXILIARY_MASK} || continue
+		    fi
+
+		    test ${ip_mk} != ${_WEB_NET}/${_WEB_MASK}  || continue		    
+
+		    if test ${VLAN_MODE} == True ; then
+			i2=0
+			unset found2
+			for elt2 in ${IP_VLAN_LIST}
+			do
+			    range2=$[${i2} % 3]
+			    case ${range2} in
+				0)
+				    ;;
+				1)
+				    ip=${elt2}
+				    ;;
+				2)
+				    mk=${elt2}
+
+				    nt=$(ipcalc -s ${ip} ${mk} -n)
+				    nt=${nt/NETWORK=/}
+				    if test ${ip_mk} == ${nt}/${mk} ; then
+					found2='yes'
+					break
+				    fi
+				    ;;
+				*)
+				    return 255
+				    ;;
+			    esac
+			    ((i2++))
+			done
+			test -z "${found2}" || continue
+		    fi
+
+		    i2=0
+		    unset found2
+		    for elt2 in ${IP_ROUTE_LIST}
+		    do
+			range2=$[${i2} % 5]
+			case ${range2} in
+			    0)
+				ip2=${elt2}
+				;;
+			    1)
+				mk2=${elt2}
+				;;
+			    2)
+				gw=${elt2}
+				;;
+			    3)
+				;;
+			    4)
+				if test ${ip_mk} == ${ip2}/${mk2} ; then
+				    if test -n "${BOND_AUXILIARIES}" -a ${IP_AUXILIARY_IP} != 0.0.0.0 ; then
+					if ip-is-included ${gw} ${_AUX_NET} ${_AUX_BRD} ${IP_AUXILIARY_MASK} ; then
+					    found2='yes'
+					    break
+					fi
+				    fi
+				    
+				    if ip-is-included ${gw} ${_WEB_NET} ${_WEB_BRD} ${_WEB_MASK} ; then
+					found2='yes'
+					break
+				    fi
+				    
+				    if test ${VLAN_MODE} == True ; then
+					i3=0
+					unset found3
+					for elt3 in ${IP_VLAN_LIST}
+					do
+					    range3=$[${i3} % 3]
+					    case ${range3} in
+						0)
+				                    ;;
+						1)
+						    ip=${elt3}
+						    ;;
+						2)
+						    mk=${elt3}
+
+						    nt=$(ipcalc -s ${ip} ${mk} -n)
+						    bd=$(ipcalc -s ${ip} ${mk} -b)
+						    nt=${nt/NETWORK=/}
+						    bd=${bd/BROADCAST=/}
+						    if ip-is-included ${gw} ${nt} ${bd} ${mk} ; then
+							found3='yes'
+							break
+						    fi
+						    ;;
+						*)
+						return 255
+						;;
+					    esac
+					    ((i3++))
+					done
+					if test -n "${found3}" ; then
+					    found2='yes'
+					    break
+					fi
+				    fi
+				fi
+				;;
+			    *)
+				return 255
+				;;
+			esac
+			((i2++))
+		    done
+
+		    test -z "${found2}" || continue
+
+		    return 21
+		done
+		;;
+
+	    *)
+		return 255
+		;;
+	esac
+	working-sign
+	((i1++))
+    done
+    
+    return 0
+}
+
+check-peer-next-rweb-integrity()
+{
+    test ${RWEB_MODE} == False -o -z "${PEER_NEXT_LIST}"
+}
+
+rweb-site-hosted()
+{
+    local in_name=${1}
+
+    local elt range i=0
+    local name
+
+    for elt in ${RWEB_SITE_HOSTS_LIST}
+    do
+	range=$[${i} % 2]
+	case ${range} in
+	    0)
+		name=${elt}
+		;;
+	    1)
+		test ${name} != ${in_name} || return 0
+		;;
+	    *)
+		return 1
+		;;
+	esac
+	((i++))
+    done
+
+    return 1
+}
+
+check-rweb-host-integrity()
+{
+    test ${RWEB_MODE} == True || return 0
+    test ${_RWEB_HOSTED} == True
+}
+
+check-waf-rweb-integrity()
+{
+    test ${WAF_MODE} == True || return 0
+    test ${RWEB_MODE} == True
+}
+
+check-rweb-names()
+{
+    test ${RWEB_MODE} == True || return 0
+
+    working-sign
+    
+    local name
+
+    for name in ${_RWEB_NAME_LIST}
+    do
+	if test ${name} == ${SHOSTNAME}.${DOMAIN_NAME} ; then
+	    ERROR=277
+	    return 11
+	fi
+
+	if test ${EMBEDDED_VPNSUBSCR_MODE} == True ; then
+	    if test ${name} == "${EMBEDDED_VPNSUBSCR_RWEB_SITE_NAME}" ; then
+		ERROR=365
+		return 13
+	    fi
+	fi
+    done
+
+    return 0
+}
+
+check-rweb-public-ip-integrity()
+{
+    test ${RWEB_MODE} == True || return 0
+
+    local elt range i=0
+    local name ip proto
+    local net_brd
+
+    _RWEB_HOSTED=True
+
+    case ${CLOUD_NAME} in
+	aws|azure)
+	    working-sign
+	    ;;
+	*)
+	    ;;
+    esac
+
+    for elt in ${RWEB_SITE_LIST}
+    do
+	range=$[${i} % 5]
+	case ${range} in
+	    0)
+		name=${elt}
+		;;
+	    1)
+		proto=${elt}
+		;;
+	    2)
+		ip=${elt}
+		;;
+	    3)
+		;;
+	    4)
+		case ${CLOUD_NAME} in
+		    aws|azure)
+			if test ${ip} != ${IP_EXTERNAL_IP} ; then
+			    ERROR=363
+			    return 11
+			fi
+			;;
+		    *)
+			working-sign
+			net_brd=$(ip-is-included-in-valid-boradcast ${ip} ${_EXT_NET} ${_EXT_BRD} ${IP_EXTERNAL_MASK})
+			if test ${?} -ne 0 ; then
+			    ERROR=285
+			    return 13
+			fi
+			rweb-site-hosted ${name} || _RWEB_HOSTED=False
+			;;
+		esac
+		;;
+	    *)
+		ERROR=255
+		return 15
+		;;
+	esac
+	((i++))
+    done
+
+    return 0
+}
+
+check-admin-topology()
+{
+    test ${ADMIN_SSH} == True -o ${ADMIN_WADMIN} == True -o  ${ADMIN_WAUDIT} == True || return 0
+    test ${ADMIN_INTERNAL} == True -o ${ADMIN_EXTERNAL} == True -o ${ADMIN_AUXILIARY} == True -o ${ADMIN_VPN_IPSEC} == True
+}
+
+check-ha-integrity()
+{
+    test ${HA_MODE} == True || return 0
+    if test ${VLAN_MODE} == False ; then
+	test -n "${VRRP_EXTERNAL_LIST}" -o -n "${VRRP_INTERNAL_LIST}" || return 1
+    else
+	test -n "${VRRP_EXTERNAL_LIST}" -o -n "${VRRP_WEB_LIST}" -o -n "${VRRP_RWEB_LIST}" || return 1
+    fi
+    return 0
+}
+
+check-rweb-ha-ip()
+{
+    test ${RWEB_MODE} == True -a ${HA_MODE} == True || return 0
+
+    local elt range i=0
+
+    for elt in ${RWEB_SITE_LIST}
+    do
+	range=$[${i} % 5]
+	case ${range} in
+	    0|1|3)
+		;;
+	    2)
+		ip=${elt}
+		;;
+	    4)
+		ip-is-external-vrrp-ip ${ip} || return 1
+		;;
+	    *)
+		return 1
+		;;
+	esac
+	((i++))
+    done
+    
+    return 0
+
+}
+
+check-ldap-integrity()
+{
+    test ${AUTHENTICATE_MODE} == True || return 0
+    test ${AUTHENTICATE_LDAP} == True || return 0
+    test -n "${LDAP_SERVER_LIST}" || return 1
+}
+
+check-kerberos-integrity()
+{
+    test ${AUTHENTICATE_MODE} == True || return 0
+    test ${AUTHENTICATE_KERBEROS} == True || return 0
+    test -n "${KERBEROS_SERVER_LIST}" || return 1
+}
+
+check-authentication-integrity()
+{
+    test ${AUTHENTICATE_MODE} == True || return 0
+    test ${AUTHENTICATE_LDAP} == True -o ${AUTHENTICATE_KERBEROS} == True
+}
+
+check-kerberos-domainname-integrity()
+{
+    test ${AUTHENTICATE_MODE} == True || return 0
+    test ${AUTHENTICATE_KERBEROS} == True || return 0
+    test "${DOMAIN_NAME}" != "${DOMAIN_NAME//.}" || return 1
+}
+
+check-guard-ldap-filter-integrity()
+{
+    test ${WEB_MODE} == True || return 0
+    test ${GUARD_MODE} == True || return 0
+    test-new-guard-rules-use-ldap || return 0
+
+    test ${AUTHENTICATE_MODE} == True
+}
+
+check-all-sldap()
+{
+    test ${AUTHENTICATE_MODE} == True || return 0
+    test ${AUTHENTICATE_LDAP} == True || return 0
+
+    working-sign
+
+    local elt i=0
+    local proto name ip port
+    local one_sldap=0
+
+    for elt in ${LDAP_SERVER_LIST}
+    do
+	range=$[${i} % 4]
+	case ${range} in
+	    0)
+		proto=${elt}
+		if test ${proto} == sldap ; then
+		    one_sldap=1
+		    break
+		fi
+		;;
+	    *)
+		;;
+	esac
+	((i++))
+    done
+
+    test ${one_sldap} -eq 1 || return 0
+
+    i=0
+    for elt in ${LDAP_SERVER_LIST}
+    do
+	range=$[${i} % 4]
+	case ${range} in
+	    0)
+		proto=${elt}
+		test ${proto} == sldap || return 1
+		;;
+	    *)
+		;;
+	esac
+	((i++))
+    done
+
+    return 0
+}
+
+check-auth-transparent()
+{
+    test ${AUTHENTICATE_MODE} == True -a ${TRANSPARENT_MODE} == True || return 0
+    test ${WEB_MODE} == True -o ${RWEB_MODE} == True
+}
+
+check-auth-target()
+{
+    test ${AUTHENTICATE_MODE} == True || return 0
+    test ${AUTHENTICATE_WEB} == True -o ${AUTHENTICATE_RWEB} == True
+}
+
+check-password-file-server()
+{
+    local elt range i=0
+    local protocol ip login
+
+    for elt in ${FILE_SERVER_PASSWORD_LIST}
+    do
+	range=$[${i} % 4]
+	case ${range} in
+	    0|2)
+		;;
+	    1)
+		ip=${elt}
+		;;
+	    3)
+		member-access-file "${ACCESS_FILE_LIST}" ${ip} || return 1
+		;;
+	    *)
+		return 1
+		;;
+	esac
+	((i++))
+    done
+
+    return 0
+}
+
+check-tls-admin-usage-integrity()
+{
+    local tls_id=${ADMIN_TLS/:*} ca_id
+
+    mono-elt ${ADMIN_TLS//:/ } || ca_id=${ADMIN_TLS/*:}
+    tls-server-id-exist ${tls_id} || return 11
+    test -z "${ca_id}" || tls-ca-id-exist ${ca_id} || return 13
+
+    return 0
+}
+
+check-tls-vpnipsec-site-integrity()
+{
+    test ${VPN_IPSEC_MODE} == True || return 0
+    test ${_VPN_IPSEC_ACCESS_MODE} == False || return 0
+
+    local elt range i=0
+    local auth_type auth_key1 auth_key2
+
+    for elt in ${VPN_IPSEC_SITE_LIST}
+    do
+	range=$[${i} % 12]
+	case ${range} in
+	    0|1|5|6|7|8|9|10)
+	       ;;
+	    2)
+		auth_type=${elt}
+		;;
+	    3)
+		auth_key1=${elt}
+		;;
+	    4)
+		auth_key2=${elt}
+		;;
+	    11)
+		case ${auth_type} in
+		    psk)
+			;;
+		    tls)
+			case ${auth_key1} in
+			    certificate)
+				tls-server-id-exist ${auth_key2} || return 11
+				;;
+			    fqdn|dn)
+				;;
+			    *)
+				return 255
+				;;
+			esac
+			;;
+		    eaptls)
+			case ${auth_key1} in
+			    fqdn|dn)
+				;;
+			    *)
+				return 255
+				;;
+			esac
+			;;
+		    *)
+			return 255
+			;;
+		esac
+		;;
+	    *)
+		return 1
+		;;
+	esac
+	((i++))
+    done
+
+    return 0
+}
+
+check-rhttp-integrity()
+{
+    test ${RWEB_MODE} == True || return 0
+    test -n "${RWEB_SITE_HTTPX_LIST}" || return 0
+
+    local name protocol
+
+    for name in ${RWEB_SITE_HTTPX_LIST}
+    do
+	working-sign
+	protocol=$(rweb-get-protocol ${name})
+	test ${protocol} != both || return 0
+    done
+
+    return 11
+}
+
+check-embedded-vpnsubscr-integrity()
+{
+    test ${EMBEDDED_VPNSUBSCR_MODE} == True || return 0
+
+    unset ERRORS
+
+    check-rweb-tls-chain-integrity ${EMBEDDED_VPNSUBSCR_RWEB_TLS_ID} || ERRORS="${ERRORS} 361"
+    test ${HA_MODE} == False || ERRORS="${ERRORS} 366"
+    test ${RWEB_MODE} == True || ERRORS="${ERRORS} 367"
+
+    if is-embedded-license-required vpnsubscr ; then
+	if test ! -s ${TMP_DIR}/${EMBEDDED_VPNSUBSCR_REGISTER_KEY} ; then
+	    test -s ${HARD_DIR}/${EMBEDDED_VPNSUBSCR_NAME}.${REGISTER_STATE} || ERRORS="${ERRORS} 368"
+	fi
+    fi
+
+    ERRORS=${ERRORS:1}
+    test -z "${ERRORS}"
+}
+
+check-waudit-wadmin-integrity()
+{
+    test ${ADMIN_WAUDIT} == True || return 0
+    test ${ADMIN_WADMIN} == True
+}
+
+check-tls-ca-integrity()
+{
+    local elt range i=0
+    local ca_id ca_file
+
+    auto-gen-missing-tls
+
+    for elt in ${TLS_CA_LIST}
+    do
+	range=$[${i} % 2]
+	case ${range} in
+	    0)
+		ca_id=${elt}
+		;;
+	    1)
+		ca_file=$(get-tls-ca-file ${ca_id})
+
+		if test -f ${ca_file} ; then
+		    ((i++))
+		    continue
+		else
+		    return 1
+		fi
+		;;
+	    *)
+		return 255
+		;;
+	esac
+	((i++))
+    done
+
+    return 0
+}
+
+check-snmp-tls-client-certificate-integrity()
+{
+    test ${SNMP_CLIENT_CERTIFICATE} == True || return 0
+
+    local certificate
+
+    if test -f ${TMP_DIR}/${LOADED}.${SNMP_SSL}.certificate ; then
+	certificate=${TMP_DIR}/${LOADED}.${SNMP_SSL}.certificate
+    elif test -f ${SSL_SERVER_DIR}/${SNMP_SSL}.crt ; then
+	certificate=${SSL_SERVER_DIR}/${SNMP_SSL}.crt
+    fi
+
+    test -f ${certificate} || return 0
+    check-tls-cert-self-signed ${certificate} || return 0
+
+    local system_ca_file=$(get-tls-ca-system-component-file certificate)
+    ! check-tls-cert-signed-by-ca ${certificate} ${system_ca_file} || return 0
+
+    local elt range i=0
+    local ca_id base ca_file signed
+
+    for elt in ${TLS_CA_LIST}
+    do
+	range=$[${i} % 2]
+	case ${range} in
+	    0)
+		ca_id=${elt}
+		;;
+	    1)
+		ca_file=$(get-tls-ca-file ${ca_id})
+		if check-tls-cert-signed-by-ca ${certificate} ${ca_file} ; then
+		    signed='yes'
+		    break
+		fi
+		;;
+	    *)
+		return 255
+		;;
+	esac
+	((i++))
+    done
+
+    test -n "${signed}" || return 11
+
+    return 0
+}
+
+check-tls-system-ca-integrity()
+{
+    test -f ${TMP_DIR}/${SYSTEM_CA}.conf -o -f ${TMP_DIR}/${LOADED}.${SYSTEM_CA}.certificate -o -f ${TMP_DIR}/${LOADED}.${SYSTEM_CA}.key || return 0
+    test -s ${SSL_CTL_DIR}/index.txt || return 0
+
+    local link tls_dir tls
+    local state expiration revoke serial unknown fdn
+
+    while read state expiration serial unknown fdn
+    do
+	test -n "${state}" || continue
+	test "${state:0:1}" != '#' || continue
+	test ${state} == 'V' || continue
+
+	link=$(ls -l ${SSL_CTL_DIR}/${serial}.pem 2> /dev/null)
+	link=${link/*-> }
+	link=${link/..\/}
+	tls_dir=$(file-dirname ${link})
+	tls=$(file-basename ${link} .certificate)
+
+	test -n "${tls_dir}" || continue
+	test -n "${tls}" || continue
+
+	if test ${tls_dir} == ${SSL_SERVER_DIR/*\/} ; then
+	    test ! -f ${TMP_DIR}/${TLS_SERVER}.${tls}.conf -a ! -f ${TMP_DIR}/${TLS_SERVER}.${tls}.2sign -a ! -f ${TMP_DIR}/${LOADED}.${TLS_SERVER}.certificate.${tls} || continue
+	    ! tls-server-id-exist ${tls} || return 11
+	elif test ${tls_dir} == ${SSL_CLIENT_DIR/*\/}/${tls}.cur ; then
+	    test -f ${SSL_CLIENT_DIR}/${tls}.2del -o -f ${SSL_CLIENT_DIR}/${tls}.new || return 13
+	else
+	    continue
+	fi
+    done < ${SSL_CTL_DIR}/index.txt
+
+    return 0
+}
+
+check-ocsp-tls-integrity()
+{
+    test ${OCSP_MODE} == True || return 0
+    test -n "${OCSP_TLS}" || return 0
+    member "${TLS_SERVER_LIST}" ${OCSP_TLS} || return 11
+    tls-key-exist ${OCSP_TLS} || tls-tmp-key-exist ${OCSP_TLS} || tls-tmp-conf-exist ${OCSP_TLS} || return 13
+    check-tls-cert-signed-by-system-ca server ${OCSP_TLS} || return 15
+
+    return 0
+}
+
+check-qos-integrity()
+{
+    local elt range i=0
+    local bw dev gress qos len
+    local list
+
+    for dev in internal external
+    do
+	for gress in ingress egress
+	do
+	    case ${dev} in
+		internal)
+		    case ${gress} in
+			ingress)
+			    list=${QOS_SHAPE_INTERNAL_INGRESS_LIST}
+			    bw=${QOS_BW_INTERNAL_INGRESS}
+			    ;;
+			egress)
+			    list=${QOS_SHAPE_INTERNAL_EGRESS_LIST}
+			    bw=${QOS_BW_INTERNAL_EGRESS}
+			    ;;
+			*)
+			    return 255
+			    ;;
+		    esac
+		    ;;
+		external)
+		    case ${gress} in
+			ingress)
+			    list=${QOS_SHAPE_EXTERNAL_INGRESS_LIST}
+			    bw=${QOS_BW_EXTERNAL_INGRESS}
+			    ;;
+			egress)
+			    list=${QOS_SHAPE_EXTERNAL_EGRESS_LIST}
+			    bw=${QOS_BW_EXTERNAL_EGRESS}
+			    ;;
+			*)
+			    return 255
+			    ;;
+		    esac
+		    ;;
+		auxiliary)
+		    case ${gress} in
+			ingress)
+			    list=${QOS_SHAPE_AUXILIARY_INGRESS_LIST}
+			    bw=${QOS_BW_AUXILIARY_INGRESS}
+			    ;;
+			egress)
+			    list=${QOS_SHAPE_AUXILIARY_EGRESS_LIST}
+			    bw=${QOS_BW_AUXILIARY_EGRESS}
+			    ;;
+			*)
+			    return 255
+			    ;;
+		    esac
+		    ;;
+		*)
+		    return 255
+		    ;;
+	    esac
+
+	    i=0
+	    for elt in ${list}
+	    do
+		range=$[${i} % 2]
+		case ${range} in
+		    0)
+			;;
+		    1)
+			qos=${elt}
+			len=${#qos}
+			((len--))
+
+			if test ${qos:${len}} == '%' ; then
+			    ((i++))
+			    continue
+			fi
+			test ${qos} -le ${bw} || return 1
+			;;
+		    *)
+			return 255
+			;;
+		esac
+		((i++))
+	    done
+	done
+    done
+
+    local dev ingress_qos egress_qos
+
+    i=0
+    for elt in ${QOS_SHAPE_ROUTER_LIST}
+    do
+	range=$[${i} % 10]
+	case ${range} in
+	    0|2|3|4|6|7)
+		;;
+	    1)
+		dev=${elt}
+		;;
+	    5)
+		ingress_qos=${elt}
+		;;
+	    8)
+		egress_qos=${elt}
+		;;
+	    9)
+		len=${#ingress_qos}
+		((len--))
+		
+		if test ${ingress_qos:${len}} != '%' ; then
+
+		    case ${dev} in
+			internal)
+			    test ${ingress_qos} -le ${QOS_BW_INTERNAL_INGRESS} || return 1
+			    ;;
+			external)
+			    test ${ingress_qos} -le ${QOS_BW_EXTERNAL_INGRESS} || return 1
+			    ;;
+			auxiliary)
+			    test ${ingress_qos} -le ${QOS_BW_AUXILIARY_INGRESS} || return 1
+			    ;;
+			*)
+			    return 255
+			    ;;
+		    esac
+
+		fi
+
+		len=${#egress_qos}
+		((len--))
+		
+		if test ${egress_qos:${len}} != '%' ; then
+
+		    case ${dev} in
+			internal)
+			    test ${egress_qos} -le ${QOS_BW_INTERNAL_EGRESS} || return 1
+			    ;;
+			external)
+			    test ${egress_qos} -le ${QOS_BW_EXTERNAL_EGRESS} || return 1
+			    ;;
+			auxiliary)
+			    test ${egress_qos} -le ${QOS_BW_AUXILIARY_EGRESS} || return 1
+			    ;;
+			*)
+			    return 255
+			    ;;
+		    esac
+		fi
+
+		;;
+	    *)
+		return 1
+		;;
+	esac
+	((i++))
+    done
+}
+
+check-snmp-protocols()
+{
+    test ${ADMIN_SNMP} == True || return 0
+    test ${SNMP_UDP} == True -o ${SNMP_TCP} == True -o ${SNMP_TLS} == True
+}
+
+check-urllist-auto-load-access()
+{
+    local bool load op period protocol ip fn
+    local file_new
+
+    local files=$(ls -1 ${URLLIST_DIR}/*.${URLLIST_AUTO} 2> /dev/null) file
+    for file in ${files}
+    do
+	read bool load op period protocol ip fn < ${file}
+	test "${bool}" == on || continue
+	test "${protocol}" != push || continue
+	member-access-file "${ACCESS_FILE_LIST}" ${ip} || return 11
+    done
+
+    files=$(ls -1 ${URLLIST_DIR}/*.${URLLIST_AUTO}.current 2> /dev/null)
+    for file in ${files}
+    do
+	file_new=${file/\.current}
+	test ! -f ${file_new} || continue
+	read bool load op period protocol ip fn < ${file}
+	test "${bool}" == on || continue
+	test "${protocol}" != push || continue
+	member-access-file "${CURRENT_ACCESS_FILE_LIST}" ${ip} || return 13
+    done
+
+    return 0
+}
+
+check-urllist-auto-push()
+{
+    test -z "${ACCESS_MANAGER_LIST}" || return 0
+
+    local bool load op period protocol ip fn
+    local file_new
+
+    local files=$(ls -1 ${URLLIST_DIR}/*.${URLLIST_AUTO} 2> /dev/null) file
+    for file in ${files}
+    do
+	read bool load op period protocol ip fn < ${file}
+	test "${bool}" == on || continue
+	test "${protocol}" != push || return 11
+    done
+
+    files=$(ls -1 ${URLLIST_DIR}/*.${URLLIST_AUTO}.current 2> /dev/null)
+    for file in ${files}
+    do
+	file_new=${file/\.current}
+	test ! -f ${file_new} || continue
+	read bool load op period protocol ip fn < ${file}
+	test "${bool}" == on || continue
+	test "${protocol}" != push || return 13
+    done
+
+    return 0
+}
+
+check-antivirus-extended-method()
+{
+    test ${AV_EXTENDED_METHOD} == push || return 0
+    test -n "${ACCESS_MANAGER_LIST}"
+}
+
+check-manager-sync-integrity()
+{
+    case ${MANAGER_SYNC_ROLE} in
+	alone)
+	    return 0
+	    ;;
+	master|slave)
+	    test ${MANAGER_SYNC_PEER_IP} != 0.0.0.0 || return 11
+
+	    if test ${MANAGER_SYNC_ROLE} == slave ; then
+		local ssh_key ssh_key_id=$(get-manager-key-id peer)
+
+		test \
+		    -s ${SSH_PUBLIC_KEY_DIR}/${ssh_key_id} -o \
+		    -s ${TMP_DIR}/${LOADED}.${SSH_KEY}.${ssh_key_id} || return 13
+	    fi
+	    ;;
+	*)
+	    return 255
+	    ;;
+    esac
+}
+
+set-integrity-env()
+{
+    working-sign
+
+    local ip_mask
+
+    if test ${VLAN_MODE} == True ; then
+
+	make-ip_vlan_list-ip
+
+	_WEB_VLAN=$(get-vlan-tag web new)
+	ip_mask=$(get-vlan-ip-netmask ${_WEB_VLAN} new)
+
+	_WEB_IP=${ip_mask/ *}
+	_WEB_MASK=${ip_mask/* }
+
+	if test ${_WEB_IP} == 0.0.0.0 ; then
+	    _WEB_NET=0.0.0.0
+	    _WEB_BRD=0.0.0.0
+	else
+	    _WEB_NET=$(ipcalc -s ${ip_mask} -n)
+	    _WEB_BRD=$(ipcalc -s ${ip_mask} -b)
+
+	    _WEB_NET=${_WEB_NET/NETWORK=/}
+	    _WEB_BRD=${_WEB_BRD/BROADCAST=/}
+	fi
+
+	_RWEB_VLAN=$(get-vlan-tag rweb new)
+	ip_mask=$(get-vlan-ip-netmask ${_RWEB_VLAN} new)
+
+	_RWEB_IP=${ip_mask/ *}
+	_RWEB_MASK=${ip_mask/* }
+
+	if test ${_RWEB_IP} == 0.0.0.0 ; then
+	    _RWEB_NET=0.0.0.0
+	    _RWEB_BRD=0.0.0.0
+	else
+	    _RWEB_NET=$(ipcalc -s ${ip_mask} -n)
+	    _RWEB_BRD=$(ipcalc -s ${ip_mask} -b)
+
+	    _RWEB_NET=${_RWEB_NET/NETWORK=/}
+	    _RWEB_BRD=${_RWEB_BRD/BROADCAST=/}
+	fi
+
+	_AV_VLAN=$(get-vlan-tag antivirus new)
+	ip_mask=$(get-vlan-ip-netmask ${_AV_VLAN} new)
+
+	_AV_IP=${ip_mask/ *}
+	_AV_MASK=${ip_mask/* }
+
+	if test ${_AV_IP} == 0.0.0.0 ; then
+	    _AV_NET=0.0.0.0
+	    _AV_BRD=0.0.0.0
+	else
+	    _AV_NET=$(ipcalc -s ${ip_mask} -n)
+	    _AV_BRD=$(ipcalc -s ${ip_mask} -b)
+
+	    _AV_NET=${_AV_NET/NETWORK=/}
+	    _AV_BRD=${_AV_BRD/BROADCAST=/}
+	fi
+
+    else
+	ip_mask="${IP_INTERNAL_IP} ${IP_INTERNAL_MASK}"
+
+	_WEB_IP=${IP_INTERNAL_IP}
+	_WEB_MASK=${IP_INTERNAL_MASK}
+
+	if test ${_WEB_IP} == 0.0.0.0 ; then
+	    _WEB_NET=0.0.0.0
+	    _WEB_BRD=0.0.0.0
+	else
+	    _WEB_NET=$(ipcalc -s ${IP_INTERNAL_IP} ${IP_INTERNAL_MASK} -n)
+	    _WEB_BRD=$(ipcalc -s ${IP_INTERNAL_IP} ${IP_INTERNAL_MASK} -b)
+
+	    _WEB_NET=${_WEB_NET/NETWORK=/}
+	    _WEB_BRD=${_WEB_BRD/BROADCAST=/}
+	fi
+    fi
+
+    if test ${IP_EXTERNAL_IP} == 0.0.0.0 -a ${IP_EXTERNAL_MASK} == 0.0.0.0 ; then
+	_EXT_NET=0.0.0.0
+	_EXT_BRD=0.0.0.0
+    else
+	_EXT_NET=$(ipcalc -s ${IP_EXTERNAL_IP} ${IP_EXTERNAL_MASK} -n)
+	_EXT_BRD=$(ipcalc -s ${IP_EXTERNAL_IP} ${IP_EXTERNAL_MASK} -b)
+
+	_EXT_NET=${_EXT_NET/NETWORK=/}
+	_EXT_BRD=${_EXT_BRD/BROADCAST=/}
+    fi
+
+    if test ${IP_AUXILIARY_IP} == 0.0.0.0 -a ${IP_AUXILIARY_MASK} == 0.0.0.0 ; then
+	_AUX_NET=0.0.0.0
+	_AUX_BRD=0.0.0.0
+    else
+	_AUX_NET=$(ipcalc -s ${IP_AUXILIARY_IP} ${IP_AUXILIARY_MASK} -n)
+	_AUX_BRD=$(ipcalc -s ${IP_AUXILIARY_IP} ${IP_AUXILIARY_MASK} -b)
+
+	_AUX_NET=${_AUX_NET/NETWORK=/}
+	_AUX_BRD=${_AUX_BRD/BROADCAST=/}
+    fi
+
+    if test ${RWEB_MODE} == True ; then
+	_RWEB_NAME_LIST=''
+	_RWEB_HTTPS_IP_LIST=''
+
+	local elt range i=0
+	local name proto ip
+
+	for elt in ${RWEB_SITE_LIST}
+	do
+	    range=$[${i} % 5]
+	    case ${range} in
+		0)
+		    name=${elt}
+		    ;;
+		1)
+		    proto=${elt}
+		    ;;
+		2)
+		    ip=${elt}
+		    ;;
+		3)
+		    ;;
+		4)
+		    member "${_RWEB_NAME_LIST}" ${name} || _RWEB_NAME_LIST="${_RWEB_NAME_LIST} ${name}"
+		    test ${proto} != 'https' || _RWEB_HTTPS_IP_LIST="${_RWEB_HTTPS_IP_LIST} ${ip}"
+		    ;;
+		*)
+		    return 1
+		    ;;
+	    esac
+	    ((i++))
+	done
+	_RWEB_NAME_LIST=${_RWEB_NAME_LIST:1}
+	_RWEB_HTTPS_IP_LIST=${_RWEB_HTTPS_IP_LIST:1}
+    fi
+
+    local access_mode=${VPN_IPSEC_ACCESS/ *}
+    if test "${access_mode}" == 'on' ; then
+	_VPN_IPSEC_ACCESS_MODE=True
+    else
+	_VPN_IPSEC_ACCESS_MODE=False
+    fi
+
+    unset _EXTERNAL_GATEWAYS
+    unset _MULTI_EXTERNAL_GATEWAYS_MODE
+
+    working-sign
+}
+
+check-ipsec-via-integrity1()
+{
+    test ${VPN_IPSEC_MODE} == True || return 0
+    test ${_MULTI_EXTERNAL_GATEWAYS_MODE} == True || return 0
+    test -n "${VPN_IPSEC_VIA_LIST}" || return 13
+
+    local vpns vpn_id
+
+    if test ${_VPN_IPSEC_ACCESS_MODE} == True ; then
+	vpns="access access"
+    else
+	local elt range i=0
+
+	for elt in ${VPN_IPSEC_SITE_LIST}
+	do
+	    range=$[${i} % 12]
+	    case ${range} in
+		0)
+		    vpn_id=${elt}
+		    ;;
+		1|2|3|4|5|6|7|8|9|10)
+		    ;;
+		11)
+		    working-sign
+
+		    vpns="${vpns} site ${vpn_id}"
+		    ;;
+		*)
+		    return 255
+		    ;;
+	    esac
+	    ((i++))
+	done
+	vpns=${vpns:1}
+    fi
+
+    local elt1 range1 i1=0
+    local elt2 range2 i2=0
+
+    local ipsec_type1 vpn_id1
+    local ipsec_type2 vpn_id2
+
+    local vias via gateway weight
+    local via_role_prio via_role
+    local found
+
+    for elt2 in ${VPN_IPSEC_VIA_LIST}
+    do
+	range2=$[${i2} % 3]
+	case ${range2} in
+	    0)
+		ipsec_type2=${elt2}
+		;;
+	    1)
+		vpn_id2=${elt2}
+		;;
+	    2)
+		working-sign
+
+		vias=$(colon2space ${elt2})
+
+		for via in ${vias}
+		do
+		    if test ${_VPN_IPSEC_ACCESS_MODE} == True ; then
+			if test ${ipsec_type2} == access ; then
+			    gateway=${via/_*}
+			    member "${_EXTERNAL_GATEWAYS}" ${gateway} || return 11
+			    weight=$(get-gateway-weight ${gateway} new)
+			    test ${weight} != 0 || return 15
+			fi
+		    else
+			if test ${ipsec_type2} == site ; then
+			    gateway=${via/_*}
+			    member "${_EXTERNAL_GATEWAYS}" ${gateway} || return 11
+			    weight=$(get-gateway-weight ${gateway} new)
+			    test ${weight} != 0 || return 15
+			fi
+		    fi
+		done
+		;;
+	    *)
+		return 255
+		;;
+	esac
+	((i2++))
+    done
+
+    for elt1 in ${vpns}
+    do
+	range1=$[${i1} % 2]
+	case ${range1} in
+	    0)
+		ipsec_type1=${elt1}
+		;;
+	    1)
+		vpn_id1=${elt1}
+		
+		unset found
+		i2=0
+		
+		for elt2 in ${VPN_IPSEC_VIA_LIST}
+		do
+		    range2=$[${i2} % 3]
+
+		    case ${range2} in
+			0)
+			    ipsec_type2=${elt2}
+			    ;;
+			1)
+			    vpn_id2=${elt2}
+			    ;;
+			2)
+			    working-sign
+
+			    if test ${ipsec_type1} == ${ipsec_type2} -a ${vpn_id1} == ${vpn_id2} ; then
+				vias=$(colon2space ${elt2})
+				for via in ${vias}
+				do
+				    gateway=${via/_*}
+				    via_role_prio=${via#*_}
+				    via_role=${via_role_prio/_*}
+				    
+				    if test ${via_role} == master ; then
+					found=yes
+					break
+				    fi
+				done
+				break
+			    fi
+			    ;;
+			*)
+			    return 255
+			    ;;
+		    esac
+		    ((i2++))
+		done
+
+		test -n "${found}" || return 13
+		;;
+	    *)
+		return 255
+		;;
+	esac
+	((i1++))
+    done
+
+    return 0
+}
+
+check-ipsec-via-integrity()
+{
+    local ret
+    check-ipsec-via-integrity1
+    ret=${?}
+
+    case ${ret} in
+	11)
+	    ERROR=316
+	    ;;
+	13)
+	    ERROR=317
+	    ;;
+	15)
+	    ERROR=322
+	    ;;
+	*)
+	    ERROR=255
+	    ;;
+    esac
+
+    return ${ret}
+}
+
+check-rweb-via-integrity1()
+{
+    test ${RWEB_MODE} == True || return 0
+    test ${_MULTI_EXTERNAL_GATEWAYS_MODE} == True || return 0
+    test -n "${RWEB_SITE_VIA_LIST}" || return 13
+
+    local elt range i=0
+    local rwebs name ip
+
+    for elt in ${RWEB_SITE_LIST}
+    do
+	range=$[${i} % 5]
+	case ${range} in
+	    0)
+		name=${elt}
+		;;
+	    1|3)
+		;;
+	    2)
+		ip=${elt}
+		;;
+	    4)
+		working-sign
+
+		rwebs=$(insert-record-in-list 2 2 "${name} ${ip}" "${rwebs}")
+		;;
+	    *)
+		return 255
+		;;
+	esac
+	((i++))
+    done
+
+    local elt1 range1 i1=0
+    local elt2 range2 i2=0
+
+    local name1 ip1
+    local name2 ip2
+
+    local vias via gateway weight
+    local via_role_prio via_role
+    local found
+
+    for elt2 in ${RWEB_SITE_VIA_LIST}
+    do
+	range2=$[${i2} % 3]
+	case ${range2} in
+	    0)
+	       name2=${elt2}
+		;;
+	    1)
+		ip2=${elt2}
+		;;
+	    2)
+		working-sign
+
+		vias=$(colon2space ${elt2})
+
+		for via in ${vias}
+		do
+		    gateway=${via/_*}
+		    member "${_EXTERNAL_GATEWAYS}" ${gateway} || return 11
+		    weight=$(get-gateway-weight ${gateway} new)
+		    test ${weight} != 0 || return 15
+
+		done
+		;;
+	    *)
+		return 255
+		;;
+	esac
+	((i2++))
+    done
+
+    for elt1 in ${rwebs}
+    do
+	range1=$[${i1} % 2]
+
+	case ${range1} in
+	    0)
+		name1=${elt1}
+		;;
+	    1)
+		ip1=${elt1}
+
+		unset found
+		i2=0
+
+		for elt2 in ${RWEB_SITE_VIA_LIST}
+		do
+		    range2=$[${i2} % 3]
+
+		    case ${range2} in
+			0)
+			    name2=${elt2}
+			    ;;
+			1)
+			    ip2=${elt2}
+			    ;;
+			2)
+			    working-sign
+
+			    if test ${name1} == ${name2} -a ${ip1} == ${ip2} ; then
+
+				vias=$(colon2space ${elt2})
+				for via in ${vias}
+				do
+				    gateway=${via/_*}
+				    via_role_prio=${via#*_}
+				    via_role=${via_role_prio/_*}
+
+				    if test ${via_role} == master ; then
+					found=yes
+					break
+				    fi
+				done
+
+				break
+			    fi
+			    ;;
+			*)
+			    return 255
+			    ;;
+		    esac
+		    ((i2++))
+		done
+
+		test -n "${found}" || return 13
+		;;
+	    *)
+		return 255
+		;;
+	esac
+	((i1++))
+    done
+
+    return 0  
+}
+
+check-rweb-via-integrity()
+{
+    local ret
+    check-rweb-via-integrity1
+    ret=${?}
+
+    case ${ret} in
+	11)
+	    ERROR=320
+	    ;;
+	13)
+	    ERROR=321
+	    ;;
+	15)
+	    ERROR=323
+	    ;;
+	*)
+	    ERROR=255
+	    ;;
+    esac
+
+    return ${ret}
+}
+
+check-ip-via-integrity1()
+{
+    test ${_MULTI_EXTERNAL_GATEWAYS_MODE} == True || return 0
+    test -n "${IP_VIA_LIST}" || return 13
+
+    local elt range i=0
+    local gateway role found
+
+    for elt in ${IP_VIA_LIST}
+    do
+	range=$[${i} % 3]
+	case ${range} in
+	    0)
+		gateway=${elt}
+		;;
+	    1)
+		role=${elt}
+		;;
+	    2)
+		working-sign
+
+		member "${_EXTERNAL_GATEWAYS}" ${gateway} || return 11
+		weight=$(get-gateway-weight ${gateway} new)
+		test ${weight} != 0 || return 15
+		test ${role} != master || found=yes
+		;;
+	    *)
+		return 255
+		;;
+	esac
+	((i++))
+    done
+
+    test -n "${found}" || return 13
+}
+
+check-ip-via-integrity()
+{
+    local ret
+    check-ip-via-integrity1
+    ret=${?}
+
+    case ${ret} in
+	11)
+	    ERROR=324
+	    ;;
+	13)
+	    ERROR=325
+	    ;;
+	15)
+	    ERROR=326
+	    ;;
+	*)
+	    ERROR=255
+	    ;;
+    esac
+
+    return ${ret}
+}
+
+check-manager-ssh-integrity()
+{
+    test -n "${ACCESS_MANAGER_LIST}" || return 0
+    test ${ADMIN_SSH} == True
+}
+
+check-access-manager-ssh-key-integrity()
+{
+    local apl_role=$(get-contextual-role)
+    test ${apl_role} == gateway || return 0
+
+    local role key_id
+    local elt range i=0
+
+    for elt in ${ACCESS_MANAGER_LIST}
+    do
+	range=$[${i} % 3]
+	case ${range} in
+	    0)
+		role=${elt}
+		;;
+	    1)
+		;;
+	    2)
+		working-sign
+
+		local key_id=$(get-manager-key-id ${role})
+
+		test \
+		    -f ${TMP_DIR}/${LOADED}.${SSH_KEY}.${key_id} -o \
+		    -f ${SSH_PUBLIC_KEY_DIR}/${key_id} || return 11
+		;;
+	    *)
+		return 255
+		;;
+	esac
+	((i++))
+    done
+
+    return 0
+}
+
+check-loaded-tls-self-ca-integrity()
+{
+    local file=${TMP_DIR}/${LOADED}.${SYSTEM_CA}
+    test -f ${file}.key -o -f ${file}.certificate || return 0
+
+    working-sign
+
+    if test -f ${file}.key ; then
+	key_file=${file}.key
+    else
+	key_file=${SSL_CA_DIR}/${SYSTEM_CA}.key
+    fi
+
+    if test -f ${file}.certificate ; then
+	cert_file=${file}.certificate
+    else
+	cert_file=${SSL_CA_DIR}/${SYSTEM_CA}.certificate
+    fi
+
+    if test -f ${file}.key ; then
+	if test ! -f ${file}.certificate ; then
+	    ERROR=329
+	    return 11
+	fi
+    fi
+
+    openssl rsa -noout -text -in ${key_file} -modulus 2> /dev/null | tail -1 > ${ADMIN_TMP_DIR}/${SYSTEM_CA}.key.modulus.${$}
+    openssl x509 -noout -text -in ${cert_file} -modulus 2> /dev/null | tail -1 > ${ADMIN_TMP_DIR}/${SYSTEM_CA}.certificate.modulus.${$}
+
+    diff --brief ${ADMIN_TMP_DIR}/${SYSTEM_CA}.key.modulus.${$} ${ADMIN_TMP_DIR}/${SYSTEM_CA}.certificate.modulus.${$} > /dev/null 2>&1
+    local ret=${?}
+
+    rm -f ${ADMIN_TMP_DIR}/${SYSTEM_CA}.key.modulus.${$} ${ADMIN_TMP_DIR}/${SYSTEM_CA}.certificate.modulus.${$}
+
+    if test ${ret} -ne 0 ; then
+	ERROR=330
+	return 13
+    fi
+
+    return 0
+}
+
+tls-version-exist-in-index()
+{
+    test -n "${1}" || return 1
+    local cert_file=${1}
+
+    test -s ${SSL_CTL_DIR}/index.txt || return 13
+
+    local in_fdn=$(openssl x509 -in ${cert_file} -text -noout 2> /dev/null | grep 'Subject: ')
+    in_fdn=${in_fdn/*Subject: }
+    in_fdn=/${in_fdn//, /\/}
+
+    local in_serial=$(openssl x509 -in ${cert_file} -noout -nameopt multiline -serial 2> /dev/null)
+    in_serial=${in_serial/serial=}
+
+    local state expiration serial unknown fdn
+    local revoke
+
+    while read state expiration serial unknown fdn
+    do
+	if test ${state} == R ; then
+	    revoke=${serial}
+	    serial=${unknown}
+	    fdn=${fdn#unknown*\/}
+	    fdn=/${fdn}
+	fi
+	test "${fdn}" != "${in_fdn}" -o "${serial}" != "${in_serial}" || return 0
+    done < ${SSL_CTL_DIR}/index.txt
+
+    return 15
+}
+
+check-loaded-tls-server-integrity()
+{
+    local key_file cert_file
+
+    for tls in ${TLS_SERVER_LIST}
+    do
+	test -f ${TMP_DIR}/${LOADED}.${TLS_SERVER}.certificate.${tls} -o \
+	     -f ${TMP_DIR}/${LOADED}.${TLS_SERVER}.key.${tls} || continue
+
+	if test -f ${TMP_DIR}/${LOADED}.${TLS_SERVER}.key.${tls} ; then
+	    key_file=${TMP_DIR}/${LOADED}.${TLS_SERVER}.key.${tls}
+	else
+	    key_file=${SSL_SERVER_DIR}/${tls}.key
+	fi
+
+	if test -f ${TMP_DIR}/${LOADED}.${TLS_SERVER}.certificate.${tls} ; then
+	    cert_file=${TMP_DIR}/${LOADED}.${TLS_SERVER}.certificate.${tls}
+	else
+	    cert_file=${SSL_SERVER_DIR}/${tls}.certificate
+	fi
+
+	working-sign
+
+	if test -f ${TMP_DIR}/${LOADED}.${TLS_SERVER}.certificate.${tls} ; then
+
+	    if test -f ${key_file} ; then
+		openssl rsa -noout -text -in ${key_file} -modulus 2> /dev/null | tail -1 > ${ADMIN_TMP_DIR}/${TLS_SERVER}.${tls}.key.modulus.${$}
+		openssl x509 -noout -text -in ${cert_file} -modulus 2> /dev/null | tail -1 > ${ADMIN_TMP_DIR}/${TLS_SERVER}.${tls}.certificate.modulus.${$}
+
+		diff --brief ${ADMIN_TMP_DIR}/${TLS_SERVER}.${tls}.key.modulus.${$} ${ADMIN_TMP_DIR}/${TLS_SERVER}.${tls}.certificate.modulus.${$} > /dev/null
+		local ret=${?}
+
+		rm -f ${ADMIN_TMP_DIR}/${TLS_SERVER}.${tls}.key.modulus.${$} ${ADMIN_TMP_DIR}/${TLS_SERVER}.${tls}.certificate.modulus.${$} 
+
+		if test ${ret} -ne 0 ; then
+		    ERROR=333
+		    return 13
+		fi
+	    fi
+
+	    if check-tls-cert-signed-by-system-ca server ${tls} ; then
+		if tls-version-exist-in-index ${TMP_DIR}/${LOADED}.${TLS_SERVER}.certificate.${tls} ; then
+		    ERROR=334
+		    return 15
+		fi
+	    fi
+	fi
+    done
+
+    return 0
+}
+
+check-free-memory()
+{
+    set-new-proxy2-mode
+    set-new-self-ns
+
+    local total_memory_sz free_memory_sz
+
+    total_memory_sz=$(get-installed-memory-sz)
+    total_memory_sz=$[${total_memory_sz} / 1024]
+    free_memory_sz=$(get-free-memory-sz ${total_memory_sz})
+
+    test ${free_memory_sz} -ge 0
+}
+
+check-manager-ssh-key-integrity()
+{
+    test ${APL_ROLE} == manager || return 0
+
+    local file=${TMP_DIR}/${LOADED}.manager.${SSH_KEY}
+
+    test -f ${file}.public -o -f ${file}.private || return 0
+
+    if test -f ${file}.public ; then
+	if test -f ${file}.private ; then
+
+	    local ret
+	    local tmp_public_file=${ADMIN_TMP_DIR}/manager.ssh.public.${$}
+	    ssh-keygen -y -f ${file}.private > ${tmp_public_file} 2> /dev/null
+	    diff --brief ${tmp_public_file} ${file}.public > /dev/null 2>&1
+	    ret=${?}
+
+	    rm -f ${tmp_public_file}
+
+	    if test ${ret} -eq 0 ; then
+		return 0
+	    else
+		ERROR=337
+		return 21
+	    fi
+	else
+	    ERROR=336
+	    return 11
+	fi
+    else
+	ERROR=336
+	return 13
+    fi
+}
+
+check-tls-client-certificate-integrity()
+{
+    working-sign
+
+    local ca_file=$(get-tls-ca-system-component-file certificate)
+    local files=$(ls -1 ${TMP_DIR}/${LOADED}.${TLS_CLIENT}.certificate.* 2>/dev/null) file
+
+    for file in ${files}
+    do
+	working-sign
+	check-tls-cert-signed-by-ca ${file} ${ca_file} || return 11
+    done
+}
+
+check-cloud-integrity()
+{
+    unset ERRORS
+
+    case ${CLOUD_NAME} in
+	aws|azure)
+	    case ${APL_ROLE} in
+		gateway)
+		    test "${BOND_EXTERNALS}" == "${CLOUD_NETWORK_MAIN_DEV}" || ERRORS="${ERRORS} 348"
+		    test "${BOND_INTERNALS}" == "${CLOUD_NETWORK_SECOND_DEV}" || ERRORS="${ERRORS} 349"
+
+		    test ${IP_EXTERNAL_IP} == "${CLOUD_NETWORK_MAIN_IP}" -a \
+			 ${IP_EXTERNAL_MASK} == "${CLOUD_NETWORK_MAIN_MASK}" || ERRORS="${ERRORS} 351"
+
+		    test ${IP_INTERNAL_IP} == "${CLOUD_NETWORK_SECOND_IP}" -a \
+			 ${IP_INTERNAL_MASK} == "${CLOUD_NETWORK_SECOND_MASK}" || ERRORS="${ERRORS} 352"
+
+		    test ${VLAN_MODE} == False || ERRORS="${ERRORS} 356"
+		    test ${HA_MODE} == False || ERRORS="${ERRORS} 357"
+		    ;;
+
+		manager)
+		    test "${BOND_INTERNALS}" == ${CLOUD_NETWORK_MAIN_DEV} || ERRORS="${ERRORS} 350"
+		    test ${IP_INTERNAL_IP} == "${CLOUD_NETWORK_MAIN_IP}" -a \
+			 ${IP_INTERNAL_MASK} == "${CLOUD_NETWORK_MAIN_MASK}" || ERRORS="${ERRORS} 353"
+		    ;;
+		*)
+		    ;;
+	    esac
+
+	    local elt range i=0
+	    local network netmask gateway
+	    local found
+
+	    for elt in ${IP_ROUTE_LIST}
+	    do
+		range=$[${i} % 5]
+		case ${range} in
+		    0)
+			network=${elt}
+			;;
+		    1)
+			netmask=${elt}
+			;;
+		    2)
+			gateway=${elt}
+			;;
+		    3)
+			;;
+		    4)
+			working-sign
+
+			if test ${network} == '0.0.0.0' -a ${netmask} == '0.0.0.0' ; then
+			    found=yes
+			    if test ${gateway} != "${CLOUD_NETWORK_MAIN_GATEWAY}" ; then
+				ERRORS="${ERRORS} 354"
+				break
+			    fi
+			fi
+			;;
+		    *)
+			return 255
+			;;
+		esac
+		((i++))
+	    done
+
+	    test -n "${found}" || ERRORS="${ERRORS} 354"
+	    ;;
+	*)
+	    ;;
+    esac
+
+    ERRORS=${ERRORS:1}
+    test -z "${ERRORS}"
+}
+
+check-nic-number-integrity()
+{
+    local nic_nb=$(record-length-list 1 "${NETWORK_DEVICES}")
+    test ${nic_nb} -ge ${MIN_NIC_NB}
+}
+
+check-guard-rule-integrity()
+{
+    local i=0 elt range
+    local name action urllists
+    local urllist
+
+    for elt in ${GUARD_RULE_LIST}
+    do
+      range=$[${i} % 3]
+      case ${range} in
+	  0)
+	      name=${elt}
+	      ;;
+	  1)
+	      action=${elt}
+	      ;;
+	  2)
+	      urllists=${elt//:/ }
+
+	      if test "${urllists}" != self ; then
+		  working-sign
+		  for urllist in ${urllists}
+		  do
+		      member "${URLLIST_LIST}" "${urllist}" || return 1
+		  done
+	      fi
+	      ;;
+	  *)
+	      return 1
+	      ;;
+      esac
+      ((i++))
+    done
+}
+
+check-sslmediate-exception-urllist-integrity()
+{
+    local urllist
+
+    for urllist in ${SSLMEDIATE_EXCEPTION_URLLIST_LIST}
+    do
+	member "${URLLIST_LIST}" "${urllist}" || return 1
+    done
+}
+
+check-authenticate-ldaps-ca-integrity()
+{
+    test ${AUTHENTICATE_MODE} == True || return 0
+    test ${AUTHENTICATE_LDAP} == True || return 0
+    test -n "${LDAPS_CA}" || return 0
+    tls-ca-id-exist ${LDAPS_CA} || return 11
+}
+
+check-log-syslog-ca-integrity()
+{
+    test -n "${SYSLOG_CA}" || return 0
+    tls-ca-id-exist ${SYSLOG_CA} || return 11
+}
+
+check-integrity()
+{
+    local err errors
+
+    set-integrity-env
+
+    check-port-integrity			|| errors="${errors} 256"
+    check-ns-integrity				|| errors="${errors} 257"
+    check-ip-integrity				|| errors="${errors} 258"
+    check-ntp-integrity				|| errors="${errors} 259"
+    check-peer-integrity-ip			|| errors="${errors} 260"
+    check-ip-route-integrity			|| errors="${errors} ${ERROR}"
+    check-peer-integrity-uniq			|| errors="${errors} 262"
+    check-vrrp-integrity			|| errors="${errors} 263"
+    check-if-integrity-notnull			|| errors="${errors} 264"
+    check-if-integrity-disjunctive		|| errors="${errors} 265"
+
+    check-fw-integrity				|| errors="${errors} 267"
+    check-dhcp-range-net-integrity		|| errors="${errors} 268"
+    check-dhcp-range-integrity			|| errors="${errors} 269"
+    check-dhcp-peer-integrity			|| errors="${errors} 270"
+    check-dhcp-null-integrity			|| errors="${errors} 271"
+    check-dhcp-null-ip-integrity		|| errors="${errors} 272"
+    check-dhcp-range-lease-nb-integrity		|| errors="${errors} 273"
+    check-guard-proxy-integrity			|| errors="${errors} 274"
+    check-peer-next-rweb-integrity		|| errors="${errors} 275"
+    check-urllist-auto-load-access		|| errors="${errors} 276"
+    check-rweb-names				|| errors="${errors} ${ERROR}"
+    check-admin-topology			|| errors="${errors} 278"
+    check-ha-integrity				|| errors="${errors} 279"
+    check-rweb-ha-ip				|| errors="${errors} 280"
+    check-ldap-integrity			|| errors="${errors} 281"
+    check-all-sldap				|| errors="${errors} 282"
+    check-auth-transparent			|| errors="${errors} 283"
+    check-auth-target				|| errors="${errors} 284"
+    check-rweb-public-ip-integrity		|| errors="${errors} ${ERROR}"
+
+    check-rweb-host-integrity			|| errors="${errors} 287"
+    check-snmp-protocols			|| errors="${errors} 288"
+    check-password-file-server			|| errors="${errors} 289"
+    check-tls-ca-integrity			|| errors="${errors} 290"
+    check-qos-integrity				|| errors="${errors} 291"
+    check-authentication-integrity		|| errors="${errors} 292"
+    check-kerberos-integrity			|| errors="${errors} 293"
+    check-kerberos-domainname-integrity		|| errors="${errors} 294"
+    check-guard-ldap-filter-integrity		|| errors="${errors} 295"
+    check-dhcp-fixed-net-integrity		|| errors="${errors} 296"
+    check-dhcp-fixed-nb-integrity 		|| errors="${errors} 297"
+    check-waf-rweb-integrity			|| errors="${errors} 298"
+    check-transparent-integrity			|| errors="${errors} 299"
+    check-signing-ca-integrity			|| errors="${errors} 300"
+
+    check-rweb-tls-integrity			|| errors="${errors} 302"
+    check-vpn-ipsec-auth-integrity		|| errors="${errors} 303"
+    check-vpn-ipsec-site-integrity		|| errors="${errors} ${ERROR}"
+    check-vpn-ipsec-access-integrity		|| errors="${errors} 308"
+    check-vpn-ipsec-route-integrity		|| errors="${errors} 309"
+    check-ocsp-tls-integrity			|| errors="${errors} 310"
+    check-tls-system-ca-integrity		|| errors="${errors} 311"
+    check-snmp-tls-client-certificate-integrity	|| errors="${errors} 312"
+    check-tls-admin-usage-integrity		|| errors="${errors} 314"
+    check-ipsec-via-integrity  			|| errors="${errors} ${ERROR}"
+    check-rweb-via-integrity  			|| errors="${errors} ${ERROR}"
+    check-ip-via-integrity  			|| errors="${errors} ${ERROR}"
+    check-manager-ssh-integrity  		|| errors="${errors} 327"
+    check-access-manager-ssh-key-integrity	|| errors="${errors} 328"
+    check-loaded-tls-self-ca-integrity		|| errors="${errors} ${ERROR}"
+    check-loaded-tls-server-integrity		|| errors="${errors} ${ERROR}"
+    check-manager-ssh-key-integrity		|| errors="${errors} ${ERROR}"
+    check-tls-client-certificate-integrity	|| errors="${errors} 331"
+    check-urllist-auto-push			|| errors="${errors} 340"
+
+    if test ${APL_ROLE} == manager ; then
+
+	local apl_role=$(get-contextual-role)
+
+	case ${apl_role} in
+	    gateway)
+		check-rweb-nb			|| errors="${errors} 338"
+		check-tls-server-nb		|| errors="${errors} 339"
+		;;
+	    *)
+		;;
+	esac
+
+	check-manager-sync-integrity		|| errors="${errors} 347"
+    fi
+
+    check-compress-proxy-integrity		|| errors="${errors} 341"
+    check-cache-proxy-integrity			|| errors="${errors} 342"
+    check-sslmediate-proxy-integrity		|| errors="${errors} 343"
+    check-sslmediate-tproxy-integrity		|| errors="${errors} 344"
+    check-antivirus-extended-method		|| errors="${errors} 345"
+    check-cloud-integrity			|| errors="${errors} ${ERRORS}"
+    check-nic-number-integrity			|| errors="${errors} 355"
+    check-guard-rule-integrity			|| errors="${errors} 358"
+    check-sslmediate-exception-urllist-integrity|| errors="${errors} 359"
+    check-authenticate-ldaps-ca-integrity	|| errors="${errors} 360"
+    check-tls-vpnipsec-site-integrity		|| errors="${errors} 362"
+    check-rhttp-integrity			|| errors="${errors} 364"
+    check-embedded-vpnsubscr-integrity		|| errors="${errors} ${ERRORS}"
+    check-waudit-wadmin-integrity		|| errors="${errors} 369"
+    check-log-syslog-ca-integrity		|| errors="${errors} 370"
+
+    errors=${errors:1}
+
+    stop-working
+
+    for err in ${errors}
+    do
+	display-error ${err}
+    done
+
+    if test -n "${errors}" ; then
+	return 11
+    else
+	if ! check-free-memory ; then
+	    display-error 335
+	    return 13
+	else
+	    return 0
+	fi
+    fi
+}
+
+check-warning-integrity-compress()
+{
+    test ${COMPRESS_MODE} == False -o ${AV_MODE} == False -o ${WEB_MODE} == False
+}
+
+check-warning-integrity-ssl-sni()
+{
+    test ${RWEB_MODE} == True -a ${WAF_MODE} == False || return 0
+    local len=$(length-list "${_RWEB_HTTPS_IP_LIST}")
+    test ${len} -gt 1 || return 0
+    local uniq_ips=$(uniq-elt ${_RWEB_HTTPS_IP_LIST})
+    test "${uniq_ips}" != "${_RWEB_HTTPS_IP_LIST}" || return 0
+    return 11
+}
+
+check-warning-integrity()
+{
+    local warning
+
+    check-warning-integrity-compress || warning 3
+    check-warning-integrity-ssl-sni || warning 4
+
+    for warning in ${WARNINGS:1}
+    do
+	warning ${warning}
+    done
+}
+
+display-apply-log()
+{
+    display-log ${APPLY_LOG}
+}
+
+display-manager-context-apply-log()
+{
+    local log_dir=$(get-manager-context-apply-log-dir)
+    local log=${log_dir}/apply.log
+    display-log ${log}
+}
+
+apply-to-appliance()
+{
+    local at=${1}
+    local wt=${2}
+
+    test -z "${wt}" || test ${wt} == wait || return 1
+
+    if test "${at}" == "cancel" ; then
+	supervisor-action "apply-cancel" inform ${wt} || return 104
+	return 0
+    else
+	supervisor-action "apply" inform ${wt}
+	test ${?} -eq 0 || return 104
+    fi
+}
+
+delete-third-ca-components()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    local ca=${1}
+    local log_file=${2}
+
+    local ret
+
+    working-sign
+    local-log ${log_file} "Purging the '${ca}' CA"
+
+    rm -f \
+       ${SSL_LOCAL_CA_DIR}/${ca}.certificate \
+       ${SSL_LOCAL_CA_DIR}/${ca}.certificate.${ICA}
+    ret=${?}
+
+    local-log-result ${log_file} ${ret}
+
+    return ${ret}
+}
+
+delete-tls-server-components()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    local tls=${1}
+    local log_file=${2}
+
+    local ret    
+
+    working-sign
+    local-log ${log_file} "Purging the '${tls}' TLS"
+
+    remove-tmp-tls-server-components ${tls} &&
+	remove-arch-tls-server-components ${tls}
+    ret=${?}
+    local-log-result ${log_file} ${ret}
+
+    return ${ret}
+}
+
+apply-to-manager-context()
+{
+    local context_reference=$(get-manager-context-reference)
+    local log_dir=$(get-manager-context-apply-log-dir)
+
+    test -d ${log_dir} || return 104
+    local log_file=${log_dir}/apply.log
+
+    local file files
+    local name extension private
+    local bool rest
+    local ret
+
+    context_reference=${context_reference/ /:}
+
+    local-log-reset ${log_file}
+
+    local-log ${log_file} "Begining the Apply operation on ${context_reference}"
+    local-log-result ${log_file} ${?}
+
+    working-sign
+
+    if test -f ${TMP_DIR}/${LOADED}.${SYSTEM_CA}.certificate; then
+
+	local-log ${log_file} "Committing loaded system CA"
+	install-loaded-system-ca
+	local-log-result ${log_file} ${?}
+
+    else
+	local generate_system_ca
+
+	if test -f ${TMP_DIR}/${SYSTEM_CA}.conf ; then
+	    generate_system_ca=yes
+	else
+	    if test ! -f ${SSL_CA_DIR}/${SYSTEM_CA}.conf ; then
+		cp --no-preserve=mode -f ${ADMIN_DIR}/${ENV_RDIR}/${SSL_CA_RDIR}/${SYSTEM_CA}.conf ${TMP_DIR}/${SYSTEM_CA}.conf
+		generate_system_ca=yes
+	    fi
+	fi
+
+	if test -n "${generate_system_ca}" ; then
+	    
+	    local-log ${log_file} "Generating the system's CA"
+	    generate-system-ca ; ret=${?}
+	    if test ${ret} -ne 0 ; then
+		local-log-result ${log_file} ${ret}
+	    else
+		working-sign
+		install-generated-system-ca ; ret=${?}
+		local-log-result ${log_file} ${ret}
+	    fi
+	    clean-generated-system-ca
+	fi
+    fi
+
+    working-sign
+    files=$(ls -1 ${TMP_DIR}/${LOADED}.${THIRD_CA}.* 2>/dev/null)
+    if test -n "${files}" ; then
+
+	local-log ${log_file} "Committing loaded CA certificates"
+	ret=0
+	for file in ${files}
+	do
+	    working-sign
+	    name=$(file-basename ${file})
+	    name=${name/${LOADED}\.${THIRD_CA}\.}
+	    cp -f ${file} ${SSL_LOCAL_CA_DIR}/${name}.certificate || ((ret++))
+	    rm -f ${file}
+	done
+	local-log-result ${log_file} ${ret}
+    fi
+
+    clean-all-deleted-third-ca ${log_file}
+
+    working-sign
+    files=$(ls -1 ${TMP_DIR}/${LOADED}.${TLS_SERVER}.csr 2>/dev/null)
+    for file in ${files}
+    do
+	working-sign
+	name=$(file-basename ${file})
+	name=${name/${LOADED}\.${TLS_SERVER}\.}
+	extension=${name/*\.}
+
+	local-log ${log_file} "Signing the '${name}' certificate"
+	generate-tls-server-from-csr ${name} ; ret=${?}
+	local-log-result ${log_file} ${ret}
+
+	rm -f ${file}
+    done
+
+    working-sign
+    files=$(ls -1 ${TMP_DIR}/${LOADED}.${TLS_SERVER}.certificate.* 2>/dev/null)
+    if test -n "${files}" ; then
+
+	for file in ${files}
+	do
+	    working-sign
+	    name=$(file-basename ${file})
+	    name=${name/${LOADED}\.${TLS_SERVER}\.}
+	    extension=${name/\.*}
+	    name=${name#*\.}
+
+	    local-log ${log_file} "Committing the '${name}' certificate"
+	    install-tls-server ${name}
+	    local-log-result ${log_file} ${?}
+	done
+    fi
+
+    working-sign
+    files=$(ls -1 ${TMP_DIR}/${TLS_SERVER}.*.conf 2>/dev/null)
+    for file in ${files}
+    do
+	working-sign
+	name=$(file-basename ${file})
+	name=${name/${TLS_SERVER}\.}
+	name=${name%.*}
+
+	local-log ${log_file} "Generating the '${name}' TLS server"
+
+	generate-tls-server ${name} ; ret=${?}
+	local-log-result ${log_file} ${ret}
+    done
+
+    working-sign
+    files=$(ls -1 ${TMP_DIR}/${TLS_SERVER}.*.2rev 2>/dev/null)
+    for file in ${files}
+    do
+	working-sign
+	name=$(file-basename ${file} .2rev)
+	name=${name/${TLS_SERVER}\.}
+
+	local-log ${log_file} "Revoking the '${name}' server certificate"
+	revoke-tls-server ${name}
+	local-log-result ${log_file} ${?}
+    done
+
+    clean-all-deleted-tls-server ${log_file}
+
+    cd ${SSL_CLIENT_DIR}
+
+    working-sign
+    local news=$(ls -1 *.new 2> /dev/null) new
+    local files=$(ls -1 ${TMP_DIR}/${LOADED}.${TLS_CLIENT}.certificate.* 2> /dev/null) file
+    local dels=$(ls -1 *.2del 2> /dev/null) del
+    local revs=$(ls -1 ${TMP_DIR}/${TLS_CLIENT}.*.2rev 2> /dev/null) rev
+
+    local n=0 i=1
+
+    for new in ${news}
+    do
+	((n++))
+    done
+
+    for file in ${files}
+    do
+	((n++))
+    done
+
+    for new in ${news}
+    do
+	working-sign
+	name=${new%\.new}
+
+	local-log ${log_file} "Generating the '${name}' TLS client (${i}/${n})"
+	generate-tls-client ${new}
+	local-log-result ${log_file} ${?}
+	((i++))
+    done
+
+    for file in ${files}
+    do
+	working-sign
+	name=$(file-basename ${file})
+	name=${name/${LOADED}\.${TLS_CLIENT}\.certificate\.}
+
+	local-log ${log_file} "Integrating the '${name}' client certificate (${i}/${n})"
+	install-tls-client ${name}
+	local-log-result ${log_file} ${?}
+	((i++))
+    done
+
+    for rev in ${revs}
+    do
+	working-sign
+	name=$(file-basename ${rev} .2rev)
+	local-log ${log_file} "Revoking the '${name}' client certificate"
+	revoke-tls-client ${rev}
+	local-log-result ${log_file} ${?}
+    done
+
+    for del in ${dels}
+    do
+	working-sign
+	name=${del%\.2del}
+	private=$(cat ${del} 2> /dev/null)
+
+	if test -z "${private}" ; then
+	    local-log ${log_file} "Purging '${name}' client TLS"
+	    delete-tls-client ${name}
+	else
+	    local-log ${log_file} "Deleting '${name}' client TLS private part"
+	    delete-tls-client ${name} ${private}
+	fi
+	local-log-result ${log_file} ${?}
+    done
+
+    cd ${HOME}
+    
+    if test -f ${TMP_DIR}/${LOADED}.${SNMP_SSL}.certificate ; then
+	working-sign
+	local-log ${log_file} "Committing the SNMP client certificate"
+	cp -f ${TMP_DIR}/${LOADED}.${SNMP_SSL}.certificate ${SSL_SNMP_DIR}/${SNMP_SSL}.crt &&
+	    rm -f ${TMP_DIR}/${LOADED}.${SNMP_SSL}.certificate
+	local-log-result ${log_file} ${?}
+    fi
+
+    working-sign
+    files=$(ls -1 ${TMP_DIR}/${LOADED}.${SSH_KEY}.* 2>/dev/null)
+    if test -n "${files}" ; then
+	local-log ${log_file} "Committing administrator SSH keys"
+	ret=0
+	for file in ${files}
+	do
+	    working-sign
+	    name=$(file-basename ${file})
+	    name=${name/${LOADED}\.${SSH_KEY}\.}
+	    cp -f ${file} ${SSH_PUBLIC_KEY_DIR}/${name} || ((ret++))
+	    rm -f ${file}
+	done
+	local-log-result ${log_file} ${ret}
+    fi
+
+    working-sign
+    files=$(ls -1 ${URLLIST_DIR}/*.${URLLIST_AUTO} 2> /dev/null)
+    for file in ${files}
+    do
+	working-sign
+	name=$(file-basename ${file} .${URLLIST_AUTO})
+
+	if test -s ${file}.current ; then
+	    read bool rest < ${file}
+	    if test ${bool} == off ; then
+		local-log ${log_file} "Turning off '${name}' URL list auto load"
+		rm -f ${file}.current ${file}
+		local-log-result ${log_file} ${?}
+	    else
+		local-log ${log_file} "Updating '${name}' URL list auto load"
+		mv -f ${file} ${file}.current
+		local-log-result ${log_file} ${?}
+	    fi
+	else
+	    local-log ${log_file} "Turning on '${name}' URL list auto load"
+	    mv -f ${file} ${file}.current
+	    local-log-result ${log_file} ${?}
+	fi
+    done
+
+    working-sign
+    files=$(ls -1 ${WAF_DIR}/*.rules 2>/dev/null)
+    for file in ${files}
+    do
+	working-sign
+	name=$(file-basename ${file} .rules)
+
+	if test -f ${file}.current ; then
+	    diff --brief ${file} ${file}.current > /dev/null 2>&1
+	    if test ${?} -ne 0 ; then
+		local-log ${log_file} "Committing '${name}' custom WAF rules"
+		cp -f ${file} ${file}.current
+		local-log-result ${log_file} ${?}
+	    fi
+	else
+	    local-log ${log_file} "Committing '${name}' custom WAF rules"
+	    cp -f ${file} ${file}.current
+	    local-log-result ${log_file} ${?}
+	fi
+    done
+
+    working-sign
+    files=$(ls -1 ${WAF_DIR}/*.rules.current 2>/dev/null)
+    for file in ${files}
+    do
+	working-sign
+	name=$(file-basename ${file} .rules.current)
+	if test ! -f ${WAF_DIR}/${name}.rules ; then
+	    local-log ${log_file} "Clearing '${name}' custom WAF rules"
+	    rm -f ${file}
+	    local-log-result ${log_file} ${?}
+	fi
+    done
+
+    working-sign
+    local psk_file=${VPN_IPSEC_DIR}/${IPSEC_AUTHENTICATE_PSK_FILENAME}
+
+    if test -f ${psk_file} -a -f ${psk_file}.current ; then
+	diff --brief ${psk_file} ${psk_file}.current > /dev/null 2>&1
+	if test ${?} -ne 0 ; then
+	    local-log ${log_file} "Committing the IPsec VPN PSK"
+	    cp -f ${psk_file} ${psk_file}.current
+	    local-log-result ${log_file} ${?}
+	fi
+    fi
+
+    if vpnipsec-access-access-soft-modified ; then
+	working-sign
+	local-log ${log_file} "Committing IPsec VPN access list"
+	commit-ipsec-whitelist
+	local-log-result ${log_file} ${?}
+    fi
+
+    working-sign
+    local-log ${log_file} "Saving the configuration"
+
+    generate-current-env-file-from-env ${USERENV_FILE} > ${USERENV_FILE_CURRENT} &&
+	cp -f ${USERENV_FILE} ${USERENV_FILE_CANCEL} &&
+	cp -f ${CONFIGURATION_DB_FILE} ${CONFIGURATION_DB_FILE_CURRENT} &&
+	update-modification-state
+    local-log-result ${log_file} ${?}
+
+    local-log ${log_file} "Ending the Apply operation on ${context_reference}"
+    local-log-result ${log_file} ${?}
+
+    stop-working
+}
+
+run()
+{
+    test -z "${TRANSACTION}" || return 106
+
+    local at=${ARGS[1]}
+    unset WARNINGS
+
+    case ${at} in
+	
+	''|force|cancel|check)
+	    test "${at}" == 'check' || is-usage-allowed || return 155
+	    ;;
+
+	report)
+	    case ${APL_ROLE} in
+		gateway)
+		    display-apply-log
+		    ;;
+		manager)
+		    if is-in-manager-conf-context ; then
+			display-manager-context-apply-log
+		    else
+			display-apply-log
+		    fi
+		    ;;
+		*)
+		    return 255
+		    ;;
+	    esac
+	    return 0
+	    ;;
+
+	*)
+	    return 1
+	    ;;
+    esac
+
+    local wt
+
+    case "${at}" in
+	'cancel')
+	    user-has-admin-rights || return 31
+	    check-all-but-apply-lock || return 123
+	    test ! -f ${ADMIN_LOCK_DIR}/apl_patch || return 108
+	    local ct=${ARGS[2]}
+	    case ${ct} in
+		force)
+		    wt=${ARGS[3]}
+		    ;;
+		'')
+		    request-confirmation
+		    ;;
+		*)
+		    return 1
+		    ;;
+	    esac
+	    ;;
+
+	check)
+	    check-integrity || return 200
+	    check-warning-integrity
+	    info 1
+	    return 0
+	    ;;
+
+	''|force)
+	    check-lock || return 123
+	    check-integrity || return 200
+	    check-warning-integrity
+	    if user-has-admin-rights ; then
+		if test "${at}" == force ; then
+		    wt=${ARGS[2]}
+		else
+		    request-confirmation
+		fi
+	    fi
+	    ;;
+	*)
+	    ;;
+    esac
+
+    user-has-admin-rights || return 31
+
+    case ${APL_ROLE} in
+	gateway)
+	    apply-to-appliance ${at} ${wt}
+	    ;;
+	manager)
+	    if is-in-manager-conf-context ; then
+		apply-to-manager-context
+	    else
+		apply-to-appliance ${at} ${wt}
+	    fi
+	    ;;
+	*)
+	    return 255
+	    ;;
+    esac
+}
+
+main "${@}"

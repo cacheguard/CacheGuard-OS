@@ -1,0 +1,1 @@
+MDADM_OPTS="--quiet --pid-file /var/run/mdadm/mdadm.pid --syslog --delay 60 --increment 20"

@@ -1,0 +1,85 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       GUI
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+set-rweb-settings()
+{
+    local transaction=/tmp/${TRANSACTION_FILE}.wadmin.${REMOTE_USER}.${$}
+    local i=0
+
+    local site_name=${VALUES[${i}]} ; ((i++))
+    local protocol=${VALUES[${i}]} ; ((i++))
+    local ip=${VALUES[${i}]} ; ((i++))
+
+    if test "${protocol}" == 'https' ; then
+
+	local tls_id=${VALUES[${i}]} ; ((i++))
+	local ca_id=${VALUES[${i}]} ; ((i++))
+	local rhttp_state=${VALUES[${i}]} ; ((i++))
+
+	if test -z "${ca_id}" ; then
+	    local tls=${tls_id}
+	else
+	    local tls="${tls_id}:${ca_id}"
+	fi
+    fi
+
+    local qos=${VALUES[${i}]} ; ((i++))
+
+    case ${protocol} in
+	http)
+	    echo "rweb site add '${site_name}' '${protocol}' '${ip}' '${qos}'" >> ${transaction}
+	    ;;
+	https)
+	    echo "rweb site add '${site_name}' '${protocol}' '${tls}' '${ip}' '${qos}'" >> ${transaction}
+	    echo "rweb rhttp '${site_name}' '${rhttp_state}'" >> ${transaction}
+	    ;;
+	*)
+	    ;;
+    esac
+
+    local sb_state=${VALUES[${i}]} ; ((i++))
+
+    case ${sb_state} in
+	on)
+	    local sb_protocol=${VALUES[${i}]} ; ((i++))
+	    local sb_location=${VALUES[${i}]}
+
+	    if test ${sb_protocol} == 'none' -o -z "${sb_location}" ; then
+		echo "rweb standby '${site_name}' on" >> ${transaction}
+	    else
+		echo "rweb standby '${site_name}' on ${sb_protocol}://${sb_location}" >> ${transaction}
+	    fi
+	    ;;
+	off)
+	    echo "rweb standby '${site_name}' off" >> ${transaction}
+	    ;;
+	*)
+	    ;;
+    esac
+    
+    
+    execute-transaction ${transaction}
+}
+
+set-rweb-settings

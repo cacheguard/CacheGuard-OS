@@ -1,0 +1,120 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       Commands
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+__complete-apply()
+{
+    test -n "${COMP_CWORD-1}" || return 1
+
+    case ${COMP_CWORD} in
+	1)
+	    case ${COMP_WORDS[1]} in
+		f|fo|'for'|forc|force)
+		    COMPREPLY=(force)
+		    ;;
+		r|re|rep|repo|repor|report)
+		    COMPREPLY=(report)
+		    ;;
+		c)
+		    COMPREPLY=('' cancel check)
+		    ;;
+		ca|can|canc|cance|cancel)
+		    COMPREPLY=(cancel)
+		    ;;
+		ch|che|chec|check)
+		    COMPREPLY=(check)
+		    ;;
+		'')
+		    COMPREPLY=('' '<RET>' force report cancel check)
+		    ;;
+		*)
+		    COMPREPLY=()
+		    ;;
+	    esac
+	    ;;
+	2)
+	    case ${COMP_WORDS[1]} in
+		force)
+		    case ${COMP_WORDS[2]} in
+			w|wa|wai|wait)
+			    COMPREPLY=(wait)
+			    ;;
+			'')
+			    COMPREPLY=('' '<RET>' wait)
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		cancel)
+		    case ${COMP_WORDS[2]} in
+			f|fo|'for'|forc|force)
+			    COMPREPLY=(force)
+			    ;;
+			'')
+			    COMPREPLY=('' '<RET>' force)
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		*)
+		    COMPREPLY=()
+		    ;;
+	    esac
+	    ;;
+	3)
+	    case ${COMP_WORDS[1]} in
+		cancel)
+		    case ${COMP_WORDS[2]} in
+			force)
+			    case ${COMP_WORDS[3]} in
+				w|wa|wai|wait)
+				    COMPREPLY=(wait)
+				    ;;
+				'')
+				    COMPREPLY=('' '<RET>' wait)
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		*)
+		    COMPREPLY=()
+		    ;;
+	    esac
+	    ;;
+
+	*)
+	    COMPREPLY=()
+	    ;;
+    esac
+}

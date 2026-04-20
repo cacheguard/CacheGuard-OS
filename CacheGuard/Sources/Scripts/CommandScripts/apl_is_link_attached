@@ -1,0 +1,46 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       Scripts
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+is_attached()
+{
+    test -n "${1}" || return 1
+    local device=${1}
+    
+    local state=$(cat /sys/class/net/${device}/carrier 2> /dev/null)
+    test -n "${state}" || return 1
+    test ${state} -eq 1
+}
+
+main()
+{
+    test -n "${1}" || return 1
+    local master=${1} ; shift
+    local slaves=${*}
+    
+    is_attached ${master}
+}
+
+# Main
+
+main "${@}"

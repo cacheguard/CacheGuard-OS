@@ -1,0 +1,97 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       Scripts
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+CACHEGUARD_DIR=/etc/sysconfig/cacheguard
+source ${CACHEGUARD_DIR}/constant
+source ${APPLIANCE_DIR}/etc/role
+source ${ABASE_DIR}/${ENV_RDIR}/${ENV_CURRENT_NAME}
+
+raid-notification()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 1
+    local event=${1}
+    local mdev=${2}
+    local dev=${3}
+    
+    local event_description
+
+    case ${event} in
+	DeviceDisappeared)
+            event_description="An md array which previously was configured appears to no longer be configured (Critical)."
+	    ;;
+        RebuildStarted)
+	    event_description="An md array started reconstruction (Warning)."
+	    ;;
+	RebuildNN)
+	    event_description="Where NN is a two-digit number (ie. 20, 40). This indicates  that rebuild has passed that many percent of the total (Warning)."
+	    ;;
+        RebuildFinished)
+            event_description="An md array that was rebuilding, isn't any more, either because it finished normally or was aborted (Warning)."
+	    ;;
+	Fail)
+	    event_description="An active component device of an array has been marked as faulty (Critical)."
+	    ;;
+        FailSpare)
+            event_description="A spare component device which was being rebuilt to replace a faulty device has failed (Critical)."
+	    ;;
+	SpareActive)
+	    event_description="A spare component device which was being rebuilt to replace a faulty device has been successfully rebuilt and has been made active (Inform)."
+	    ;;
+        NewArray)
+	    event_description="A new md array has been detected in the /proc/mdstat file (Inform)."
+	    ;;
+        DegradedArray)
+            event_description="A newly noticed array appears to be degraded (Critical)."
+	    ;;
+        MoveSpare)
+	    event_description="A spare drive has been moved from one array in a spare-group or domain to another to allow a failed drive to be replaced (Inform)."
+	    ;;
+        SparesMissing)
+            event_description="If mdadm has been told, via the config file, that an array should have a certain number of spare devices, and mdadm detects that it has fewer than this number when it first sees the array, it will report a SparesMissing message. (Warning)"
+	    ;;
+	TestMessage)
+	    event_description="An array was found at startup, and the --test flag was given (Inform)."
+	    ;;
+	*)
+	    event_description="Unkonw event (Inform)."
+	    ;;
+    esac
+
+
+    if test -n "${dev}" ; then
+	local description="RAID ${event} alert on ${dev}: ${event_description}"
+    else
+	local description="RAID ${event} alert: ${event_description}"
+    fi
+
+    logger -p daemon.alert -t apl_raid_monitor -- "${description}"
+    ${LOCAL_DIR}/bin/apl_rlogger "${description}"
+    test "${CURRENT_ADMIN_SNMP}" == True || return 0
+    ${LOCAL_DIR}/bin/apl_snmp_trap 13 "${event}" "${dev}" "${description}" > /dev/null 2>&1
+}
+
+# Main()
+
+raid-notification "${1}" "${2}" "${3}"

@@ -1,0 +1,19 @@
+<script type="text/javascript">
+
+$( document ).ready(function( ){
+    $( "#uguide" ).treeview( {
+	animated:"normal",
+	persist: "cookie"
+    } );
+
+    $( "#samplebutton" ).click( function( ) {
+	var branches = $( "<li><span class='folder'>New Sublist</span><ul>" + 
+			  "<li><span class='file'>Item1</span></li>" + 
+			  "<li><span class='file'>Item2</span></li></ul></li>" ).appendTo( "#uguide" );
+	$( "#uguide" ).treeview( {
+	    add: branches
+	} );
+    } );
+} );
+
+</script>

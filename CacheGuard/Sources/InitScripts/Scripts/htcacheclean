@@ -1,0 +1,108 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       InitScript
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+source /lib/lsb/init-functions
+
+CACHEGUARD_DIR=/etc/sysconfig/cacheguard
+source ${CACHEGUARD_DIR}/constant
+source ${APPLIANCE_DIR}/etc/role
+
+PROG="htcacheclean"
+RPROG=sbin/${PROG}
+
+[ -f /etc/sysconfig/${PROG} ] && source /etc/sysconfig/${PROG}
+[ -x ${WEB_SERVER_DIR}/${RPROG} ] || exit 0
+
+test -n "${CACHE_RDIR}" || CACHE_RDIR=apache-cache
+test -n "${CACHE_SZ}" || CACHE_SZ=0
+test -n "${CACHE_INTERVAL}" || CACHE_INTERVAL=10
+
+test ${CACHE_SZ} -gt 0 || exit 0
+
+RETVAL=0
+SERV="rCache Cleaner"
+OPTIONS="-ni -p${WEB_SERVER_DIR}/${CACHE_RDIR} -P/var/run/${PROG}.pid -l${CACHE_SZ}M"
+
+clear-cache()
+{
+    test -n "${CACHE_RDIR}" || return 1
+    test -n "${WEB_SERVER_DIR}" || return 3
+    test -d ${WEB_SERVER_DIR}/${CACHE_RDIR} || return 5
+
+    local directories=$(find ${WEB_SERVER_DIR}/${CACHE_RDIR}/* -maxdepth 1 -type d 2> /dev/null) directory
+
+    for directory in ${directories}
+    do
+	test ${directory} != "${PROXY_DIR}/${CACHE_RDIR}" || continue
+	rm -rf ${directory}
+    done
+}
+
+case "${1}" in
+    start)	
+	# Start daemons.
+	log_info_msg "Starting ${SERV}..."
+        ${WEB_SERVER_DIR}/${RPROG} -d${CACHE_INTERVAL} ${OPTIONS} > /dev/null 2>&1
+	RETVAL=$?
+	[ ${RETVAL} -eq 0 ] && touch /var/lock/${PROG}
+	evaluate_retval
+	exit ${RETVAL}
+	;;
+    stop)
+	# Stop daemons.
+	log_info_msg "Stopping ${SERV}... "
+        killproc -p /var/run/${PROG}.pid ${WEB_SERVER_DIR}/${RPROG}
+	RETVAL=${?}
+	usleep 300000
+	[ ${RETVAL} -eq 0 ] && rm -f /var/lock/${PROG}
+	evaluate_retval
+	exit ${RETVAL}
+	;;
+
+    clear)
+	RETVAL1=$(pidof ${PROG})
+	test -z "${RETVAL1}" || ${0} stop
+
+	log_info_msg "Clearing the rCache..."	
+	clear-cache
+	RETVAL2=${?}
+	[ ${RETVAL2} -eq 0 ]
+	evaluate_retval
+
+	test -z "${RETVAL1}" || ${0} start
+	;;
+    
+    restart)
+	${0} stop
+	${0} start
+	;;
+
+    status)
+	statusproc ${PROG}
+	;;
+    *)
+	echo "Usage: ${0} {start|stop|clear|restart|status}"
+	exit 1
+	;;
+esac

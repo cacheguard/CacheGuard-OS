@@ -1,0 +1,1135 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       Configurator
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+echo-html-sha1()
+{
+    test -n "${1}" || return 1
+    local sha1=${1}
+
+    echo -n ": [SHA1] ${sha1}"
+}
+
+get-formatted-sha1()
+{
+    test -n "${1}" || return 1
+    local file=${1}
+    test -f "${file}" || return 2
+
+    local sha1=$(openssl dgst -sha1 -c ${file} 2> /dev/null)
+    sha1=${sha1/*= }
+    sha1=${sha1^^}
+
+    echo -n ${sha1}
+}
+
+remove-rweb-tls-server-components()
+{
+    test -n "${1}" || return 1
+    local tls=${1}
+
+    local dir
+
+    for dir in ${PROXY_SSL_SERVER_DIR} ${WEB_SSL_DIR}
+    do
+	rm -f \
+	   ${dir}/${tls}.key \
+	   ${dir}/${tls}.certificate \
+	   ${dir}/${tls}.chain \
+	   ${dir}/${tls}.certificate+chain
+    done
+}
+
+delete-tls-server-components()
+{
+    test -n "${1}" || return 1
+    local tls=${1}
+
+    local ret
+
+    log "Purging the '${tls}' TLS"
+
+    remove-tmp-tls-server-components ${tls} &&
+	remove-arch-tls-server-components ${tls} &&
+	remove-rweb-tls-server-components ${tls}
+    ret=${?}
+
+    log-result ${ret}
+    return ${ret}
+}
+
+delete-third-ca-components()
+{
+    test -n "${1}" || return 1
+    local ca=${1}
+
+    local ret
+
+    log "Purging the '${ca}' CA"
+
+    rm -f \
+       ${SSL_LOCAL_CA_DIR}/${ca}.certificate \
+       ${SSL_LOCAL_CA_DIR}/${ca}.certificate.${ICA} \
+       ${PROXY_SSL_LOCAL_CA_DIR}/${ca}.certificate \
+       ${SNMP_SSL_CA_DIR}/${ca}.crt
+    ret=${?}
+
+    log-result ${ret}
+    return ${ret}
+}
+
+clean-all-deleted-runtime-third-ca()
+{
+    log "Cleaning the certificates DB"
+
+    cd ${PROXY_SSL_LOCAL_CA_DIR}
+    local links=$(ls *.[0-9] *.[0-9][0-9] 2> /dev/null) link
+    for link in ${links}
+    do
+	file=$(readlink ${link} 2> /dev/null)
+	test ${file} != ${SYSTEM_CA_ID}.certificate || continue
+	test -f ${file} || rm -f ${link}
+    done
+
+    cd ${SSL_LOCAL_CA_DIR}
+    links=$(ls *.[0-9] *.[0-9][0-9] 2> /dev/null)
+    for link in ${links}
+    do
+	file=$(readlink ${link} 2> /dev/null)
+	test ${file} != ${SYSTEM_CA_ID}.certificate || continue
+	test -f ${file} || rm -f ${link}
+    done
+
+    log-result 0
+
+    cd ${HOME}
+}
+
+get-tls-location()
+{
+    local tls_conf_file var equal value
+    local location country province locality
+
+    local tls_id=${ADMIN_TLS/:*}
+
+    tls_conf_file=${SSL_SERVER_DIR}/${tls_id}.conf
+
+    test ! -f ${TMP_DIR}/${TLS_SERVER}.${tls_id}.conf || tls_conf_file=${TMP_DIR}/${TLS_SERVER}.${tls_id}.conf
+
+    if test -f ${tls_conf_file} ; then
+        while read var equal value
+        do
+            case ${var} in
+                countryName)
+                    country=${value}
+                    ;;
+                stateOrProvinceName)
+                    province=${value}
+                    ;;
+                localityName)
+                    locality=${value}
+                    ;;
+                *)
+                    ;;
+            esac
+        done < ${tls_conf_file}
+        location="${locality} - ${province} (${country})"
+    else
+	location="My Location"
+    fi
+
+    echo ${location}
+}
+
+do-install-loaded-system-ca()
+{
+    test -f ${TMP_DIR}/${LOADED}.${SYSTEM_CA}.certificate || return 0
+
+    local ret
+
+    log "Activating the loaded system CA"
+    install-loaded-system-ca ; ret=${?}
+    log-result ${ret}
+
+    return ${ret}
+}
+
+do-generate-tls-server-from-csr()
+{
+    test -n "${1}" || return 1
+    local tls=${1}
+
+    local ret
+    test -f ${TMP_DIR}/${LOADED}.${TLS_SERVER}.csr.${tls} || return 0
+
+    log "Signing the '${tls}' certificate"
+    generate-tls-server-from-csr ${tls} ; ret=${?}
+    log-result ${ret}
+
+    return ${ret}
+}
+
+do-install-tls-server()
+{
+    test -n "${1}" || return 1
+    local tls=${1}
+
+    test -f ${TMP_DIR}/${LOADED}.${TLS_SERVER}.certificate.${tls} || return 0
+
+    local ret
+
+    log "Activating the '${tls}' certificate"
+    install-tls-server ${tls} ; ret=${?}
+    log-result ${ret}
+
+    return ${ret}
+}
+
+generate-install-system-ca()
+{
+    local ret
+
+    log "Generating the system's CA"
+
+    generate-system-ca ; ret=${?}
+    if test ${ret} -ne 0 ; then clean-generated-system-ca ; log-result ${ret} ; return ${ret} ; fi
+
+    install-generated-system-ca ; ret=${?}
+    log-result ${ret}
+
+    clean-generated-system-ca
+    return ${ret}
+}
+
+do-generate-tls-server()
+{
+    test -n "${1}" || return 1
+    local tls=${1}
+
+    local ret
+
+    log "Generating the '${tls}' TLS server"
+
+    generate-tls-server ${tls} ; ret=${?}
+    log-result ${ret}
+
+    return ${ret}
+}
+
+remove-unused-tls-rweb()
+{
+    local used_tls=${1}
+
+    cd ${PROXY_SSL_SERVER_DIR}
+    local proxy_files=$(ls -1 *.certificate 2> /dev/null) file
+
+    cd ${WEB_SSL_SERVER_DIR}
+    local web_files=$(ls -1 *.certificate 2> /dev/null) file
+
+    local tls file
+
+    for file in ${proxy_files} ${web_files}
+    do
+	tls=${file%\.certificate}
+	member "${used_tls}" ${tls} || remove-rweb-tls-server-components ${tls}
+    done
+}
+
+raz-dlaps-ca()
+{
+    rm -f \
+       ${LDAP_DIR}/${LDAP_CA} \
+       ${PROXY_DIR}${LDAP_DIR}/${LDAP_CA} \
+       ${WEB_SERVER_DIR}${LDAP_DIR}/${LDAP_CA}
+}
+
+deploy-dlaps-ca()
+{
+    local file=${1}
+    test -n "${file}" || file=${SSL_LOCAL_CA_DIR}/${LDAPS_CA}.certificate
+
+    install -m 644 -o root -g root ${file} ${LDAP_DIR}/${LDAP_CA}
+    install -m 644 -o root -g root ${file} ${PROXY_DIR}${LDAP_DIR}/${LDAP_CA}
+    install -m 644 -o root -g root ${file} ${WEB_SERVER_DIR}${LDAP_DIR}/${LDAP_CA}
+}
+
+set-system-ca()
+{
+    if test -f ${TMP_DIR}/${SYSTEM_CA}.conf ; then
+	generate-install-system-ca
+    else
+	do-install-loaded-system-ca
+    fi
+
+    vpnipsec-do-reset-access-db
+}
+
+install-loaded-tls-third-ca()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    local ca_id=${1}
+    local browsing=${2}
+
+    local ret
+    local file=${TMP_DIR}/${LOADED}.${THIRD_CA}.${ca_id}
+    test -f ${file} || return 0
+
+    log "Installing the loaded '${ca_id}' CA"
+
+    local tmp_x509_ca_file=/tmp/x509.ca.${$}
+    openssl x509 -in ${file} -text -noout > ${tmp_x509_ca_file} 2> /dev/null
+    local issuer=$(grep 'Issuer: ' ${tmp_x509_ca_file} 2> /dev/null) ; issuer=${issuer/*Issuer: }
+    local subject=$(grep 'Subject: ' ${tmp_x509_ca_file} 2> /dev/nul) ; subject=${subject/*Subject: }
+    rm -f ${tmp_x509_ca_file}
+
+    if test "${issuer}" != "${subject}" ; then
+	echo off > ${SSL_LOCAL_CA_DIR}/${ca_id}.certificate.${ICA}
+    else
+	rm -f ${SSL_LOCAL_CA_DIR}/${ca_id}.certificate.${ICA}
+    fi
+
+    install -m 644 -o ${ADMIN_NAME} -g ${GROUP_NAME} ${file} ${SSL_LOCAL_CA_DIR}/${ca_id}.certificate
+    if test ${?} -ne 0 ; then rm -f ${file} ${tmp_x509} ; log-result 13 ; return 13 ; fi
+    log-result 0
+
+    if test "${LDAPS_CA}" == "${ca_id}" ; then
+	log "Activating the '${ca_id}' CA for LDAPS"
+	deploy-dlaps-ca ${file}
+	log-result ${?}
+    fi
+
+    if test "${SYSLOG_CA}" == "${ca_id}" ; then
+	log "Activating the '${ca_id}' CA certificate for syslog"
+	log-result ${?}
+    fi
+
+    rm -f ${file}
+
+    return ${?}
+}
+
+set-third-ca()
+{
+    local i=0 elt range 
+    local ca browsing
+    local ret=0
+
+    for elt in ${TLS_CA_LIST}
+    do
+	range=$[${i} % 2]
+	case ${range} in
+	    0)
+		ca=${elt}
+		;;
+	    1)
+		browsing=${elt}
+		install-loaded-tls-third-ca ${ca} ${browsing} || ((ret++))
+		;;
+	    *)
+		return 1
+		;;
+	esac
+	((i++))
+    done
+
+    return ${ret}
+}
+
+do-revoke-tls-server()
+{
+    test -n "${1}" || return 1
+    local tls=${1}
+
+    test -f ${TMP_DIR}/${TLS_SERVER}.${tls}.2rev || return 0
+
+    log "Revoking the '${tls}' certificate"
+    revoke-tls-server ${tls}
+    log-result ${?}
+}
+
+set-tls-server()
+{
+    local tls
+    local ret=0
+
+    auto-gen-missing-tls
+
+    for tls in ${TLS_SERVER_LIST}
+    do
+	if test -f ${TMP_DIR}/${TLS_SERVER}.${tls}.conf ; then
+	    do-generate-tls-server ${tls} || ((ret++))
+	elif test -f ${TMP_DIR}/${LOADED}.${TLS_SERVER}.csr.${tls} ; then
+	    do-generate-tls-server-from-csr ${tls} || ((ret++))
+	else
+	    do-install-tls-server ${tls} || ((ret++))
+	fi
+	do-revoke-tls-server ${tls} || ((ret++))
+    done
+
+    return ${ret}
+}
+
+set-tls-rweb()
+{
+    test -n "${1}" || return 1
+    local mode=${1}
+
+    test ${RWEB_MODE} == True || return 0
+
+    local elt i=0 range
+    local protocol tls tls_id ca_id
+    local used_tls
+    local do_key do_cert
+
+    for elt in ${_RWEB_SITE_LIST}
+    do
+	range=$[${i} % 5]
+	case ${range} in
+	    0)
+		;;
+	    1)
+		protocol=${elt}
+		;;
+	    2)
+		;;
+	    3)
+		tls=${elt}
+		;;
+	    4)
+		if test ${protocol} == https ; then
+
+		    tls_id=${tls/:*}
+
+		    member "${used_tls}" ${tls_id} || used_tls="${used_tls} ${tls_id}"
+		    if mono-elt ${tls//:/ } ; then
+			unset ca_id
+		    else
+			ca_id=${tls/*:}
+		    fi
+
+		    if test -f ${SSL_SERVER_DIR}/${tls_id}.key -a -f ${SSL_SERVER_DIR}/${tls_id}.certificate ; then
+
+			unset do_key
+			if test ${mode} == force ; then
+			    do_key='yes'
+			else
+			    diff --brief ${SSL_SERVER_DIR}/${tls_id}.key ${WEB_SSL_DIR}/${tls_id}.key > /dev/null 2>&1 || do_key='yes'
+			fi
+			if test -n "${do_key}" ; then
+			    install -m 644 -o root -g root ${SSL_SERVER_DIR}/${tls_id}.key ${WEB_SSL_DIR}/${tls_id}.key
+			    install -m 644 -o root -g root ${SSL_SERVER_DIR}/${tls_id}.key ${PROXY_SSL_SERVER_DIR}/${tls_id}.key
+			fi
+
+			unset do_cert
+			if test ${PROXY2_MODE} == True -o -z "${ca_id}" ; then
+			    if test ${mode} == force ; then
+				do_cert='yes'
+			    else
+				diff --brief ${SSL_SERVER_DIR}/${tls_id}.certificate ${WEB_SSL_DIR}/${tls_id}.certificate > /dev/null 2>&1 || do_cert='yes'
+			    fi
+			    if test -n "${do_cert}" ; then
+				install -m 644 -o root -g root ${SSL_SERVER_DIR}/${tls_id}.certificate ${WEB_SSL_DIR}/${tls_id}.certificate
+				install -m 644 -o root -g root ${SSL_SERVER_DIR}/${tls_id}.certificate ${PROXY_SSL_SERVER_DIR}/${tls_id}.certificate
+			    fi
+			fi
+		    fi
+
+		    if test -n "${ca_id}" -a -f ${SSL_LOCAL_CA_DIR}/${ca_id}.certificate ; then
+			if test ${PROXY2_MODE} == True ; then
+			    install -m 644 -o root -g root ${SSL_LOCAL_CA_DIR}/${ca_id}.certificate ${WEB_SSL_DIR}/${tls_id}.chain
+			    install -m 644 -o root -g root ${SSL_LOCAL_CA_DIR}/${ca_id}.certificate ${PROXY_SSL_SERVER_DIR}/${tls_id}.chain
+			    rm -f ${WEB_SSL_DIR}/${tls_id}.certificate+chain
+			    rm -f ${PROXY_SSL_SERVER_DIR}/${tls_id}.certificate+chain
+			else
+			    cat ${SSL_SERVER_DIR}/${tls_id}.certificate ${SSL_LOCAL_CA_DIR}/${ca_id}.certificate > /tmp/${tls_id}.certificate+chain
+			    install -m 644 -o root -g root /tmp/${tls_id}.certificate+chain ${WEB_SSL_DIR}/${tls_id}.certificate+chain
+			    install -m 644 -o root -g root /tmp/${tls_id}.certificate+chain ${PROXY_SSL_SERVER_DIR}/${tls_id}.certificate+chain
+			    rm -f ${WEB_SSL_DIR}/${tls_id}.certificate
+			    rm -f ${PROXY_SSL_SERVER_DIR}/${tls_id}.certificate
+			fi
+		    else
+			rm -f ${WEB_SSL_DIR}/${tlsid}.{chain,certificate+chain}
+			rm -f ${PROXY_SSL_SERVER_DIR}/${tls_id}.{chain,certificate+chain}
+		    fi
+		fi
+		;;
+	    *)
+		return 255
+		;;
+	esac
+	((i++))
+    done
+
+    used_tls=${used_tls:1}
+
+    remove-unused-tls-rweb "${used_tls}"
+}
+
+set-tls-snmp-ca()
+{
+    test -n "${1}" || return 1
+    local mode=${1}
+
+    test ${mode} == force -o "${TLS_CA_LIST}" != "${CURRENT_TLS_CA_LIST}" || return 0
+
+    local certificates certificate cert
+
+    rm -f ${SNMP_SSL_CA_DIR}/*
+    certificates=$(ls -1 ${SSL_LOCAL_CA_DIR}/*.certificate 2> /dev/null)
+
+    for certificate in ${certificates}
+    do
+	cert=$(file-basename ${certificate} .certificate)
+	ln -s ${certificate} ${SNMP_SSL_CA_DIR}/${cert}.crt
+    done
+}
+
+set-tls-snmp-server()
+{
+    test -n "${1}" || return 1
+    local mode=${1}
+
+    local tls_id=${ADMIN_TLS/:*}
+    local doit
+
+    test -f ${SSL_SERVER_DIR}/${tls_id}.key -a -f ${SSL_SERVER_DIR}/${tls_id}.certificate || return 21
+
+    test ${mode} != force || doit='yes'
+    test ${ADMIN_TLS} == ${CURRENT_ADMIN_TLS} || doit='yes'
+    diff --brief ${SSL_SERVER_DIR}/${tls_id}.key ${SNMP_SSL_KEY_DIR}/server.key > /dev/null 2>&1 &&
+	diff --brief ${SSL_SERVER_DIR}/${tls_id}.certificate ${SNMP_SSL_CERTIFICATE_DIR}/server.crt > /dev/null 2>&1 || doit='yes'
+
+    if test -n "${doit}" ; then
+	ln -sf ${SSL_SERVER_DIR}/${tls_id}.key ${SNMP_SSL_KEY_DIR}/server.key
+	ln -sf ${SSL_SERVER_DIR}/${tls_id}.certificate ${SNMP_SSL_CERTIFICATE_DIR}/server.crt
+    fi
+}
+
+set-tls-snmp-clients()
+{
+    if test -f ${TMP_DIR}/${LOADED}.${SNMP_SSL}.certificate ; then
+	log "Activating the SNMP client certificate"
+	install -m 644 -o ${ADMIN_NAME} -g ${GROUP_NAME} ${TMP_DIR}/${LOADED}.${SNMP_SSL}.certificate ${SSL_SNMP_DIR}/${SNMP_SSL}.crt &&
+	    rm -f ${TMP_DIR}/${LOADED}.${SNMP_SSL}.certificate &&
+	    ln -s ${SSL_SNMP_DIR}/${SNMP_SSL}.crt ${SNMP_SSL_CERTIFICATE_DIR}/${SNMP_SSL}.crt
+	log-result ${?}
+	return 0
+    fi
+
+    if test ${SNMP_CLIENT_CERTIFICATE} != ${CURRENT_SNMP_CLIENT_CERTIFICATE} -a ${SNMP_CLIENT_CERTIFICATE} == False ; then
+	log "Purging the SNMP client certificate"
+	rm -f \
+	   ${SNMP_SSL_CERTIFICATE_DIR}/${SNMP_SSL}.crt \
+	   ${SSL_SNMP_DIR}/${SNMP_SSL}.crt
+	log-result ${?}
+	return 0
+    fi
+}
+
+update-apache-ca-bundle-system()
+{
+    test -f ${SSL_VAR_DIR}/ca-bundle.crt || return 11
+    test -f ${SSL_CA_DIR}/${SYSTEM_CA}.certificate || return 13
+
+    local title="${COMMERCIAL_NAME} System CA"
+    local n=${#title} i
+    local underline=$(for ((i=0 ; i<n ; i++)) ; do echo -n '=' ; done)
+    local tmp_bundle=/tmp/ca-bundle+system.crt.${$}
+
+    cp ${SSL_VAR_DIR}/ca-bundle.crt ${tmp_bundle}
+    cat << EOF >> ${tmp_bundle}
+
+${title}
+${underline}
+EOF
+    cat ${SSL_CA_DIR}/${SYSTEM_CA}.certificate >> ${tmp_bundle}
+
+    install -m 444 -o root -g root ${tmp_bundle} ${WEB_SSL_CA_DIR}/ca-bundle+system.crt
+    rm -f ${tmp_bundle}
+}
+
+deploy-self-ca()
+{
+    test -n "${1}" || return 1
+    local mode=${1}
+
+    test -f ${SSL_CA_DIR}/${SYSTEM_CA}.key -a -f ${SSL_CA_DIR}/${SYSTEM_CA}.certificate || return 0
+
+    local doit
+    local sha1
+    local ext
+
+    if test ${mode} == force ; then
+	doit='yes'
+    else
+	diff --brief ${SSL_CA_DIR}/${SYSTEM_CA}.key ${PROXY_SSL_CA_DIR}/${SYSTEM_CA}.key > /dev/null 2>&1 || doit='yes'
+	test -n "${doit}" || \
+	    diff --brief ${SSL_CA_DIR}/${SYSTEM_CA}.certificate ${PROXY_SSL_CA_DIR}/${SYSTEM_CA}.certificate > /dev/null 2>&1 || doit='yes'
+    fi
+
+    test -n "${doit}" || return 0
+
+    install -m 644 -o root -g root ${SSL_CA_DIR}/${SYSTEM_CA}.key ${PROXY_SSL_CA_DIR}/${SYSTEM_CA}.key
+    install -m 644 -o root -g root ${SSL_CA_DIR}/${SYSTEM_CA}.certificate ${PROXY_SSL_CA_DIR}/${SYSTEM_CA}.certificate
+    install -m 644 -o root -g root ${SSL_CA_DIR}/${SYSTEM_CA}.certificate ${WEB_SSL_CA_DIR}/${SYSTEM_CA_ID}.certificate
+
+    install -m 644 -o root -g root ${SSL_CA_DIR}/${SYSTEM_CA}.certificate ${WEB_CA_DIR}/ca.crt
+    install -m 644 -o root -g root ${SSL_CA_DIR}/${SYSTEM_CA}.der ${WEB_CA_DIR}/ca.der
+
+    for ext in crt der
+    do
+	sha1=$(get-formatted-sha1 ${WEB_CA_DIR}/ca.${ext})
+	echo-html-sha1 "${sha1}" > ${WEB_CA_DIR}/ca.${ext}.sha1
+    done
+
+    find ${PROXY_SSL_LOCAL_CA_DIR} -lname ${SYSTEM_CA_ID}.certificate -exec rm -f {} \; > /dev/null 2>&1
+    local hash_value=$(openssl x509 -noout -hash -in ${PROXY_SSL_LOCAL_CA_DIR}/${SYSTEM_CA_ID}.certificate 2> /dev/null)
+    ln -sf ${SYSTEM_CA_ID}.certificate ${PROXY_SSL_LOCAL_CA_DIR}/${hash_value}.0
+
+    test "${LDAPS_CA}" != "${SYSTEM_CA_ID}" || deploy-dlaps-ca
+
+    update-apache-ca-bundle-system
+}
+
+set-tls-ldaps-ca()
+{
+    test -n "${1}" || return 1
+    local mode=${1}
+
+    test ${mode} == force || test "${LDAPS_CA}" != "${CURRENT_LDAPS_CA}" || return 0
+
+    if test -z "${LDAPS_CA}" ; then
+	log "Resetting the LDAPS CA certificate"
+	raz-dlaps-ca
+	log-result ${?}
+    else
+	if test -s ${SSL_LOCAL_CA_DIR}/${LDAPS_CA}.certificate ; then
+	    log "Activating the '${LDAPS_CA}' CA for LDAPS"
+	    deploy-dlaps-ca
+	    log-result ${?}
+	else
+	    log-result 11
+	fi
+    fi
+}
+
+set-tls-syslog-ca()
+{
+    test -n "${1}" || return 1
+    local mode=${1}
+
+    test ${mode} == force || test "${SYSLOG_CA}" != "${CURRENT_SYSLOG_CA}" || return 0
+
+    if test -z "${SYSLOG_CA}" ; then
+	log "Resetting the CA certificate for syslog"
+	log-result ${?}
+    else
+	if test -s ${SSL_LOCAL_CA_DIR}/${SYSLOG_CA}.certificate ; then
+	    log "Activating the '${ca_id}' CA certificate for syslog"
+	    log-result ${?}
+	else
+	    log-result 11
+	fi
+    fi
+}
+
+set-tls-client()
+{
+    local cur_dir=${PWD}
+    cd ${SSL_CLIENT_DIR}
+
+    local id private
+
+    local news=$(ls -1 *.new 2> /dev/null) new
+    local files=$(ls -1 ${TMP_DIR}/${LOADED}.${TLS_CLIENT}.certificate.* 2> /dev/null) file
+    local dels=$(ls -1 *.2del 2> /dev/null) del
+    local revs=$(ls -1 ${TMP_DIR}/${TLS_CLIENT}.*.2rev 2> /dev/null) rev
+
+    local id
+    local n=0 i=1
+
+    for new in ${news}
+    do
+	((n++))
+    done
+
+    for file in ${files}
+    do
+	((n++))
+    done
+
+    for new in ${news}
+    do
+	id=${new%\.new}
+	log "Generating the '${id}' TLS client (${i}/${n})"
+	generate-tls-client ${new}
+	log-result ${?}
+	((i++))
+    done
+
+    for file in ${files}
+    do
+	id=$(file-basename ${file})
+	id=${id/${LOADED}\.${TLS_CLIENT}\.certificate\.}
+
+	log "Integrating the '${id}' client certificate (${i}/${n})"
+	install-tls-client ${id}
+	log-result ${?}
+	((i++))
+    done
+
+    for rev in ${revs}
+    do
+	id=$(file-basename ${rev} .2rev)
+	id=${id/${TLS_CLIENT}\.}
+	log "Revoking the '${id}' client certificate"
+	revoke-tls-client ${rev}
+	log-result ${?}
+    done
+
+    for del in ${dels}
+    do
+	private=$(cat ${del} 2> /dev/null)
+	id=${del%\.2del}
+
+	if test -z "${private}" ; then
+	    log "Purging '${id}' client TLS"
+	    delete-tls-client ${id}
+	    vpnipsec-do-delete-access-db ${id}
+	else
+	    log "Deleting '${id}' client TLS private part"
+	    delete-tls-client ${id} ${private}
+	fi
+	log-result ${?}
+    done
+
+    cd ${cur_dir}
+}
+
+set-ca-browsing()
+{
+    test -n "${1}" || return 1
+    local ca=${1}
+
+    local ret
+
+    log "Activating the '${ca}' CA for Web browsing"
+    install -m 644 -o root -g root ${SSL_LOCAL_CA_DIR}/${ca}.certificate ${PROXY_SSL_LOCAL_CA_DIR}/${ca}.certificate
+    local hash_value=$(openssl x509 -noout -hash -in ${PROXY_SSL_LOCAL_CA_DIR}/${ca}.certificate 2> /dev/null)
+    ln -sf ${ca}.certificate ${PROXY_SSL_LOCAL_CA_DIR}/${hash_value}.0 2> /dev/null &&
+	ln -sf ${ca}.certificate ${SSL_LOCAL_CA_DIR}/${hash_value}.0 2> /dev/null
+
+    if test ${?} -eq 0 ; then
+	ret=0
+    else
+	rm -f ${PROXY_SSL_LOCAL_CA_DIR}/${ca}.certificate
+	ret=12
+    fi
+
+    log-result ${ret}
+    return ${ret}
+}
+
+set-ca()
+{
+    test -n "${1}" || return 1
+    local mode=${1}
+
+    local elt range i=0
+    local ca browsing ica_state
+    local ret=0
+
+    echo -n > ${PROXY_SSL_CA_DIR}/${INTERMEDIATE_CA}
+
+    for elt in ${TLS_CA_LIST}
+    do
+	range=$[${i} % 2]
+	case ${range} in
+	    0)
+		ca=${elt}
+		;;
+	    1)
+		browsing=${elt}
+
+		if test ! -f ${SSL_LOCAL_CA_DIR}/${ca}.certificate ; then
+		    ((i++))
+		    continue
+		fi
+
+		if test ${browsing} == on ; then
+		    if test -f ${SSL_LOCAL_CA_DIR}/${ca}.certificate.${ICA} ; then
+			ica_state=$(cat ${SSL_LOCAL_CA_DIR}/${ca}.certificate.${ICA})
+
+			if test "${ica_state}" == off -o ${mode} == force ; then
+			    echo on > ${SSL_LOCAL_CA_DIR}/${ca}.certificate.${ICA}
+			    log "Activating the '${ca}' CA for Web browsing"
+			    cat ${SSL_LOCAL_CA_DIR}/${ca}.certificate >> ${PROXY_SSL_CA_DIR}/${INTERMEDIATE_CA}
+			    log-result ${?}
+			fi
+		    else
+			if test ${mode} == force ; then
+			    set-ca-browsing ${ca} || ((ret++))
+			else
+			    if test ! -f ${PROXY_SSL_LOCAL_CA_DIR}/${ca}.certificate || \
+				    diff --brief ${PROXY_SSL_LOCAL_CA_DIR}/${ca}.certificate ${SSL_LOCAL_CA_DIR}/${ca}.certificate > /dev/null 2>&1 ; then
+				set-ca-browsing ${ca} || ((ret++))
+			    fi
+			fi
+		    fi
+		else
+		    if test -f ${SSL_LOCAL_CA_DIR}/${ca}.certificate.${ICA} ; then
+			ica_state=$(cat ${SSL_LOCAL_CA_DIR}/${ca}.certificate.${ICA})
+			if test "${ica_state}" == on -o ${mode} == force ; then
+			    echo off > ${SSL_LOCAL_CA_DIR}/${ca}.certificate.${ICA}
+			    log "Deactivating the '${ca}' CA for Web browsing"
+			    cat ${SSL_LOCAL_CA_DIR}/${ca}.certificate >> ${PROXY_SSL_CA_DIR}/${INTERMEDIATE_CA}
+			    log-result ${?}
+			fi
+		    else
+			if test -f ${PROXY_SSL_LOCAL_CA_DIR}/${ca}.certificate ; then
+			    log "Deactivating the '${ca}' CA for Web browsing"
+			    rm -f ${PROXY_SSL_LOCAL_CA_DIR}/${ca}.certificate
+			    log-result ${?}
+			fi
+		    fi
+		fi
+		;;
+	    *)
+		return 1
+		;;
+	esac
+	((i++))
+    done
+
+    return ${ret}
+}
+
+set-tls-waudit()
+{
+    local tls_id=${ADMIN_TLS/:*} ca_ids ca_id
+    mono-elt ${ADMIN_TLS//:/ } || ca_ids=${ADMIN_TLS#*:}
+
+    case ${ADMIN_WAUDIT} in
+	True)
+	    test ! -f ${SSL_SERVER_DIR}/${tls_id}.key || \
+		install -m 644 -o root -g root ${SSL_SERVER_DIR}/${tls_id}.key ${WEB_SERVER_DIR}/etc/${tls_id}.key
+	    
+	    test ! -f ${SSL_SERVER_DIR}/${tls_id}.certificate || \
+		install -m 644 -o root -g root ${SSL_SERVER_DIR}/${tls_id}.certificate ${WEB_SERVER_DIR}/etc/${tls_id}.certificate
+
+	    for ca_id in ${ca_ids}
+	    do
+		if test ${ca_id} == ${SYSTEM_CA_ID} ; then
+		    install -m 644 -o root -g root ${SSL_CA_DIR}/${SYSTEM_CA}.certificate ${WEB_SERVER_DIR}/etc/${tls_id}.chain
+		else
+		    test ! -f ${SSL_LOCAL_CA_DIR}/${ca_id}.certificate || \
+			install -m 644 -o root -g root ${SSL_LOCAL_CA_DIR}/${ca_id}.certificate ${WEB_SERVER_DIR}/etc/${tls_id}.chain
+		fi
+	    done
+	    ;;
+
+	False)
+	    rm -f \
+	       ${WEB_SERVER_DIR}/etc/${tls_id}.key \
+	       ${WEB_SERVER_DIR}/etc/${tls_id}.certificate
+	    ;;
+	*)
+	    ;;
+    esac
+}
+
+set-tls-snmp()
+{
+    test -n "${1}" || return 1
+    local mode=${1}
+
+    set-tls-snmp-ca ${mode} || return ${?}
+    set-tls-snmp-server ${mode} || return ${?}
+    set-tls-snmp-clients || return ${?}
+}
+
+set-tls-certificates()
+{
+    test -n "${1}" || return 1
+    local mode=${1}
+
+    local errors error no_errors
+    local ret n i=0
+
+    local errors_t
+    declare -a errors_t
+
+    clean-all-deleted-tls-server
+    if test ${?} -eq 0 ; then errors_t[${i}]=0 ; else errors_t[${i}]=1 ; fi ; ((i++))
+    clean-all-deleted-third-ca
+    if test ${?} -eq 0 ; then errors_t[${i}]=0 ; else errors_t[${i}]=1 ; fi ; ((i++))
+    set-system-ca
+    if test ${?} -eq 0 ; then errors_t[${i}]=0 ; else errors_t[${i}]=1 ; fi ; ((i++))
+    set-third-ca
+    if test ${?} -eq 0 ; then errors_t[${i}]=0 ; else errors_t[${i}]=1 ; fi ; ((i++))
+    set-tls-server
+    if test ${?} -eq 0 ; then errors_t[${i}]=0 ; else errors_t[${i}]=1 ; fi ; ((i++))
+    deploy-self-ca ${mode}
+    if test ${?} -eq 0 ; then errors_t[${i}]=0 ; else errors_t[${i}]=1 ; fi ; ((i++))
+    set-tls-ldaps-ca ${mode}
+    if test ${?} -eq 0 ; then errors_t[${i}]=0 ; else errors_t[${i}]=1 ; fi ; ((i++))
+    set-tls-syslog-ca ${mode}
+    if test ${?} -eq 0 ; then errors_t[${i}]=0 ; else errors_t[${i}]=1 ; fi ; ((i++))
+    set-tls-client
+    if test ${?} -eq 0 ; then errors_t[${i}]=0 ; else errors_t[${i}]=1 ; fi ; ((i++))
+    set-ca ${mode}
+    if test ${?} -eq 0 ; then errors_t[${i}]=0 ; else errors_t[${i}]=1 ; fi ; ((i++))
+    set-tls-waudit
+    if test ${?} -eq 0 ; then errors_t[${i}]=0 ; else errors_t[${i}]=1 ; fi ; ((i++))
+    set-tls-rweb ${mode}
+    if test ${?} -eq 0 ; then errors_t[${i}]=0 ; else errors_t[${i}]=1 ; fi ; ((i++))
+    set-tls-snmp ${mode}
+    if test ${?} -eq 0 ; then errors_t[${i}]=0 ; else errors_t[${i}]=1 ; fi ; ((i++))
+
+    n=${#errors_t[@]}
+
+    for ((i=0 ; i < n ; i++))
+    do
+	error=${errors_t[${i}]}
+	errors="${errors}${error}"
+	no_errors="${no_errors}0"
+    done
+
+    if test "${errors}" == "${no_errors}" ; then
+	ret=0
+    else
+	ret=1
+	if test ${APPLIANCE_DEBUG_LEVEL} -gt 0 ; then
+	    log "TLS management error '${errors}'"
+	    log-result ${ret}
+	fi
+    fi
+
+    return ${ret}
+}
+
+tls-dep-conf-is-modified()
+{
+    test -n "${1}" || return 1
+    local module=${1}
+
+    local file tls files=$(ls ${TLS_SERVER}.*.conf 2> /dev/null)
+    test -n "${files}" || return 1
+
+    for file in ${files}
+    do
+	tls=$(file-basename ${file} .conf)
+	tls=${tls/${TLS_SERVER}\.}
+	case ${module} in
+	    rweb)
+		! tls-is-used-by-rweb server ${tls} || return 0
+		;;
+	    ipsec)
+		! tls-is-used-by-ipsec ${tls} || return 0
+		;;
+	    *)
+		;;
+	esac
+    done
+
+    return 11
+}
+
+tls-dep-cert-is-modified()
+{
+    test -n "${1}" || return 1
+    local module=${1}
+
+    local file tls files=$(ls ${LOADED}.${TLS_SERVER}.certificate.* 2> /dev/null)
+    test -n "${files}" || return 1
+
+    for file in ${files}
+    do
+	tls=${file/${LOADED}\.${TLS_SERVER}\.certificate\.}
+
+	case ${module} in
+	    rweb)
+		! tls-is-used-by-rweb server ${tls} || return 0
+		;;
+	    ipsec)
+		! tls-is-used-by-ipsec ${tls} || return 0
+		;;
+	    *)
+		;;
+	esac
+    done
+
+    return 11
+}
+
+tls-dep-ca-is-modified()
+{
+    test -n "${1}" || return 1
+    local module=${1}
+
+    local file tls files=$(ls ${LOADED}.${THIRD_CA}.* 2> /dev/null)
+
+    for file in ${files}
+    do
+	tls=${file/${LOADED}\.${THIRD_CA}\.}
+	case ${module} in
+	    rweb)
+		! tls-is-used-by-rweb ca ${tls} || return 0
+		;;
+	    *)
+		;;
+	esac
+    done
+
+    return 11
+}
+
+tls-dep-key-is-modified()
+{
+    test -n "${1}" || return 1
+    local module=${1}
+
+    local file tls files=$(ls ${LOADED}.${TLS_SERVER}.key.* 2> /dev/null)
+    test -n "${files}" || return 1
+
+    for file in ${files}
+    do
+	tls=${file/${LOADED}\.${TLS_SERVER}\.key\.}
+	case ${module} in
+	    rweb)
+		! tls-is-used-by-rweb server ${tls} || return 0
+		;;
+	    ipsec)
+		! tls-is-used-by-ipsec ${tls} || return 0
+		;;
+	    *)
+		;;
+	esac
+    done
+
+    return 11
+}
+
+tls-rweb-dep-file-is-modified()
+{
+    test ${RWEB_MODE} == True || return 1
+
+    cd ${TMP_DIR}
+
+    ! tls-dep-conf-is-modified rweb || return 0
+    ! tls-dep-cert-is-modified rweb || return 0
+    ! tls-dep-ca-is-modified rweb || return 0
+    ! tls-dep-key-is-modified rweb || return 0
+
+    return 1
+}
+
+tls-ipsec-dep-file-is-modified()
+{
+    test ${VPN_IPSEC_MODE} == True || return 1
+
+    ! tls-signed-index-is-modified || return 0
+
+    cd ${TMP_DIR}
+
+    ! tls-dep-conf-is-modified ipsec || return 0
+    ! tls-dep-cert-is-modified ipsec || return 0
+    ! tls-dep-key-is-modified ipsec || return 0
+
+    return 1
+}
+
+tls-admin-dep-file-is-modified()
+{
+    local tls_id=${ADMIN_TLS/:*} ca_ids ca_id
+    mono-elt ${ADMIN_TLS//:/ } || ca_ids=${ADMIN_TLS#*:}
+
+    cd ${TMP_DIR}
+
+    test ! -f ${TLS_SERVER}.${tls_id}.conf || return 0
+    test ! -f ${LOADED}.${TLS_SERVER}.certificate.${tls_id} || return 0
+    test ! -f ${LOADED}.${TLS_SERVER}.key.${tls_id} || return 0
+
+    for ca_id in ${ca_ids}
+    do
+	if test ${ca_id} == ${SYSTEM_CA_ID} ; then
+	    test ! ${TMP_DIR}/${LOADED}.${SYSTEM_CA}.key || return 0
+	    test ! ${TMP_DIR}/${LOADED}.${SYSTEM_CA}.certificate || return 0
+	else
+	    test ! -f ${TMP_DIR}/${LOADED}.${THIRD_CA}.${ca_id} || return 0
+	fi
+    done
+
+    return 11
+}
+
+tls-self-ca-file-is-modified()
+{
+    cd ${TMP_DIR}
+
+    ls ${SYSTEM_CA}.conf 2> /dev/null 1>&2 || \
+	ls ${LOADED}.${SYSTEM_CA}.certificate 2> /dev/null 1>&2 || \
+	ls ${LOADED}.${SYSTEM_CA}.key 2> /dev/null 1>&2
+}
+
+tls-ca-file-is-modified()
+{
+    cd ${TMP_DIR}
+
+    ls ${LOADED}.${THIRD_CA}.* 2> /dev/null 1>&2
+}
+
+tls-signed-index-is-modified()
+{
+    local files
+
+    files=$(ls -1 \
+	       ${TMP_DIR}/${TLS_SERVER}.*.2rev \
+	       ${TMP_DIR}/${TLS_SERVER}.*.2sign \
+	       ${TMP_DIR}/${TLS_SERVER}.certificate.* \
+	       ${TMP_DIR}/${SYSTEM_CA}.conf \
+	       ${TMP_DIR}/${LOADED}.${SYSTEM_CA}.* \
+	       2> /dev/null)
+
+    test -n "${files}"
+}
+
+tls-ocsp-dep-file-is-modified()
+{
+    test ${OCSP_MODE} == True || return 1
+
+    ! tls-self-ca-file-is-modified || return 0
+
+    if test -n "${OCSP_TLS}" ; then
+	cd ${TMP_DIR}
+
+	ls ${TLS_SERVER}.${OCSP_TLS}.conf 2> /dev/null 1>&2 || \
+	    ls ${LOADED}.${TLS_SERVER}.certificate.${OCSP_TLS} 2> /dev/null 1>&2 || \
+	    ls ${LOADED}.${TLS_SERVER}.key.${OCSP_TLS} 2> /dev/null 1>&2
+    fi
+
+    return 1
+}
+
+LIB_APL_TLS=Yes

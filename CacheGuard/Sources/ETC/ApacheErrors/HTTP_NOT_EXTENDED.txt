@@ -1,0 +1,3 @@
+510
+Not Extended
+A mandatory extension policy in the request is not accepted by the Web Gateway for this resource

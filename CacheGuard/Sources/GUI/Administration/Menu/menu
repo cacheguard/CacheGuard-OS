@@ -1,0 +1,281 @@
+###########################
+# First level visibility: #
+###########################
+
+# 1: on real Gateway machine only
+# 2: on Manager machine only
+# 3: on both real Gateway & Manager machines
+
+############################
+# Second level visibility: #
+############################
+
+# 1 1: on real Gateway machine only (the context is meaningless)
+# 2 1: on Manager machine in a Gateway or Template context only
+# 2 2: on Manager machine at the Manager level only
+# 3 1: on real Gateway machine and Manager machine in a Gateway or Template context only
+# 3 2: on real Gateway machine and Manager machine at the Manager level only
+# 3 3: on real Gateway machine and Manager machine at the Manager level and in a Gateway or Template context
+# 3 4: on real Gateway machine and Manager machine in the Gateway context only (not yet developped)
+
+3 2 _BEGIN_ REPORTS
+3 2 _ITEM_  REPORTS HEALTH_DASHBOARD /gui/system-report.apl
+
+3 2 _BEGIN_ REPORTS Health_Reports
+3 2 _ITEM_  REPORTS Health_Reports CPU_&_IO_Load /gui/system-report-load.apl
+3 2 _ITEM_  REPORTS Health_Reports Disk_Activity /gui/system-report-disk.apl
+3 2 _ITEM_  REPORTS Health_Reports Gateway_Health /gui/system-report-gateway.apl
+3 2 _ITEM_  REPORTS Health_Reports HA_&_Links_Health /gui/system-report-link.apl
+3 2 _ITEM_  REPORTS Health_Reports Memory_Activity /gui/system-report-memory.apl
+3 2 _ITEM_  REPORTS Health_Reports Network_Activity /gui/network-activity.apl
+2 2 _ITEM_  REPORTS Health_Reports Peer_Managers_Report /gui/manager-sync-report.apl
+3 2 _ITEM_  REPORTS Health_Reports RAID_Activity /gui/system-report-raid.apl
+3 2 _ITEM_  REPORTS Health_Reports Services_Health /gui/system-report-service.apl
+3 2 _ITEM_  REPORTS Health_Reports URL_Lists_&_AV_Updates /gui/urllist-antivirus-report.apl
+1 1 _ITEM_  REPORTS Health_Reports VPN_IPsec_Site_to_Site /gui/vpnipsec-report.apl?site
+3 2 _END_   REPORTS Health_Reports
+
+3 2 _BEGIN_ REPORTS Other_Reports
+3 2 _ITEM_  REPORTS Other_Reports Certificate_Validity_Report /gui/tls-report.apl
+1 1 _ITEM_  REPORTS Other_Reports DHCP_Leases_Report /gui/dhcp-report.apl
+3 2 _ITEM_  REPORTS Other_Reports Exchanged_Files /gui/file-exchange.apl
+1 1 _ITEM_  REPORTS Other_Reports Network_Connections /gui/system-report-connection.apl
+1 1 _ITEM_  REPORTS Other_Reports QoS_Shaping_Report /gui/qos-report.apl
+1 1 _ITEM_  REPORTS Other_Reports Traffic_Counters_Report /gui/system-report-counter.apl
+1 1 _ITEM_  REPORTS Other_Reports VPN_IPsec_Access_Report /gui/vpnipsec-report.apl?access
+1 1 _ITEM_  REPORTS Other_Reports Web_Cache_Report /gui/cache-report.apl
+3 2 _END_   REPORTS Other_Reports
+3 2 _END_   REPORTS
+
+3 3 _BEGIN_ GENERAL
+3 1 _ITEM_  GENERAL FUNCTION_MODES /gui/mode-feature.apl
+3 3 _BEGIN_ GENERAL Administration_Settings
+3 3 _ITEM_  GENERAL Administration_Settings Administration_Services /gui/admin.apl
+3 3 _ITEM_  GENERAL Administration_Settings Administrator_SSH_Keys /gui/admin-ssh-key.apl
+3 1 _ITEM_  GENERAL Administration_Settings EMail_Configuration /gui/email.apl
+3 3 _ITEM_  GENERAL Administration_Settings Unprivileged_Administrators /gui/admin-user.apl
+3 3 _END_   GENERAL Administration_Settings
+
+3 1 _ITEM_  GENERAL Cloaked_Reverse_Websites /gui/rweb-site.apl
+
+3 1 _BEGIN_ GENERAL Embedded_Applications
+3 1 _ITEM_  GENERAL Embedded_Applications BeVyPN_Application /gui/embedded-bevypn.apl
+3 1 _END_   GENERAL Embedded_Applications
+
+3 1 _BEGIN_ GENERAL Peer_Web_Proxies
+3 1 _ITEM_  GENERAL Peer_Web_Proxies Forwarding_Next_Peers /gui/peer-next.apl
+3 1 _ITEM_  GENERAL Peer_Web_Proxies HA_Cache_Peers /gui/peer-ha.apl
+3 1 _ITEM_  GENERAL Peer_Web_Proxies Previsous_Peers /gui/peer-previous.apl
+3 1 _ITEM_  GENERAL Peer_Web_Proxies Shared_Cache_Peers /gui/peer-share.apl
+3 1 _END_   GENERAL Peer_Web_Proxies
+
+3 2 _ITEM_  GENERAL Registration_&_Subscription /gui/register.apl
+
+3 2 _BEGIN_ GENERAL System_Operations
+3 2 _ITEM_  GENERAL System_Operations Antivirus_SDB_Creation /gui/antivirus-create.apl
+3 2 _ITEM_  GENERAL System_Operations Antivirus_SDB_Updating /gui/antivirus-update.apl
+3 2 _ITEM_  GENERAL System_Operations Backup_&_Restore /gui/system-backup.apl
+1 1 _ITEM_  GENERAL System_Operations Clear_Web_Cache /gui/cache-clear.apl
+1 1 _ITEM_  GENERAL System_Operations Kerberos_Initialization /gui/authenticate-kerberos-create.apl
+3 2 _ITEM_  GENERAL System_Operations Load_OS_Patch /gui/system-patch.apl
+3 2 _ITEM_  GENERAL System_Operations Logs_Rotation /gui/log-rotate.apl
+3 2 _ITEM_  GENERAL System_Operations Reboot_|_Halt_|_HA_State /gui/power.apl
+3 2 _ITEM_  GENERAL System_Operations Save_Logs /gui/log-save.apl
+3 2 _ITEM_  GENERAL System_Operations Update_URL_Lists /gui/urllist-update.apl
+3 2 _END_   GENERAL System_Operations
+
+3 3 _BEGIN_ GENERAL Time_Settings
+3 3 _ITEM_  GENERAL Time_Settings Date_&_Clock /gui/time.apl
+3 3 _ITEM_  GENERAL Time_Settings NTP_Servers /gui/ntp.apl
+3 3 _END_   GENERAL Time_Settings
+
+3 1 _ITEM_  GENERAL Traffic_Logging /gui/log-type.apl
+
+3 1 _BEGIN_ GENERAL Web_Cache
+1 1 _ITEM_  GENERAL Web_Cache Cache_Load_URL /gui/cache-loadurl.apl
+3 1 _ITEM_  GENERAL Web_Cache Object_Size_Limits /gui/cache-size.apl
+3 1 _END_   GENERAL Web_Cache
+
+3 3 _BEGIN_ GENERAL Whole_Configuration
+3 3 _ITEM_  GENERAL Whole_Configuration Apply_New_Configuration /gui/apply.apl
+3 3 _ITEM_  GENERAL Whole_Configuration Cancel_New_Configuration /gui/cancel.apl
+2 1 _ITEM_  GENERAL Whole_Configuration Configure_by_Template /gui/conf-manager.apl
+3 3 _ITEM_  GENERAL Whole_Configuration Factory_Reset /gui/conf-factoryreset.apl
+3 3 _ITEM_  GENERAL Whole_Configuration File_Operations /gui/file-operation.apl
+3 3 _ITEM_  GENERAL Whole_Configuration Load_&_Save_Configuration /gui/conf-load-save.apl
+3 3 _ITEM_  GENERAL Whole_Configuration Overview /gui/conf-show.apl
+3 3 _END_   GENERAL Whole_Configuration
+3 3 _END_   GENERAL
+
+3 3 _BEGIN_ NETWORK
+3 3 _ITEM_  NETWORK NETWORK_MODES /gui/mode-network.apl
+3 1 _BEGIN_ NETWORK DHCP_Configuration
+3 1 _ITEM_  NETWORK DHCP_Configuration DHCP_Fixed_IP /gui/dhcp-fixed.apl
+3 1 _ITEM_  NETWORK DHCP_Configuration DHCP_IP_Ranges /gui/dhcp-range.apl
+3 1 _END_   NETWORK DHCP_Configuration
+
+3 2 _ITEM_  NETWORK Diagnostic_Tools /gui/network-utilities.apl
+
+3 1 _BEGIN_ NETWORK High_Availability
+3 1 _ITEM_  NETWORK High_Availability Antivirus_VLAN_VRRP /gui/vrrp-antivirus.apl
+3 1 _ITEM_  NETWORK High_Availability RWeb_VLAN_VRRP /gui/vrrp-rweb.apl
+3 1 _ITEM_  NETWORK High_Availability Web_VLAN_VRRP /gui/vrrp-web.apl
+3 1 _ITEM_  NETWORK High_Availability DHCP_Failover_Peer /gui/dhcp-peer.apl
+3 1 _ITEM_  NETWORK High_Availability Auxiliary_VRRP /gui/vrrp-auxiliary.apl
+3 1 _ITEM_  NETWORK High_Availability External_VRRP /gui/vrrp-external.apl
+3 1 _ITEM_  NETWORK High_Availability Native_Internal_VRRP /gui/vrrp-internal.apl
+3 1 _END_   NETWORK High_Availability
+
+3 3 _BEGIN_ NETWORK IP_&_Link_Configuration
+3 1 _ITEM_  NETWORK IP_&_Link_Configuration 802.1q_VLAN_Tags /gui/vlan.apl
+3 3 _ITEM_  NETWORK IP_&_Link_Configuration IP_Addresses /gui/ip.apl
+3 3 _ITEM_  NETWORK IP_&_Link_Configuration Links_Bonding /gui/link-bond.apl
+3 3 _ITEM_  NETWORK IP_&_Link_Configuration Listening_Ports /gui/port.apl
+3 3 _ITEM_  NETWORK IP_&_Link_Configuration Static_IP_Routes /gui/ip-route.apl
+3 3 _ITEM_  NETWORK IP_&_Link_Configuration Via_Gateways /gui/ip-via.apl
+3 3 _END_   NETWORK IP_&_Link_Configuration
+
+3 3 _BEGIN_ NETWORK Names_&_Resolutions
+1 1 _ITEM_  NETWORK Names_&_Resolutions Arm_Name_Resolution /gui/dns-resolve.apl
+3 3 _ITEM_  NETWORK Names_&_Resolutions Domain_Name_Servers /gui/dns.apl
+3 3 _ITEM_  NETWORK Names_&_Resolutions Dynamic_DNS /gui/dynamicdns.apl
+3 3 _ITEM_  NETWORK Names_&_Resolutions Hostname_&_Domainname /gui/names.apl
+3 1 _ITEM_  NETWORK Names_&_Resolutions Override_DNS_Resolutions /gui/ip-name.apl
+3 3 _END_   NETWORK Names_&_Resolutions
+
+3 3 _BEGIN_ NETWORK Monitoring_Configuration
+3 3 _ITEM_  NETWORK Monitoring_Configuration SNMP_Agent_Settings /gui/admin-snmp.apl
+3 3 _ITEM_  NETWORK Monitoring_Configuration SNMP_Client_Certificate /gui/admin-snmp-certificate.apl
+3 3 _ITEM_  NETWORK Monitoring_Configuration SNMP_Traps_Settings /gui/admin-snmp-trap.apl
+3 3 _ITEM_  NETWORK Monitoring_Configuration SysLog_Servers /gui/log-syslog.apl
+3 3 _END_   NETWORK Monitoring_Configuration
+
+3 1 _BEGIN_ NETWORK QoS_&_Bandwidth_Shaping
+3 1 _ITEM_  NETWORK QoS_&_Bandwidth_Shaping Bandwidth_Limits /gui/qos-bandwidth.apl
+3 1 _ITEM_  NETWORK QoS_&_Bandwidth_Shaping Borrowing_Shaped_Traffic /gui/qos-borrow.apl
+3 1 _ITEM_  NETWORK QoS_&_Bandwidth_Shaping Shape_Gateway_Traffic /gui/qos-shape-gateway.apl
+3 1 _ITEM_  NETWORK QoS_&_Bandwidth_Shaping Shape_Routed_Traffic /gui/qos-shape-router.apl
+3 1 _END_   NETWORK QoS_&_Bandwidth_Shaping
+
+3 1 _ITEM_  NETWORK Transparent_Web_Networks /gui/transparent.apl
+3 3 _END_   NETWORK
+
+3 3 _BEGIN_ SECURITY
+3 3 _BEGIN_ SECURITY Antivirus_&_Antimalware
+3 3 _ITEM_  SECURITY Antivirus_&_Antimalware Antivirus_Settings /gui/antivirus.apl
+3 1 _ITEM_  SECURITY Antivirus_&_Antimalware Domain_Name_White_List /gui/antivirus-whitelist-domainname.apl
+3 2 _ITEM_  SECURITY Antivirus_&_Antimalware Signature_White_List /gui/antivirus-whitelist-signature.apl
+3 3 _END_   SECURITY Antivirus_&_Antimalware
+
+3 3 _BEGIN_ SECURITY Appliance_Access
+3 1 _ITEM_  SECURITY Appliance_Access Administration_Topology /gui/admin-topology.apl
+3 1 _ITEM_  SECURITY Appliance_Access Antivirus_Clients /gui/access-antivirus.apl
+3 1 _ITEM_  SECURITY Appliance_Access Antivirus_Topology /gui/antivirus-topology.apl
+3 1 _ITEM_  SECURITY Appliance_Access Managers_Access /gui/access-manager.apl
+3 3 _ITEM_  SECURITY Appliance_Access Remote_Administrators /gui/access-admin.apl
+3 3 _ITEM_  SECURITY Appliance_Access SNMP_Managers /gui/access-mon.apl
+3 3 _ITEM_  SECURITY Appliance_Access Trusted_File_Servers /gui/access-file.apl
+3 1 _ITEM_  SECURITY Appliance_Access Web_Proxy_Clients /gui/access-web.apl
+3 3 _END_   SECURITY Appliance_Access
+
+3 1 _ITEM_  SECURITY Firewall_DoS_Limits /gui/firewall-dos.apl
+3 1 _BEGIN_ SECURITY Firewall_Rules
+3 1 _ITEM_  SECURITY Firewall_Rules Auxiliary_Interface /gui/firewall-auxiliary.apl
+3 1 _ITEM_  SECURITY Firewall_Rules External_Interface /gui/firewall-external.apl
+3 1 _ITEM_  SECURITY Firewall_Rules Internal_Antivirus_Interface /gui/firewall-antivirus.apl
+3 1 _ITEM_  SECURITY Firewall_Rules Internal_Admin_Interface /gui/firewall-admin.apl
+3 1 _ITEM_  SECURITY Firewall_Rules Internal_File_Interface /gui/firewall-file.apl
+3 1 _ITEM_  SECURITY Firewall_Rules Internal_Mon_Interface /gui/firewall-mon.apl
+3 1 _ITEM_  SECURITY Firewall_Rules Internal_Peer_Interface /gui/firewall-peer.apl
+3 1 _ITEM_  SECURITY Firewall_Rules Internal_rWeb_Interface /gui/firewall-rweb.apl
+3 1 _ITEM_  SECURITY Firewall_Rules Internal_Web_Interface /gui/firewall-web.apl
+3 1 _ITEM_  SECURITY Firewall_Rules VPN_IPsec_Interface /gui/firewall-vpnipsec.apl
+3 1 _END_   SECURITY Firewall_Rules
+
+3 3 _BEGIN_ SECURITY Passwords
+3 2 _ITEM_  SECURITY Passwords Administrator_Password /gui/password-login.apl
+3 2 _ITEM_  SECURITY Passwords Email_Password /gui/password-email.apl
+3 3 _ITEM_  SECURITY Passwords File_Server_Accounts /gui/password-file.apl
+3 1 _ITEM_  SECURITY Passwords Kerberos_Password /gui/password-kerberos.apl
+3 1 _ITEM_  SECURITY Passwords LDAP_Bind_Password /gui/password-ldap.apl
+3 3 _ITEM_  SECURITY Passwords SNMP_Agent_Password /gui/password-snmp.apl
+3 3 _END_   SECURITY Passwords
+
+3 3 _BEGIN_ SECURITY SSL_Certificates_&_PKI
+3 1 _ITEM_  SECURITY SSL_Certificates_&_PKI Client_Certificates /gui/tls-client.apl
+3 3 _ITEM_  SECURITY SSL_Certificates_&_PKI Other_TLS_Settings /gui/tls-ocsp-etc.apl
+3 3 _ITEM_  SECURITY SSL_Certificates_&_PKI Server_Certificates /gui/tls-server.apl
+3 1 _ITEM_  SECURITY SSL_Certificates_&_PKI System_CA_Generation /gui/tls-ca-system-generate.apl
+3 1 _ITEM_  SECURITY SSL_Certificates_&_PKI System_CA_Management /gui/tls-ca-system-load-save.apl
+3 3 _ITEM_  SECURITY SSL_Certificates_&_PKI Third_Party_CA /gui/tls-ca-third.apl
+3 3 _END_   SECURITY SSL_Certificates_&_PKI
+
+3 1 _BEGIN_ SECURITY SSL_Mediation
+3 1 _ITEM_  SECURITY SSL_Mediation Domain_Name_Exceptions /gui/sslmediate-exception-domainname.apl
+3 1 _ITEM_  SECURITY SSL_Mediation General_Settings /gui/sslmediate.apl
+3 1 _ITEM_  SECURITY SSL_Mediation URL_List_Exceptions /gui/sslmediate-exception-urllist.apl
+3 1 _END_   SECURITY SSL_Mediation
+
+3 3 _BEGIN_ SECURITY URL_&_Domain_Lists
+3 3 _ITEM_  SECURITY URL_&_Domain_Lists Add_&_Delete_Lists /gui/urllist.apl
+3 2 _ITEM_  SECURITY URL_&_Domain_Lists Manage_Contents /gui/urllist-content.apl
+3 3 _ITEM_  SECURITY URL_&_Domain_Lists Auto_Load_Contents /gui/urllist-auto.apl
+3 3 _END_   SECURITY URL_&_Domain_Lists
+
+3 1 _BEGIN_ SECURITY URL_Guarding
+3 1 _ITEM_  SECURITY URL_Guarding Global_Settings /gui/guard-settings.apl
+3 1 _ITEM_  SECURITY URL_Guarding IP_Filters /gui/guard-filter-ip.apl
+3 1 _ITEM_  SECURITY URL_Guarding LDAP_Filters /gui/guard-filter-ldap.apl
+3 1 _ITEM_  SECURITY URL_Guarding Time_Filters /gui/guard-filter-time.apl
+3 1 _ITEM_  SECURITY URL_Guarding Guarding_Policies /gui/guard-policy.apl
+3 1 _ITEM_  SECURITY URL_Guarding Guarding_Rules /gui/guard-rule.apl
+3 1 _END_   SECURITY URL_Guarding
+
+3 1 _BEGIN_ SECURITY VPN_IPsec
+3 1 _ITEM_  SECURITY VPN_IPsec Access_Mode_Settings /gui/vpnipsec-access.apl
+3 1 _ITEM_  SECURITY VPN_IPsec Allowed_Client_Access /gui/vpnipsec-access-access.apl
+3 1 _ITEM_  SECURITY VPN_IPsec Authentication_Method /gui/vpnipsec-authenticate.apl
+3 1 _ITEM_  SECURITY VPN_IPsec Client_Configuration /gui/vpnipsec-access-conf.apl
+3 1 _ITEM_  SECURITY VPN_IPsec Site_to_Site_VPNs /gui/vpnipsec-site.apl
+3 1 _END_   SECURITY VPN_IPsec
+
+3 1 _BEGIN_ SECURITY WAF_[Web_Application_Firewall]
+3 1 _ITEM_  SECURITY WAF_[Web_Application_Firewall] Auditing_rWeb_Traffic /gui/waf-rweb-audit.apl
+3 1 _ITEM_  SECURITY WAF_[Web_Application_Firewall] By_rWeb_Filters /gui/waf-rweb-generic-select.apl
+3 1 _ITEM_  SECURITY WAF_[Web_Application_Firewall] Bypass_Application /gui/waf-rweb-bypass-application.apl
+3 1 _ITEM_  SECURITY WAF_[Web_Application_Firewall] Bypass_Rules /gui/waf-rweb-bypass-rule.apl
+3 1 _ITEM_  SECURITY WAF_[Web_Application_Firewall] Country_Reputation /gui/waf-reputation-country.apl
+3 1 _ITEM_  SECURITY WAF_[Web_Application_Firewall] Custom_Rules /gui/waf-rweb-custom.apl
+3 1 _ITEM_  SECURITY WAF_[Web_Application_Firewall] Default_Filters /gui/waf-generic.apl
+3 1 _ITEM_  SECURITY WAF_[Web_Application_Firewall] Deny_URL /gui/waf-rweb-denyurl.apl
+3 1 _ITEM_  SECURITY WAF_[Web_Application_Firewall] Denial_of_Service /gui/waf-dos.apl
+3 1 _ITEM_  SECURITY WAF_[Web_Application_Firewall] Other_Settings /gui/waf-settings.apl
+3 1 _ITEM_  SECURITY WAF_[Web_Application_Firewall] HTTP_Errors /gui/waf-rweb-errors.apl
+3 1 _ITEM_  SECURITY WAF_[Web_Application_Firewall] Size_Limits /gui/waf-limit.apl
+3 1 _END_   SECURITY WAF_[Web_Application_Firewall]
+
+3 1 _BEGIN_ SECURITY Web_Access_Authentication
+3 1 _ITEM_  SECURITY Web_Access_Authentication MAIN_SETTINGS /gui/authenticate.apl
+3 1 _ITEM_  SECURITY Web_Access_Authentication Kerberos_Reverse_Web /gui/authenticate-kerberos-rweb.apl
+3 1 _ITEM_  SECURITY Web_Access_Authentication Kerberos_Servers /gui/authenticate-kerberos-server.apl
+3 1 _ITEM_  SECURITY Web_Access_Authentication Kerberos_Settings /gui/authenticate-kerberos-ad.apl
+3 1 _ITEM_  SECURITY Web_Access_Authentication LDAP_Servers /gui/authenticate-ldap-server.apl
+3 1 _ITEM_  SECURITY Web_Access_Authentication LDAP_Settings /gui/authenticate-ldap-request.apl
+3 1 _END_   SECURITY Web_Access_Authentication
+3 3 _END_   SECURITY
+
+2 2 _BEGIN_ MANAGER
+2 2 _ITEM_  MANAGER Gateways_Repository /gui/manager-gateway.apl
+2 2 _ITEM_  MANAGER Manage_Templates /gui/manager-template.apl
+2 2 _ITEM_  MANAGER Operation_on_Gateways /gui/manager-gateway-operation.apl
+2 2 _ITEM_  MANAGER Manager_SSH_Keys /gui/manager-ssh.apl
+2 2 _ITEM_  MANAGER Manager_Sync_Peer /gui/manager-sync.apl
+2 2 _END_   MANAGER
+
+3 3 _BEGIN_		HELP
+3 3 _ITEM_		HELP About_this_System /gui/about.apl
+3 3 _ITEM_BLANK_	HELP Commands_Manual /doc/command/index.html
+3 3 _ITEM_BLANK_	HELP User's_Guide /doc/guide/index.html
+3 3 _ITEM_		HELP Error_Descriptions /gui/error.apl
+3 3 _ITEM_		HELP Get_Support /gui/help.apl
+3 3 _END_		HELP

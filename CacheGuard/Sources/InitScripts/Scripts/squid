@@ -1,0 +1,567 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       InitScript
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+source /lib/lsb/init-functions
+
+CACHEGUARD_DIR=/etc/sysconfig/cacheguard
+source ${CACHEGUARD_DIR}/constant
+source ${APPLIANCE_DIR}/etc/role
+
+PROG=squid
+FPROG=/sbin/${PROG}
+
+[ ! -f /etc/sysconfig/${PROG} ] || source /etc/sysconfig/${PROG}
+[ -x ${PROXY_DIR}${FPROG} ] && SQUID="chroot ${PROXY_DIR} ${FPROG} -f /etc/${PROG}.conf" || exit 0
+[ -f ${PROXY_DIR}/etc/${PROG}.conf ] || exit 0
+[ -n "${SQUID_ACTION_RETRY}" ] || SQUID_ACTION_RETRY=15
+
+RETVAL=0
+SERV="Proxy Service"
+WITNESS=.cache.ok
+
+set-max-filedesc()
+{
+    local arch=$(uname -m) limit
+
+    case ${arch} in
+	x86_64)
+	    limit=$[1024 * 1024]
+	    ;;
+	*)
+	    limit=$[4 * 1024]
+	    ;;
+    esac
+
+    ulimit -HSn ${limit}
+}
+
+wait4-cache-dirs()
+{
+    local nb
+    local retry=20 i=0
+
+    while true
+    do
+	nb=$(find ${PROXY_CACHE_DIR} -mindepth 3 -type d 2> /dev/null | wc -l)
+	test ${nb} -lt ${CACHE_SWAPS_NB} || break
+	test ${i} -lt ${retry} || break
+	usleep 250000
+	((i++))
+    done
+
+    test ${i} -lt ${retry}
+}
+
+find-cache-dir()
+{
+    local cache_swaps nb=0
+
+    local cache_dir ctype dir size l1 l2 rest
+
+    while read cache_dir ctype dir size l1 l2 rest
+    do
+	test -n "${cache_dir}" || continue
+	test ${cache_dir:0:1} != '#' || continue
+	test ${cache_dir} == 'cache_dir' || continue
+	nb=$[${nb} + ${l1}*${l2}]
+	cache_swaps="${cache_swaps} ${ctype} ${dir} ${size}"
+    done < ${PROXY_DIR}/etc/${PROG}.conf
+
+    cache_swaps=${cache_swaps:1}
+    CACHE_SWAPS=${cache_swaps}
+    CACHE_SWAPS_NB=${nb}
+}
+
+clean-squid()
+{
+    rm -f /var/lock/${PROG}
+    rm -f ${PROXY_DIR}/var/run/${PROG}.pid
+}
+
+hard-kill-squid()
+{
+    local pid ppid
+    local main_ppid main_pid
+
+    main_ppid=$(pidof "${FPROG}" 2> /dev/null)
+    main_ppid=${main_ppid/ */}
+
+    main_pid=$(pidof "(${PROG}-1)" 2> /dev/null)
+    main_pid=${main_pid/ */}
+
+    test -z "${main_ppid}" || kill -s SIGKILL ${main_ppid} > /dev/null 2>&1
+    test -z "${main_pid}" || kill -s SIGKILL ${main_pid} > /dev/null 2>&1
+    test -n "${main_pid}" || return 0
+    
+    usleep 500000
+    
+    ps -eo "%p %P" | grep ${main_pid} | \
+	while read pid ppid
+	do
+	    test ${ppid} == ${main_pid} || continue
+	    kill -s SIGKILL ${pid} > /dev/null 2>&1
+	done
+
+    return 0
+}
+
+update-pid-file()
+{
+    local pid_file=${PROXY_DIR}/var/run/${PROG}.pid
+    test ! -s ${pid_file} || return 0
+
+    local pid=$(pidof "(${PROG}-1)" 2> /dev/null)
+    test -n "${pid}" || return 11
+
+    echo ${pid} > ${pid_file} &&
+	chgrp cache ${pid_file}
+}
+
+squid-start()
+{
+    local pid_file=${PROXY_DIR}/var/run/${PROG}.pid
+
+    set-max-filedesc
+
+    ${SQUID} ${SQUID_OPTS} > /dev/null 2>&1
+    test ${?} -eq 0 || return 1
+
+    local i=0
+    while true
+    do
+	test ! -f ${pid_file} || break
+	test ${i} -lt ${SQUID_ACTION_RETRY} || break
+	usleep 500000
+	((i++))
+    done
+    return 0
+}
+
+squid-stop()
+{
+    update-pid-file
+
+    if test ${?} -ne 0 ; then
+	hard-kill-squid
+	local ret=${?}
+	sleep 3
+	return ${ret}
+    fi
+
+    ${SQUID} -k check > /dev/null 2>&1
+    if test ${?} -ne 0 ; then
+	hard-kill-squid
+	return ${?}
+    fi
+
+    if test "${SQUID_DUMP_CACHE}" == off ; then
+	hard-kill-squid
+	return ${?}
+    fi
+
+    ${SQUID} -k shutdown > /dev/null 2>&1 || return 13
+
+    local pid_file=${PROXY_DIR}/var/run/${PROG}.pid
+    local retries=$[${SQUID_ACTION_RETRY} * 2]
+    local i=0
+
+    while true
+    do
+        test -s ${pid_file} || break
+	test ${i} -lt ${retries} || break
+	usleep 500000
+	((i++))
+    done
+
+    hard-kill-squid
+}
+
+squid-init-lock()
+{
+    touch /var/lock/${PROG}.init
+}
+
+squid-init-unlock()
+{
+    rm -f /var/lock/${PROG}.init
+}
+
+squid-init-is-locked()
+{
+    test -f /var/lock/${PROG}.init
+}
+
+clear-cache()
+{
+    local elt i=0 range
+    local dir
+
+    for elt in ${CACHE_SWAPS}
+    do
+	range=$[${i} % 3]
+	case ${range} in
+	    0)
+		;;
+	    1)
+		dir=${elt}
+		;;
+	    2)
+		if test -d ${PROXY_DIR}${dir} ; then
+		    rm -rf ${PROXY_DIR}${dir}/*
+		    rm -f  ${PROXY_DIR}${dir}/${WITNESS}
+		fi
+		;;
+	    *)
+		return 255
+		;;
+	esac
+	((i++))
+    done
+
+    rm -f ${PROXY_STATE_DIR}/*.swap.state*
+}
+
+mkdir-cache()
+{
+    local elt i=0 range
+    local dir
+
+    for elt in ${CACHE_SWAPS}
+    do
+	range=$[${i} % 3]
+	case ${range} in
+	    0)
+		;;
+	    1)
+		dir=${elt}
+		;;
+	    2)
+		if test ! -d ${PROXY_DIR}${dir} ; then
+		    mkdir -p ${PROXY_DIR}${dir}
+		    chown cache:cache ${PROXY_DIR}${dir}
+		fi
+		;;
+	    *)
+		return 255
+		;;
+	esac
+	((i++))
+    done
+}
+
+is-ssl-cache-built()
+{
+    test -d ${PROXY_DB_SSL_DIR} || return 11
+    test -d ${PROXY_DB_SSL_DIR}/certs || return 13
+    test -f ${PROXY_DB_SSL_DIR}/index.txt || return 15
+    test -f ${PROXY_DB_SSL_DIR}/size || return 17
+
+    return 0
+}
+
+build-ssl-cache()
+{
+    log_info_msg "Building the SSL Cache..."
+
+    if squid-init-is-locked ; then
+	log_failure_msg2
+	return 11
+    fi
+
+    local ret
+    local db_ssl_rdir=${PROXY_DB_SSL_DIR/${PROXY_DIR}}
+
+    squid-init-lock
+
+    chroot ${PROXY_DIR} /libexec/security_file_certgen -c -s ${db_ssl_rdir} -M ${SSL_MIMIC_CERTIFICATE_CACHE_SZ}MB > /dev/null 2>&1
+
+    if [ ${?} -eq 0 ] ; then
+	ret=0
+    else
+	ret=13
+    fi
+
+    test ! -d ${PROXY_DB_SSL_DIR} || chown -R cache:cache ${PROXY_DB_SSL_DIR}
+
+    squid-init-unlock
+    if test ${ret} -eq 0 ; then
+	log_success_msg2
+    else
+	log_failure_msg2
+    fi
+
+    return ${ret}
+}
+
+clear-ssl-cache()
+{
+    rm -rf ${PROXY_DB_SSL_DIR}
+}
+
+is-cache-built()
+{
+    local elt i=0 range
+    local dir
+
+    for elt in ${CACHE_SWAPS}
+    do
+	range=$[${i} % 3]
+	case ${range} in
+	    0)
+		;;
+	    1)
+		dir=${elt}
+		;;
+	    2)
+		test -f ${PROXY_DIR}${dir}/${WITNESS} || return 1
+		;;
+	    *)
+		return 255
+		;;
+	esac
+	((i++))
+    done
+
+    return 0
+}
+
+create-witness()
+{
+    local elt i=0 range
+    local ctype dir
+
+    for elt in ${CACHE_SWAPS}
+    do
+	range=$[${i} % 3]
+	case ${range} in
+	    0)
+		ctype=${elt}
+		;;
+	    1)
+		dir=${elt}
+		;;
+	    2)
+		touch ${PROXY_DIR}${dir}/${WITNESS}
+		;;
+	    *)
+		return 255
+		;;
+	esac
+	((i++))
+    done
+
+    return 0
+}
+
+delete-witness()
+{
+    local elt i=0 range
+    local ctype dir
+
+    for elt in ${CACHE_SWAPS}
+    do
+	range=$[${i} % 3]
+	case ${range} in
+	    0)
+		ctype=${elt}
+		;;
+	    1)
+		dir=${elt}
+		;;
+	    2)
+		rm -f ${PROXY_DIR}${dir}/${WITNESS}
+		;;
+	    *)
+		return 255
+		;;
+	esac
+	((i++))
+    done
+
+    return 0
+}
+
+build-cache()
+{
+    log_info_msg "Building the Cache..."
+
+    if squid-init-is-locked ; then
+	log_failure_msg2
+	return 11
+    fi
+
+    local ret
+    squid-init-lock
+    mkdir-cache
+
+    ${SQUID} -z -F > /dev/null 2>&1
+    if [ ${?} -eq 0 ] ; then
+	if wait4-cache-dirs ; then
+	    create-witness
+	    ret=0
+	else
+	    ret=13
+	fi
+    else
+	delete-witness
+	ret=15
+    fi
+
+    squid-init-unlock
+    if test ${ret} -eq 0 ; then
+	log_success_msg2
+    else
+	log_failure_msg2
+    fi
+
+    return ${ret}
+}
+
+find-cache-dir
+
+cd ${PROXY_DIR}
+
+case "${1}" in
+    start)
+	if [ -n "$(pidof ${PROG})" ]; then
+	    echo $"${PROG}: already running"
+	    exit 31
+	fi
+	
+	is-ssl-cache-built || build-ssl-cache || exit 33
+	is-cache-built || build-cache || exit 35
+	log_info_msg "Starting ${SERV}..."
+	squid-start
+	RETVAL=${?}
+	[ ${RETVAL} -eq 0 ] && touch /var/lock/${PROG}
+	evaluate_retval
+	exit ${RETVAL}
+	;;
+
+    build)
+	if [ -n "$(pidof ${PROG})" ]; then
+	    echo $"${PROG}: already running"
+	    exit 41
+	fi
+	is-cache-built || build-cache
+	;;
+
+    stop)
+	# Stop daemons.
+	log_info_msg "Stopping ${SERV}..."
+	squid-stop
+	RETVAL=${?}
+	[ ${RETVAL} -eq 0 ]
+	evaluate_retval
+	clean-squid
+	exit ${RETVAL}
+	;;
+
+    reload)
+	log_info_msg "Reloading ${SERV}..."
+
+	update-pid-file
+
+	${SQUID} -k reconfigure > /dev/null 2>&1
+	RETVAL=${?}
+	[ ${RETVAL} -eq 0 ]
+	evaluate_retval
+	exit ${RETVAL}
+	;;
+
+    restart)
+	${0} stop || exit ${?}
+	${0} start
+	;;
+
+    clear)
+	if squid-init-is-locked ; then
+	    log_failure_msg2
+	    exit 51
+	fi
+
+	RETVAL1=$(pidof ${PROG})
+	test -z "${RETVAL1}" || ${0} stop
+
+	squid-init-lock
+	log_info_msg "Clearing the Cache..."	
+	clear-cache
+	RETVAL2=${?}
+	[ ${RETVAL2} -eq 0 ]
+	evaluate_retval
+	squid-init-unlock
+
+	test -z "${RETVAL1}" || ${0} start
+	;;
+
+    clearssl)
+	if squid-init-is-locked ; then
+	    log_failure_msg2
+	    exit 61
+	fi
+
+	RETVAL1=$(pidof ${PROG})
+	test -z "${RETVAL1}" || ${0} stop
+
+	squid-init-lock
+	log_info_msg "Clearing the SSL Cache..."
+	clear-ssl-cache
+	RETVAL2=${?}
+	[ ${RETVAL2} -eq 0 ]
+	evaluate_retval
+	squid-init-unlock
+
+	test -z "${RETVAL1}" || ${0} start
+	;;
+
+    force-build)
+	if [ -n "$(pidof ${PROG})" ]; then
+	    echo $"${PROG}: already running"
+	    exit 71
+	fi
+
+	squid-init-unlock
+	build-cache
+	;;
+
+    rotate)
+	log_info_msg "Log rotating ${SERV}..."
+
+	update-pid-file
+
+	${SQUID} -k rotate > /dev/null 2>&1
+	RETVAL=${?}
+	[ ${RETVAL} -eq 0 ]
+	evaluate_retval
+	exit ${RETVAL}
+	;;
+
+    status)
+	statusproc ${PROG}
+	;;
+    *)
+	echo "Usage: ${0} {clear|clearssl|start|stop|reload|restart|rotate|build|status}"
+	exit 81
+	;;
+esac

@@ -1,0 +1,144 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       Scripts
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+CACHEGUARD_DIR=/etc/sysconfig/cacheguard
+source ${CACHEGUARD_DIR}/constant
+source ${APPLIANCE_DIR}/etc/role
+
+set-environment()
+{
+    if test -n "${1}" ; then
+	CALLER_PID=${1}
+    else
+	CALLER_PID=${$}
+    fi
+
+    TMP_TC_STATUS=/tmp/tc.status.${$}
+    TMP_QOS_REPORT_PREFIX=/tmp/qos.report.${$}
+    trap "clean-exit 1" INT QUIT TERM
+    touch ${RUN_DIR}/${WAITING_PROCESS}.${CALLER_PID}    
+}
+
+clean-environment()
+{
+    rm -f ${RUN_DIR}/${WAITING_PROCESS}.${CALLER_PID}
+    rm -f ${TMP_TC_STATUS} ${TMP_QOS_REPORT_PREFIX}.*
+}
+
+clean-exit()
+{
+    trap "" INT QUIT TERM
+
+    local code=${1}
+    clean-environment
+    exit ${code}
+}
+
+get-gos-bytes()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    local in_handle=${1}
+    local in_dev=${2}
+
+    local dummy value handle dev rest
+    local found=0
+
+    while read dummy value handle dummy dev rest
+    do
+	if test ${handle} == ${in_handle} -a ${dev} == ${in_dev} ; then
+	    found=1
+	elif test ${found} -eq 1 ; then
+	    echo ${value}
+	    break
+	fi
+    done < ${TMP_TC_STATUS}
+}
+
+main()
+{
+    set-environment "${@}"
+
+    test -f ${RUN_DIR}/${QOS_INDEX_FILENAME} || clean-exit 11
+    tc -s -d qdisc show > ${TMP_TC_STATUS} 2> /dev/null || clean-exit 13
+
+    local flow qdisc interface idev odev handle
+    local flow_type ibytes obytes
+
+    local      trafficFlow trafficInterface trafficIngress trafficEgress trafficIngressOld trafficEgressOld
+    declare -a trafficFlow trafficInterface trafficIngress trafficEgress trafficIngressOld trafficEgressOld
+    local i=0 n idiff ediff
+
+    if test -f ${RUN_DIR}/${QOS_TRAFFIC_FILENAME}.old ; then
+	while read flow interface ibytes obytes
+	do
+	    trafficIngressOld[${i}]=${ibytes}
+	    trafficEgressOld[${i}]=${obytes}
+	    ((i++))
+	done < ${RUN_DIR}/${QOS_TRAFFIC_FILENAME}.old
+    fi
+
+    i=0
+    while read flow qdisc interface idev odev handle
+    do
+	test ${flow} != nonadmin: || continue
+	ibytes=$(get-gos-bytes ${handle} ${idev})
+	obytes=$(get-gos-bytes ${handle} ${odev})
+
+	test -n "${ibytes}" -a -n "${obytes}" || continue
+
+	trafficFlow[${i}]=${flow}
+	trafficInterface[${i}]=${interface}
+	trafficIngress[${i}]=${ibytes}
+	trafficEgress[${i}]=${obytes}
+	echo "${flow} ${interface} ${ibytes} ${obytes}"
+	((i++))
+    done < ${RUN_DIR}/${QOS_INDEX_FILENAME} > ${TMP_QOS_REPORT_PREFIX}.new
+    n=${i}
+
+    if test ! -f ${RUN_DIR}/${QOS_TRAFFIC_FILENAME}.old ; then
+	for ((i=0 ; i<n ; i++))
+	do
+	    trafficIngressOld[${i}]=0
+	    trafficEgressOld[${i}]=0
+	done
+    fi
+
+    for ((i=0 ; i<n ; i++))
+    do
+	idiff=$[${trafficIngress[${i}]} - ${trafficIngressOld[${i}]}]
+	ediff=$[${trafficEgress[${i}]} - ${trafficEgressOld[${i}]}]
+	echo "${trafficFlow[${i}]} ${trafficInterface[${i}]} ${idiff} ${ediff}"
+    done > ${TMP_QOS_REPORT_PREFIX}.diff
+
+    test ! -f ${RUN_DIR}/${QOS_TRAFFIC_FILENAME} || mv -f ${RUN_DIR}/${QOS_TRAFFIC_FILENAME} ${RUN_DIR}/${QOS_TRAFFIC_FILENAME}.old
+    mv -f ${TMP_QOS_REPORT_PREFIX}.new ${RUN_DIR}/${QOS_TRAFFIC_FILENAME}
+    mv -f ${TMP_QOS_REPORT_PREFIX}.diff ${RUN_DIR}/${QOS_DIFF_TRAFFIC_FILENAME}
+    clean-exit ${?}
+}
+
+# Main()
+
+main "${@}"
+clean-environment "${@}"

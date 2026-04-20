@@ -1,0 +1,66 @@
+<a name='main' class='doc-title'></a>
+<h1>Web Server Cloaking</h1>
+
+A CacheGuard appliance can be implemented as a reverse Web proxy positioned in front of a group of Web servers to protect them against unwanted direct access on the one hand, and to optimise the Web traffic exchanged with them on the other. This implementation is referred to as <i>reverse mode</i> (or <strong>rweb</strong> mode), and the protected Web applications are known as <i>reverse websites</i>. All security and optimisation features available in CacheGuard-OS can be combined to provide a highly secure and efficient network optimisation solution for protecting Web applications. The following list summarises the advantages of this mode when combined with others:
+
+<ul>
+  <li type='circle'><strong>Firewall</strong>: blocks unauthorised network access to Web servers.</li>
+  <li type='circle'><strong>Reverse Proxy</strong>: prevents direct exposure of Web servers to the Internet.</li>
+  <li type='circle'><strong>SSL Offloading</strong>: terminates SSL connections on the CacheGuard appliance to relieve Web servers of encryption tasks.</li>
+  <li type='circle'><strong>WAF</strong>: the Web Application Firewall (WAF) blocks content-based attacks such as SQL injection attempts.</li>
+  <li type='circle'><strong>Load Balancing</strong>: distributes website traffic evenly across multiple Web servers.</li>
+  <li type='circle'><strong>High Availability</strong>: ensures service continuity in the event of a failure on a CacheGuard appliance or a Web server.</li>
+  <li type='circle'><strong>Caching</strong>: stores static Web objects such as images to reduce load on Web servers.</li>
+  <li type='circle'><strong>HTTP Compression</strong>: conserves WAN bandwidth.</li>
+  <li type='circle'><strong>Antivirus</strong>: prevents malware injections into Web pages.</li>
+  <li type='circle'><strong>QoS</strong>: enables traffic shaping and provides Quality of Service to critical applications.</li>
+</ul>
+
+<center><img width='600' src="/doc/image/classic_usage.png" class="schema" /></center>
+
+To activate the reverse mode, use the <a href="/doc/command/mode.html">mode rweb on</a> command. You must then use the <a href="/doc/command/rweb.html">rweb</a> command to configure this mode. For example, the following commands activate reverse mode and protect the Web server with the IP address <i>10.0.10.11</i> hosting the <i>www.example.com</i> website:
+
+<ul>
+  <li><i>mode rweb on</i></li>
+  <li><i>ip external 192.168.1.1 255.255.255.0</i></li>
+  <li><i>rweb site add www.example.com http</i></li>
+  <li><i>rweb host www.example.com add rweb http 10.0.10.11</i></li>
+  <li><i>apply</i></li>
+</ul>
+
+<u>Anti-Spoofing Note</u>: a host is always associated with a specific network interface through which it is authorised to communicate, thereby preventing IP address spoofing. The <strong>rweb</strong> keyword in the command "<i>rweb host www.example.com add <strong>rweb</strong> http 10.0.10.11</i>" identifies that network interface. It corresponds to the pseudo-interface named <strong>rweb</strong> in <a href="network_configuration.html#vlan">VLAN mode</a>, or the native <strong>internal</strong> interface if VLAN mode is disabled. For detailed information, refer to the <a href="/doc/command/rweb.html">rweb</a> command manual.
+<p>
+In reverse mode, the CacheGuard appliance acts as a virtual Web server, concealing the real Web servers (referred to as hosts). These cloaked Web servers must then be publicly accessible via the CacheGuard appliance’s external IP address. For example, in the configuration above, the <i>www.example.com</i> name should publicly resolve to 192.168.1.1.
+
+<a name='host' class='doc-title'></a><h2>Load Balancing</h2>
+
+If multiple hosts are associated with a single website, the total load is distributed among all associated hosts. The CacheGuard appliance continuously monitors host availability, and in the event of a host failure, it temporarily removes that host from the load-balancing pool, thereby maintaining high availability for the website.
+<p>
+The default load-balancing method is round-robin, which distributes an equal number of requests to each host. When associating a host with a website, an optional weight may be specified to adjust the load distribution. Furthermore, if the underlying Web application requires that a specific Web client always be served by the same host (to preserve application context), sticky load balancing must be enabled for that website. Sticky connections are based on either an existing HTTP cookie or one inserted by the CacheGuard appliance, which can be configured using the <a href="/doc/command/rweb.html">rweb</a> command.
+<p>
+To extend the previous example, the following configuration adds a host with the IP address <i>10.0.10.12</i> to the pool of load-balanced hosts and enables round-robin sticky load balancing for the <i>www.example.com</i> website:
+
+<ul>
+  <li><i>rweb host www.example.com add rweb http 10.0.10.12</i></li>
+  <li><i>rweb balancer www.example.com robin sticky</i></li>
+  <li><i>apply</i></li>
+</ul>
+
+<a name='ssl' class='doc-title'></a><h2>SSL Offloading</h2>
+
+To allow a CacheGuard appliance to process (inspect, cache, etc.) Web content within HTTPS (encrypted) traffic, it must first decrypt that traffic to gain unencrypted access to the data. To achieve this, the CacheGuard appliance acts as an SSL terminator for the HTTPS websites it manages. While communication between Web clients and HTTPS websites managed by the appliance is always encrypted, communication between the appliance and hosts may be either encrypted (using HTTPS) or unencrypted (using HTTP).
+<p>
+When the HTTP protocol is used for communication with hosts, the CacheGuard appliance performs SSL offloading for those hosts. It is crucial in such configurations to ensure that the unencrypted Web traffic between the appliance and hosts is fully isolated, preventing any unauthorised access. The <strong>http</strong> keyword in the command "<i>rweb host www.example.com add rweb <strong>http</strong> 10.0.10.12</i>" specifies the use of SSL offloading for that host. To avoid SSL offloading, replace <strong>http</strong> with <strong>https</strong>. Refer to the <a href="/doc/command/rweb.html">rweb</a> command manual for further details.
+
+<center><img width='600' src="/doc/image/ssl_terminator.png" class="schema" /></center>
+
+As an SSL offloader, the CacheGuard appliance must have access to the public SSL certificates and private keys associated with the HTTPS websites it manages. The <a href="/doc/command/tls.html">tls</a> command can be used to manage the SSL certificates and private keys used by the appliance. A website can exist in both HTTP and HTTPS versions. In such cases, all HTTP requests are redirected to the HTTPS version by default (although this behaviour can be modified if required). Continuing the previous example, the following commands add SSL encryption capability to the <i>www.example.com</i> website (accessible at <i>https://www.example.com/</i>):
+
+<ul>
+  <li><i>tls server add myTLSObject</i></li>
+  <li><i>tls server generate myTLSObject</i></li>
+  <li><i>rweb site add www.example.com https myTLSObject</i></li>
+  <li><i>apply</i></li>
+</ul>
+
+<u>TLS Note</u>: once the <i>apply</i> operation is complete, an RSA private key, a self-signed X.509 SSL certificate, and a CSR (Certificate Signing Request) are generated. The CSR can be saved to a trusted file server and submitted to a Certificate Authority (CA) for signing. The new signed certificate can then be imported into the CacheGuard appliance. Refer to the <a href="/doc/command/access.html">access file</a> and <a href="/doc/command/tls.html">tls server</a> command manuals for guidance on saving and loading SSL certificates.

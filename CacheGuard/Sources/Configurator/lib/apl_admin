@@ -1,0 +1,1307 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       Configurator
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+set-admin-parameters()
+{
+    local managers
+
+    case ${APL_ROLE} in
+	gateway)
+
+	    local elt range i=0
+	    local role
+
+	    for elt in ${ACCESS_MANAGER_LIST}
+	    do
+		range=$[${i} % 3]
+		case ${range} in
+		    0)
+			role=${elt}
+			;;
+		    1)
+			;;
+		    2)
+			case ${role} in
+			    backup)
+				managers="${managers} ${BACKUP_MANAGER_NAME}"
+				;;
+			    master)
+				managers="${managers} ${MASTER_MANAGER_NAME}"
+				;;
+			    *)
+				;;
+			esac
+			;;
+		    *)
+			return 255
+			;;
+		esac
+		((i++))
+	    done
+	    managers=${managers:1}
+	    ;;
+	manager)
+	    test ${MANAGER_SYNC_PEER_IP} == 0.0.0.0 || managers=${PEER_MANAGER_NAME}
+	    ;;
+	*)
+	    ;;
+    esac
+
+    export SSH_MANAGER_KEY_LIST=${managers}
+}
+
+gen-admin-hosts()
+{
+    echo "# Begin /etc/hosts"
+    echo
+    echo "127.0.0.1 localhost.localdomain localhost"
+    echo "${IP_ADMIN_IP} ${SHOSTNAME} ${SHOSTNAME}.${DOMAIN_NAME}"
+
+    gen-rweb-hosts
+    gen-name-ip-hosts
+
+    echo
+    echo "# End /etc/hosts"
+}
+
+gen-sshd-conf()
+{
+    local admin_user_list=${ADMIN_USER_LIST}
+    test -z "${admin_user_list}" || admin_user_list=" ${admin_user_list}"
+    local manager
+
+    echo "Port ${SSH_PORT}"
+    echo "ListenAddress 127.0.0.1"
+
+    if test "${IP_ADMIN_IP}" != "0.0.0.0" ; then
+
+	local admin
+
+	test ${ADMIN_INTERNAL} == False || admin='yes'
+	test ${VPN_IPSEC_MODE} == False -o ${ADMIN_VPN_IPSEC} == False || admin='yes'
+
+	test -z "${admin}" || echo "ListenAddress ${IP_ADMIN_IP}"
+    fi
+
+    if test ${APL_ROLE} == 'manager' -a ${MANAGER_SYNC_PEER_IP} != 0.0.0.0 -a ${MANAGER_SYNC_ROLE} == slave ; then
+	manager=" ${MANAGER_NAME}"
+    fi
+
+    test "${IP_EXTERNAL_IP}" == "0.0.0.0" -o ${ADMIN_EXTERNAL} == False || echo "ListenAddress ${IP_EXTERNAL_IP}"
+    test -z "${IF_AUXILIARY}" -o "${IP_AUXILIARY_IP}" == "0.0.0.0" -o ${ADMIN_AUXILIARY} == False || echo "ListenAddress ${IP_AUXILIARY_IP}"
+    echo
+    echo "AllowUsers ${ADMIN_NAME}${manager} ${SUPERADMIN_NAME}${admin_user_list}"
+
+    local new_2fa=$(get-admin-2fa ${ADMIN_NAME} new)
+
+    if test ${ADMIN_SSH_PASSWORD} == True ; then
+	if test ${new_2fa} == True ; then
+	    echo "PasswordAuthentication no"
+	else
+	    echo "PasswordAuthentication yes"
+	fi
+	echo "KbdInteractiveAuthentication yes"
+    else
+	echo "PasswordAuthentication no"
+	echo "KbdInteractiveAuthentication no"
+    fi
+
+    if test ${new_2fa} == True ; then
+	echo "UsePAM yes"
+    else
+	echo "UsePAM no"
+    fi
+
+    cat sshd_config-tuned
+    cat sshd_config-constant
+}
+
+gen-directory-admin-access-allow()
+{
+    local elt range i=0
+    local ip mk
+
+    for elt in ${ACCESS_IF_IP_MK_ADMIN_LIST}
+    do
+	range=$[${i} % 4]
+	case ${range} in
+	    0)
+		interface=${elt}
+		;;
+	    1)
+		ip=${elt}
+		;;
+	    2)
+		mk=${elt}
+		;;
+	    3)
+		echo "Allow from ${ip}/${mk}"
+		;;
+	    *)
+		return 1
+		;;
+	esac
+	((i++))
+    done
+}
+
+gen-directory-admin-access()
+{
+    test -n "${1}" || return 1
+    local www=${1}
+    local dir=${2}
+
+    echo
+    echo "<Directory ${dir}/${www}>"
+    echo "Options -Indexes +FollowSymLinks"
+    echo "AllowOverride AuthConfig"
+    echo "SSLOptions +StdEnvVars"
+    echo "Order allow,deny"
+    gen-directory-admin-access-allow
+    echo "</Directory>"
+
+    echo
+
+    echo "<Directory ${dir}/${CGI_RDIR}>"
+    echo "AllowOverride AuthConfig"
+    echo "SSLOptions +StdEnvVars"
+    echo "Options None"
+    echo "Order allow,deny"
+    gen-directory-admin-access-allow
+    echo "</Directory>"
+}
+
+gen-wadmin-vhost()
+{
+    test -n "${1}" || return 1
+    local ip=${1}
+
+    echo
+    echo "Listen ${ip}:${WADMIN_PORT}"
+
+    echo "<VirtualHost ${ip}:${WADMIN_PORT}>"
+    echo "DocumentRoot \"${GUI_HTML_DIR}\""
+    echo "ServerName ${SHOSTNAME}.${DOMAIN_NAME}:${WADMIN_PORT}"
+    echo "ServerAdmin ${ADMINISTRATOR_EMAIL}"
+    echo "SSLEngine On"
+
+    echo "RewriteEngine On"
+    echo "RewriteCond %{HTTPS} off"
+    echo "RewriteRule (.*) https://%{SERVER_NAME}:%{SERVER_PORT} [R=307,L]"
+
+    if test ${APPLIANCE_DEBUG_LEVEL} -gt 0 ; then
+	echo "SecAuditEngine On"
+	echo "SecAuditLogStorageDir /${AUDIT_RDIR}"
+	echo "SecAuditLog ${AUDIT_RDIR}/audit.log"
+    fi
+
+    echo "</VirtualHost>"
+}
+
+gen-wadmin-conf()
+{
+    local tls_id=${ADMIN_TLS/:*}
+
+    cat httpd-modules.conf-constant
+
+    echo "LoadModule ssl_module ${WEB_SERVER_DIR}/libexec/mod_ssl.so"
+    echo "LoadModule deflate_module ${WEB_SERVER_DIR}/libexec/mod_deflate.so"
+    echo "LoadModule filter_module ${WEB_SERVER_DIR}/libexec/mod_filter.so"
+
+    cat ${WADMIND_NAME}.conf-constant
+    cat ${WADMIND_NAME}.conf-tuned
+
+    gen-httpd-log-level
+    gen-waf-common-conf
+
+    echo "SecDebugLogLevel ${APPLIANCE_DEBUG_LEVEL}"
+    echo "SecDebugLog var/log/${WAF_DEBUG_LOG}"
+
+    gen-waf-rules ${WADMIN_NAME}
+    gen-directory-admin-access ${WWW_DIR_NAME} $(get-admin-relative-dir ${GUI_DIR})
+
+    test ! -f ${SSL_SERVER_DIR}/${tls_id}.chain || echo "SSLCertificateChainFile ${SSL_SERVER_DIR}/${tls_id}.chain"
+    echo "SSLCertificateFile ${SSL_SERVER_DIR}/${tls_id}.certificate"
+    echo "SSLCertificateKeyFile ${SSL_SERVER_DIR}/${tls_id}.key"
+
+    echo "ServerName ${SHOSTNAME}.${DOMAIN_NAME}:${WADMIN_PORT}"
+    echo "Listen 127.0.0.1:${WADMIN_PORT}"
+
+    if test "${IP_ADMIN_IP}" != "0.0.0.0" ; then
+
+	local admin
+
+	test ${ADMIN_INTERNAL} == False || admin='yes'
+	test ${VPN_IPSEC_MODE} == False -o ${ADMIN_VPN_IPSEC} == False || admin='yes'
+
+	test -z "${admin}" || gen-wadmin-vhost ${IP_ADMIN_IP}
+    fi
+
+    test "${IP_EXTERNAL_IP}" == "0.0.0.0" -o ${ADMIN_EXTERNAL} == False || gen-wadmin-vhost ${IP_EXTERNAL_IP}
+    test -z "${IF_AUXILIARY}" -o "${IP_AUXILIARY_IP}" == "0.0.0.0" -o ${ADMIN_AUXILIARY} == False || gen-wadmin-vhost ${IP_AUXILIARY_IP}
+}
+
+gen-admin-sudoers()
+{
+    cat admin-sudoers-constant
+
+    echo
+    echo "Defaults mailto = \"${ADMINISTRATOR_EMAIL}\""
+    echo "Host_Alias SECUREHOST = ${SHOSTNAME}"
+    echo -n "Runas_Alias ADMINISTRATOR = ${ADMIN_NAME}"
+
+    local user
+
+    for user in ${ADMIN_USER_LIST}
+    do
+	echo -n ",${user}"
+    done
+
+    echo
+}
+
+gen-login-access()
+{
+    cat login.access-constant
+
+    local sn_user=$(cat ${HARD_DIR}/${SN_ID})
+
+    echo "+:${ADMIN_NAME}:/dev/ttyS0 /dev/tty1"
+    test -z "${sn_user}" || echo "+:${sn_user}:/dev/ttyS0 /dev/tty1"
+    test -z "${ADMIN_USER_LIST}" || echo "+:${ADMIN_USER_LIST}:/dev/tty1 /dev/ttyS0"
+    echo "-:ALL:ALL"
+}
+
+init-dashboard-layout-file()
+{
+    test -n "${1}" || return 1
+    user=${1}
+
+    local touch_file=/tmp/touch.${$}
+    local dashboard_file=${BASE_DIR}/${user}/${ENV_RDIR}/${GUI_DASHBOARD_LAYOUT_FILENAME}
+
+    touch ${touch_file}
+    install -m 664 -o ${user} -g ${GROUP_NAME} ${touch_file} ${dashboard_file}
+    rm -f ${touch_file}
+}
+
+init-first-login()
+{
+    test -n "${1}" || return 1
+    user=${1}
+
+    local base=${BASE_DIR}/${user}
+    local touch_file=/tmp/touch.${$}
+
+    touch ${touch_file}
+    install -m 600 -o ${user} -g ${GROUP_NAME} ${touch_file} ${base}/${FIRST_LOGIN}
+    rm -f ${touch_file}
+}
+
+init-netrc-file()
+{
+    test -n "${1}" || return 1
+    user=${1}
+
+    local base=${BASE_DIR}/${user}
+    local touch_file=/tmp/touch.${$}
+
+    touch ${touch_file}
+    install -m 600 -o ${user} -g ${GROUP_NAME} ${touch_file} ${base}/.netrc
+    rm -f ${touch_file}
+}
+
+init-htpasswd-file()
+{
+    test -n "${1}" || return 1
+    user=${1}
+
+    chroot ${ADMIN_DIR} /bin/htpasswd -Bb /${HARD_DIR_NAME}/.htpasswd ${user} "" > /dev/null 2>&1
+}
+
+init-unprivileged-admin-user()
+{
+    test -n "${1}" || return 1
+    user=${1}
+
+    install -d -m 755 -o ${user} -g ${GROUP_NAME} ${HOME_DIR}/${user}
+    install -d -m 755 -o ${user} -g ${GROUP_NAME} ${BASE_DIR}/${user}/${ENV_RDIR}
+
+    init-first-login ${user}
+    init-htpasswd-file ${user}
+    init-dashboard-layout-file ${user}
+}
+
+do-set-admin-users()
+{
+    local user password users2del users2add
+    local procs ret
+
+    local year=$(date +"%Y")
+    local tmp_passwd=/tmp/.new.users.passwd.${$}
+    rm -f ${tmp_passwd}
+
+    for user in ${ADMIN_USER_LIST}
+    do
+	member "${CURRENT_ADMIN_USER_LIST}" ${user} || users2add="${user} ${users2add}"
+    done
+    
+    for user in ${CURRENT_ADMIN_USER_LIST}
+    do
+	member "${ADMIN_USER_LIST}" ${user} || users2del="${user} ${users2del}"
+    done
+    
+    cd ${BASE_DIR}
+    
+    for user in ${users2add}
+    do
+	log "Adding the user '${user}'"
+	useradd \
+	    -m \
+	    -c "Login user" \
+	    -s /usr/local/bin/apl_chroot_bash \
+	    -d ${HOME_DIR}/${user} \
+	    -g users \
+	    ${user} 2> /dev/null
+
+	if test ${?} -eq 0 ; then
+	    passwd -d ${user} > /dev/null 2> /dev/null
+	    chroot ${ADMIN_DIR} /usr/sbin/useradd \
+		-m \
+		-c "A User" \
+		-s /bin/apl_bash \
+		-d /home/${user} \
+		-g users \
+		${user} 2> /dev/null
+
+	    if test ${?} -eq 0 ; then
+		password=$(cat ${TMP_DIR}/${ADMIN_USER_PASSWD}.${user} 2> /dev/null)
+		test -n "${password}" || password="apl${year}${user}"
+		echo ${user}:${password} >> ${tmp_passwd}
+		init-unprivileged-admin-user ${user}
+		ret=${?}
+		test ${ret} == 0 || ret=1
+		log-result ${ret}
+	    else
+		chroot ${ADMIN_DIR} /usr/sbin/userdel -rf ${user} 2> /dev/null
+		userdel -rf ${user} 2> /dev/null
+		log-result 2
+	    fi
+	else
+	    userdel -rf ${user} 2> /dev/null
+	    log-result 3
+	fi
+	rm -f ${TMP_DIR}/${ADMIN_USER_PASSWD}.${user}
+
+	mkdir -p ${WEB_SERVER_DIR}${HOME_DIR}/${user}
+    done
+
+    cd ${ADMIN_DIR}
+    for user in ${users2del}
+    do
+	log "Deleting the user '${user}'"
+	procs=$(ps -u ${user} -U ${user} h --sort=pid --format=pid 2> /dev/null)
+	for proc in ${procs}
+	do
+	    kill -9 ${proc} 2> /dev/null
+	done
+	
+	chroot ${ADMIN_DIR} /usr/sbin/userdel --force ${user} 2> /dev/null
+	if test ${?} -eq 0 ; then
+	    rm -rf ${BASE_DIR}/${user}
+	    userdel --force ${user} 2> /dev/null
+	    if test ${?} -eq 0 ; then
+		rm -rf ${HOME_DIR}/${user}
+		chroot ${ADMIN_DIR} /bin/htpasswd -D /${HARD_DIR_NAME}/.htpasswd ${user} > /dev/null 2>&1
+		ret=${?}
+		test ${ret} == 0 || ret=4
+		log-result ${ret}
+	    else
+		log-result 5
+	    fi
+	else
+	    log-result 6
+	fi
+
+	rm -rf ${WEB_SERVER_DIR}${HOME_DIR}/${user}
+    done
+}
+
+set-admin-users()
+{
+    local mode=${1}
+
+    local new_2fa=$(get-admin-2fa ${ADMIN_NAME} new)
+    local cur_2fa=$(get-admin-2fa ${ADMIN_NAME} cur)
+
+    if test ${new_2fa} != ${cur_2fa} -o "${mode}" == force ; then
+	if test ${new_2fa} == True ; then
+
+	    set-admin-2fa ${ACCOUNT} cur ${new_2fa}
+
+	    test "${APL_MODEL}" != 'test' || \
+		install -m 400 -o root -g root ${ADMIN_DIR}/${TWO_FACTOR_GOOGLE_AUTHENTICATOR} /root/${TWO_FACTOR_GOOGLE_AUTHENTICATOR}
+	else
+	    local user
+
+	    for user in ${ACCOUNT} ${ADMIN_USER_LIST}
+	    do
+		reset-admin-2fa ${user}
+		rm -f \
+		   ${BASE_DIR}/${user}/${TWO_FACTOR_GOOGLE_AUTHENTICATOR} \
+		   ${HOME_DIR}/${user}/${TWO_FACTOR_GOOGLE_AUTHENTICATOR}
+	    done
+
+	    test "${APL_MODEL}" != 'test' || rm -f /root/${TWO_FACTOR_GOOGLE_AUTHENTICATOR}
+	fi
+    fi
+
+    if test "${mode}" != force ; then
+	test "${ADMIN_USER_LIST}" != "${CURRENT_ADMIN_USER_LIST}" -o \
+	    "${STATE_CFG_USERS}" == modified || return 0
+    fi
+
+    STATE_CFG_USERS=modified
+    do-set-admin-users
+}
+
+set-shadow()
+{
+    local file1=/etc/shadow
+    local file2=${ETC_DIR}/shadow
+
+    diff --brief ${file1} ${file2} > /dev/null 2>&1 || test "${ADMIN_USER_LIST}" != "${CURRENT_ADMIN_USER_LIST}" || return 0
+
+    log "Updating administrator password list"
+
+    local tmp_shadow1=/tmp/shadow1.${$} tmp_shadow2=/tmp/shadow2.${$}
+    touch ${tmp_shadow1} ${tmp_shadow2}
+    chmod 400 ${tmp_shadow1} ${tmp_shadow2}
+
+    local line user shadow ret
+    local users
+
+    while read line
+    do
+	user=${line/:*}
+	test ${user} != root || continue
+	test ${user} != ${WADMIN_NAME} || continue
+	users="${users} ${user}"
+    done < ${file2} > ${tmp_shadow2}
+
+    while read line
+    do
+	user=${line/:*}
+	member "${users}" ${user} || echo "${line}"
+    done < ${file1} > ${tmp_shadow1}
+    ret=${?}
+
+    test ${ret} -eq 0  &&
+    cat ${tmp_shadow2} >> ${tmp_shadow1} &&
+    cp ${tmp_shadow1} /etc/shadow
+    ret=${?}
+
+    rm -f ${tmp_shadow1} ${tmp_shadow2}
+    log-result ${ret}
+}
+
+set-passwords()
+{
+    local tmp_passwd=/tmp/.new.users.passwd.${$}
+    test -f ${tmp_passwd} || return 0
+
+    local line user password sha1
+
+    log "Initializing administrator passwords"
+    while read line
+    do
+	user=${line/:*}
+	password=${line#*:}
+	sha1=$(echo ${password} | openssl dgst -sha1 2> /dev/null)
+	chroot ${ADMIN_DIR} /bin/htpasswd -Bb /${HARD_DIR_NAME}/.htpasswd ${user} "${password}" > /dev/null 2>&1 &&
+	echo ${sha1} > ${BASE_DIR}/${user}/.passwd.sha1 &&
+	echo ${sha1} > ${BASE_DIR}/${user}/.htpasswd.sha1 &&
+	chown \
+	    ${user}:${GROUP_NAME} \
+	    ${BASE_DIR}/${user}/.passwd.sha1 \
+	    ${BASE_DIR}/${user}/.htpasswd.sha1 &&
+	chmod 600 \
+	    ${BASE_DIR}/${user}/.passwd.sha1 \
+	    ${BASE_DIR}/${user}/.htpasswd.sha1
+    done < ${tmp_passwd} &&
+    chpasswd < ${tmp_passwd} &&
+    rm -f ${tmp_passwd}
+    log-result ${?}
+}
+
+commit-ssh-keys()
+{
+    if test -f ${ADMIN_DIR}/.ssh/authorized_keys.new ; then
+	install -m 640 -o ${ACCOUNT} -g ${GROUP_NAME} ${ADMIN_DIR}/.ssh/authorized_keys.new ${ADMIN_DIR}/.ssh/authorized_keys
+	test ${ACCOUNT} != ${ADMIN_NAME} || \
+	    install -m 640 -o ${SUPERADMIN_NAME} -g ${SUPERADMIN_NAME} ${ADMIN_DIR}/.ssh/authorized_keys.new ${SUPERADMIN_DIR}/.ssh/authorized_keys
+	rm -f ${ADMIN_DIR}/.ssh/authorized_keys.{old,new}
+    fi
+
+    local file key_id
+
+    local new_ssh_key_files=$(ls -1 ${BASE_DIR}/${ACCOUNT}/${SSH_PUBLIC_KEY_RDIR}/*.new 2> /dev/null)
+
+    for file in ${new_ssh_key_files}
+    do
+	key_id=$(file-basename ${file} .new)
+	mv -f ${file} ${BASE_DIR}/${ACCOUNT}/${SSH_PUBLIC_KEY_RDIR}/${key_id}
+    done
+
+    local ssh_key_files=$(ls -1 ${BASE_DIR}/${ACCOUNT}/${SSH_PUBLIC_KEY_RDIR}/* 2> /dev/null)
+
+    for file in ${ssh_key_files}
+    do
+	key_id=$(file-basename ${file})
+ 	member "${SSH_KEY_LIST}" ${key_id} || member "${SSH_MANAGER_KEY_LIST}" ${key_id} || rm -f ${file}
+    done
+
+    if test ${APL_ROLE} == 'manager' ; then
+	if test -f ${MANAGER_DIR}/.ssh/authorized_keys.new ; then
+	    install -m 640 -o ${MANAGER_NAME} -g ${GROUP_NAME} ${MANAGER_DIR}/.ssh/authorized_keys.new ${MANAGER_DIR}/.ssh/authorized_keys
+	    rm -f ${MANAGER_DIR}/.ssh/authorized_keys.{old,new}
+	fi
+    fi
+}
+
+restore-ssh-keys()
+{
+    if test -f ${ADMIN_DIR}/.ssh/authorized_keys.old ; then
+	install -m 640 -o ${ACCOUNT} -g ${GROUP_NAME} ${ADMIN_DIR}/.ssh/authorized_keys.old ${ADMIN_DIR}/.ssh/authorized_keys
+	test ${ACCOUNT} != ${ADMIN_NAME} || \
+	    install -m 640 -o ${SUPERADMIN_NAME} -g ${SUPERADMIN_NAME} ${ADMIN_DIR}/.ssh/authorized_keys.old ${SUPERADMIN_DIR}/.ssh/authorized_keys
+	rm -f ${ADMIN_DIR}/.ssh/authorized_keys.{old,new}
+    fi
+
+    rm -f ${BASE_DIR}/${ACCOUNT}/${SSH_PUBLIC_KEY_RDIR}/*.new
+
+    if test ${APL_ROLE} == 'manager' ; then
+	if test -f ${MANAGER_DIR}/.ssh/authorized_keys.old ; then
+	    mv -f ${MANAGER_DIR}/.ssh/authorized_keys.old ${MANAGER_DIR}/.ssh/authorized_keys
+	    rm -f ${MANAGER_DIR}/.ssh/authorized_keys.new
+	fi
+    fi
+}
+
+set-sshkeys()
+{
+    local new_ssh_key_files=$(ls -1 ${TMP_DIR}/${LOADED}.${SSH_KEY}.* 2> /dev/null)
+    local cur_ssh_key_files=$(ls -1 ${BASE_DIR}/${ACCOUNT}/${SSH_PUBLIC_KEY_RDIR}/* 2> /dev/null)
+
+    test -n "${new_ssh_key_files}" -o \
+	 "${SSH_KEY_LIST}" != "${CURRENT_SSH_KEY_LIST}" -o \
+	 "${ACCESS_MANAGER_LIST}" != "${CURRENT_ACCESS_MANAGER_LIST}" || return 0
+
+    log "Updating SSH keys"
+
+    local key_id key_file
+    local tmp_admin_authorized_keys=/tmp/authorized_keys.${ACCOUNT}.${$}
+    test ! -f ${ADMIN_DIR}/.ssh/authorized_keys || cp -af ${ADMIN_DIR}/.ssh/authorized_keys ${ADMIN_DIR}/.ssh/authorized_keys.old
+
+    if test ${APL_ROLE} == 'manager' ; then
+
+	local tmp_manager_authorized_keys=/tmp/authorized_keys.${MANAGER_NAME}.${$}
+	test ! -f ${MANAGER_DIR}/.ssh/authorized_keys || cp -af ${MANAGER_DIR}/.ssh/authorized_keys ${MANAGER_DIR}/.ssh/authorized_keys.old
+
+	if test -f ${TMP_DIR}/${LOADED}.${SSH_KEY}.${PEER_MANAGER_NAME} ; then
+	    cat ${TMP_DIR}/${LOADED}.${SSH_KEY}.${PEER_MANAGER_NAME}
+	elif test -f ${BASE_DIR}/${ACCOUNT}/${SSH_PUBLIC_KEY_RDIR}/${PEER_MANAGER_NAME} ; then
+	    cat ${BASE_DIR}/${ACCOUNT}/${SSH_PUBLIC_KEY_RDIR}/${PEER_MANAGER_NAME}
+	fi > ${tmp_manager_authorized_keys}
+
+	mv -f ${tmp_manager_authorized_keys} ${MANAGER_DIR}/.ssh/authorized_keys.new
+    fi
+
+    for key_id in ${SSH_KEY_LIST} ${SSH_MANAGER_KEY_LIST}
+    do
+	if test -f ${TMP_DIR}/${LOADED}.${SSH_KEY}.${key_id} ; then
+	    cp -f ${TMP_DIR}/${LOADED}.${SSH_KEY}.${key_id} ${BASE_DIR}/${ACCOUNT}/${SSH_PUBLIC_KEY_RDIR}/${key_id}.new 2> /dev/null
+
+	    for key_file in ${cur_ssh_key_files}
+	    do
+		diff --brief ${TMP_DIR}/${LOADED}.${SSH_KEY}.${key_id} ${key_file} > /dev/null 2>&1
+		test ${?} -ne 0 || rm -f ${TMP_DIR}/${LOADED}.${SSH_KEY}.${key_id}
+	    done
+
+	    cat ${TMP_DIR}/${LOADED}.${SSH_KEY}.${key_id}
+	    rm -f ${TMP_DIR}/${LOADED}.${SSH_KEY}.${key_id}
+
+	elif test -f ${BASE_DIR}/${ACCOUNT}/${SSH_PUBLIC_KEY_RDIR}/${key_id} ; then
+	    cat ${BASE_DIR}/${ACCOUNT}/${SSH_PUBLIC_KEY_RDIR}/${key_id}
+	fi
+    done > ${tmp_admin_authorized_keys}
+
+    mv -f ${tmp_admin_authorized_keys} ${ADMIN_DIR}/.ssh/authorized_keys.new
+
+    log-result 0
+}
+
+clean-loaded-manager-ssh-key()
+{
+    rm -f ${TMP_DIR}/${LOADED}.manager.${SSH_KEY}.{private,public}
+}
+
+set-manager-sshkeys()
+{
+    test ${APL_ROLE} == 'manager' || return 0
+
+    test -f ${TMP_DIR}/${LOADED}.manager.${SSH_KEY}.private -a -f ${TMP_DIR}/${LOADED}.manager.${SSH_KEY}.public || return 0
+
+    log "Importing Manager SSH keys"
+    install -m 600 -o ${ACCOUNT} -g ${GROUP_NAME} ${TMP_DIR}/${LOADED}.manager.${SSH_KEY}.private ${ABASE_DIR}/.ssh/id_rsa &&
+	install -m 644 -o ${ACCOUNT} -g ${GROUP_NAME} ${TMP_DIR}/${LOADED}.manager.${SSH_KEY}.public ${ABASE_DIR}/.ssh/id_rsa.pub &&
+	clean-loaded-manager-ssh-key
+    log-result ${?}
+}
+
+set-files2dir()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 1
+    test -n "${3}" || return 1
+    local state=${1}
+    local dir=${2} 
+    local files=${3}
+    
+    local file basename
+
+    case ${state} in
+	True)
+	    for file in ${files}
+	    do
+		basename=$(file-basename "${file}")
+		if test ! -f ${WEB_SERVER_DIR}/${dir}/${basename} ; then
+		    cp -a ${file} ${WEB_SERVER_DIR}/${dir}
+		    test -L ${WEB_SERVER_DIR}/${dir}/${basename} || chattr +i ${WEB_SERVER_DIR}/${dir}/${basename}
+		fi
+	    done
+	    ;;
+	False)
+	    for file in ${files}
+	    do
+		basename=$(file-basename "${file}")
+		if test -f ${WEB_SERVER_DIR}/${dir}/${basename} ; then
+		    test -L ${WEB_SERVER_DIR}/${dir}/${basename} || chattr -i ${WEB_SERVER_DIR}/${dir}/${basename}
+		    rm -f ${WEB_SERVER_DIR}/${dir}/${basename}
+		fi
+	    done
+	    ;;
+	*)
+	    ;;
+    esac
+}
+
+set-waudit-commands()
+{
+    test -n "${1}" || return 1
+    local state=${1}
+
+    chattr -i ${WEB_SERVER_DIR}/bin
+    mkdir  -p ${WEB_SERVER_DIR}/bin
+    set-files2dir ${state} bin "${WAUDIT_BINARY_FILES}"
+    chattr +i ${WEB_SERVER_DIR}/bin
+}
+
+gen-waudit-env-file()
+{
+    local osversion=${1}
+    test -n "${osversion}" || osversion=$(cat ${HARD_DIR}/os-version)
+
+    local osname=$(cat ${HARD_DIR}/os-name)
+    local len=${#WEB_SERVER_DIR}
+    local wauditdir=${RWEB_AUDIT_DIR:${len}}
+
+    echo "PATH=/bin"
+    echo "OSNAME='${osname}'"
+    echo "OSVERSION='${osversion}'"
+    echo "WAUDITDIR='${wauditdir}'"
+    echo "ADMINISTRATOR_EMAIL='${ADMINISTRATOR_EMAIL}'"
+    echo "GUI_HOME_PAGE=${GUI_HOME_PAGE}"
+    echo "GUI_PAGE_TITLE=Auditing"
+
+    echo "WEB_SERVER_DIR='/'"
+    echo "IMAGE_DIR='${IMAGE_DIR}'"
+    echo "ETC_HTML_DIR='/${ETC_HTML_RDIR}'"
+    echo "GUI_DIR_NAME='${GUI_DIR_NAME}'"
+    echo "JS_DIR='${JS_DIR}'"
+
+    echo "COMMERCIAL_NAME='${COMMERCIAL_NAME}'"
+    echo "WEBSITE='${WEBSITE}'"
+    echo "YEARS='${YEARS}'"
+    echo "COMMERCIAL_NAME='${COMMERCIAL_NAME}'"
+    echo "APL_ROLE='${APL_ROLE}'"
+    echo "GUI_CORE_EXT='${GUI_CORE_EXT}'"
+    echo "GUI_CGI_DIR='/${CGI_RDIR}'"
+    echo "GUI_PAGES_HIERARCHY_FILENAME='${GUI_PAGES_HIERARCHY_FILENAME}'"
+    echo "FW_LOG_TAG='${FW_LOG_TAG}'"
+    echo "ERROR_TAG='${ERROR_TAG}'"
+    echo "FIREWALL_LOG='${FIREWALL_LOG}'"
+    echo "WAF_LOG='${WAF_LOG}'"
+    echo "WEB_LOG='${WEB_LOG}'"
+    echo "RWEB_LOG='${RWEB_LOG}'"
+    echo "VPN_IPSEC_LOG='${VPN_IPSEC_LOG}'"
+    echo "ACCESS_GUARD_LOG='${ACCESS_GUARD_LOG}'"
+    echo "ANTI_VIRUS_LOG='${ANTI_VIRUS_LOG}'"
+    echo "ANTI_VIRUS_SERVER_LOG='${ANTI_VIRUS_SERVER_LOG}'"
+    echo "GUI_MODULE_NAME='Auditing'"
+    echo "GUI_EXT_NAME='${GUI_EXT_NAME}'"
+    echo "GUI_AUTHENTICATION_KEY_FILE='${GUI_AUTHENTICATION_KEY_FILE}'"
+    echo "GUI_COOKIE_AUTH_NAME='${GUI_COOKIE_AUTH_NAME}'"
+    echo "GUI_COOKIE_CONTEXT_NAME='${GUI_COOKIE_CONTEXT_NAME}'"
+    echo "GUI_COOKIE_LEFT_MENU_NAME='${GUI_COOKIE_LEFT_MENU_NAME}'"
+    echo "GUI_COOKIE_TOP_MENU_NAME='${GUI_COOKIE_TOP_MENU_NAME}'"
+    echo "GUI_COOKIE_DASHBOARD_MENU_NAME='${GUI_COOKIE_DASHBOARD_MENU_NAME}'"
+    echo "GUI_CSRF_ATTRIBUTE='${GUI_CSRF_ATTRIBUTE}'"
+    echo "WAUDITPORT='${WAUDIT_PORT}'"
+    echo "WEB_SERVER_DENY_NAME='${WEB_SERVER_DENY_NAME}'"
+    echo "AV_DENIED_URI='${AV_DENIED_URI}'"
+    echo "WAF_RULE_ID_INIT=${WAF_RULE_ID_INIT}"
+    echo "WADMIN_PORT=${WADMIN_PORT}"
+
+    set-generic-rule-table
+
+    local i len=${#WAF_GENERIC_FILTER_FILE[@]}
+
+    for ((i=0; i<len; i++))
+    do
+	echo "WAF_GENERIC_FILTER_NAME[${i}]='${WAF_GENERIC_FILTER_NAME[${i}]}'"
+	echo "WAF_GENERIC_FILTER_FILE[${i}]='${WAF_GENERIC_FILTER_FILE[${i}]}'"
+    done
+}
+
+set-waudit-env-file()
+{
+    test -n "${1}" || return 1
+    local state=${1}
+    local os_version=${2}
+
+    local env_file=${WEB_SERVER_DIR}/etc/${WAUDIT_NAME}.env
+
+    case ${state} in
+	True)
+	    gen-waudit-env-file ${os_version} > ${env_file}
+	    ;;
+	False)
+	    rm -f ${env_file}
+	    ;;
+	*)
+	    ;;
+    esac
+}
+
+set-waudit-constant-files()
+{
+    test -n "${1}" || return 1
+    local state=${1}
+
+    local libs="lib-common lib-usage lib-2fa" lib
+
+    chattr -i ${WEB_SERVER_DIR}/${CGI_RDIR}
+    
+    case ${state} in
+	True)
+	    cp -a ${ETC_DIR}/.file* ${WEB_SERVER_DIR}/etc 2> /dev/null
+
+	    for lib in ${libs}
+	    do
+		test -f ${WEB_SERVER_DIR}/${CGI_RDIR}/${lib} || \
+		    install -m 444 -o root -g root ${APPLIANCE_DIR}/lib/${lib} ${WEB_SERVER_DIR}/${CGI_RDIR}/${lib}
+		chattr +i ${WEB_SERVER_DIR}/${CGI_RDIR}/${lib}
+	    done
+	    ;;
+
+	False)
+	    rm -f ${WEB_SERVER_DIR}/etc/.file*
+
+	    for lib in ${libs}
+	    do
+		if test -f ${WEB_SERVER_DIR}/${CGI_RDIR}/${lib} ; then
+		    chattr -i ${WEB_SERVER_DIR}/${CGI_RDIR}/${lib}
+		    rm -f ${WEB_SERVER_DIR}/${CGI_RDIR}/${lib}
+		fi
+	    done
+	    ;;
+	*)
+	    ;;
+    esac
+
+    chattr +i ${WEB_SERVER_DIR}/${CGI_RDIR}
+}
+
+set-waudit-env()
+{
+    test -n "${1}" || return 1
+    local state=${1}
+
+    set-waudit-env-file ${state}
+    set-waudit-constant-files ${state}
+}
+
+update-waudit-htpasswd()
+{
+    test -f ${HARD_DIR}/.htpasswd || return 1
+
+    local line user
+    local tmp_htpasswd=/tmp/htpasswd.${$}
+
+    while read line
+    do
+	user=${line/:*}
+	! is-first-login ${user} || continue
+	echo ${line}
+    done < ${HARD_DIR}/.htpasswd > ${tmp_htpasswd}
+
+    cp -a ${tmp_htpasswd} ${WEB_SERVER_DIR}/etc/.htpasswd 2> /dev/null
+    rm -f ${tmp_htpasswd}
+}
+
+set-waudit-password()
+{
+    test -n "${1}" || return 1
+    local state=${1}
+
+    local file1=${WEB_SERVER_DIR}/etc/.htpasswd
+
+    case ${state} in
+	True)
+	    local file2=${HARD_DIR}/.htpasswd
+	    diff --brief ${file2} ${file1} > /dev/null 2>&1 || update-waudit-htpasswd
+	    ;;
+	False)
+	    test "${state}" == "${CURRENT_ADMIN_WAUDIT}" || rm -f ${file1}
+	    ;;
+	*)
+	    ;;
+    esac
+}
+
+add-audit-filter()
+{
+    test -n "${1}" || return 1
+    local name=${1}
+
+    local dir=${RWEB_AUDIT_DIR}/${name}
+    log "Activating ${name} auditing"
+    mkdir -p ${dir} && chown filter ${dir}
+    touch ${dir}/audit.log
+    chmod +r ${dir}/audit.log
+    local ret=${?}
+    log-result ${ret}
+    return ${ret}
+}
+
+delete-audit-filter()
+{
+    test -n "${1}" || return 1
+    local name=${1}
+
+    test -d ${RWEB_AUDIT_DIR}/${name} || return 0
+
+    log "Deactivating ${name} auditing"
+    rm -rf ${RWEB_AUDIT_DIR}/${name}
+    local ret=${?}
+    log-result ${ret}
+    return ${ret}
+}
+
+set-filter-audit()
+{
+    local mode=${1}
+    if test "${mode}" != force ; then
+	test "${_WAF_RWEB_AUDIT_LIST}" != "${CURRENT_WAF_RWEB_AUDIT_LIST}" -o \
+	    "${STATE_CFG_RWEB_AUDIT_LIST}" == modified || return 0
+    fi
+
+    STATE_CFG_RWEB_AUDIT_LIST=modified
+
+    local name
+
+    for name in ${RWEB_SITE_NAME_LIST} ; do
+	if member "${_WAF_RWEB_AUDIT_LIST}" ${name} ; then
+	    add-audit-filter ${name}
+	    test ${?} -eq 0 || return 1
+	fi
+    done
+
+    local names=$(ls ${RWEB_AUDIT_DIR} 2> /dev/null)
+
+    for name in ${names}
+    do
+	name=$(file-basename ${name})
+	if ! member "${_WAF_RWEB_AUDIT_LIST}" ${name} ; then
+	    delete-audit-filter ${name}
+	    test ${?} -eq 0 || return 1
+	fi
+    done
+}
+
+set-waudit-mode()
+{
+    test -n "${1}" || return 1
+    local mode=${1}
+
+    set-waudit-password ${ADMIN_WAUDIT}
+
+    test "${ADMIN_WAUDIT}" != "${CURRENT_ADMIN_WAUDIT}" -o ${mode} == force || return 0
+
+    set-waudit-commands ${ADMIN_WAUDIT}
+    set-waudit-env ${ADMIN_WAUDIT}
+}
+
+gen-health-check-srv()
+{
+    test ${HA_MODE} == False || echo "keepalived critical"
+    test ${RLOGGER_IS_ACTIVE} == False || echo "rlogger major"
+    test ${IKE_IS_ACTIVE} == False || echo "iked major - ${ISAKMP_PORT}"
+    test ${SELF_NS} == False || echo "named major 127.0.0.1 ${DOMAIN_PORT}"
+    test ${DHCP_IS_ACTIVE} == False || echo "dhcpd major"
+
+    test -z "${NTP_SERVER_LIST}" || echo "ntpd minor"
+
+    test ${ADMIN_SNMP} == False || echo "snmpd minor 127.0.0.1 ${SNMP_PORT}"
+    test ${SMANAGER_IS_ACTIVE} == False || echo "smanager major"
+    test ${ADMIN_SSH} == False || echo "sshd minor 127.0.0.1 ${SSH_PORT}"
+    test ${ADMIN_WADMIN} == False || echo "${WADMIND_NAME} minor 127.0.0.1 ${WADMIN_PORT}"
+    test ${OCSP_IS_ACTIVE} == False || echo "ocspd major - ${OCSP_PORT}"
+    test ${LDAP_PROXY_IS_ACTIVE} == False || echo "slapd major - ${LDAP_PORT}"
+
+    if test ${AV_MODE} == True ; then
+	echo "freshclam major"
+	echo "clamd major ${AV_LOCAL_IP} ${AV_PORT}"
+	echo "c-icap major ${ICAP_LOCAL_IP} ${ICAP_PORT}"
+    fi
+
+    test ${PROXY2_MODE} == False -o ${CACHE_MODE} == False || echo "htcacheclean minor"
+
+    if test ${APL_ROLE} == 'gateway' ; then
+	test ${SQUID_IS_ACTIVE} == False || echo "squid critical 127.0.0.1 ${PROXY_PORT}"
+	echo "httpd critical 127.0.0.2 ${WWW_PORT}"
+    fi
+}
+
+set-admin-fingerprint()
+{
+    local tls_id=${ADMIN_TLS/:*}
+    local sha256
+
+    sha256=$(openssl x509 -noout -fingerprint -sha256 -in ${SSL_SERVER_DIR}/${tls_id}.certificate 2> /dev/null)
+    sha256=${sha256/*=}
+
+    export ADMIN_SHA256=${sha256}
+}
+
+gen-snmp-conf()
+{
+    cat snmp.conf-constant
+
+    echo "defVersion ${SNMP_VERSION}"
+    echo "defSecurityName ${SNMP_USER}"
+
+    if test -n "${SNMP_COMMUNITY}" ; then
+	echo "defCommunity ${SNMP_COMMUNITY}"
+	echo "defAuthPassphrase ${SNMP_COMMUNITY}"
+	if test -n "${SNMP_PRIVACY}" ; then
+	    echo "defPrivPassphrase ${SNMP_PRIVACY}"
+	    echo "defSecurityLevel authPriv"
+	else
+	    echo "defSecurityLevel authNoPriv"
+	fi
+    else
+	echo "defSecurityLevel noAuthNoPriv"
+    fi
+}
+
+gen-var-snmpd-conf()
+{
+    echo "createUser ${SNMP_USER} SHA-256 ${SNMP_COMMUNITY} AES ${SNMP_PRIVACY}"
+    test -f /var/snmpd/snmpd.conf || return 0
+
+    local key value
+
+    while read key value
+    do
+	test ${key} != usmUser -a ${key} != createUser || continue
+	echo ${key} ${value}
+    done  < /var/snmpd/snmpd.conf
+}
+
+gen-sysconfig-snmpd()
+{
+    cat sysconfig.ntpd-constant
+    echo "COMMUNITY=\"${SNMP_COMMUNITY}\""
+}
+
+gen-snmpd-conf-proc()
+{
+    local ocspd_nb_min=$[${OCSPD_NB} + 1]
+    local ocspd_nb_max=$[${ocspd_nb_min} + 3]
+
+    echo "proc supervisor 1 1"
+    echo "proc health 1 1"
+
+    test ${HA_MODE} == False || echo "proc keepalived 1 1"
+    test ${IKE_IS_ACTIVE} == False || echo "proc charon 1 1"
+    test ${SELF_NS} == False || echo "proc named 1 1"
+    test ${DHCP_IS_ACTIVE} == False || echo "proc dhcpd 1 1"       
+
+    test -z "${NTP_SERVER_LIST}" || echo "proc ntpd 1 1"
+
+    test ${SMANAGER_IS_ACTIVE} == False || echo "proc apl_smanagerd 7 3"
+    test ${ADMIN_SSH} == False || echo "proc sshd 1 1"
+    test ${ADMIN_WADMIN} == False || echo "proc ${WADMIND_NAME} 1 1"
+    test ${OCSP_IS_ACTIVE} == False || echo "proc openssl ${ocspd_nb_max} ${ocspd_nb_min}"
+    test ${LDAP_PROXY_IS_ACTIVE} == False || echo "proc slapd 1 1"
+
+    if test ${AV_MODE} == True ; then
+	echo "proc freshclam 1 1"
+	echo "proc clamd 1 1"
+	cat snmpd.conf-c-icap-tuned
+    fi
+
+    test ${PROXY2_MODE} == False -o ${CACHE_MODE} == False || echo "proc htcacheclean 1 1"
+
+    test ${GUARD_MODE} == False || cat snmpd.conf-squidGuard-tuned
+
+    if test ${APL_ROLE} == 'gateway' ; then
+	test ${SQUID_IS_ACTIVE} == False || echo "proc squid 2 2"
+	cat snmpd.conf-httpd-tuned
+    fi
+
+}
+
+gen-snmpd-conf()
+{
+    local internal external auxiliary
+    local elt i=0 range if_server
+    local version server port user hash_value enc_value password privacy
+    local certificate certificates cert
+
+    local addresses="TCP:127.0.0.1:${SNMP_PORT}"
+    local trap_options="-r 2 -t 4" trap_v3_options
+    local view_name="iso_view"
+
+    local sha256=${ADMIN_SHA256/SHA256 /}
+    sha256=${sha256/*=}
+
+    cat snmpd.conf-constant
+    echo "[snmp] defVersion ${SNMP_VERSION}"
+    echo "[snmp] defSecurityName ${SNMP_USER}"
+    echo "[snmp] localCert ${sha256}"
+    echo "[snmp] trustCert ${sha256}"
+    if test -n "${SNMP_COMMUNITY}" ; then
+	echo "[snmp] defCommunity ${SNMP_COMMUNITY}"
+	echo "[snmp] defAuthPassphrase ${SNMP_COMMUNITY}"
+	if test -n "${SNMP_PRIVACY}" ; then
+	    echo "[snmp] defPrivPassphrase ${SNMP_PRIVACY}"
+	    echo "[snmp] defSecurityLevel authPriv"
+	else
+	    echo "[snmp] defSecurityLevel authNoPriv"
+	fi
+    else
+	echo "[snmp] defSecurityLevel noAuthNoPriv"
+    fi
+
+    cat snmpd.conf-tuned
+
+    echo "sysName ${SHOSTNAME}.${DOMAIN_NAME}"
+    echo "sysContact ${ADMINISTRATOR_EMAIL}"
+    echo "sysLocation $(get-tls-location)"
+
+    if test ${IP_MON_IP} != "0.0.0.0" ; then
+
+	local admin
+
+	test ${ADMIN_INTERNAL} == False || admin='yes'
+	test ${VPN_IPSEC_MODE} == False -o ${ADMIN_VPN_IPSEC} == False || admin='yes'
+
+	if test -n "${admin}" ; then
+	   test ${SNMP_UDP} == False || internal="${internal},UDP:${IP_MON_IP}:${SNMP_PORT}"
+	   test ${SNMP_TCP} == False || internal="${internal},TCP:${IP_MON_IP}:${SNMP_PORT}"
+	   test ${SNMP_TLS} == False || internal="${internal},TLSTCP:${IP_MON_IP}:${SNMP_TLS_PORT}"
+	   test -z "${internal}" || internal=${internal:1}
+	fi
+    fi
+
+    if test ${ADMIN_EXTERNAL} == True -a ${IP_EXTERNAL_IP} != "0.0.0.0" ; then
+	test ${SNMP_UDP} == False || external="${external},UDP:${IP_EXTERNAL_IP}:${SNMP_PORT}"
+	test ${SNMP_TCP} == False || external="${external},TCP:${IP_EXTERNAL_IP}:${SNMP_PORT}"
+	test ${SNMP_TLS} == False || external="${external},TLSTCP:${IP_EXTERNAL_IP}:${SNMP_TLS_PORT}"
+	test -z "${external}" || external=${external:1}
+    fi
+
+    if test -n "${IF_AUXILIARY}" -a ${ADMIN_AUXILIARY} == True -a ${IP_AUXILIARY_IP} != "0.0.0.0" ; then
+	test ${SNMP_UDP} == False || auxiliary="${auxiliary},UDP:${IP_AUXILIARY_IP}:${SNMP_PORT}"
+	test ${SNMP_TCP} == False || auxiliary="${auxiliary},TCP:${IP_AUXILIARY_IP}:${SNMP_PORT}"
+	test ${SNMP_TLS} == False || auxiliary="${auxiliary},TLSTCP:${IP_AUXILIARY_IP}:${SNMP_TLS_PORT}"
+	test -z "${auxiliary}" || auxiliary=${auxiliary:1}
+    fi
+
+    test -z "${internal}" || addresses="${addresses},${internal}"
+    test -z "${external}" || addresses="${addresses},${external}"
+    test -z "${auxiliary}" || addresses="${addresses},${auxiliary}"
+
+    echo "agentaddress ${addresses}"
+    echo "engineIDNic ${IF_MON}"
+
+    echo "certSecName 10 ${sha256} --sn ${SNMP_USER}"
+
+    certificates=$(ls -1 ${SNMP_SSL_CERTIFICATE_DIR}/${SNMP_SSL}.[1-8].crt 2> /dev/null)
+
+    i=11
+    for certificate in ${certificates}
+    do
+	cert=$(file-basename ${certificate} .crt)
+	echo "certSecName ${i} ${cert} --sn ${SNMP_USER}"
+	((i++))
+    done
+
+    local send_trap
+
+    if test ${IP_MON_IP} != "0.0.0.0" ; then
+	test ${ADMIN_INTERNAL} == False || send_trap='yes'
+	test ${VPN_IPSEC_MODE} == False -o ${ADMIN_VPN_IPSEC} == False || send_trap='yes'
+    fi
+
+    test ${ADMIN_EXTERNAL} == False -o ${IP_EXTERNAL_IP} == "0.0.0.0" || send_trap='yes'
+    test -z "${IF_AUXILIARY}" -o ${ADMIN_AUXILIARY} == False -o ${IP_AUXILIARY_IP} == "0.0.0.0" || send_trap='yes'
+    
+    if test -n "${send_trap}" ; then
+	i=0
+	for elt in ${SNMP_TRAP_SERVER_LIST}
+	do
+	    range=$[${i} % 8]
+	    case ${range} in
+		0)
+		    version=${elt}
+		    ;;
+		1)
+		    server=${elt}
+		    ;;
+		2)
+		    port=${elt}
+		    ;;
+		3)
+		    user=${elt}
+		    ;;
+		4)
+		    hash_value=${elt}
+		    ;;
+		5)
+		    enc_value=${elt}
+		    ;;
+		6)
+		    password=${elt}
+		    ;;
+		7)
+		    privacy=${elt}
+
+		    case ${version} in
+			v1)
+			    echo "trapsess ${trap_options} -v 1 -c ${password} tcp:${server}:${port} ${server}"
+			    ;;
+			v2c)
+			    echo "trapsess ${trap_options} -v 2c -c ${password} tcp:${server}:${port} ${server}"
+			    ;;
+			v3)
+			    hash_value=${hash_value^^}
+			    enc_value=${enc_value^^}
+
+			    # Sending Inform Notification with -Ci option (for Traps the user should be the local SNMP_USER)
+			    trap_v3_options="${trap_options} -v 3 -Ci -u '${user}'"
+
+			    if test -n "${password}" ; then
+				if test -n "${privacy}" ; then
+				    echo "trapsess ${trap_v3_options} -l authPriv -a ${hash_value} -A ${password} -x ${enc_value} -X ${privacy} tcp:${server}:${port} ${server}"
+				else
+				    echo "trapsess ${trap_v3_options} -l authNoPriv -a ${hash_value} -A ${password} udp:${server}:${port}"
+				fi
+			    else
+				echo "trapsess ${trap_v3_options} -l noAuthNoPriv udp:${server}:${port}"
+			    fi
+			    ;;
+			*)
+			    ;;
+		    esac
+		    ;;
+		*)
+		    return 1
+		    ;;
+	    esac
+	    ((i++))
+	done
+    fi
+
+    nb=1
+    for if_server in localhost ${ACCESS_MON_IF_IP_LIST} ${ACCESS_MON_IF_DN_LIST}
+    do
+	server=${if_server#*:}
+	echo "com2sec ${SNMP_USER}_${nb} ${server} ${SNMP_COMMUNITY}"
+	((nb++))
+    done
+
+    for ((i=1 ; i<nb ; i++))
+    do
+	echo "group ${SNMP_USER}_group v1  ${SNMP_USER}_${i}"
+	echo "group ${SNMP_USER}_group v2c ${SNMP_USER}_${i}"
+    done
+
+    echo "view ${view_name} included .iso"
+    echo "access ${SNMP_USER}_group '' any noAuth exact ${view_name} none none"
+
+    echo "authuser read -s usm ${SNMP_USER} authNoPriv -V ${view_name}"
+    echo "authuser read -s tsm ${SNMP_USER} authNoPriv -V ${view_name}"
+
+    echo "trapcommunity ${SNMP_COMMUNITY}"
+    echo "iquerySecName ${SNMP_USER}"
+    echo "v1trapaddress ${IP_MON_IP}"
+
+    gen-snmpd-conf-proc
+}
+
+gen-sudoers()
+{
+    cat sudoers-constant
+
+    echo
+    echo "Defaults mailto = \"${ADMINISTRATOR_EMAIL}\""
+    echo "Host_Alias SECUREHOST = ${SHOSTNAME}"
+
+    local nb=1 user
+
+    for user in ${ADMIN_USER_LIST}
+    do
+	echo
+	echo "User_Alias USER${nb} = ${user}"
+	echo "Cmnd_Alias CHROOT_USER${nb} = /usr/sbin/chroot ${ADMIN_DIR} su --login ${user}*"
+	echo "USER${nb} SECUREHOST = (ROOT) NOPASSWD: CHROOT_USER${nb}"
+	((nb++))
+    done
+}
+
+LIB_APL_ADMIN=Yes

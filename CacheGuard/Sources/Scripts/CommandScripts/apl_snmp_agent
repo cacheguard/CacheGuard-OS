@@ -1,0 +1,232 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       Scripts
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+CACHEGUARD_DIR=/etc/sysconfig/cacheguard
+source ${CACHEGUARD_DIR}/constant
+source ${APPLIANCE_DIR}/etc/role
+source ${LOCAL_DIR}/lib/apl_functions
+
+ROOT_DIR=${ADMIN_DIR}
+
+snmp-get-ssd-lifetime-min()
+{
+    local value=100
+
+    if test -s ${RUN_DIR}/${DISKS_HEALTH_FILENAME} ; then
+	local disk state lifetime
+	while read disk state lifetime
+	do
+	    test -n "${lifetime}" || continue
+	    check-digit ${lifetime} || continue
+	    value=$(min-value ${lifetime} ${value})
+	done < ${RUN_DIR}/${DISKS_HEALTH_FILENAME}
+    fi
+
+    echo ${value}
+}
+
+snmp-get()
+{
+    test -n "${1}" || return 1
+    local oid=${1}
+
+    local label=$(snmptranslate -m CACHEGUARD-MIB -Tl ${oid} 2> /dev/null)
+    if test ${?} -ne 0 ; then
+	echo NONE
+	return 1
+    fi
+
+    local type value
+    
+    case ${label} in
+	cgOSVersion)
+	    value=$(cat ${HARD_DIR}/os-version)
+	    type='string'
+	    ;;
+	cgEndUsers)
+	    value=${USERS_NB}
+	    type='integer'
+	    ;;
+	cgReverseWebSites)
+	    value=${RWEB_NB}
+	    type='integer'
+	    ;;
+	cgCacheSize)
+	    source ${ABASE_DIR}/${ENV_RDIR}/${ENV_CURRENT_NAME}
+	    value=$(get-cache-size)
+	    type='integer'
+	    ;;
+	cgCacheUsed)
+	    source ${ABASE_DIR}/${ENV_RDIR}/${ENV_CURRENT_NAME}
+	    value=$(get-cache-used)
+	    type='integer'
+	    ;;
+	cgBigCacheSize)
+	    source ${ABASE_DIR}/${ENV_RDIR}/${ENV_CURRENT_NAME}
+	    value=$(get-bigcache-size)
+	    type='integer'
+	    ;;
+	cgRCacheSize)
+	    source ${ABASE_DIR}/${ENV_RDIR}/${ENV_CURRENT_NAME}
+	    value=$(get-rcache-size)
+	    type='integer'
+	    ;;
+	cgRCacheUsed)
+	    source ${ABASE_DIR}/${ENV_RDIR}/${ENV_CURRENT_NAME}
+	    sudo apl_health_check ${$} disk rcache > /dev/null 2>&1
+	    value=$(get-rcache-used)
+	    type='integer'
+	    ;;
+	cgCacheHitRequest)
+	    source ${ABASE_DIR}/${ENV_RDIR}/${ENV_CURRENT_NAME}
+	    value=$(get-cache-hit-request)
+	    type='integer'
+	    ;;
+	cgCacheHitVolume)
+	    source ${ABASE_DIR}/${ENV_RDIR}/${ENV_CURRENT_NAME}
+	    value=$(get-cache-hit-volume)
+	    type='integer'
+	    ;;
+	cgCacheMeanObjectSize)
+	    source ${ABASE_DIR}/${ENV_RDIR}/${ENV_CURRENT_NAME}
+	    value=$(get-cache-real-mean-object-sz)
+	    type='integer'
+	    ;;
+	cgCacheMeanObjectReferenceSize)
+	    value=$(get-cache-reference-mean-object-sz)
+	    type='integer'
+	    ;;
+	cgDiskAverageIO)
+	    sudo apl_health_check ${$} disk io > /dev/null 2>&1
+	    local io=$(cat ${RUN_DIR}/${DISKS_STATS_IO_FILENAME} 2>/dev/null)
+	    local time_io=$(cat ${RUN_DIR}/${DISKS_STATS_TIME_IO_FILENAME} 2>/dev/null)
+	    if test ${io} -eq 0 ; then
+		local avg=0
+	    else
+		local avg=$[${time_io} / ${io}]
+	    fi
+	    value=${avg}
+	    type='integer'
+	    ;;
+	cgDiskAverageIOSinceLastCheck)
+	    sudo apl_health_check ${$} disk io > /dev/null 2>&1
+	    local avg=$(cat ${RUN_DIR}/${DISKS_STATS_AVG_FILENAME} 2>/dev/null)
+	    value=${avg}
+	    type='integer'
+	    ;;
+	cgSSDLifetime)
+	    sudo apl_health_check ${$} disk health > /dev/null 2>&1
+	    value=$(snmp-get-ssd-lifetime-min)
+	    type='integer'
+	    ;;
+	cgRAIDState)
+	    sudo apl_health_check ${$} disk raid > /dev/null 2>&1
+	    type='integer'
+	    if test -s ${RUN_DIR}/${RAID_HEALTH_FILENAME} ; then
+		local key val
+		while read key val
+		do
+		    case ${key} in
+			Raid_State)
+			    case ${val} in
+				clean)
+				    value=1
+				    ;;
+				*)
+				    value=0
+				    ;;
+			    esac
+			    break
+			    ;;
+			*)
+			    ;;
+		    esac
+		done < ${RUN_DIR}/${RAID_HEALTH_FILENAME}
+	    else
+		value="1"
+	    fi
+	    ;;
+	cgRAIDBuildStatus)
+	    sudo apl_health_check ${$} disk raid > /dev/null 2>&1
+	    type='integer'
+	    if test -s ${RUN_DIR}/${RAID_HEALTH_FILENAME} ; then
+		local key val
+		while read key val
+		do
+		    case ${key} in
+			Build_Status)
+			    value="${val}"
+			    break
+			    ;;
+			*)
+			    ;;
+		    esac
+		done < ${RUN_DIR}/${RAID_HEALTH_FILENAME}
+	    else
+		value="0"
+	    fi
+	    ;;
+	*)
+	    ;;
+    esac
+
+    if test -n "${value}" ; then
+	echo "${oid}"
+	echo "${type}"
+	echo "${value}"
+    else
+	echo NONE
+    fi
+}
+
+main()
+{
+    local request oid
+
+    while true
+    do
+	read request
+	case ${request} in
+	    PING)
+		echo PONG
+		;;
+	    get|getnext)
+		read oid
+		snmp-get ${oid}
+		;;
+	    set)
+		read oid
+		read type value
+		echo not-writable
+		;;
+	    "")
+		return 0
+		;;
+	    *)
+		;;
+	esac
+    done
+}
+
+main ${*}

@@ -1,0 +1,2 @@
+Empty reply
+Your Web Gateway did not receive any data for this request

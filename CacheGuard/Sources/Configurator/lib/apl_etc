@@ -1,0 +1,481 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       Configurator
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+lcd-print()
+{
+    test -n "${1}" || return 1
+    local state=${1}
+
+    [ -f /usr/local/bin/lcd4linux ] || return 11
+    [ -f /etc/lcd4linux-${state}.conf ] || exit 12
+    [ -f /etc/sysconfig/lcd4linux ] && source /etc/sysconfig/lcd4linux
+
+    lcd4linux ${OPTIONS} -f /etc/lcd4linux-${state}.conf
+}
+
+gen-issue()
+{
+    echo "Welcome to the ${COMMERCIAL_NAME} ${APL_ROLE^}"
+    if test "${IP_ADMIN_IP}" == "0.0.0.0" -a "${IP_AUXILIARY_IP}" == "0.0.0.0" -a "${IP_EXTERNAL_IP}" == "0.0.0.0" ; then
+	echo "Login as ${ADMIN_NAME} to setup this appliance"
+    else
+	local elt range i=0
+	local interface interfaces
+	local admin_ip_displayed
+
+	for elt in ${ACCESS_IF_IP_MK_ADMIN_LIST}
+	do
+	    range=$[${i} % 4]
+	    case ${range} in
+		0)
+		    interface=${elt}
+		    ;;
+		1)
+		    ;;
+		2)
+		    ;;
+		3)
+		    member "${interfaces}" ${interface} || interfaces="${interfaces} ${interface}"
+		    ;;
+		*)
+		    return 255
+		    ;;
+	    esac
+	    ((i++))
+	done
+	interfaces=${interfaces:1}
+
+	for interface in ${interfaces}
+	do
+	    case ${interface} in
+		internal)
+		    if test -z "${admin_ip_displayed}" ; then
+			if test "${ADMIN_INTERNAL}" == True -a "${IP_ADMIN_IP}" != "0.0.0.0" ; then
+			    echo "Management URL: https://${IP_ADMIN_IP}:${WADMIN_PORT} from allowed networks"
+			    admin_ip_displayed=yes
+			fi
+		    fi
+		    ;;
+		vpnipsec)
+		    if test -z "${admin_ip_displayed}" ; then
+			if test "${ADMIN_VPN_IPSEC}" == True -a "${IP_ADMIN_IP}" != "0.0.0.0" ; then
+			    echo "Management URL: https://${IP_ADMIN_IP}:${WADMIN_PORT} from allowed networks"
+			    admin_ip_displayed=yes
+			fi
+		    fi
+		    ;;
+		external)
+		    test "${ADMIN_EXTERNAL}" == False -o "${IP_EXTERNAL_IP}" == "0.0.0.0" || echo "Management URL: https://${IP_EXTERNAL_IP}:${WADMIN_PORT} from allowed networks"
+		    ;;
+		auxiliary)
+		    if test -n "${IF_AUXILIARY}" ; then
+			test "${ADMIN_AUXILIARY}" == False -o "${IP_AUXILIARY_IP}" == "0.0.0.0" || echo "Management URL: https://${IP_AUXILIARY_IP}:${WADMIN_PORT} from allowed networks"
+		    fi
+		    ;;
+		*)
+		    ;;
+	    esac
+	done
+    fi
+
+    echo "Copyrights (C) ${YEARS} ${COMMERCIAL_NAME} - All rights reserved"
+    echo
+}
+
+gen-sysctl()
+{
+    local rp_filter ip_forward ha_mode
+
+    cat sysctl.conf-constant
+
+    echo
+
+    if test ${TPROXY_MODE} == False ; then
+	rp_filter=1
+    else
+	rp_filter=0
+    fi
+
+    if test ${ROUTER_MODE} == True ; then
+	ip_forward=1
+    else
+	ip_forward=1
+    fi
+
+    if test ${HA_MODE} == True ; then
+	ha_mode=1
+    else
+	ha_mode=0
+    fi
+    
+    echo "net.ipv4.ip_forward = ${ip_forward}"
+    echo "net.ipv4.conf.default.rp_filter = ${rp_filter}"
+    echo "net.ipv4.conf.all.rp_filter = ${rp_filter}"
+    echo "net.ipv4.conf.all.arp_ignore = ${ha_mode}"
+    echo "net.ipv4.conf.all.arp_announce = ${ha_mode}"
+    echo "net.ipv4.ip_nonlocal_bind = ${ha_mode}"
+}
+
+gen-sysnetctl()
+{
+    test ${APL_ROLE} == 'gateway' || return 0
+
+    if test ${TPROXY_MODE} == False ; then
+	rp_filter=1
+    else
+	rp_filter=0
+    fi
+
+    echo "net.ipv4.conf.${IF_EXTERNAL}.rp_filter = ${rp_filter}"
+}
+
+gen-at-allow()
+{
+    local user
+
+    for user in ${ADMIN_NAME} ${ADMIN_USER_LIST}
+    do
+	echo ${user}
+    done
+}
+
+gen-lcd4linux-conf()
+{
+    echo -e "Variables {"
+    echo -e "\tdev\t'${IF_EXTERNAL}'"
+    echo -e "\tbw\t$[(${QOS_BW_INTERNAL_INGRESS} + ${QOS_BW_INTERNAL_EGRESS}) * 1000 / 2]"
+    echo -e "}"
+    echo
+    cat lcd4linux.conf-constant
+}
+
+load-timezones()
+{
+    unset TIMEZONES
+
+    local tz i=0
+
+    while read tz
+    do
+	if test -n "${tz}" ; then
+	    TIMEZONES[${i}]=${tz}
+	    ((i++))
+	fi
+    done < ${ETC_DIR}/timezones
+
+    TIMEZONES_NB=${i}
+}
+
+set-prompt!()
+{
+
+    echo "${SHOSTNAME}" > ${BASE_DIR}/${ACCOUNT}/.prompt
+    chown ${ACCOUNT}:${GROUP_NAME} ${BASE_DIR}/${ACCOUNT}/.prompt
+}
+
+set-prompt()
+{
+    test "${CURRENT_SHOSTNAME}" != "${SHOSTNAME}" || return 0
+    set-prompt!
+}
+
+set-local-time!()
+{
+    local tz=${TIMEZONE}
+    test -n "${tz}" || return 1
+
+    test -f /usr/share/zoneinfo/${tz} || return 1
+
+    ln -sf /usr/share/zoneinfo/${tz} /etc/localtime
+
+    install -m 644 -o ${NAMED_UID} -g ${NAMED_GID} /usr/share/zoneinfo/${tz} ${NAMED_DIR}/etc/localtime
+    install -m 644 -o root  -g root /usr/share/zoneinfo/${tz} ${ETC_DIR}/localtime
+    install -m 644 -o root  -g root /usr/share/zoneinfo/${tz} ${PROXY_DIR}/etc/localtime
+}
+
+set-local-time()
+{
+    local mode=${1}
+    if test "${mode}" != force ; then
+	test "${CURRENT_TIMEZONE}" != "${TIMEZONE}" -o \
+	    "${STATE_CFG_TIMEZONE}" == modified || return 0
+    fi
+
+    STATE_CFG_TIMEZONE=modified
+
+    local ret    
+    log "Updating the Time Zone"
+    set-local-time!
+    log-result ${?}
+}
+
+set-clock()
+{
+    test -f ${TMP_DIR}/${CLOCK_2SAVE} || return 0
+
+    log "Saving the hardware clock"
+    service-nolog setclock stop &&
+	rm -f ${TMP_DIR}/${CLOCK_2SAVE}
+    log-result ${?}
+
+    log "Resetting network statistics"
+    reset-network-statistics
+    log-result ${?}
+}
+
+set-memory-cache-parameters()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    local cache_mode=${1}
+    local free_memory_sz=${2}
+    local store_average_object_sz=${3}
+
+    test -n "${store_average_object_sz}" || store_average_object_sz=$(get-cache-reference-mean-object-sz)
+
+    if test ${PERSISTENT_CACHE} == False -o ${cache_mode} == False ; then
+	((cache_index_memory_sz = 0))
+	((hdd_cache_usable_pct = 0))
+    else
+	if test ${free_memory_sz} -le 0 ; then
+	    ((cache_index_memory_sz = 0))
+	    ((hdd_cache_usable_pct = 0))
+	else
+	    local max_objects_in_cache
+
+	    ((max_objects_in_cache = PROXY_CACHE_SZ * 1024 / store_average_object_sz))
+	    ((cache_index_memory_sz = max_objects_in_cache * CACHE_INDEX_OBJECT_MEMORY_SZ / 1024 / 1024))
+
+	    if test ${cache_index_memory_sz} -le ${free_memory_sz} ; then
+		((hdd_cache_usable_pct = 100))
+	    else
+		local hdd_cache_usable
+		local objects_in_cache
+
+		((cache_index_memory_sz = free_memory_sz))
+		((objects_in_cache = cache_index_memory_sz * 1024 * 1024 / CACHE_INDEX_OBJECT_MEMORY_SZ))
+		((hdd_cache_usable = objects_in_cache * store_average_object_sz / 1024))
+		((hdd_cache_usable_pct = hdd_cache_usable * 100 / PROXY_CACHE_SZ))
+	    fi
+	fi
+    fi
+
+    export HDD_CACHE_USABLE_PCT=${hdd_cache_usable_pct}
+    export CACHE_INDEX_MEMORY_SZ=${cache_index_memory_sz}
+    export STORE_AVERAGE_OBJECT_SZ=${store_average_object_sz}
+
+    test \
+	${HDD_CACHE_USABLE_PCT} -ge 1 -a \
+	${CACHE_INDEX_MEMORY_SZ} -gt 0 -a \
+	${STORE_AVERAGE_OBJECT_SZ} -ge 1
+}
+
+set-memory-parameters()
+{
+    local total_memory_sz total_in_memory_cached_object_sz
+
+    if test -n "${TEST_MEMORY_SZ}" ; then
+	total_memory_sz=${TEST_MEMORY_SZ}
+    else
+	total_memory_sz=$(get-memory-sz)
+    fi
+    total_memory_sz=$[${total_memory_sz} / 1024]
+
+    local free_memory_sz=$(get-free-memory-sz ${total_memory_sz})
+
+    set-memory-cache-parameters ${CACHE_MODE} ${free_memory_sz}
+
+    export FREE_MEMORY_SZ=${free_memory_sz}
+    export TOTAL_IN_MEMORY_CACHED_OBJECT_SZ=${free_memory_sz}
+}
+
+set-architecture-parameters()
+{
+    export CPU_ARCHITECTURE=$(uname -m 2> /dev/null)
+}
+
+set-ocsp-parameters()
+{
+    if test ${OCSP_MODE} == True -a ${IP_EXTERNAL_IP} != "0.0.0.0" ; then
+	export OCSP_IS_ACTIVE=True
+    else
+	export OCSP_IS_ACTIVE=False
+    fi
+
+    if test ${CURRENT_OCSP_MODE} == True -a ${CURRENT_IP_EXTERNAL_IP} != "0.0.0.0" ; then
+	export CURRENT_OCSP_IS_ACTIVE=True
+    else
+	export CURRENT_OCSP_IS_ACTIVE=False
+    fi
+
+}
+
+gen-sysconfig-ocspd()
+{
+    echo "OCSP_PORT=\"${OCSP_PORT}\""
+    echo "OCSP_DAYS=\"${OCSP_DAYS}\""
+    echo "PROCESS_COUNT=\"${OCSPD_NB}\""
+
+    if test -z "${OCSP_TLS}" ; then
+	echo "TLS_PATH=\"${SSL_CA_DIR}/${SYSTEM_CA}\""
+    else
+	echo "TLS_PATH=\"${SSL_SERVER_DIR}/${OCSP_TLS}\""
+    fi
+}
+
+set-smanager-parameters()
+{
+    local ssh_key ssh_key_id=$(get-manager-key-id peer)
+
+    if test ${MANAGER_SYNC_ROLE} == master -a ${MANAGER_SYNC_PEER_IP} != "0.0.0.0" ; then
+
+	if test \
+	       -s ${SSH_PUBLIC_KEY_DIR}/${ssh_key_id} -o \
+	       -s ${TMP_DIR}/${LOADED}.${SSH_KEY}.${ssh_key_id} ; then
+	    export SMANAGER_IS_ACTIVE=True
+	else
+	    export SMANAGER_IS_ACTIVE=False
+	fi
+    else
+	export SMANAGER_IS_ACTIVE=False
+    fi
+
+    if test ${CURRENT_MANAGER_SYNC_ROLE} == master -a ${CURRENT_MANAGER_SYNC_PEER_IP} != "0.0.0.0" ; then
+
+	if test -s ${SSH_PUBLIC_KEY_DIR}/${ssh_key_id} ; then
+	    export CURRENT_SMANAGER_IS_ACTIVE=True
+	else
+	    export CURRENT_SMANAGER_IS_ACTIVE=False
+	fi
+    else
+	export CURRENT_SMANAGER_IS_ACTIVE=False
+    fi
+}
+
+gen-sysconfig-smanager()
+{
+    echo "PEER_IP=\"${MANAGER_SYNC_PEER_IP}\""
+}
+
+gen-hostname()
+{
+    echo ${SHOSTNAME}
+}
+
+gen-domainname()
+{
+    echo ${DOMAIN_NAME}
+}
+
+gen-embedded-vpnsubscr-cron()
+{
+    local manage_interval_mn=3
+    local report_interval_mn=10
+
+    echo "SHELL=/bin/bash"
+    echo "PATH=${PATH}"
+    echo "MAILTO=''"
+    echo
+    echo "*/${manage_interval_mn} * * * * root [ -x ${LOCAL_DIR}/bin/apl_ea_vpnsubscr_manage ] && apl_ea_vpnsubscr_manage"
+    echo "*/${report_interval_mn} * * * * root [ -x ${LOCAL_DIR}/bin/apl_vpnipsec_report ] && apl_vpnipsec_report"
+    echo "00 08 * * * root [ -x ${LOCAL_DIR}/bin/apl_ea_vpnsubscr_purge ] && apl_ea_vpnsubscr_purge"
+}
+
+set-embedded-vpnsubscr-cron()
+{
+    if test ${APL_ROLE} != 'gateway' -o ${EMBEDDED_VPNSUBSCR_IS_ACTIVE} == False ; then
+	rm -f /etc/cron.d/${EMBEDDED_APPLICATIONS_NAME}-${EMBEDDED_VPNSUBSCR_NAME}
+	return 0
+    fi
+
+    gen-embedded-vpnsubscr-cron > /etc/cron.d/${EMBEDDED_APPLICATIONS_NAME}-${EMBEDDED_VPNSUBSCR_NAME}
+}
+
+embedded-vpnsubscr-reset()
+{
+    test "${CURRENT_EMBEDDED_VPNSUBSCR_IS_ACTIVE}" == False -a "${EMBEDDED_VPNSUBSCR_IS_ACTIVE}" == True || return 0
+
+    local sha1_password=$(cat ${BASE_DIR}/${ADMIN_NAME}/.htpasswd.sha1 2> /dev/null)
+    sha1_password=${sha1_password#* }
+
+    source ${LOCAL_DIR}/lib/apl_ea_vpnsubscr.env
+    
+    sqlite3 ${EMBEDDED_VPNSUBSCR_DB_FILE} <<EOF 2> /dev/null
+UPDATE administrator SET password = '${sha1_password}', mfa_state = 0, mfa_secret = '' WHERE username = '${ADMIN_NAME}';
+DELETE from mfa_emergency WHERE username = '${ADMIN_NAME}';
+DELETE from mfa_timestamp WHERE username = '${ADMIN_NAME}';
+EOF
+}
+
+set-embedded-applications()
+{
+    embedded-vpnsubscr-reset
+    set-embedded-vpnsubscr-cron
+}
+
+gen-php-ini()
+{
+    cat << EOT
+[Date]
+date.timezone = "${TIMEZONE}"
+EOT
+}
+
+gen-dyndns-cron()
+{
+    local minutes="*/${DYNAMIC_DNS_INTERVAL}"
+
+    echo "SHELL=/bin/bash"
+    echo "PATH=${PATH}"
+    echo "MAILTO=''"
+    echo
+    echo "${minutes} * * * * root [ -x ${LOCAL_DIR}/bin/apl_dynamic_dns_update ] && apl_dynamic_dns_update"
+}
+
+update-dyndns-cron()
+{
+    if test ${DYNAMIC_DNS_STATE} == True ; then
+	gen-dyndns-cron > /etc/cron.d/${DYNAMIC_DNS_CRON_FILENAME}
+    else
+	rm -f /etc/cron.d/${DYNAMIC_DNS_CRON_FILENAME}
+    fi
+}
+
+commit-dynamic-dns()
+{
+    test -n "${1}" || return 1
+    local mode=${1}
+
+    if test ${mode} == force ; then
+	update-dyndns-cron
+    else
+	test "${CURRENT_DYNAMIC_DNS_STATE}" == "${DYNAMIC_DNS_STATE}" -a \
+	     "${CURRENT_DYNAMIC_DNS_INTERVAL}" == "${DYNAMIC_DNS_INTERVAL}" || update-dyndns-cron
+    fi
+
+    test ${DYNAMIC_DNS_STATE} == True || rm -f ${RUN_DIR}/${DYNAMIC_DNS_STATE_FILENAME}
+    ! dynamic-dns-request-is-modified || apl_dynamic_dns_update new
+}
+
+LIB_APL_ETC=Yes

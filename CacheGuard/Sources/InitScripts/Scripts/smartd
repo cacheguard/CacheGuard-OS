@@ -1,0 +1,118 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       InitScript
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+source /lib/lsb/init-functions
+
+CACHEGUARD_DIR=/etc/sysconfig/cacheguard
+source ${CACHEGUARD_DIR}/constant
+source ${APPLIANCE_DIR}/etc/role
+
+PROG="smartd"
+FPROG=/sbin/${PROG}
+SMART_CONF=/usr/etc/${PROG}.conf
+
+[ ! -f /etc/sysconfig/${PROG} ] || source /etc/sysconfig/${PROG}
+[ -x ${FPROG} ] || exit 0
+[ -s ${SMART_CONF} ] || exit 0
+
+RETVAL=0
+SERV="SMART Monitor"
+SMARTD_OPTS="--configfile=${SMART_CONF} --pidfile=/var/run/${PROG}/${PROG}.pid --savestates=/var/run/${PROG}/health- ${SMARTD_OPTS} --warnexec=${LOCAL_DIR}/bin/apl_smart_monitor"
+
+enable-smart()
+{
+    local dev options
+
+    while read dev options
+    do
+	test "${dev:0:5}" == '/dev/' || continue
+	smartctl ${dev} --smart=on \
+	    --quietmode=silent \
+	    --device=auto \
+	    --nocheck=standby \
+	    --offlineauto=on \
+	    --saveauto=on \
+	    --format=brief \
+	    --log=selftest \
+	    --firmwarebug=none \
+	    --presets=use \
+	    --drivedb=/usr/share/smartmontools/drivedb.h > /dev/null 2>&1
+    done < ${SMART_CONF}
+}
+
+case "${1}" in
+    start)
+	# Start daemons.
+	enable-smart
+	log_info_msg "Starting ${SERV}... "
+	start_daemon ${FPROG} \
+	    --pidfile=/var/run/${PROG}/${PROG}.pid \
+	    --drivedb=/usr/share/smartmontools/drivedb.h \
+	    --savestates=/var/run/${PROG}/health- \
+	    --configfile=${SMART_CONF} \
+	    ${SMARTD_OPTS}
+	RETVAL=${?}
+	[ ${RETVAL} -eq 0 ] && touch /var/lock/${PROG}
+	evaluate_retval
+	exit ${RETVAL}
+	;;
+    stop)
+	# Stop daemons.
+	log_info_msg "Stopping ${SERV}... "
+	killproc ${FPROG}
+	RETVAL=${?}
+	usleep 300000
+	rm -f /var/run/${PROG}/${PROG}.pid
+	[ ${RETVAL} -eq 0 ] && rm -f /var/lock/${PROG}
+	evaluate_retval
+	exit ${RETVAL}
+	;;
+    restart)
+	${0} stop
+	${0} start
+	;;
+    reload)
+	log_info_msg "Reloading ${SERV}... "
+	killproc ${FPROG} -HUP
+	RETVAL=${?}
+	[ ${RETVAL} -eq 0 ]
+	evaluate_retval
+	exit ${RETVAL}
+	;;
+    check)
+	log_info_msg "Checking ${SERV} device(s)... "
+	killproc ${PROG} -USR1
+	RETVAL=${?}
+	[ ${RETVAL} -eq 0 ]
+	evaluate_retval
+	exit ${RETVAL}
+	;;
+    status)
+	statusproc ${PROG}
+	;;
+    *)
+	echo "Usage: ${0} {start|stop|restart|reload|check|status}"
+	exit 1
+	;;
+esac

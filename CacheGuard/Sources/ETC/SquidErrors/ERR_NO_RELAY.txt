@@ -1,0 +1,2 @@
+No wais relay
+There is no WAIS relay host defined for this Cache

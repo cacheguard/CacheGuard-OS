@@ -1,0 +1,218 @@
+Display HD44780 {
+	Driver		'HD44780'
+	Model		'Generic'
+	Bus		'parport'
+	Port		'0x378'
+	Controllers	1
+	Bits		8
+	UseBusy		1
+	GPOs		0
+	Backlight	on
+	Size		'16x2'
+	Icons		0
+
+    Wire {
+    	RW		'GND'
+	RS		'AUTOFD'
+        ENABLE		'STROBE'
+        ENABLE2		'SLCTIN'
+        BACKLIGHT	'GND'
+        GPO		'INIT'
+        POWER		'GND'
+    }
+
+    Timing {
+    	CY		1000  
+        PW		450  
+        AS		140  
+        AH		20  
+        INIT1		4100
+        INIT2		100
+        EXEC		80
+        WRCG		120
+        CLEAR		2250
+        HOME		2250
+        ONOFF		2250
+        GPO_ST		20
+        GPO_PW		230
+        POWER		500
+    }
+}
+
+Display X11 {
+	Driver		'X11'
+	Size		'80x16'
+	Font		'5x8'
+	Pixel		'4+1'
+	Gap		'-1x-1'
+	Border		10
+	Foreground	'000000cc'
+	Background	'00000022'
+	Basecolor	'80d000'
+	Buttons		0
+	Brightness	150
+}
+
+Display CrystalFontz {
+	Driver		'Crystalfontz'
+	Model		'Generic'
+	Port		'/dev/tts/USB0'
+	Speed		115200
+	Contrast	90
+	Backlight	100
+	Icons		0
+}
+
+Display Nil {
+	Driver	'NULL'
+	Size	'16x2'
+}
+
+Widget LoadTitle {
+	class		'Text'
+	expression	''
+	prefix		'Load'
+	width		5
+	align		'L'
+	style		'normal'
+	foreground	'000000ff'
+	background	'ffffff00'
+	speed		tick
+	update		tick
+}
+
+Widget StartTitle {
+	class		'Text'
+	expression	''
+	prefix		'Starting...'
+	width		16
+	align		'L'
+	style		'normal'
+	foreground	'000000ff'
+	background	'ffffff00'
+	speed		tick
+	update		tick
+}
+
+Widget StopTitle {
+	class		'Text'
+	expression	''
+	prefix		'Stopping...'
+	width		16
+	align		'L'
+	style		'normal'
+	foreground	'000000ff'
+	background	'ffffff00'
+	speed		tick
+	update		tick
+}
+
+Widget RestartTitle {
+	class		'Text'
+	expression	''
+	prefix		'Rebooting...'
+	width		16
+	align		'L'
+	style		'normal'
+	foreground	'000000ff'
+	background	'ffffff00'
+	speed		tick
+	update		tick
+}
+
+Widget ApplianceTitle {
+	class		'Text'
+	expression	''
+	prefix		appliance
+	width		16
+	align		'L'
+	style		'normal'
+	foreground	'000000ff'
+	background	'ffffff00'
+	speed		tick
+	update		tick
+}
+
+Widget LoadBar {
+	class		'Bar'
+	expression	loadavg(1)
+	length		11
+	min		0
+	max		100
+	direction	'E'
+	style		'H'
+	foreground	'000000ff'
+	background	'ffffff00'
+	update		tick
+}
+
+Widget FlowTitle {
+	class		'Text'
+	expression	''
+	prefix		'Flow'
+	width		5
+	align		'L'
+	style		'normal'
+	foreground	'000000ff'
+	background	'ffffff00'
+	speed		tick
+	update		tick
+}
+
+Widget FlowBar {
+	class       'Bar'
+	expression  (netdev::fast(dev, 'Rx_bytes', mn) + netdev::fast(dev, 'Tx_bytes', mn)) * 8 / bw
+	length		11
+	min		0
+	max		100
+	direction	'E'
+	style		'H'
+	foreground	'000000ff'
+	background	'ffffff00'
+	update		tick
+}
+
+Layout RunTime {
+	Row1 {
+		Col1 'LoadTitle'
+		Col6 'LoadBar'
+	}
+
+	Row2 {
+		Col1 'FlowTitle'
+		Col6 'FlowBar'
+	}
+}
+
+Layout Start {
+
+	Row1 {
+		Col1 'ApplianceTitle'
+	}
+
+	Row2 {
+		Col1 'StartTitle'
+	}
+}
+
+Layout Stop {
+
+	Row1 {
+		Col1 'ApplianceTitle'
+	}
+
+	Row2 {
+		Col1 'StopTitle'
+	}
+}
+
+Layout Restart {
+
+	Row1 {
+		Col1 'ApplianceTitle'
+	}
+
+	Row2 {
+		Col1 'RestartTitle'
+	}
+}

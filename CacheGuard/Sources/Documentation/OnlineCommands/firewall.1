@@ -1,0 +1,163 @@
+Configure the firewall
+.SH SYNOPSIS
+
+[1] \fBfirewall\fR [(\fBexternal\fR | \fBweb\fR | \fBrweb\fR | \fBantivirus\fR | \fBadmin\fR | \fBmon\fR | \fBfile\fR | \fBpeer\fR | \fBauxiliary\fR | \fBvpnipsec\fR) [(\fBadd\fR | \fBadd:\fR\fI<rule-name>\fR | \fBinsert:\fR\fI<rule-name>\fR) \fI<rule-name>\fR (\fBdeny\fR | \fBallow\fR) [\fI<protocol>\fR [\fI<src-ip>\fR[/\fI<mask-prefix>\fR] [\fI<destination-zone>\fR [\fI<dst-ip>\fR[/\fI<mask-prefix>\fR] [\fI<dst-port1>\fR[\fB:\fR\fI<dst-port2>\fR] [(\fI<src-nat-ip>\fR | \fBnil\fR) [\fI<dst-nat-ip>\fR [\fI<dst-pat-port>\fR]]]]]]]]]]
+
+[2] \fBfirewall\fR [(\fBexternal\fR | \fBweb\fR | \fBrweb\fR | \fBantivirus\fR | \fBadmin\fR | \fBmon\fR | \fBfile\fR | \fBpeer\fR | \fBauxiliary\fR | \fBvpnipsec\fR) [\fBmove:(\fB-\fR|\fB+\fR)\fI<rule-name>\fR \fI<rule-name>\fR | \fBmove:\fI<position>\fR]]
+
+[3] \fBfirewall\fR [(\fBexternal\fR | \fBweb\fR | \fBrweb\fR | \fBantivirus\fR | \fBadmin\fR | \fBmon\fR | \fBfile\fR | \fBpeer\fR | \fBauxiliary\fR | \fBvpnipsec\fR) [\fBdel\fR \fI<rule-name>\fR]]
+
+[4] \fBfirewall\fR [(\fBexternal\fR | \fBweb\fR | \fBrweb\fR | \fBantivirus\fR | \fBadmin\fR | \fBmon\fR | \fBfile\fR | \fBpeer\fR | \fBauxiliary\fR | \fBvpnipsec\fR) [\fBraz\fR]]
+
+[5] \fBfirewall\fR [(\fBexternal\fR | \fBweb\fR | \fBrweb\fR | \fBantivirus\fR | \fBadmin\fR | \fBmon\fR | \fBfile\fR | \fBpeer\fR | \fBauxiliary\fR | \fBvpnipsec\fR) [((\fBon\fR | \fBoff\fR) \fI<rule-name>\fR)+]]
+
+[6] \fBfirewall dos\fR [(\fBtcpflood\fR | \fBudpflood\fR | \fBwebflood\fR | \fBrwebflood\fR) [\fBdefault\fR | \fBset\fR \fI<limit-per-second>\fR [\fI<limit-burst>\fR]]]
+
+[7] \fBfirewall dos\fR [(\fBpiptcp\fR | \fBpipweb\fR | \fBpiprweb\fR | \fBpipdns\fR | \fBpipocsp\fR) [\fBdefault\fR | \fBset\fR \fI<max-limit>\fR]]
+
+.SH DESCRIPTION
+When the modes \fBrouter\fR and \fBfirewall\fR are activated (see the command \fBmode\fR), the appliance acts as a stateful firewall filtering IP traffic crossing the system. The \fBfirewall\fR command allows you to manage firewall rules. Please note that the command \fBfirewall\fR allows you to filter traffic crossing the appliance but not destined to the appliance itself. To filter traffic destined to the appliance itself use the command \fBaccess\fR.
+
+To the appliance, networks are divided to four main zones: the \fBexternal\fR, the \fBinternal\fR, the \fBauxiliary\fR and the \fBvpnipsec\fR zones. Each zone is connected to the appliance via a network interface such that the external zone is connected via the \fBexternal\fR network interface and the auxiliary zone is connected via the \fBauxiliary\fR network interface. As the internal network interface may be configured with tagged vlans (see the command \fBmode\fR), possible internal zones are \fBweb\fR, \fBrweb\fR, \fBantivirus\fR, \fBadmin\fR, \fBmon\fR, \fBfile\fR and \fBpeer\fR. When the appliance works without tagged VLANs, these zones are not differentiated (and setting a firewall rule for one of them is applied to the others). When the IPsec VPN mode is activated (mode \fBvpnipsec on\fR), the \fBvpnipsec\fR zone refers to private networks inside connected IPsec VPN tunnels.
+
+The firewall filters the traffic according to the incoming zone from which a new connection is sent. Each firewall rule is attached to a zone and can \fBallow\fR or \fBdeny\fR incoming new connections from that zone and outgoing to another zones (\fI<destination-zone>\fR). A firewall rule should specify the source IP address, the destination IP address and possibly the destination port number. Optionally the rule may specify to NAT (Network Address Translation) the source and/or destination IP address of the traffic. In case of a NAT for the destination IP address the destination port may also be translated to another port number. The translation of destination port number is called PAT (Port Address Translation).
+
+It is IMPORTANT to note that in rules, destination and source \fBNAT\fR are always applied \fBAFTER\fR the filtering.
+
+Default rules are applied when no rules is specified for a zone. When at least one rule is specified for a given zone, any traffic other than those specified by that rule are denied by default and there is no need to add a deny rule at the end of a rule set. Default rules are base on the principals below:
+
+  \(bu New connections incoming from the \fBexternal\fR zone and destined to the \fBinternal\fR, \fBauxiliary\fR and \fBvpnipsec\fR zones are denied.
+
+  \(bu New connections incoming from the \fBinternal\fR zone (the \fBweb\fR zone only if the \fBvlan\fR mode is activated) and destined to other zones are allowed.
+
+  \(bu New connections incoming from the auxiliary zone are denied by default (to allow traffic you should explicitly specify rules).
+
+  \(bu If the \fBvlan\fR mode is activated, new connections incoming from the \fBrweb\fR, \fBantivirus\fR, \fBadmin\fR, \fBmon\fR, \fBfile\fR and \fBpeer\fR zones are denied by default. Otherwise, they are all considered as being the \fBinternal\fR zone and therefore follow the principals applied to the \fBinternal\fR zone.
+
+  \(bu New connections incoming from the \fBvpnipsec\fR zone and destined to the \fBinternal\fR zone (the \fBweb\fR zone only if the \fBvlan\fR mode is activated) are allowed. Incoming connections from the \fBvpnipsec\fR zone and destined to other zones are denied by default.
+
+The first [1] usage form allows you to add or insert a firewall rule to a firewall rule set. There are as many rule sets as there are network interfaces. Each firewall rule is identified by an identifier (\fI<rule-name>\fR) in a rule set. A \fI<rule-name>\fR must begin with an alpha character and may contains alpha numeric characters as well as the characters "_" and "-". To add a rule at the end of a all rules in a set, use the keyword \fBadd\fR. To add a rule after a given rule, use the keyword \fBadd:\fR  followed by the rule name after which the new rule have to be inserted. To insert a rule before a given rule, use the keyword \fBinsert:\fR followed by the rule name before which the new rule have to be inserted.
+
+To allow a traffic use the keyword \fBallow\fR. To deny a traffic use the keyword \fBdeny\fR.
+
+Supported protocols are as follows:
+
+  \(bu \fBah\fR (IPsec AH - IP Authentication Header)
+
+  \(bu \fBesp\fR (IPsec ESP - IP Encapsulating Security Payload)
+
+  \(bu \fBetherip\fR (Ethernet within IP encapsulation)
+
+  \(bu \fBfc\fR (Fiber Channel)
+
+  \(bu \fBftp_active\fR (Active File Transfer Protocol )
+
+  \(bu \fBftp_passive\fR (Passive File Transfer Protocol )
+
+  \(bu \fBftp_trivial\fR (TFTP or Trivial File Transfer Protocol)
+
+  \(bu \fBsip\fR (Session Initiation Protocol for VoIP)
+
+  \(bu \fBgre\fR (GRE tunneling)
+
+  \(bu \fBicmp\fR (Internet Control Message Protocol - Ping)
+
+  \(bu \fBigmp\fR (Internet Group Management Protocol - Multicast)
+
+  \(bu \fBipv6\fR (Internet Protocol Version 6)
+
+  \(bu \fBmtp\fR (Multicast Transport Protocol)
+
+  \(bu \fBospfigp\fR (Open Shortest Path First IGP)
+
+  \(bu \fBtcp\fR (Transmission Control Protocol)
+
+  \(bu \fBtlsp\fR (Transport Layer Security Protocol)
+
+  \(bu \fBudp\fR (User Datagram Protocol)
+
+  \(bu \fBvisa\fR (VISA Protocol)
+
+The source or destination may be a single IP address or an IP address range using the CIDR ( Classless Inter-Domain Routing) notation. CIDR notation uses a combination of an IP address and its associated network mask prefix separated with the '/' character. The network mask prefix is the number of (leftmost) '1' bits in the mask. For example 10.0.10.0/24 is a CIDR notation where the network mask 255.255.255.0 is applied to the 10.0.10.0 network. This notation represents the IP address range 10.0.10.0 - 10.0.10.255. The port specification may be a unique port number or a port range. A port range is specified by giving two port numbers separated by a colon (\fI:\fR) character (for instance \fI7510:7529\fR). The keyword \fBany\fR can be used to specify an undefined protocol, IP address or port number.
+
+The second [2] usage form allows you to move a rule from one position to another in a firewall rule set. To move a rule before or after another denoted rule use the keyword \fBmove:\fR followed by the sign \fB-\fR (for before) or \fB+\fR (for after), the rule name of the denoted rule and the rule name of the rule to move. Please note that white spaces are not allowed between the keyword \fBmove:\fR, the signs \fB-\fR or \fB+\fR and the rule name of the denoted rule. To move a rule to an absolute position use the \fBmove:\fR followed by the position number and the rule name of the rule to move (the first position is the position number 1). Please note that white spaces are not allowed between the keyword \fBmove:\fR and the position number.
+
+The third [3] usage form allows you to delete a firewall rule identified by a \fI<rule-name>\fR in a rule set. The fourth [4] usage form allows you to erase all firewall rules in a rule set.
+
+The fifth [5] usage allow you to activate or deactivate a firewall rule in a rule set. You can activate or deactivate several rules at the same time be giving several rule name preceded by \fBon\fR or \fBoff\fR.
+
+There are a bunch of built-in firewall rules that protect against known attacks such as Denial of Service (DoS) attacks. Built-in firewall rules and the tags that identify them in logs are described in the \fBINTERNAL RULES\fR section below. Regarding DoS attacks, it is important to properly tune the system in order to distinguish between high loads and attacks. During the OS installation, DoS limits are automatically configured according to the number of supported users. Usage forms [6] and [7] allow you to modify those limits if necessary. To modify the limits for a given DoS attack, use the keyword \fBdos\fR followed by the DoS attack name, the keyword \fBset\fR and the required limits. To apply default values, use the \fBdefault\fR keyword instead of fBset\fR without any further arguments.
+
+DoS attack for which limits can be configured are given below:
+
+  \(bu \fBtcpflood\fR: protects against TCP SYN and RST flood attacks routed via the system (not destined to services running on the system). Two limit values could be specified for this DoS type: \fI<limit-per-second>\fR and \fI<limit-burst>\fR. The first value is mandatory and specifies the number of allowed TCP SYN/RST per second. The second value is optional and specifies the maximum number of TCP SYN/RST per second to reach before beginning to block TCP SYN/RST connections.
+
+  \(bu \fBudpflood\fR: protects against UDP flood attacks routed via the system (not destined to services running on the system). Two limit values could be specified for this DoS type: \fI<limit-per-second>\fR and \fI<limit-burst>\fR. The first value is mandatory and specifies the number of allowed UDP requests per second. The second value is optional and specifies the maximum number of UDP requests per second to reach before beginning to block requests.
+
+  \(bu \fBwebflood\fR: protects against TCP SYN and RST flood and UDP flood attacks destined to services running on the system except the reverse web service (see the \fBrweb\fR command). Two limit values could be specified for this DoS type: \fI<limit-per-second>\fR and \fI<limit-burst>\fR. The first value is mandatory and specifies the number of allowed TCP SYN/RST or UDP requests per second. The second value is optional and specifies the maximum number of TCP SYN/RST or UDP requests per second to reach before beginning to block TCP SYN/RST connections or UDP requests. Even if the name of this DoS type includes the \fBweb\fR word, it concerns non only Web services such as the forwarding Web proxy but also all other services used by protected end-users such as the embedded DNS and OCSP servers.
+
+  \(bu \fBrwebflood\fR: protects against TCP SYN and RST flood attacks destined to the reverse web service (see the \fBrweb\fR command). Two limit values could be specified for this DoS type: \fI<limit-per-second>\fR and \fI<limit-burst>\fR. The first value is mandatory and specifies the number of allowed TCP SYN/RST per second. The second value is optional and specifies the maximum number of TCP SYN/RST per second to reach before beginning to block TCP SYN/RST connections. Setting this value to 0 allows you to disable this protection.
+
+  \(bu \fBpiptcp\fR: protects against an abusive number of TCP SYN incoming from the same source IP address and routed via the system. One limit value should be specified for this DoS type: \fI<max-limit>\fR. The \fI<max-limit>\fR is the maximum number of parallel TCP SYN incoming from the same source IP address. Setting this value to 0 allows you to disable this protection.
+
+  \(bu \fBpipweb\fR: protects against an abusive number of new (TCP SYN) Web requests incoming from the same source IP address and destined to the system itself except the reverse proxy (see the \fBrweb\fR command). One limit value should be specified for this DoS type: \fI<max-limit>\fR. The \fI<max-limit>\fR is the maximum number of parallel TCP SYN incoming from the same source IP address. Setting this value to 0 allows you to disable this protection. Disabling this protection can be useful when the system is accessed by remote end-users having all the same IP address (for instance in a public cloud configuration).
+
+  \(bu \fBpiprweb\fR: protects against an abusive number of new (TCP SYN) requests on cloaked websites (rWeb websites) incoming from the same source IP address). One limit value should be specified for this DoS type: \fI<max-limit>\fR. The \fI<max-limit>\fR is the maximum number of parallel TCP SYN incoming from the same source IP address. Setting this value to 0 allows you to disable this protection. Disabling this protection can be useful when the system is accessed by remote end-users having all the same IP address.
+
+\(bu \fBpipdns\fR: protects against an abusive number of new (TCP SYN) DNS requests per source IP address. One limit value should be specified for this DoS type: \fI<max-limit>\fR. The \fI<max-limit>\fR is the maximum number of parallel TCP SYN incoming from the same source IP address. Setting this value to 0 allows you to disable this protection. Disabling this protection can be useful when the system is accessed by remote end-users having all the same IP address.
+
+\(bu \fBpipocsp\fR: protects against an abusive number of new (TCP SYN) OCSP requests per source IP address. One limit value should be specified for this DoS type: \fI<max-limit>\fR. The \fI<max-limit>\fR is the maximum number of parallel TCP SYN incoming from the same source IP address. Setting this value to 0 allows you to disable this protection. Disabling this protection can be useful when the system is accessed by remote end-users having all the same IP address.
+
+If no \fI<limit-burst>\fR is specified, it is set to the same value as \fI<limit-per-second>\fR.
+
+.SH INTERNAL RULES
+
+  \(bu \fBAllState\fR: TCP connection with all states set.
+
+  \(bu \fBBruteForce\fR: SSH brute force attack.
+
+  \(bu \fBConLimit\fR: more than a specified number of TCP SYN from the same source IP (see the seventh usage form).
+
+  \(bu \fBIllegalSyn\fR: synchronise packets with illegal state.
+
+  \(bu \fBInvalidState\fR: TCP/UDP traffic with invalid states.
+
+  \(bu \fBLoopbackIP\fR: 127.0.0.0/8 IP addresses.
+
+  \(bu \fBMulticastIP\fR: multicast IP addresses other than 224.0.0.1 and VRRP in HA mode.
+
+  \(bu \fBNullState\fR: TCP connection without any state.
+
+  \(bu \fBPolicy\fR: no defined rule matches found.
+
+  \(bu \fBReservedIP\fR: 240.0.0.0/4, 169.254.0.0/16 and 255.255.255.255/32 IP addresses.
+
+  \(bu \fBResetFlood\fR: TCP reset (RST) packet flooding (see the sixth usage form).
+
+  \(bu \fBSelfSpoof\fR: spoofing of an IP address assigned to the appliance.
+
+  \(bu \fBSmurfPing\fR: smurf DoS attack.
+
+  \(bu \fBSynFlood\fR: TCP SYN (synchronise) packet flooding (see the sixth usage form).
+
+  \(bu \fBTraceRoute\fR: route tracing.
+
+  \(bu \fBUDPFlood\fR: UDP packet flooding (see the sixth usage form).
+
+  \(bu \fBUpTime\fR: time left from the last reboot.
+
+  \(bu \fBXMasTCP\fR: TCP connection with all states to detect the running OS.
+
+  \(bu \fBZeroIP\fR: 0.0.0.0/8 IP addresses.
+
+.SH SEE ALSO
+.B access
+(1)
+.B apply
+(1)
+.B mode
+(1)
+.B vlan
+(1)
+.B vpnipsec
+(1)

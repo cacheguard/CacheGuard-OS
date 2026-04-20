@@ -1,0 +1,70 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       GUI
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+set-mode-feature()
+{
+    local i mode
+
+    local anonymous=off
+    local firewall=off
+    local av=off
+    local cache=off
+    local compress=off
+    local guard=off
+    local log=off
+    local ocsp=off
+    local rweb=off
+    local sslmediate=off
+    local vpnipsec=off
+    local authenticate=off
+    local waf=off
+    local web=off
+
+    for ((i=1 ; i<${ATTRIBUTE_NB} ; i++))
+    do
+	mode=${ATTRIBUTES[${i}]:5}
+	local ${mode}=on
+    done
+
+    local transaction=/tmp/${TRANSACTION_FILE}.wadmin.${REMOTE_USER}.${$}
+
+    echo mode anonymous ${anonymous}		 > ${transaction}
+    echo mode antivirus ${av}			>> ${transaction}
+    echo mode firewall ${firewall}		>> ${transaction}
+    echo mode cache ${cache}			>> ${transaction}
+    echo mode compress ${compress}		>> ${transaction}
+    echo mode guard ${guard}			>> ${transaction}
+    echo mode log ${log}			>> ${transaction}
+    echo mode ocsp ${ocsp}			>> ${transaction}
+    echo mode rweb ${rweb}			>> ${transaction}    
+    echo mode sslmediate ${sslmediate}		>> ${transaction}
+    echo mode vpnipsec ${vpnipsec}		>> ${transaction}
+    echo mode authenticate ${authenticate}	>> ${transaction}
+    echo mode waf ${waf}			>> ${transaction}
+    echo mode web ${web}			>> ${transaction}
+
+    execute-transaction ${transaction}
+}
+
+set-mode-feature

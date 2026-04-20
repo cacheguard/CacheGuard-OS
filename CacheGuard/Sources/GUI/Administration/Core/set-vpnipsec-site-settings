@@ -1,0 +1,98 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       GUI
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+set-vpnipsec-site-settings()
+{
+    local transaction=/tmp/${TRANSACTION_FILE}.wadmin.${REMOTE_USER}.${$}
+
+    local vpn_id=${VALUES[0]}
+    local ips=${VALUES[1]}
+    local auth_type=${VALUES[2]}
+
+    if test -z "${ips}" ; then
+	gen-gui-error 2
+	return 0
+    fi
+
+    local ip
+    local master_ip=${ips/,*}
+    local backup_ips=${ips#*,}
+    backup_ips=${backup_ips//,/ }
+    test "${master_ip}" != "${backup_ips}" || unset backup_ips
+
+    case "${auth_type}" in
+	psk)
+	    local psk=${VALUES[6]}
+	    test -n "${psk}" || psk='nil'
+
+	    echo "vpnipsec site add '${vpn_id}' '${master_ip}' '${auth_type}' '${psk}' '${VALUES[7]}' '${VALUES[8]}' '${VALUES[9]}' '${VALUES[10]}' '${VALUES[11]}' '${VALUES[12]}' '${VALUES[13]}'" > ${transaction}
+	    ;;
+	tls)
+	    local auth_key1=${VALUES[3]}
+	    case ${auth_key1} in
+		certificate)
+		    if test -z "${VALUES[4]}" ; then
+			gen-gui-error 24
+			return 0
+		    fi
+		    echo "vpnipsec site add '${vpn_id}' '${master_ip}' '${auth_type}' '${auth_key1}' '${VALUES[4]}' '${VALUES[7]}' '${VALUES[8]}' '${VALUES[9]}' '${VALUES[10]}' '${VALUES[11]}' '${VALUES[12]}' '${VALUES[13]}'" > ${transaction}
+		    ;;
+		dn|fqdn)
+		    local dn_fqdn=${VALUES[5]}
+		    if test -z "${dn_fqdn}" ; then
+			case ${auth_key1} in
+			    dn)
+				gen-gui-error 25
+				;;
+			    fqdn)
+				gen-gui-error 26
+				;;
+			    *)
+				;;
+			esac
+			return 0
+		    else
+			echo "vpnipsec site add '${vpn_id}' '${master_ip}' '${auth_type}' '${auth_key1}' '${dn_fqdn}' '${VALUES[7]}' '${VALUES[8]}' '${VALUES[9]}' '${VALUES[10]}' '${VALUES[11]}' '${VALUES[12]}' '${VALUES[13]}'" > ${transaction}
+		    fi
+		    ;;
+		*)
+		    ;;
+	    esac
+	    ;;
+	*)
+	    ;;
+    esac
+
+    echo "vpnipsec nat role ${vpn_id} ${VALUES[14]}" >> ${transaction}
+
+    echo "vpnipsec to ${vpn_id} raz" >> ${transaction}
+    for ip in ${backup_ips}
+    do
+	echo "vpnipsec to ${vpn_id} add ${ip}"
+    done >> ${transaction}
+    
+    execute-transaction ${transaction}
+}
+
+set-vpnipsec-site-settings

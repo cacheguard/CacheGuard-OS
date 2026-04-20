@@ -1,0 +1,221 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       Commands
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+get-cache-real-mean-object-sz()
+{
+    local tmp_file=${ADMIN_TMP_DIR}/squid.info.${$}
+
+    squidclient -T 3 -h localhost -p ${CURRENT_PROXY_PORT} mgr:info > ${tmp_file} 2> /dev/null
+
+    if test ${?} -ne 0 ; then
+	rm -f ${tmp_file}
+	echo 0
+	return 1
+    fi
+
+    if test ! -f ${tmp_file} ; then
+	echo "0"
+	return 3
+    fi
+
+    local mean_object_sz=$(cat ${tmp_file} | grep "Mean Object Size:" 2> /dev/null | expand -t 2)
+    rm -f ${tmp_file}
+
+    if test -z "${mean_object_sz}" ; then
+	echo "0"
+	return 0
+    fi
+
+    mean_object_sz=${mean_object_sz/*Mean Object Size: }
+    mean_object_sz=${mean_object_sz/ KB}
+    mean_object_sz=$(printf "%.*f\n" 0 ${mean_object_sz})
+
+    echo ${mean_object_sz}
+    return 0
+}
+
+get-external-mean-object-size()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    local real_size=${1}
+    local ref_size=${2}
+
+    local value epoch date
+
+    value="${real_size}KB"
+
+    if test ${real_size} != 0 ; then
+	if test ${real_size} != ${ref_size} ; then
+	    if test -s ${RUN_DIR}/${MEAN_OBJECT_SZ_FILENAME} ; then
+		epoch=$(get-modification-time ${RUN_DIR}/${MEAN_OBJECT_SZ_FILENAME})
+	    else
+		epoch=$(date +"%s" 2> /dev/null)
+	    fi
+	    date=$(get-date-from-epoch-seconds ${epoch})
+	    value="${value} (${ref_size}KB on ${date})"
+	fi
+    fi
+
+    echo -n "${value}"
+}
+
+get-cache-hit()
+{
+    local tmp_file=${ADMIN_TMP_DIR}/squid.counters.${$}
+    squidclient -T 3 -h localhost -p ${CURRENT_PROXY_PORT} mgr:counters > ${tmp_file} 2> /dev/null
+
+    if test ! -s ${tmp_file} ; then
+	rm -f ${tmp_file}
+	echo "0 0"
+	return 0
+    fi
+
+    local total_volume=$(cat ${tmp_file} | grep "client_http.kbytes_out")
+    local hit_volume=$(cat ${tmp_file} | grep "client_http.hit_kbytes_out")
+
+    if test -z "${total_volume}" -o -z "${hit_volume}" ; then
+	rm -f ${tmp_file}
+	echo "0 0"
+	return 0
+    fi
+
+    total_volume=${total_volume/* = /}
+    hit_volume=${hit_volume/* = /}
+
+    if test ${total_volume} -eq 0 ; then
+	local hit_volume_pct=0
+    else
+	local hit_volume_pct=$[100 * ${hit_volume} / ${total_volume}]
+    fi
+
+    local total_request=$(cat ${tmp_file} | grep "client_http.requests")
+    local hit_request=$(cat ${tmp_file} | grep "client_http.hits")
+    rm -f ${tmp_file}
+
+    total_request=${total_request/* = /}
+    hit_request=${hit_request/* = /}
+
+    if test ${total_request} -eq 0 ; then
+	local hit_request_pct=0
+    else
+	local hit_request_pct=$[100 * ${hit_request} / ${total_request}]
+    fi
+
+    echo "${hit_request_pct} ${hit_volume_pct}"
+}
+
+get-cache-hit-request()
+{
+    local hit=$(get-cache-hit)
+    echo ${hit/ *}
+}
+
+get-cache-hit-volume()
+{
+    local hit=$(get-cache-hit)
+    echo ${hit/* }
+}
+
+get-cache-size()
+{
+    local tmp_file=${ADMIN_TMP_DIR}/squid.storedir.${$}
+    squidclient -T 3 -h 127.0.0.1 -p ${CURRENT_PROXY_PORT} mgr:storedir > ${tmp_file} 2> /dev/null
+
+    if test ! -s ${tmp_file} ; then
+	rm -f ${tmp_file}
+	echo 0
+	return 0
+    fi
+
+    local total_size=$(cat ${tmp_file} | grep "Maximum Swap Size")
+    rm -f ${tmp_file}
+
+    if test -z "${total_size}" ; then
+	echo 0
+	return 0
+    fi
+
+    total_size=${total_size/Maximum Swap Size*:/}
+    total_size=${total_size/ KB/}
+    total_size=$[${total_size} / 1024]
+
+    echo ${total_size}
+}
+
+get-cache-used()
+{
+    local tmp_file=${ADMIN_TMP_DIR}/squid.storedir.${$}
+    squidclient -T 3 -h localhost -p ${CURRENT_PROXY_PORT} mgr:storedir > ${tmp_file} 2> /dev/null
+
+    if test ! -s ${tmp_file} ; then
+	rm -f ${tmp_file}
+	echo 0
+	return 0
+    fi
+
+    local used=$(cat ${tmp_file} | grep "Current Capacity")
+    rm -f ${tmp_file}
+
+    if test -z "${used}" ; then
+	echo 0
+	return 0
+    fi
+
+    used=${used/Current Capacity*:/}
+    used=${used/\%/}
+
+    echo ${used}
+}
+
+get-rcache-size()
+{
+    if test ${CURRENT_CACHE_MODE} == True ; then
+	echo ${RWEB_CACHE_SZ}
+    else
+	echo 0
+    fi
+}
+
+get-bigcache-size()
+{
+    if test ${CURRENT_CACHE_MODE} == True -a ${CURRENT_CACHE_BIG_MAX_OBJECT_SZ} -gt 0 ; then
+	echo $[${PROXY_CACHE_UNIT_SZ} / 1024]
+    else
+	echo 0
+    fi
+}
+
+get-rcache-used()
+{
+    if test ${CURRENT_CACHE_MODE} == True ; then
+	if test -f ${ROOT_DIR}/var/run/${USED_RCACHE_FILENAME} ; then
+	    cat ${ROOT_DIR}/var/run/${USED_RCACHE_FILENAME} 2> /dev/null
+	else
+	    echo 0
+	fi
+    else
+	echo 0
+    fi
+}

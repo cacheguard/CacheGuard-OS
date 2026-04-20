@@ -1,0 +1,1682 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       Configurator
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+get-guard-contact()
+{
+    local email=${ADMINISTRATOR_EMAIL}
+    test -n "${email}" || email="admin@example.com"
+    email=${email/@/(at)}
+
+    local name=${ADMINISTRATOR_NAME}
+    test -n "${name}" || name="Your Administrator"
+    name=${name// /%20}
+
+    local contact="${name}%20%3C${email}%3E"
+
+    echo ${contact}
+}
+
+set-warning-parameters()
+{
+    local contact=$(get-guard-contact)
+
+    URL_DENIED_URI="${URL_DENIED_URI/@EMAIL@/${contact}}"
+}
+
+set-guard-parameters()
+{
+    if test ${SSLMEDIATE_MODE} == True ; then
+	export GUARD_REDIRECT_WEB_SERVER="http://${IP_WEB_IP}"
+    else
+	export GUARD_REDIRECT_WEB_SERVER="http://${WEB_SERVER_DENY_NAME}"
+    fi
+
+    if test ${GUARD_MODE} == True -a ${LOG_MODE} == True -a ${LOG_TYPE_GUARD/:*} == True ; then
+	GUARD_LOG_MODE=True
+    else
+	GUARD_LOG_MODE=False
+    fi
+
+    if test ${WEB_MODE} == True -a ${GUARD_MODE} == True -a ${AUTHENTICATE_MODE} == True && test-new-guard-rules-use-ldap ; then
+	LDAP_PROXY_IS_ACTIVE=True
+    else
+	LDAP_PROXY_IS_ACTIVE=False
+    fi
+
+    if test ${CURRENT_GUARD_MODE} == True -a ${CURRENT_LOG_MODE} == True -a ${CURRENT_LOG_TYPE_GUARD/:*} == True ; then
+	CURRENT_GUARD_LOG_MODE=True
+    else
+	CURRENT_GUARD_LOG_MODE=False
+    fi
+
+    if test ${CURRENT_WEB_MODE} == True -a ${CURRENT_GUARD_MODE} == True -a ${CURRENT_AUTHENTICATE_MODE} == True && test-cur-guard-rules-use-ldap ; then
+	CURRENT_LDAP_PROXY_IS_ACTIVE=True
+    else
+	CURRENT_LDAP_PROXY_IS_ACTIVE=False
+    fi
+
+    set-warning-parameters
+}
+
+touch-urllist()
+{
+    test -n "${1}" || return 1
+    local file=${1}
+
+    touch ${file} 2> /dev/null || return 11
+    chmod 400 ${file} 2> /dev/null || return 13
+    chown ${SQUID_UID}:${SQUID_GID} ${file} 2> /dev/null || return 15
+}
+
+clean-urllist()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    test -n "${3}" || return 3
+    local ftype=${1}
+    local urllist=${2}
+    local suffix=${3}
+
+    rm -f \
+       ${PROXY_GUARD_DIR}/${urllist}/${suffix}.tmp \
+       ${PROXY_GUARD_DIR}/${urllist}/${suffix}.gz
+
+    if test -f ${PROXY_GUARD_DIR}/${urllist}/${suffix}.db ; then
+	rm -f ${PROXY_GUARD_DIR}/${urllist}/${suffix}
+    else
+	touch-urllist ${PROXY_GUARD_DIR}/${urllist}/${suffix}
+    fi
+
+    case ${ftype} in
+	${URLLIST_CREATE})
+	    rm -f ${URLLIST_VAR_DIR}/${urllist}.${suffix}.${URLLIST_UPDATE}
+	    ;;
+
+	${URLLIST_UPDATE})
+	    rm -f ${PROXY_GUARD_DIR}/${urllist}/${suffix}.diff
+	    ;;
+	*)
+	    ;;
+    esac
+}
+
+set-urllist-auto-load()
+{
+    local file files urllist
+    local bool load op period protocol ip fn
+
+    files=$(ls -1 ${URLLIST_DIR}/*.${URLLIST_AUTO} 2> /dev/null)
+    for file in ${files}
+    do
+	urllist=$(file-basename ${file} .${URLLIST_AUTO})
+	read bool load op period protocol ip fn < ${file}
+	case "${bool}" in
+	    off)
+		log "Turning off '${urllist}' URL list auto load"
+		mv -f ${file} ${file}.2del
+		test ! -f ${file}.current || mv -f ${file}.current ${file}.current.2del
+		log-result 0
+		;;
+	    on)
+		log "Turning on '${urllist}' URL list auto load"
+		log-result 0
+		;;
+	    *)
+		;;
+	esac
+    done
+}
+
+clean-loaded-urllist()
+{
+    test -n "${1}" || return 1
+    local actor=${1}
+
+    local prefixes prefix
+
+    case ${actor} in
+	user)
+	    prefixes="${LOADED}"
+	    rm -f ${TMP_DIR}/${LOADED}.${URLLIST}.*.${PROGRESS}
+	    ;;
+	system)
+	    prefixes="${ILOADED}"
+	    ;;
+	manager)
+	    prefixes="${ILOADED} ${MPUSHED}"
+	    ;;
+	*)
+	    return 1
+	    ;;
+    esac
+
+    for prefix in ${prefixes}
+    do
+	rm -f \
+	   ${TMP_DIR}/${prefix}.${URLLIST}.*.domains.gz* \
+	   ${TMP_DIR}/${prefix}.${URLLIST}.*.urls.gz* \
+	   ${TMP_DIR}/${prefix}.${URLLIST}.*.expressions.gz*
+    done
+
+    rm -f ${PROXY_DIR}/tmp/squidGuard.conf
+}
+
+add-urllists()
+{
+    test -n "${1}" || return 1
+    local log_mode=${1}
+    shift
+    local urllists2add=${*}
+
+    local urllist ret
+    
+    cd ${PROXY_GUARD_DIR}
+
+    for urllist in ${urllists2add}
+    do
+	test ${log_mode} == "nolog" || log "Adding the '${urllist}' URL list"
+	if test ${APL_ROLE} == manager ; then
+	    log-result 0
+	    continue
+	fi
+
+	mkdir -p ${urllist}
+
+	if test ${?} -eq 0 ; then
+	    chown ${SQUID_UID}:${SQUID_GID} ${urllist}
+	    touch ${urllist}/{domains,urls,expressions}
+	    if test ${?} -eq 0 ; then
+		chown -R cache:cache ${urllist} && \
+		    chmod 500 ${urllist} && \
+		    chmod 400 ${urllist}/{domains,urls,expressions}
+		ret=${?}
+		test ${log_mode} == "nolog" || log-result ${ret}
+	    else
+		test ${log_mode} == "nolog" || log-result 4
+	    fi
+	else
+	    test ${log_mode} == "nolog" || log-result 5
+	fi
+    done
+}
+
+del-urllists()
+{
+    local urllists2del=${*}
+
+    local urllist file
+    local ret1=0 ret2=0 ret3=0 ret
+    
+    cd ${PROXY_GUARD_DIR}
+
+    for urllist in ${urllists2del}
+    do
+	log "Deleting the '${urllist}' URL list"
+
+	if test ${APL_ROLE} == manager ; then
+	    rm -f ${URLLIST_VAR_DIR}/${urllist}.*.*.gz
+	    log-result 0
+	    continue
+	fi
+
+	file=${URLLIST_DIR}/${urllist}.${URLLIST_AUTO}
+
+	test ! -f ${file} || mv -f ${file} ${file}.2del || ret1=1
+	test ! -f ${file}.current || mv -f ${file}.current ${file}.current.2del	|| ret2=2
+	test ! -d ${urllist} || mv -f ${urllist} ${urllist}.2del || ret3=4
+
+	ret=$[${ret1} + ${ret2} + ${ret3}]
+	log-result ${ret}
+    done
+}
+
+add-del-urllists()
+{
+    test "${URLLIST_LIST}" != "${CURRENT_URLLIST_LIST}" || return 0
+
+    local urllists2add
+    local urllists2del
+
+    local urllist current_urllist member suffix
+
+    for urllist in ${URLLIST_LIST}
+    do
+	member=0
+	for current_urllist in ${CURRENT_URLLIST_LIST}
+	do
+	    if test ${urllist} == ${current_urllist} ; then
+		member=1
+		break
+	    fi
+	done
+	test ${member} -eq 1 || urllists2add="${urllist} ${urllists2add}"
+    done
+
+    for current_urllist in ${CURRENT_URLLIST_LIST}
+    do
+	member=0
+	for urllist in ${URLLIST_LIST}
+	do
+	    if test ${urllist} == ${current_urllist} ; then
+		member=1
+		break
+	    fi
+	done
+	test ${member} -eq 1 || urllists2del="${current_urllist} ${urllists2del}"
+    done
+
+    add-urllists log ${urllists2add}
+    del-urllists ${urllists2del}
+}
+
+prebuild-urllist()
+{
+    add-del-urllists
+    clear-urllists
+    set-urllist-auto-load
+}
+
+gen-slapd-conf()
+{
+    local cpu_nb=$(grep '^processor' /proc/cpuinfo | wc -l)
+
+    cat slapd.conf-constant
+    echo
+    cat slapd.conf-tuned
+    echo "threadqueues $((cpu_nb/5 + 1))"
+    echo
+
+    local i=0 elt range
+    local proto name ip port
+    local uri uris ldap_uris ldaps_uris sldap_uris
+    local tls_conf
+
+    for elt in ${LDAP_SERVER_LIST}
+    do
+	range=$[${i} % 4]
+	case ${range} in
+	    0)
+		proto=${elt}
+		;;
+	    1)
+		name=${elt}
+		;;
+	    2)
+		ip=${elt}
+		;;
+	    3)
+		port=${elt}
+		case ${proto} in
+		    ldap)
+			uri="ldap://${ip}:${port}"
+			ldap_uris="${ldap_uris} ${uri}"
+			;;
+		    sldap)
+			uri="ldap://${name}:${port}"
+			sldap_uris="${sldap_uris} ${uri}"
+			;;
+		    ldaps)
+			uri="ldaps://${name}:${port}"
+			ldaps_uris="${ldaps_uris} ${uri}"
+			;;
+		    *)
+			;;
+		esac
+		uris="${uris} ${uri}"
+		;;
+	    *)
+		;;
+	esac
+	((i++))
+    done
+
+    ldap_uris=${ldap_uris:1}
+    sldap_uris=${sldap_uris:1}
+    ldaps_uris=${ldaps_uris:1}
+    uris=${uris:1}
+
+    cat <<EOF
+database ldap
+protocol-version 3
+timeout bind=3 search=30
+cancel abandon
+lastmod off
+chase-referrals yes
+readonly yes
+rebind-as-user yes
+suffix "${DOMAIN_NAME_DN}"
+uri "${uris}"
+EOF
+
+    if test -s ${LDAP_DIR}/${LDAP_CA} ; then
+	if test -n "${LDAPS_CA}" ; then
+	    tls_conf="tls_reqcert=demand tls_cacert=${LDAP_DIR}/${LDAP_CA}"
+	else
+	    tls_conf="tls_reqcert=never tls_cacert=${LDAP_DIR}/${LDAP_CA}"
+	fi
+    else
+	tls_conf="tls_reqcert==never"
+    fi
+
+    if test -n "${sldap_uris}" ; then
+	echo "tls start ${tls_conf}"
+    else
+	if test -z "${ldaps_uris}" ; then
+	    echo "tls none"
+	else
+	    echo "tls ldaps ${tls_conf}"
+	fi
+    fi
+
+    if test ${LDAP_BIND_MODE} == False ; then
+	echo "idassert-bind bindmethod=none"
+    else
+	echo "idassert-bind bindmethod=simple"
+	echo -e "\tbinddn=\"${LDAP_BIND_DN}\""
+	echo -e "\tcredentials=\"${LDAP_BIND_PASSWORD}\""
+    fi
+}
+
+gen-guard-dir()
+{
+    local chroot=${1}
+    
+    if test -n "${chroot}" ; then
+	local len=${#PROXY_DIR}
+	local log_dir=${PROXY_LOG_DIR:${len}}
+	local guard_dir=${PROXY_GUARD_DIR:${len}}
+    else
+	local log_dir=${PROXY_LOG_DIR}
+	local guard_dir=${PROXY_GUARD_DIR}
+    fi
+
+    echo "logdir ${log_dir}"
+    echo "dbhome ${guard_dir}"
+}
+
+gen-tmp-guard-conf()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    test -n "${3}" || return 3
+    local ftype=${1}
+    local urllist=${2}
+    local suffix=${3}
+
+    gen-guard-dir chroot
+    echo "ldapcachetime 300"
+    cat ${CONF_DIR}/squidGuard.conf-constant
+
+    local len=${#suffix}
+    local tag=${suffix:0:$[${len}-1]}
+    local extension
+
+    case ${ftype} in
+	${URLLIST_CREATE})
+	    extension='.tmp'
+	    ;;
+	${URLLIST_UPDATE})
+	    ;;
+	*)
+	    ;;
+    esac
+
+    echo "dest ${urllist} {"
+    echo -e "\t${tag}list ${urllist}/${suffix}${extension}"
+    echo "}"
+    echo "acl {"
+    echo -e "\tdefault {"
+    echo -e "\t\tpass all"
+    echo -e "\t}"
+    echo "}"
+}
+
+urllist-is-used-by-sslmediate()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    local in_name=${1}
+    local in_mode=${2}
+
+    local name
+
+    case ${in_mode} in
+	user)
+	    local sslmediate_exception_urllist_list=${SSLMEDIATE_EXCEPTION_URLLIST_LIST}
+	    ;;
+	system)
+	    local sslmediate_exception_urllist_list=${CURRENT_SSLMEDIATE_EXCEPTION_URLLIST_LIST}
+	    ;;
+	*)
+	    return 1
+	    ;;
+    esac
+
+
+    for name in ${sslmediate_exception_urllist_list}
+    do
+	test ${name} != ${in_name} || return 0
+    done
+
+    return 11
+}
+
+gen-db-dump-header()
+{
+    echo "VERSION=3"
+    echo "format=print"
+    echo "type=btree"
+    echo "db_pagesize=4096"
+    echo "HEADER=END"
+}
+
+gen-db-dump-footer()
+{
+    echo "DATA=END"
+}
+
+sslmediate-exception-domainname-list-2dump()
+{
+    test -n "${1}" || return 1
+    local env=${1}
+
+    local sslmediate_exception_domainname_list name
+
+    case ${env} in
+	new)
+	    sslmediate_exception_domainname_list=${SSLMEDIATE_EXCEPTION_DOMAINNAME_LIST}
+	    ;;
+	cur)
+	    sslmediate_exception_domainname_list=${CURRENT_SSLMEDIATE_EXCEPTION_DOMAINNAME_LIST}
+	    ;;
+	*)
+	    ;;
+    esac
+
+    gen-db-dump-header
+
+    for name in ${sslmediate_exception_domainname_list}
+    do
+	echo " .${name}"
+	echo " \00"
+    done
+
+    gen-db-dump-footer
+}
+
+update-sslmediation-exceptions()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    local env=${1}
+    local context=${2}
+    local in_period=${3}
+
+    local name
+
+    case ${context} in
+	apply)
+	    test ${FLAG_SSLMEDIATE_EXCEPTIONS} -eq 1 || return 0
+	    ;;
+	auto)
+	    test ${CURRENT_SSLMEDIATE_MODE} == True || return 0
+
+	    local bool load op period protocol ip fn
+	    local doit
+
+	    for name in ${CURRENT_SSLMEDIATE_EXCEPTION_URLLIST_LIST}
+	    do
+		if test -f ${URLLIST_DIR}/${name}.${URLLIST_AUTO}.current ; then
+
+		    read bool load op period protocol ip fn < ${URLLIST_DIR}/${name}.${URLLIST_AUTO}.current
+
+		    if test -z "${in_period}" -o "${in_period}" == ${period} ; then
+			doit=yes
+			break
+		    fi
+		fi
+	    done
+	    test -n "${doit}" || return 0
+	    ;;
+	*)
+	    ;;
+    esac
+
+    case ${env} in
+	new)
+	    local proxy2_mode=${PROXY2_MODE}
+	    local rweb_site_name_list=${RWEB_SITE_NAME_LIST}
+	    local sslmediate_exception_domainname_list=${SSLMEDIATE_EXCEPTION_DOMAINNAME_LIST}
+	    local sslmediate_exception_urllist_list=${SSLMEDIATE_EXCEPTION_URLLIST_LIST}
+	    ;;
+	cur)
+	    local proxy2_mode=${CURRENT_PROXY2_MODE}
+	    local rweb_site_name_list=${CURRENT_RWEB_SITE_NAME_LIST}
+	    local sslmediate_exception_domainname_list=${CURRENT_SSLMEDIATE_EXCEPTION_DOMAINNAME_LIST}
+	    local sslmediate_exception_urllist_list=${CURRENT_SSLMEDIATE_EXCEPTION_URLLIST_LIST}
+	    ;;
+	*)
+	    return 1
+	    ;;
+    esac
+
+    local exceptions_file=${PROXY_DOMAIN_LIST_DIR}/${SSLMEDIATE_EXCEPTIONS_FILENAME}
+    local exceptions_compiled=${RUN_DIR}/${SSLMEDIATE_EXCEPTIONS_FILENAME}
+
+    local reset
+
+    if test ${proxy2_mode} == True ; then
+	test -n "${sslmediate_exception_urllist_list}" -o \
+	     -n "${sslmediate_exception_domainname_list}" || reset=yes
+    else
+	test -n "${rweb_site_name_list}" -o \
+	     -n "${sslmediate_exception_urllist_list}" -o \
+	     -n "${sslmediate_exception_domainname_list}" || reset=yes
+    fi
+
+    if test -n "${reset}" ; then
+	log "Resetting the SSL mediation exceptions"
+	echo -n > ${exceptions_file}
+	log-result 0
+	return 0
+    fi
+
+    local ret len i=1
+
+    log "Compiling SSL mediation exceptions (1/2)"
+
+    rm -f ${exceptions_file}.{dump1,dump2,db}
+
+    if test ${proxy2_mode} == False ; then
+
+	gen-db-dump-header > ${exceptions_file}.dump1
+
+	for name in ${rweb_site_name_list}
+	do
+	    echo " ${name}"
+	    echo " \00"
+	done >> ${exceptions_file}.dump1
+
+	gen-db-dump-footer >> ${exceptions_file}.dump1
+
+	db_load -f ${exceptions_file}.dump1 ${exceptions_file}.db 2> /dev/null
+	ret=${?}
+
+	if test ${ret} -ne 0 ; then
+	    rm -f ${exceptions_file}.{dump1,db}
+	    ret=11
+	    log-result ${ret}
+	    return ${ret}
+	fi
+    fi
+
+    if test -n "${sslmediate_exception_domainname_list}" ; then
+
+	sslmediate-exception-domainname-list-2dump ${env} > ${exceptions_file}.dump1 2> /dev/null
+	ret=${?}
+
+	if test ${ret} -ne 0 ; then
+	    rm -f ${exceptions_file}.dump1
+	    ret=21
+	    log-result ${ret}
+	    return ${ret}
+	fi
+
+	db_load -f ${exceptions_file}.dump1 ${exceptions_file}.db 2> /dev/null
+	ret=${?}
+
+	if test ${ret} -ne 0 ; then
+	    rm -f ${exceptions_file}.{dump1,db}
+	    ret=23
+	    log-result ${ret}
+	    return ${ret}
+	fi
+    fi
+
+    for name in ${sslmediate_exception_urllist_list}
+    do
+	test -f ${PROXY_GUARD_DIR}/${name}/domains.db || continue
+	db_dump ${PROXY_GUARD_DIR}/${name}/domains.db > ${exceptions_file}.dump1 2> /dev/null
+	ret=${?}
+
+	if test ${ret} -ne 0 ; then
+	    rm -f ${exceptions_file}.{dump1,db}
+	    ret=31
+	    log-result ${ret}
+	    return ${ret}
+	fi
+
+	db_load -f ${exceptions_file}.dump1 ${exceptions_file}.db 2> /dev/null
+	ret=${?}
+
+	if test ${ret} -ne 0 ; then
+	    rm -f ${exceptions_file}.{dump1,db}
+	    ret=33
+	    log-result ${ret}
+	    return ${ret}
+	fi
+    done
+
+    if test ! -f ${exceptions_file}.db ; then
+	log-result 0
+	log "Compiling SSL mediation exceptions (2/2)"
+	log-result 0
+	return 0
+    fi
+
+    db_dump -p ${exceptions_file}.db 2> /dev/null | \
+	sed -e '/^ \\00$/d' -e 's/^ //' | \
+	tail --lines=+6 | \
+	head --lines=-1 > ${exceptions_file}.dump1
+    ret=${?}
+
+    rm -f ${exceptions_file}.db
+
+    if test ${ret} -ne 0 ; then
+	rm -f ${exceptions_file}.dump1
+	ret=41
+	log-result ${ret}
+	return ${ret}
+    fi
+
+    local lines=$(wc -l ${exceptions_file}.dump1 2> /dev/null)
+    lines=${lines/ *}
+
+    echo $[${lines} * 2] > ${exceptions_compiled}.total
+    echo 0 > ${exceptions_compiled}.cursor
+
+    log-result 0
+
+    log "Compiling SSL mediation exceptions (2/2)" ${LOG_TAG_SSLMEDIATE}
+
+    while read name
+    do
+	echo ${#name} ${name}
+	echo ${i} > ${exceptions_compiled}.cursor
+	((i++))
+    done < ${exceptions_file}.dump1 > ${exceptions_file}.dump2 2> /dev/null
+
+    sort --numeric-sort ${exceptions_file}.dump2 > ${exceptions_file}.dump1
+    rm -f ${exceptions_file}.dump2
+
+    while read len name
+    do
+	echo ${name}
+	echo ${i} > ${exceptions_compiled}.cursor
+	((i++))
+    done < ${exceptions_file}.dump1 > ${exceptions_file} 2> /dev/null
+    rm -f ${exceptions_file}.dump1
+
+    log-result 0
+}
+
+clear-urllists()
+{
+    cd ${TMP_DIR}
+
+    local files=$(ls -1 ${URLLIST_CLEAR}.*.* 2> /dev/null)
+    test -n "${files}" || return 0
+
+    local file urllist urllists suffix
+    local len=${#URLLIST_CLEAR} ; ((len++))
+
+    for file in ${files}
+    do
+	urllist=${file:${len}}
+	suffix=${urllist/*\.}
+	urllist=${urllist%\.*}
+
+	log "Clearing the '${urllist}(${suffix})' URL list"
+
+	case ${APL_ROLE} in
+	    gateway)
+		rm -f \
+		   ${PROXY_GUARD_DIR}/${urllist}/${suffix}.db \
+		   ${URLLIST_VAR_DIR}//${urllist}.${suffix}.${URLLIST_UPDATE} \
+		   ${file} &&
+		    touch-urllist ${PROXY_GUARD_DIR}/${urllist}/${suffix} &&
+		log-result ${?}
+
+		member "${urllists}" "${urllist}" || urllists="${urllists} ${urllist}"
+		;;
+	    manager)
+		rm -f \
+		   ${URLLIST_VAR_DIR}/${MPUSHED}.${URLLIST}.*.${urllist}.*.${suffix}.gz* \
+		   ${URLLIST_VAR_DIR}/${urllist}.${suffix}.${URLLIST_UPDATE} \
+		   ${file}
+		log-result ${?}
+		;;
+	    *)
+		return 255
+		;;
+	esac
+    done
+
+    test ${APL_ROLE} == gateway || return 0
+
+    urllists=${urllists:1}
+
+    for urllist in ${urllists}
+    do
+	if urllist-is-used-by-sslmediate ${urllist} user ; then
+	    FLAG_SSLMEDIATE_EXCEPTIONS=1
+	    break
+	fi
+    done
+}
+
+manager-build-urllist()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    test -n "${3}" || return 3
+    test -n "${4}" || return 4
+    test -n "${5}" || return 5
+    test -n "${6}" || return 6
+    local file=${1}
+    local prefix=${2}
+    local ftype=${3}
+    local urllist=${4}
+    local suffix=${5}
+    local serial=${6}
+
+    local days=$(get-urllist-serial-days ${file} ${prefix} ${ftype} ${urllist} ${suffix})
+    local base
+
+    base=$(file-basename ${file})
+    base=${base/${prefix}\./${MPUSHED}\.}
+
+    log "Committing (${serial}) the '${urllist}(${suffix})' URL list"
+    check-vloaded-signature ${file}
+    if test ${?} -ne 0 ; then
+	rm -f ${file} ${file}.${SIGNATURE}
+	log-result 7
+	return 7
+    fi
+
+    local ret=0
+
+    cp -f ${file} ${URLLIST_VAR_DIR}/${base} || ((ret++))
+    test ! -f ${file}.${SIGNATURE} || cp -f ${file}.${SIGNATURE} ${URLLIST_VAR_DIR}/${base}.${SIGNATURE} || ((ret++))
+    echo ${days} > ${URLLIST_VAR_DIR}/${urllist}.${suffix}.${URLLIST_UPDATE}  || ((ret++))
+
+    log-result ${ret}
+}
+
+gateway-build-urllist()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    test -n "${3}" || return 3
+    test -n "${4}" || return 4
+    test -n "${5}" || return 5
+    test -n "${6}" || return 6
+    local file=${1}
+    local prefix=${2}
+    local ftype=${3}
+    local urllist=${4}
+    local suffix=${5}
+    local message=${6}
+
+    local days=$(get-urllist-serial-days ${file} ${prefix} ${ftype} ${urllist} ${suffix})
+
+    log "${message} the '${urllist}(${suffix})' URL list"
+
+    check-vloaded-signature ${file}
+    if test ${?} -ne 0 ; then
+	rm -f ${file} ${file}.${SIGNATURE}
+	log-result 7
+	return 7
+    fi
+
+    check-gzip-file ${file}
+    if test ${?} -ne 0 ; then
+	log-result 9
+	return 9
+    fi
+    
+    if test ! -d ${PROXY_GUARD_DIR}/${urllist} ; then
+	log-result 11
+	return 11
+    fi
+
+    case ${ftype} in
+
+	${URLLIST_CREATE})
+
+	    local file_sz=$(get-file-length ${file})
+	    local fs_free_sz=$(get-fs-available-sz ${PROXY_GUARD_DIR})
+
+	    ((file_sz *= 24))
+
+	    if test ${file_sz} -gt ${fs_free_sz} ; then
+		rm -f ${file} ${file}.${SIGNATURE}
+		log-result 13
+		return 13
+	    fi
+	    ;;
+	*)
+	    ;;
+    esac
+
+    rm -f ${PROXY_GUARD_DIR}/${urllist}/${suffix}.tmp
+    gunzip --quiet --to-stdout ${file} > ${PROXY_GUARD_DIR}/${urllist}/${suffix}.tmp 2> /dev/null
+
+    if test ${?} -ne 0 ; then
+	rm -f \
+	    ${PROXY_GUARD_DIR}/${urllist}/${suffix}.gz \
+	    ${PROXY_GUARD_DIR}/${urllist}/${suffix}.tmp \
+	    ${file} ${file}.${SIGNATURE}
+	log-result 15
+	return 15
+    fi
+
+    if check-empty-file ${PROXY_GUARD_DIR}/${urllist}/${suffix}.tmp ; then
+
+	case ${ftype} in
+	    ${URLLIST_CREATE})
+		if test ! -f ${PROXY_GUARD_DIR}/${urllist}/${suffix}.db ; then
+		    rm -f ${PROXY_GUARD_DIR}/${urllist}/${suffix}.tmp
+		    echo ${days} > ${URLLIST_VAR_DIR}/${urllist}.${suffix}.${URLLIST_UPDATE}
+		    touch-urllist ${PROXY_GUARD_DIR}/${urllist}/${suffix}
+		    log-result 0
+		    return 0
+		fi
+		;;
+	    ${URLLIST_UPDATE})
+		rm -f ${PROXY_GUARD_DIR}/${urllist}/${suffix}.tmp
+		echo ${days} > ${URLLIST_VAR_DIR}/${urllist}.${suffix}.${URLLIST_UPDATE}
+		rm -f ${file} ${file}.${SIGNATURE}
+		log-result 0
+		return 0
+		;;
+	    *)
+		;;
+	esac
+    fi
+
+    if ! check-ascii-file ${PROXY_GUARD_DIR}/${urllist}/${suffix}.tmp ; then
+	rm -f \
+	   ${PROXY_GUARD_DIR}/${urllist}/${suffix}.tmp \
+	   ${file} ${file}.${SIGNATURE}
+	touch-urllist ${PROXY_GUARD_DIR}/${urllist}/${suffix}
+	log-result 17
+	return 17
+    fi
+
+    if test ${suffix} == expressions ; then
+	mv -f ${PROXY_GUARD_DIR}/${urllist}/${suffix}.tmp ${PROXY_GUARD_DIR}/${urllist}/${suffix}
+	log-result 0
+	return 0
+    fi
+
+    gen-tmp-guard-conf ${ftype} ${urllist} ${suffix} > ${PROXY_DIR}/tmp/squidGuard.conf
+
+    case ${ftype} in
+
+	${URLLIST_CREATE})
+	    chroot ${PROXY_DIR} /bin/squidGuard -C ${urllist}/${suffix}.tmp -c /tmp/squidGuard.conf -P
+	    if test ${?} -ne 0 ; then
+		clean-urllist ${ftype} ${urllist} ${suffix} &&
+		    rm -f ${file} ${file}.${SIGNATURE}
+		log-result 19
+		return 19
+	    fi
+
+	    chown ${SQUID_UID}:${SQUID_GID} ${PROXY_GUARD_DIR}/${urllist}/${suffix}.tmp.db
+	    chmod 600 ${PROXY_GUARD_DIR}/${urllist}/${suffix}.tmp.db
+	    mv -f ${PROXY_GUARD_DIR}/${urllist}/${suffix}.tmp.db ${PROXY_GUARD_DIR}/${urllist}/${suffix}.db
+	    rm -f ${PROXY_GUARD_DIR}/${urllist}/${suffix}
+	    rm -f ${PROXY_GUARD_DIR}/${urllist}/${suffix}.tmp
+
+	    echo ${days} > ${URLLIST_VAR_DIR}/${urllist}.${suffix}.${URLLIST_UPDATE}
+	    ;;
+
+	${URLLIST_UPDATE})
+	    if test ! -f ${PROXY_GUARD_DIR}/${urllist}/${suffix}.db ; then
+		clean-urllist ${ftype} ${urllist} ${suffix} &&
+		    rm -f ${file} ${file}.${SIGNATURE}
+		log-result 21
+		return 21
+	    fi
+
+	    mv -f ${PROXY_GUARD_DIR}/${urllist}/${suffix}.tmp ${PROXY_GUARD_DIR}/${urllist}/${suffix}.diff
+	    echo >> ${PROXY_GUARD_DIR}/${urllist}/${suffix}.diff
+	    chroot ${PROXY_DIR} /bin/squidGuard -u ${urllist}/${suffix}.diff -c /tmp/squidGuard.conf -P
+
+	    if test ${?} -ne 0 ; then
+		clean-urllist ${ftype} ${urllist} ${suffix} &&
+		    rm -f ${file} ${file}.${SIGNATURE}
+		log-result 23
+		return 23
+	    fi
+
+	    rm -f ${PROXY_GUARD_DIR}/${urllist}/${suffix}.diff
+	    echo ${days} > ${URLLIST_VAR_DIR}/${urllist}.${suffix}.${URLLIST_UPDATE}
+	    ;;
+	*)
+	    ;;
+    esac
+
+    log-result 0
+}
+
+build-urllist()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    test -n "${3}" || return 3
+    test -n "${4}" || return 4
+    local prefix=${1}
+    local ftype=${2}
+    local urllist=${3}
+    local suffix=${4}
+
+    local i=0 ret
+    local message
+
+    case ${ftype} in
+	"${URLLIST_CREATE}")
+	    message=Building
+	    ;;
+	"${URLLIST_UPDATE}")
+	    message=Updating
+	    ;;
+	*)
+	    ;;
+    esac
+
+    files=$(ls -1 ${prefix}.${ftype}.${urllist}.*.${suffix}.gz 2> /dev/null)
+    for file in ${files}
+    do
+	test ${ftype} == ${URLLIST_CREATE} || ((i++))
+	test -s ${file} || continue
+
+	case ${APL_ROLE} in
+	    gateway)
+		gateway-build-urllist ${file} ${prefix} ${ftype} ${urllist} ${suffix} "${message} (${i})"
+		;;
+	    manager)
+		manager-build-urllist ${file} ${prefix} ${ftype} ${urllist} ${suffix} ${i}
+		;;
+	    *)
+		;;
+	esac
+
+	ret=${?}
+	test ${ret} -eq 0 || test ${ftype} == ${URLLIST_CREATE} || break
+    done
+
+    return ${ret}
+}
+
+build-all-urllists()
+{
+    test -n "${1}" || return 1
+    local actor=${1}
+
+    local prefix ftype
+    local file files
+    local suffix suffixes
+    local urllist urllists
+
+    cd ${TMP_DIR}
+
+    case ${actor} in
+	user)
+	    prefix=${LOADED}
+	    ;;
+	system)
+	    prefix=${ILOADED}
+	    ;;
+	manager)
+	    commit-mpushed-urllists system
+	    prefix=${ILOADED}
+	    ;;
+	*)
+	    return 1
+	    ;;
+    esac
+
+    files=$(ls -1 ${prefix}.${URLLIST_CREATE}.*.gz 2> /dev/null)
+    for file in ${files}
+    do
+	urllist=${file/${prefix}.${URLLIST_CREATE}\.}
+	urllist=${urllist/\.*/}
+	member "${urllists}" "${urllist}" || urllists="${urllists} ${urllist}"
+    done
+
+    files=$(ls -1 ${prefix}.${URLLIST_UPDATE}.*.gz 2> /dev/null)
+    for file in ${files}
+    do
+	urllist=${file/${prefix}.${URLLIST_UPDATE}\.}
+	urllist=${urllist/\.*}
+	member "${urllists}" "${urllist}" || urllists="${urllists} ${urllist}"
+    done
+
+    urllists=${urllists:1}
+
+    if test ${APL_ROLE} == manager ; then
+	for urllist in ${urllists}
+	do
+	    for ftype in ${URLLIST_CREATE} ${URLLIST_UPDATE}
+	    do
+		case ${ftype} in
+		    "${URLLIST_CREATE}")
+			suffixes="domains urls expressions"
+			;;
+		    "${URLLIST_UPDATE}")
+			suffixes="domains urls"
+			;;
+		    *)
+			;;
+		esac
+
+		for suffix in ${suffixes}
+		do
+		    files=$(ls -1 ${prefix}.${URLLIST_CREATE}.${urllist}.*.${suffix}.gz ${prefix}.${URLLIST_UPDATE}.${urllist}.*.${suffix}.gz 2> /dev/null)
+		    test -z "${files}" || \
+			rm -f \
+			   ${URLLIST_VAR_DIR}/${MPUSHED}.${URLLIST_CREATE}.${urllist}.*.${suffix}.gz* \
+			   ${URLLIST_VAR_DIR}/${MPUSHED}.${URLLIST_UPDATE}.${urllist}.*.${suffix}.gz*
+		done
+	    done
+	done
+    fi
+
+    for urllist in ${urllists}
+    do
+	for ftype in ${URLLIST_CREATE} ${URLLIST_UPDATE}
+	do
+	    case ${ftype} in
+		"${URLLIST_CREATE}")
+		    suffixes="domains urls expressions"
+		    ;;
+		"${URLLIST_UPDATE}")
+		    suffixes="domains urls"
+		    ;;
+		*)
+		    ;;
+	    esac
+
+	    for suffix in ${suffixes}
+	    do
+		build-urllist ${prefix} ${ftype} ${urllist} ${suffix}
+	    done
+	done
+    done
+
+    case ${APL_ROLE} in
+	gateway)
+	    for urllist in ${urllists}
+	    do
+		if urllist-is-used-by-sslmediate ${urllist} ${actor} ; then
+		    FLAG_SSLMEDIATE_EXCEPTIONS=1
+		    break
+		fi
+	    done
+	    ;;
+	manager)
+	    ;;
+	*)
+	    ;;
+    esac
+
+    clean-loaded-urllist ${actor}
+}
+
+set-self-urllist()
+{
+    if test ${HA_MODE} == False ; then
+	echo "${IP_WEB_IP}" > ${PROXY_GUARD_DIR}/self/domains
+	echo "${WEB_SERVER_DENY_NAME}" >> ${PROXY_GUARD_DIR}/self/domains
+	echo > ${PROXY_GUARD_DIR}/self/urls 
+	echo > ${PROXY_GUARD_DIR}/self/expressions
+    else
+	local ip
+
+	echo -n > ${PROXY_GUARD_DIR}/self/domains
+	echo > ${PROXY_GUARD_DIR}/self/urls
+	echo > ${PROXY_GUARD_DIR}/self/expressions
+
+	for ip in ${VRRP_WEB_IP_LIST}
+	do
+	    echo "${ip}" >> ${PROXY_GUARD_DIR}/self/domains
+	done
+    fi
+    chown ${SQUID_UID}:${SQUID_GID} ${PROXY_GUARD_DIR}/self/domains
+    chown ${SQUID_UID}:${SQUID_GID} ${PROXY_GUARD_DIR}/self/urls
+    chown ${SQUID_UID}:${SQUID_GID} ${PROXY_GUARD_DIR}/self/expressions
+}
+
+gen-guard-conf()
+{
+    local default_urllists negative_urllists positive_urllists
+    local nb=1 i=0 j=0 k=0 elt1 elt2 elt3 range1 range2 range3
+    local rule_name policy_name action
+    local urllist urllists_col urllists_lst all_urllists
+    local filters_col filters_lst filter filter_type filter_name name
+    local ip_key ip1 ip2 time_type time_value ldap_group ldap_login ldap_filter ldap_used=0
+    local week slot date1 year1 month1 day1 date2 year2 month2 day2
+    local time_filters ip_filters ldap_filters
+
+    local timeRule
+    declare -a timeRule
+    timeRule[0]=0
+
+    gen-guard-dir chroot
+    echo "ldapcachetime ${AUTHENTICATE_LDAP_TTL}"
+    cat squidGuard.conf-constant
+
+    for elt1 in ${GUARD_RULE_LIST}
+    do
+	range1=$[${i} % 3]
+	case ${range1} in
+	    0)
+		rule_name=${elt1}
+		;;
+	    1)
+		action=${elt1}
+		;;
+	    2)
+		urllists_col=${elt1}
+		urllists_lst=$(colon2space ${urllists_col})
+		
+		if test "${rule_name}" == "default" ; then
+		    if test "${action}" == "deny" ; then
+			test ${GUARD_IP} == False || default_urllists=" !in-addr"
+			for urllist in ${urllists_lst}
+			do
+			    test ${urllist} != self || continue
+			    default_urllists="${default_urllists} !${urllist}"
+			done
+			default_urllists="${default_urllists:1} all"
+		    else
+			for urllist in ${urllists_lst}
+			do
+			    test ${urllist} != self || continue
+			    default_urllists="${default_urllists} ${urllist}"
+			done
+			default_urllists="${default_urllists:1} self none"
+		    fi
+		else
+		    j=0
+		    unset ip_filters time_filters ldap_filters
+
+		    for elt2 in ${GUARD_POLICY_LIST}
+		    do
+			range2=$[${j} % 2]
+			case ${range2} in
+			    0)
+				policy_name=${elt2}
+				;;
+			    1)
+				if test ${policy_name} == ${rule_name} ; then
+				    filters_col=${elt2}
+				    filters_lst=$(colon2space ${filters_col})
+
+				    for filter in ${filters_lst}
+				    do
+					test ${filter} != "self_self" || continue
+					filter_type=${filter/_*}
+					filter_name=${filter#*_}
+					k=0
+					case ${filter_type} in
+					    ip)
+						for elt3 in ${GUARD_FILTER_IP_LIST}
+						do
+						    range3=$[${k} % 4]
+						    case ${range3} in
+							0)
+							    name=${elt3}
+							    ;;
+							1)
+							    ip_key=${elt3}
+							    ;;
+							2)
+							    ip1=${elt3}
+							    ;;
+							3)
+							    ip2=${elt3}
+							    if test ${name} == ${filter_name} ; then
+								case ${ip_key} in
+								    range)
+									ip_filters="${ip_filters}\n\tip ${ip1}-${ip2}"
+									;;
+								    network)
+									ip_filters="${ip_filters}\n\tip ${ip1}/${ip2}"
+									;;
+								    *)
+									;;
+								esac
+							    fi
+							    ;;
+							*)
+							    ;;
+						    esac
+						    ((k++))
+						done
+						;;
+					    'time')
+						for elt3 in ${GUARD_FILTER_TIME_LIST}
+						do
+						    range3=$[${k} % 3]
+						    case ${range3} in
+							0)
+							    name=${elt3}
+							    ;;
+							1)
+							    time_type=${elt3}
+							    ;;
+							2)
+							    time_value=${elt3}
+							    test ${name} != ${filter_name} || time_filters="${time_filters} ${time_type} ${time_value}"
+							    ;;
+							*)
+							    ;;
+						    esac
+						    ((k++))
+						done
+						;;
+					    ldap)
+						for elt3 in ${GUARD_FILTER_LDAP_LIST}
+						do
+						    range3=$[${k} % 4]
+						    case ${range3} in
+							0)
+							    name=${elt3}
+							    ;;
+							1)
+							    ldap_group=${elt3}
+							    ;;
+							2)
+							    ldap_login=${elt3}
+							    ;;
+							3)
+							    ldap_filter=${elt3}
+							    if test ${name} == ${filter_name} ; then
+								if test-ldap-auth-state ; then
+								    ldap_filters="${ldap_filters}\n\tldapusersearch ldap://127.0.0.1:389/${ldap_group}?${ldap_login}?sub?(&(${ldap_filter})(${ldap_login}=%s))"
+								fi
+							    fi
+							    ;;
+							*)
+							    ;;
+						    esac
+						    ((k++))
+						done
+						;;
+					    *)
+						;;
+					esac
+				    done
+
+				    #######################
+				    echo
+				    echo "src src-${nb} {"
+				    #######################
+
+				    if test -n "${ip_filters}" ; then
+					echo -e "${ip_filters:2}"
+					if test -n "${ldap_filters}" ; then
+					    echo -e "${ldap_filters:2}"
+					    ldap_used=1
+					fi
+				    elif test -n "${ldap_filters}" ; then
+					echo -e "${ldap_filters:2}"
+					ldap_used=1
+				    else
+					echo -e "\tip 127.0.0.255/255.255.255.255"
+				    fi
+
+				    ########
+				    echo "}"
+				    ########
+				fi
+				;;
+			    *)
+				;;
+			esac
+			((j++))
+		    done
+
+		    if test -n "${time_filters}" ; then
+
+			########################
+			echo
+			echo "time time-${nb} {"
+			########################
+			
+			j=0
+			for elt2 in ${time_filters}
+			do
+			    range2=$[${j} % 2]
+			    case ${range2} in
+				0)
+				    time_type=${elt2}
+				    ;;
+				1)
+				    time_value=${elt2}
+				    case ${time_type} in
+					slot)
+					    week=${time_value:0:2}
+					    if test ${week:1:1} == "-" ; then
+						slot=${time_value:2}
+						case ${week:0:1} in
+						    0)
+							week="sundays"
+							;;
+						    1)
+							week="mondays"
+							;;
+						    2)
+							week="tuesdays"
+							;;
+						    3)
+							week="wednesdays"
+							;;
+						    4)
+							week="thursdays"
+							;;
+						    5)
+							week="fridays"
+							;;
+						    6)
+							week="saturdays"
+							;;
+						    *)
+							week='*'
+							;;
+						esac
+					    else
+						week='*'
+						slot=${time_value}
+					    fi
+					    echo -e "\tweekly ${week} ${slot}"
+					    ;;
+					date)
+					    date1=${time_value/-*}
+					    slot=${time_value#*-}
+
+					    year1=${date1/\/*}
+					    if test -n "${year1}" ; then
+						date2=${date1:5}
+					    else
+						date2=${date1:1}
+					    fi
+
+					    month1=${date2/\/*}
+					    if test -n "${month1}" ; then
+						day1=${date2:3}
+					    else
+						day1=${date2:1}
+					    fi
+
+					    test -n "${year1}" || year1='*'
+					    test -n "${month1}" || month1='*'
+					    test -n "${day1}" || day1='*'
+
+					    if test ${date1} == ${slot} ; then
+						echo "date ${year1}.${month1}.${day1}"
+					    else
+						echo -e "\tdate ${year1}.${month1}.${day1} ${slot}"
+					    fi
+					    ;;
+					frame)
+					    date1=${time_value/-*}
+					    date2=${time_value/*-}
+
+					    year1=${date1:0:4}
+					    month1=${date1:5:2}
+					    day1=${date1:8:2}
+
+					    year2=${date2:0:4}
+					    month2=${date2:5:2}
+					    day2=${date2:8:2}
+
+					    echo -e "\tdate ${year1}.${month1}.${day1}-${year2}.${month2}.${day2}"
+					    ;;
+					*)
+					    ;;
+				    esac
+				    ;;
+				*)
+				    ;;
+			    esac
+			    ((j++))
+			done
+			
+			########
+			echo "}"
+			########
+
+			timeRule[${nb}]=1
+		    else
+			timeRule[${nb}]=0
+		    fi
+		    ((nb++))
+		fi
+
+		for urllist in ${urllists_lst}
+		do
+		    test ${urllist} != self || continue
+		    member "${all_urllists}" "${urllist}" || all_urllists="${all_urllists} ${urllist}"
+		done
+		;;
+	    *)
+		return 1
+		;;
+	esac
+	((i++))
+    done
+
+    if test ${ldap_used} -eq 1 ; then
+	if test "${LDAP_BIND_MODE}" == True -a -s ${PROXY_DIR}${LDAP_DIR}/${LDAP_PASSWD} ; then
+	    local password=$(cat ${PROXY_DIR}${LDAP_DIR}/${LDAP_PASSWD})
+	    echo "ldapbinddn ${LDAP_BIND_DN}"
+	    echo "ldapbindpass ${password}"
+	fi
+    fi
+
+    test -z "${all_urllists}" || echo
+    
+    for urllist in ${all_urllists}
+    do
+	echo "dest ${urllist} {"
+	echo -e "\tdomainlist ${urllist}/domains"
+	echo -e "\turllist ${urllist}/urls"
+	echo -e "\texpressionlist ${urllist}/expressions"
+	test ${GUARD_LOG_MODE} == False || echo -e "\tlog ${ACCESS_GUARD_LOG}"
+	echo "}"
+	echo
+    done
+
+    ############
+    echo "acl {"
+    ############
+    
+    i=0 nb=1
+
+    for elt1 in ${GUARD_RULE_LIST}
+    do
+	range1=$[${i} % 3]
+	case ${range1} in
+	    0)
+		rule_name=${elt1}
+		;;
+	    1)
+		action=${elt1}
+		;;
+	    2)
+		urllists_col=${elt1}
+
+		if test "${rule_name}" != "default" ; then
+		    urllists_lst=$(colon2space ${urllists_col})
+		    if test "${action}" = "deny" ; then
+			unset negative_urllists
+			for urllist in ${urllists_lst}
+			do
+			    test ${urllist} != self || continue
+			    negative_urllists="${negative_urllists} !${urllist}"
+			done
+			negative_urllists="${negative_urllists:1}"
+
+			if test ${GUARD_IP} == True ; then
+			    if test -z "${negative_urllists}" ; then
+				negative_urllists="!in-addr"
+			    else
+				negative_urllists="!in-addr ${negative_urllists}"
+			    fi
+			fi
+		    else
+			unset positive_urllists
+			for urllist in ${urllists_lst}
+			do
+			    test ${urllist} != self || continue
+			    positive_urllists="${positive_urllists} ${urllist}"
+			done
+			positive_urllists="${positive_urllists:1}"
+		    fi
+
+		    if test ${timeRule[${nb}]} -eq 0  ; then
+			echo -e "\tsrc-${nb} {"
+		    else
+			echo -e "\tsrc-${nb} within time-${nb} {"
+		    fi
+
+		    if test "${action}" = "deny" ; then
+			echo -e "\t\tpass ${negative_urllists} all"
+			echo -e "\t\tredirect ${GUARD_REDIRECT_WEB_SERVER}/${URL_DENIED_URI}"
+		    else
+			echo -e "\t\tpass ${positive_urllists} self none"
+			echo -e "\t\tredirect ${GUARD_REDIRECT_WEB_SERVER}/${URL_DENIED_URI}"
+		    fi
+		    echo -e "\t}"
+		    echo -e ""
+		    ((nb++))
+		fi
+		;;
+	    
+	    *)
+		return 1
+		;;
+	esac
+	((i++))
+    done
+    
+    if test -n "${default_urllists}" ; then
+	echo -e "\tdefault {"
+	echo -e "\t\tpass ${default_urllists}"
+	echo -e "\t\tredirect ${GUARD_REDIRECT_WEB_SERVER}/${URL_DENIED_URI}"
+	test ${GUARD_LOG_MODE} == False || echo -e "\t\tlog ${ACCESS_GUARD_LOG}"
+	echo -e "\t}"
+    else
+	echo -e "\tdefault {"
+	echo -e "\t\tpass self none"
+	echo -e "\t\tredirect ${GUARD_REDIRECT_WEB_SERVER}/${URL_DENIED_URI}"
+	test ${GUARD_LOG_MODE} == False || echo -e "\t\tlog ${ACCESS_GUARD_LOG}"
+	echo -e "\t}"
+    fi
+    
+    ########
+    echo "}"
+    ########
+}
+
+gen-suspend-squidGuard-conf()
+{
+    local contact=$(get-guard-contact)
+    local uri="${ACCESS_WARNING_URI}?email=${contact}&ip=%a"
+
+    gen-guard-dir chroot
+
+    echo "ldapcachetime 300"
+    cat ${CONF_DIR}/squidGuard.conf-constant
+
+    echo "acl {"
+    echo "    local {"
+    echo "          pass all"
+    echo "    }"
+    echo
+    echo "    default {"
+    echo "            pass self none"
+    echo "            redirect ${GUARD_REDIRECT_WEB_SERVER}/${uri}"
+    echo "    }"
+    echo "}"
+}
+
+commit-guards()
+{
+    cd ${PROXY_GUARD_DIR}
+    local todel todels=$(ls -d *.2del 2> /dev/null)
+    local urllist
+
+    for todel in ${todels}
+    do
+	urllist=$(file-basename ${todel} .2del)
+	rm -rf ${todel} 2> /dev/null
+	rm -f ${URLLIST_VAR_DIR}/${urllist}.*.${URLLIST_UPDATE}
+    done
+
+    local guard_dir=${URLLIST_DIR}
+    rm -f ${guard_dir}/*.${URLLIST_AUTO}.2del
+    rm -f ${guard_dir}/*.${URLLIST_AUTO}.current.2del
+
+    local file files
+    files=$(ls -1 ${guard_dir}/*.${URLLIST_AUTO} 2> /dev/null)
+    for file in ${files}
+    do
+	mv -f ${file} ${file}.current
+    done
+
+    cd ${PROXY_DOMAIN_LIST_DIR}
+    rm -f *.2del
+}
+
+restore-guards()
+{
+    cd ${PROXY_GUARD_DIR}
+    local todel todels=$(ls -d *.2del 2> /dev/null)
+    for todel in ${todels}
+    do
+	mv -f ${todel} ${todel/\.2del/} 2> /dev/null
+    done
+
+    local file file1 files
+    files=$(ls -1 ${URLLIST_DIR}/*.${URLLIST_AUTO}*.2del 2> /dev/null)
+    for file in ${files}
+    do
+	file1=${file/\.2del/}
+	mv -f ${file} ${file1}
+    done
+
+    cd ${PROXY_DOMAIN_LIST_DIR}
+    todels=$(ls -1 *.2del 2> /dev/null)
+    for todel in ${todels}
+    do
+	mv -f ${todel} ${todel/\.2del/} 2> /dev/null
+    done
+}
+
+LIB_APL_GUARD=Yes

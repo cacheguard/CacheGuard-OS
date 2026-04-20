@@ -1,0 +1,2 @@
+DRIVERS=="usb", ACTION=="add", RUN+="/usr/local/sbin/apl_usb_notify add '$devpath' '$attr{busnum}' '$attr{devnum}'"
+DRIVERS=="usb", ACTION=="remove", RUN+="/usr/local/sbin/apl_usb_notify del '$devpath' '$attr{busnum}' '$attr{devnum}'"

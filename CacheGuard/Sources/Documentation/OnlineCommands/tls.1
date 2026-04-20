@@ -1,0 +1,121 @@
+Manage TLS (SSL) certificates and other components
+.SH SYNOPSIS
+
+[1] \fBtls server\fR [(\fBadd\fR | \fBdel\fR) \fI<tls-id>\fR | \fBrevoke\fR \fI<tls-id>\fR [\fI<reason>\fR] | \fBraz\fR]
+
+[2] \fBtls server\fR [\fBgenerate\fR \fI<tls-id>\fR [[\fBsign\fR] [\fBocsp\fR]]]
+
+[3] \fBtls server\fR [(\fBload\fR | \fBsave\fR) \fI<tls-id>\fR (\fBkey\fR | \fBcertificate\fR | \fBcsr\fR) (\fBftp\fR | \fBsftp\fR | \fBtftp\fR) \fI<file-server>\fR \fI<file-path>\fR [\fI<days>\fR [\fBocsp\fR]]]
+
+[4] \fBtls server\fR [\fBshow\fR \fI<tls-id>\fR (\fBcertificate\fR | \fBcsr\fR | \fBkey\fR) | \fBfingerprint\fR \fI<tls-id>\fR]
+
+[5] \fBtls server\fB [\fBdays\fR [\fI<days>\fR]]
+
+[6] \fBtls ca system\fR [\fBgenerate\fR | \fBfingerprint\fR | \fBshow\fR (\fBcertificate\fR | \fBkey\fR | \fBder\fR)]
+
+[7] \fBtls ca system\fR [(\fBload\fR | \fBsave\fR) (\fBkey\fR | \fBcertificate\fR | \fBder\fR) (\fBftp\fR | \fBsftp\fR | \fBtftp\fR) \fI<file-server>\fR \fI<file-path>\fR]
+
+[8] \fBtls ca third\fR [\fBadd\fR \fI<ca-id>\fR [\fBon\fR | \fBoff\fR] | \fBdel\fR \fI<ca-id>\fR | (\fBshow\fR | \fBfingerprint\fR) \fI<ca-id>\fR | \fBload\fR \fI<ca-id>\fR (\fBftp\fR | \fBsftp\fR | \fBtftp\fR) \fI<file-server>\fR \fI<file-path>\fR | \fBraz\fR]
+
+[9] \fBtls client\fR [(\fBadd\fR \fI<tls-id>\fR [\fI<days>\fR [\fBno\fR][\fBocsp\fR] [\fI<private-key-size>\fR]]) | (\fBdel \fI<tls-id>\fR [\fBprivate\fR [\fBcancel\fR]]) | \fBraz\fR]
+
+[10] \fBtls client\fR [(\fBgenerate\fR \fI<tls-id>\fR [\fBcancel\fR]) | (\fBshow\fR (\fBkey\fR | \fBcertificate\fR) | \fBfingerprint\fR) \fI<tls-id>\fR | \fBrevoke\fR \fI<tls-id>\fR [\fI<reason>\fR]]
+
+[11] \fBtls client\fR [\fBsave\fR \fI<tls-id>\fR (\fBkey\fR | \fBcertificate\fR | \fBpkcs12\fR | \fBpfx\fR | \fBpassword\fR) (\fBftp\fR | \fBsftp\fR | \fBtftp\fR) \fI<file-server>\fR \fI<file-path>\fR]
+
+[12] \fBtls client\fR [\fBload\fR \fI<tls-id>\fR \fBcertificate\fR (\fBftp\fR | \fBsftp\fR | \fBtftp\fR) \fI<file-server>\fR \fI<file-path>\fR]
+
+[13] \fBtls client\fR [\fBdays\fR [\fI<days>\fR]]
+
+[14] \fBtls ocsp\fR [\fBhost\fR [(\fI<ip>\fR | \fI<name>\fR)] | \fBdays\fR [\fI<days>\fR] | \fBtls\fR [\fBraz\fR | \fBset\fR \fI<tls-id>\fR]]
+
+[15] \fBtls report\fR
+
+.SH DESCRIPTION
+
+This command allows you to manage TLS (SSL v3) objects. A TLS object regroups different components that can be as follows: a private RSA key, an X.509 certificate and a CSR (Certificate Signing Request). We distinguish different types X.509 certificates: CA certificates, server certificates and client certificates. You can generate a TLS object or import its components from a file server. Prior to using a TLS object, it should be created in the system. A TLS object is created in two stages: an empty object represented by a unique identifier is created first and then TLS components are generated or loaded from the file server.
+
+Usage forms from one to five [1][2][3][4][5] allow you to manage server certificates and associated TLS object components. To create a new server TLS object use the keyword \fBserver add\fR followed by a unique TLS object identifier (\fI<tls-id>\fR). To delete a TLS object use the keyword \fBserver del\fR followed by the TLS object identifier to remove. To erase all TLS objects use the keyword \fBserver raz\fR. To revoke a certificate use the keyword \fBserver revoke\fR followed by the TLS object identifier to revoke and an optionally revoke reason (refer to the \fBCERTIFICATE REVOKE REASONS\fR section below for allowed reasons). Please note that you can only revoke a certificate that has been signed with the system's CA certificate (see below). 
+
+The second usage form allows you to generate server TLS object components. To generate server TLS components use the keyword \fBserver generate\fR followed by the identifier of a previously added TLS object. During the process of generation you will be asked questions related to the generated certificate. The first information to provide is the common name for the generated certificate. If more than one name is given, a SAN (Subject Alternate Names) certificate will be created. If a name contains the character "\fI*\fR" wildcard certificate will be created. The wildcard "\fI*\fR" can replace any allowed charters in a domain name. For instance the name "\fI*.example.com\fR" will create a certificate for all "\fIexample.com\fR" sub domains. Provided names should be separated by a blank. If the optional \fBsign\fR argument is specified the certificate is signed by the system's CA (see below). Finally the optional \fBocsp\fR argument can be used to specify the usage of OCSP in the generated server certificate.
+
+The third usage form allows you to save/load private RSA keys, X.509 certificates (in PEM format) and CSR on/from a file server. Only trusted file servers are allowed. Trusted file servers are defined with the \fBaccess\fR command. Please note that:
+
+\(bu Loaded files should be in PEM format.
+
+\(bu Private keys should be in an unencrypted format.
+
+In case where a CSR is loaded, a certificate is generated and it is signed with the system's CA certificate (see below). In this case you can't use the generated certificate by the present system as its associated private RSA key won't be known. The generated certificate can then be saved on a file server and used on other systems. The generated certificate will be valid for the number of days specified as the last argument. If no number of days is specified, the certificate will be valid for the number of days specified by the usage form \fBdays\fR (the fifth usage form). Finally the optional \fBocsp\fR argument can be used to specify the usage of OCSP in the generated server certificate.
+
+The fourth usage form allows you to show a certificate or a CSR. For security reasons a private RSA key can't be shown so this usage form shows only its fingerprint. The keyword \fBfingerprint\fR followed by a \fI<tls-id>\fR prints the SHA256 and SHA1 fingerprints of a certificate. Prior to trust and use a saved TLS object component it is highly recommended to compare its fingerprint (SHA1, SHA256) against the fingerprint of the same component displayed by the system using the CLI (with the \fBtls\fR command) or the Web GUI.
+
+Note that the generated TLS components are not part of the configuration and thus are not saved when saving the configuration with the command \fBconf\fR. To save the configuration including TLS objects you can backup the system using the command \fBsystem\fR.
+
+The sixth [6] and seventh [7] usage forms allow you to load and save the system's CA certificate and private RSA key. Please note that the system's CA certificate can be saved in both PEM and DER formats but it can be loaded only in PEM format. The system's CA certificate is used to sign server and client certificates generated by the present system. It is also used by the SSL mediation module (see the command \fBsslmediate\fR) to sign dynamically generated SSL certificates for browsed HTTPS websites. The system's CA certificate is available in PEM and DER format at: \fIhttp://<internal-ip-address>\fR (or \fIhttp://<web-ip-address>\fR if the \fBvlan\fR mode is activated). Please note that:
+
+\(bu Loaded files should be in PEM format.
+
+\(bu The private RSA key should be in an unencrypted format and not protected by a password.
+
+In case where the system's CA certificate is an intermediate CA certificate (signed with another CA certificate), it is best practice to specify an OCSP URL for it. Otherwise some browsers refuse to import the intermediate CA certificate. The system's CA certificate is identified in the system by the certificate ID \fBsystem\fR (you can't use this ID for other CA certificates). 
+
+The eighth [8] usage form allows you to add and import third parties CA certificates. Third parties CA certificates can be used for Web browsing when the SSL mediation mode is activated and/or for other purposes such as VPN peers authentication. When adding a CA certificate the last optional argument allows you to turn \fBon\fR or \fBoff\fR the usage of the added CA certificate for Web browsing. Trusted CA root certificates are regularly updated but in case where a CA root certificate is missing in the system, you have the possibility to manually add it with this usage form. Imported CA certificates can be a root or an intermediate certificates. Intermediate CA certificates are useful to verify server certificates in case where a server does not properly send the full certificate chain (including all intermediate CA certificates).
+
+Usage forms ninth to thirteenth [9][10][11][12] allow you to manage cient SSL certificates signed by the system's CA root certificate. Client certificates are used to authenticate VPN peers and clients. To add a new SSL client certificate, use the keyword \fBadd\fR followed by a unique TLS object ID. To delete an existing SSL client certificate use the keyword \fBdel\fR. You can optionally delete private components only by specifying the optional \fBprivate\fR keyword. Private components are \fBkey\fR, \fBpkcs12\fR, \fBpfx\fR and \fBpassword\fR. Keeping the public component part (\fBcertificate\fR ) allows you to revoke the certificate and publish its revocation using the embedded OCSP server. To erase all SSL client certificates (and its associated TLS components) use the keyword \fBraz\fR.
+
+To revoke an existing SSL client certificate use the keyword \fBrevoke\fR. To generate SSL client certificates and other related TLS components the \fBapply\fR command should be used. You can regenerate an existing client certificate by using the keyword \fBgenerate\fR followed by its TLS object ID. To cancel the regeneration use the keyword \fBcancel\fR as the last argument. Main TLS components are the signed \fBcertificate\fR itself and its related private RSA \fBkey\fR. Other components are \fBpkcs12\fR, \fBpfx\fR and \fBpassword\fR. The \fBpkcs12\fR component is a file storing both the private RSA key and the signed client certificate protected by an automatically generated strong password. The \fBpfx\fR component is the base 64 encoded form of the \fBpkcs12\fR component. Client TLS components are generated using the following rules:
+
+\(bu The certificate common name is formed by concatenating the client certificate ID, the character "." (dot) and the system's domain name (see the command \fBdomainname\fR).
+
+\(bu The default size of the RSA private key is 2048 bits.
+
+\(bu The password is in the form XXXXXXXX-XXXXXXXX-XXXXXXXX-XXXXXXXX where X is an alphanumeric character.
+
+The eleventh [11] usage form allows you to save TLS  client components on a trusted file server in order to distribute them to clients. If you completely delete a TLS client object (including its public certificate part), you will not be able to revoke the certificate. That's why you have the possibility to load the certificate component using the twelfth [12] usage in order to be able to revoke it. Please note that if the loaded client certificate is different than the existing client certificate in the system, all private components associated to that certificate are purged from the system.
+
+A new generated client certificate will be valid for the number of days specified by the optional argument \fI<days>\fR (in the ninth usage form). If the number of days is not specified, the client certificate will be valid for the number of days configured with the thirteenth [13] usage form (\fBclient days\fR). The optional \fBocsp\fR and \fBnoocsp\fR arguments (in the ninth usage form) can be used to specify the usage or no usage of OCSP in the generated client certificate. Finally the last optional argument \fI<private-key-size>\fR allows you to specify the size of the generated private RSA key in number of bits. This size should be greater than or equal 512 and less than or equal to 4096. If you regenerate an existing client certificate (using the tenth usage form), it will be valid for the same number of days as the number of days specified during its first generation (and will use the same OCSP specification if any). In case where the existing certificate uses OCSP, the regenerated certificate will be updated using the OCSP URI in effect during the regeneration. In case where the existing certificate does not use OCSP, the regenerated certificate will do the same.
+
+The fourteenth [14] usage form allows you to configure the embedded OCSP server. OCSP stands for Online Certificate Status Protocol. It's a protocol used for obtaining the revocation status of an X.509 digital certificate. You can use this OCSP server to revoke server and client certificates signed by the system's CA certificate. To set the OCSP host name use the keyword \fBhost\fR followed by an OCSP network name or IP address. To set the validity days for an OCSP response use the keyword \fBdays\fR followed by a number of the required validity days. OCSP responses are signed/checked using a [private RSA key/SSL certificate] pair. The keyword \fBtls\fR is used to set the TLS object to use to that end. If no TLS object is specified (by using the \fBraz\fR keyword), the system's CA TLS object is used. If another TLS object is to be set (by using the keyword \fBset\fR) the TLS object to use should be associated to a certificate that has been signed bt the system's CA certificate. To activate the embedded OCSP server use the command \fBmode ocsp on\fR.
+
+The fifteenth [15] usage form (\fBreport\fR) allows you to display a report on the status of certificates with respects to their expiration dates.
+
+.SH CERTIFICATE REVOKE REASONS
+When revoking a signed certificate a reason can be specified. Allowed revoking reasons are as follows:
+
+\(bu \fBkeyCompromise\fR: the token or disk location where the private RSA key associated with the certificate has been compromised and is in the possession of an unauthorized individual. This can include the case where a laptop is stolen, or a smart card is lost.
+
+\(bu \fBCACompromise\fR: the token or disk location where the CA's private RSA key is stored has been compromised and is in the possession of an unauthorized individual. When a CA's private RSA key is revoked, this results in all certificates issued by the CA that are signed using the private RSA key associated with the revoked certificate being considered revoked.
+
+\(bu \fBaffiliationChanged\fR: the user has terminated his or her relationship with the organization indicated in the Distinguished Name attribute of the certificate. This revocation code is typically used when an individual is terminated or has resigned from an organization. You do not have to revoke a certificate when a user changes departments, unless your security policy requires different certificate be issued by a departmental CA.
+
+\(bu \fBsuperseded\fR: a replacement certificate has been issued to a user, and the reason does not fall under the previous reasons. This revocation reason is typically used when a smart card fails, the password for a token is forgotten by a user, or the user has changed their legal name.
+
+\(bu \fBcessationOfOperation\fR: if a CA is decommissioned, no longer to be used, the CA's certificate should be revoked with this reason code. Do not revoke the CA's certificate if the CA no longer issues new certificates, yet still publishes CRLs for the currently issued certificates.
+
+\(bu \fBunspecified\fR: no reason has been specified.
+
+\(bu \fBcancel\fR: this is not intrinsically a revoke reason but if the revoke operation has not yet been applied, you can cancel it by using this keyword.
+
+.SH SEE ALSO
+.B access
+(1)
+.B admin
+(1)
+.B apply
+(1)
+.B file
+(1)
+.B mode
+(1)
+.B domainname
+(1)
+.B port
+(1)
+.B rweb
+(1)
+.B sslmediate
+(1)
+.B system
+(1)
+.B vpn
+(1)

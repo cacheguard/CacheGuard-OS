@@ -1,0 +1,169 @@
+umask 0022
+
+cachemgr_passwd none all
+
+as_whois_server whois.ra.net
+hostname_aliases tajflow
+
+cache_effective_user cache
+cache_effective_group cache
+
+cache_swap_low 90
+cache_swap_high 95
+ipcache_low 90
+ipcache_high 95
+memory_replacement_policy lru
+cache_replacement_policy lru
+
+icon_directory /share/icons
+error_directory /share/errors
+err_page_stylesheet /etc/errorpage.css
+
+httpd_suppress_version_string on
+mime_table /etc/mime.conf
+pid_filename /var/run/squid.pid
+hosts_file /etc/hosts.squid
+
+unlinkd_program /libexec/unlinkd
+pinger_program /libexec/pinger
+diskd_program /libexec/diskd
+logfile_daemon /libexec/log_file_daemon
+
+pinger_enable off
+
+logfile_rotate 0
+logformat forward %{%Y-%m-%dT%H:%M:%S}tl.0%{%z}tl %>a %un "%rm %ru HTTP/%rv" %>Hs %<st %Ss %Sh %ssl::bump_mode "%{User-Agent}>h"
+logformat reverse %{%Y-%m-%dT%H:%M:%S}tl.0%{%z}tl %>a %un "%rm %ru HTTP/%rv" %>Hs %<st "%{User-Agent}>h"
+logformat forward-syslog %>a %un "%rm %ru HTTP/%rv" %>Hs %<st %Ss %Sh %ssl::bump_mode "%{User-Agent}>h"
+logformat reverse-syslog %>a %un "%rm %ru HTTP/%rv" %>Hs %<st "%{User-Agent}>h"
+log_mime_hdrs off
+
+url_rewrite_extras "%>a/- %un %>rm"
+
+ftp_sanitycheck on
+
+ignore_unknown_nameservers on
+
+url_rewrite_bypass off
+url_rewrite_host_header on
+
+authenticate_ttl 1 hour
+authenticate_ip_ttl 0 seconds
+authenticate_cache_garbage_interval 1 hour
+auth_param basic realm Please authenticate yourself
+auth_param basic casesensitive on
+auth_param negotiate keep_alive on
+
+collapsed_forwarding on
+reload_into_ims off
+range_offset_limit none
+
+# Microsoft Windows Updates
+refresh_pattern -i microsoft.com/.*\.(cab|exe|ms[i|u|f]|[ap]sf|wm[v|a]|dat|zip) 4320 80% 43200
+refresh_pattern -i windowsupdate.com/.*\.(cab|exe|ms[i|u|f]|[ap]sf|wm[v|a]|dat|zip) 4320 80% 43200
+refresh_pattern -i windows.com/.*\.(cab|exe|ms[i|u|f]|[ap]sf|wm[v|a]|dat|zip) 4320 80% 43200
+
+# Apple iOS Updates
+refresh_pattern -i cdn\-apple\.com.*\.(ipsw|ipd|ipcc) 86400 100% 86400
+refresh_pattern -i swcdn\.apple\.com.*\.(ipsw|ipd|ipcc) 86400 100% 86400
+
+# Audio, Video & Images
+refresh_pattern -i \.(bmp|emf|gif|ico|jpeg|jpg|png|tif|tiff)$ 10080 90% 43200
+refresh_pattern -i \.(3gp|aac|adts|au|avi|mid|mov|mp3|m4a|m4b|m4p|m4r|m4v|mp4|mpeg|mpg|qt|sis|swf|wav|wma|webm|wmf|wmv)$ 10080 90% 43200
+refresh_pattern -i \.(ogg|ogv|oga|ogx|ogm|spx|opus)$ 10080 90% 43200
+
+# Packages
+refresh_pattern -i \.(ace|arj|bz|bz2|deb|exe|gz|lha|lzh|ram|rar|rar|rpm|tar|tar|tgz|zip)$ 10080 90% 43200
+
+# Office documents
+refresh_pattern -i \.(csv|dbf|dif|doc|docm|docx|dot|hqx|odp|ods|odt|pdf|potx|ppa|ppam|pps|ppsm|ppsx|ppt|pptm|pptx|prn|rtf|slk|thmx|txt|uxx|wps|xla|xlam|xls|xlsb|xlsm|xlsx|xlt|xltm|xltx|xlw)$ 1440 100% 10080
+
+# Programs
+refresh_pattern -i \.(ad|cab|dll|inc)$ 1440 100% 10080
+refresh_pattern -i \.(exe|bin)$ 1440 100% 10080
+
+# Websites
+refresh_pattern -i \.(class|css|js)$ 1440 100% 10080
+refresh_pattern -i \.(htm|html|mht|mhtml|shtml|xml|xps)$ 1440 50% 10080
+refresh_pattern -i \.(acgi|asp|aspx|php|php3|pl|shtml) 2 20% 60
+refresh_pattern -i (/cgi-bin/|\?) 0 0% 0
+
+# FTP
+refresh_pattern    ^ftp: 10080 90% 43200
+
+# Default
+refresh_pattern    . 0 75% 4320
+
+minimum_expiry_time 60 seconds
+
+negative_ttl 0 seconds
+negative_dns_ttl 1 minutes
+positive_dns_ttl 1 hours
+dns_retransmit_interval 5 seconds
+dns_timeout 30 seconds
+
+client_persistent_connections on
+server_persistent_connections on
+
+connect_timeout 1 minute
+read_timeout 5 minutes
+persistent_request_timeout 1 minutes
+pconn_timeout 2 minute
+client_lifetime 720 minutes
+half_closed_clients off
+shutdown_lifetime 10 seconds
+
+log_icp_queries off
+icp_hit_stale on
+minimum_direct_hops 4
+minimum_direct_rtt 400
+client_db off
+netdb_low 900
+netdb_high 1000
+netdb_ping_period 5 minutes
+buffered_logs on
+
+offline_mode off
+uri_whitespace strip
+strip_query_terms off
+
+nonhierarchical_direct off
+prefer_direct off
+
+icp_query_timeout 0
+maximum_icp_query_timeout 2000
+minimum_icp_query_timeout 5
+dead_peer_timeout 5 seconds
+forward_max_tries 32
+query_icmp on
+peer_connect_timeout 5 seconds
+
+miss_access allow all
+test_reachability off
+
+ssl_unclean_shutdown off
+vary_ignore_expire off
+
+sleep_after_fork 0
+request_body_max_size 0
+read_ahead_gap 16 KB
+
+client_netmask 255.255.255.255
+retry_on_error off
+max_open_disk_fds 0
+
+icap_log none !all
+icap_service_failure_limit 10
+icap_service_revival_delay 15
+icap_default_options_ttl 60
+icap_persistent_connections on
+icap_preview_enable on
+icap_preview_size 1024
+icap_send_client_ip on
+icap_send_client_username on
+icap_client_username_encode off
+icap_client_username_header X-Authenticated-User
+
+tls_outgoing_options cipher=ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-AES256-GCM-SHA384:DHE-RSA-AES128-GCM-SHA256:DHE-DSS-AES128-GCM-SHA256:kEDH+AESGCM:ECDHE-RSA-AES128-SHA256:ECDHE-ECDSA-AES128-SHA256:ECDHE-RSA-AES128-SHA:ECDHE-ECDSA-AES128-SHA:ECDHE-RSA-AES256-SHA384:ECDHE-ECDSA-AES256-SHA384:ECDHE-RSA-AES256-SHA:ECDHE-ECDSA-AES256-SHA:DHE-RSA-AES128-SHA256:DHE-RSA-AES128-SHA:DHE-DSS-AES128-SHA256:DHE-RSA-AES256-SHA256:DHE-DSS-AES256-SHA:DHE-RSA-AES256-SHA:!aNULL:!eNULL:!EXPORT:!DES:!RC4:!3DES:!MD5:!PSK default-ca=off
+sslproxy_session_ttl 300
+sslproxy_cert_sign_hash sha256

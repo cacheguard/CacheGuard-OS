@@ -1,0 +1,20 @@
+Mark the end of a template or gateway configuration context
+.SH SYNOPSIS
+
+[1] \fBend\fR [\fBcancel\fR]
+
+.SH DESCRIPTION
+
+You can use this command on a \fBmanager\fR system inside the following contexts to quit that context and return to the top level configuration contexts:
+
+\(bu Template configuration context.
+
+\(bu Gateway configuration context.
+
+\(bu Gateway execution context. In this case the optional \fBcancel\fR keyword allows you to cancel the execution of entered commands.You can alternatively press the CTRL+C keys to end and cancel the execution of entered commands. 
+
+Outside a template or gateway configuration context, this command has no effect.
+
+.SH SEE ALSO
+.B manager
+(1)

@@ -1,0 +1,2016 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       Commands
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+source functions
+
+sign-certificate()
+{
+    test -n "${1}" || return 1
+    local tls=${1}
+    local sign=${2}
+    local ocsp=${3}
+
+    if test -n "${sign}" ; then
+	echo -n > ${TMP_DIR}/${TLS_SERVER}.${tls}.2sign
+	test -z "${ocsp}" || echo -n 'ocsp' > ${TMP_DIR}/${TLS_SERVER}.${tls}.2sign
+    else
+	rm -f ${TMP_DIR}/${TLS_SERVER}.${tls}.2sign
+    fi
+    NEWENV=1
+}
+
+revoke-server-certificate()
+{
+    test -n "${1}" || return 1
+    local tls=${1}
+    local reason=${2}
+
+    if test -f ${SSL_SERVER_DIR}/${tls}.revoked ; then
+	return 11
+    fi
+
+    test -n "${reason}" || reason='unspecified'
+    echo ${reason} > ${TMP_DIR}/${TLS_SERVER}.${tls}.2rev
+    NEWENV=1
+}
+
+unrevoke-server-certificate()
+{
+    test -n "${1}" || return 1
+    local tls=${1}
+
+    if test -f ${TMP_DIR}/${TLS_SERVER}.${tls}.2rev ; then
+	rm -f ${TMP_DIR}/${TLS_SERVER}.${tls}.2rev
+	NEWENV=1
+    fi
+
+    test -f ${SSL_SERVER_DIR}/${tls}.revoked
+}
+
+revoke-client-certificate()
+{
+    test -n "${1}" || return 1
+    local tls_id=${1}
+    local reason=${2}
+
+    if test -f ${tls_id}.revoked ; then
+	return 11
+    fi
+
+    test -n "${reason}" || reason='unspecified'
+    echo ${reason} > ${TMP_DIR}/${TLS_CLIENT}.${tls_id}.2rev
+    NEWENV=1
+}
+
+unrevoke-client-certificate()
+{
+    test -n "${1}" || return 1
+    local tls_id=${1}
+
+    if test -f ${TMP_DIR}/${TLS_CLIENT}.${tls_id}.2rev ; then
+	rm -f ${TMP_DIR}/${TLS_CLIENT}.${tls_id}.2rev
+	NEWENV=1
+    fi
+
+    test -f ${tls_id}.revoked
+}
+
+check-revoke-reason()
+{
+    local reason=${1}
+
+    test -n "${reason}" || return 0
+
+    case ${reason} in
+	keyCompromise|CACompromise|affiliationChanged|superseded|cessationOfOperation|unspecified)
+	    return 0
+	    ;;
+	*)
+	    return 1
+	    ;;
+    esac
+}
+
+show-report-tls-line()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 1
+    test -n "${3}" || return 1
+    local id=${1}
+    local end_epoch=${2}
+    local state=${3}
+
+    local ext_state=$(echo-formated-state ${state})
+    local end_date=$(printf "%(%Y/%m/%d-%H:%M:%S)T" ${end_epoch} 2>/dev/null)
+    echo -n "${id} [${end_date}]"
+    echo-value ${ext_state} ${REPORT_COL}
+}
+
+show-report-tls()
+{
+    local tls end_epoch state
+
+    export REPORT_COL=56
+    echo-begin-show
+
+    if contextual-command-is-allowed ; then
+	if test -f ${RUN_DIR}/${TLS_SYSTEM_CA_STATE_FILENAME} ; then
+	    read tls end_epoch state < ${RUN_DIR}/${TLS_SYSTEM_CA_STATE_FILENAME}
+	    show-report-tls-line "[SYSTEM CA]" ${end_epoch} ${state}
+	fi
+
+	if test -f ${RUN_DIR}/${TLS_THIRD_CA_STATE_FILENAME} ; then
+	    while read tls end_epoch state
+	    do
+		show-report-tls-line "[THIRD CA] ${tls}" ${end_epoch} ${state}
+	    done < ${RUN_DIR}/${TLS_THIRD_CA_STATE_FILENAME}
+	fi
+    fi
+
+    if test -f ${RUN_DIR}/${TLS_SERVER_STATE_FILENAME} ; then
+	while read tls end_epoch state
+	do
+	    show-report-tls-line "[SERVER] ${tls}" ${end_epoch} ${state}
+	done < ${RUN_DIR}/${TLS_SERVER_STATE_FILENAME}
+    fi
+
+    if contextual-command-is-allowed ; then
+	if test -f ${RUN_DIR}/${TLS_CLIENT_STATE_FILENAME} ; then
+	    while read tls end_epoch state
+	    do
+		show-report-tls-line "[CLIENT] ${tls}" ${end_epoch} ${state}
+	    done < ${RUN_DIR}/${TLS_CLIENT_STATE_FILENAME}
+	fi
+    fi
+
+    echo-end-show
+}
+
+show-tls-ca-cert()
+{
+    test -n "${1}" || return 1
+    local name=${1}
+
+    local file=$(get-tls-ca-file ${name})
+
+    echo
+    openssl x509 -in ${file} -text 2> /dev/null
+    echo
+}
+
+show-tls-server-key()
+{
+    test -n "${1}" || return 1
+    local name=${1}
+
+    local file=$(get-tls-server-component-file ${name} key)
+
+    show-key-fingerprint ${file}
+}
+
+show-fingerprint()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    local sha1=${1}
+    local sha256=${2}
+
+    local len_sha1=${#sha1}
+    len_sha1=$[${len_sha1} / 2 + 1]
+
+    local len_sha256=${#sha256}
+    len_sha256=$[${len_sha256} / 2 + 1]
+
+    echo-begin-show
+
+    echo-command-form "SHA256"
+    echo-value ${sha256:0:${len_sha256}}
+    echo-value ${sha256:${len_sha256}}
+    echo
+    echo-command-form "SHA1"
+    echo-value ${sha1:0:${len_sha1}}
+    echo-value ${sha1:${len_sha1}}
+
+    echo-end-show
+}
+
+show-certificate-fingerprint()
+{
+    test -n "${1}" || return 1
+    local file=${1}
+
+    local sha1=$(openssl x509 -noout -fingerprint -sha1 -in ${file} 2> /dev/null)
+    local sha256=$(openssl x509 -noout -fingerprint -sha256 -in ${file} 2> /dev/null)
+
+    sha1=${sha1/* Fingerprint=}
+    sha256=${sha256/* Fingerprint=}
+
+    show-fingerprint "${sha1}" "${sha256}"
+}
+
+show-key-fingerprint()
+{
+    test -n "${1}" || return 1
+    local file=${1}
+
+    local sha1=$(openssl dgst -sha1 -c ${file} 2> /dev/null)
+    local sha256=$(openssl dgst -sha256 -c ${file} 2> /dev/null)
+
+    sha1=${sha1/*= }
+    sha1=${sha1^^}
+
+    sha256=${sha256/*= }
+    sha256=${sha256^^}
+
+    show-fingerprint "${sha1}" "${sha256}"
+}
+
+show-tls-ca-system-key()
+{
+    local file=$(get-tls-ca-system-component-file key)
+
+    show-key-fingerprint ${file}
+}
+
+show-tls-server-cert()
+{
+    test -n "${1}" || return 1
+    local name=${1}
+
+    local file=$(get-tls-server-component-file ${name} certificate)
+
+    echo
+    openssl x509 -in ${file} -text 2> /dev/null
+    echo
+}
+
+show-tls-ca-system-cert()
+{
+    local file=$(get-tls-ca-system-component-file certificate)
+
+    echo
+    openssl x509 -in ${file} -text 2> /dev/null
+    echo
+}
+
+show-tls-server-csr()
+{
+    test -n "${1}" || return 1
+    local name=${1}
+
+    local file=$(get-tls-server-component-file ${name} csr)
+
+    echo
+    openssl req -in ${file} -text 2> /dev/null
+    echo
+}
+
+show-tls-server-fp()
+{
+    test -n "${1}" || return 1
+    local name=${1}
+
+    local file=$(get-tls-server-component-file ${name} certificate)
+
+    show-certificate-fingerprint ${file}
+}
+
+show-tls-ca-system-fp()
+{
+    local file=$(get-tls-ca-system-component-file certificate)
+
+    show-certificate-fingerprint ${file}
+}
+
+show-tls-ca-fp()
+{
+    test -n "${1}" || return 1
+    local name=${1}
+
+    local file=$(get-tls-ca-file ${name})
+
+    show-certificate-fingerprint ${file}
+}
+
+clean-tls-ca-system-components()
+{
+    rm -f \
+       ${TMP_DIR}/${LOADED}.${SYSTEM_CA}.key \
+       ${TMP_DIR}/${LOADED}.${SYSTEM_CA}.certificate
+}
+
+clean-tls-server-components()
+{
+    test -n "${1}" || return 1
+    local tls=${1}
+
+    rm -f \
+       ${TMP_DIR}/${LOADED}.${TLS_SERVER}.key.${tls} \
+       ${TMP_DIR}/${LOADED}.${TLS_SERVER}.certificate.${tls} \
+       ${TMP_DIR}/${LOADED}.${TLS_SERVER}.csr.${tls} \
+       ${TMP_DIR}/${LOADED}.${TLS_SERVER}.days.${tls}
+}
+
+clean-all-tls-components()
+{
+    rm -f \
+	    ${TMP_DIR}/${LOADED}.${TLS_SERVER}.key.* \
+	    ${TMP_DIR}/${LOADED}.${TLS_SERVER}.certificate.* \
+	    ${TMP_DIR}/${LOADED}.${TLS_SERVER}.csr.* \
+	    ${TMP_DIR}/${LOADED}.${TLS_SERVER}.days.*
+}
+
+clean-all-tls-conf()
+{
+    rm -f ${TMP_DIR}/${TLS_SERVER}.*.{conf,2sign,2rev}
+    NEWENV=1
+}
+
+check-cert-entry()
+{
+    test -n "${1}" || return 1
+    local entry=${1}
+
+    local len=${#entry}
+    test ${len} -le ${MAX_LEN} || return 11
+#   [[ "${entry}" =~ ^[A-Za-z0-9\ ]+$ ]] || return 12
+    [[ "${entry}" =~ ^[[:print:]]+$ ]] || return 12
+
+    return 0
+}
+
+check-cert-country()
+{
+    test -n "${1}" || return 1
+    local entry=${1}
+
+    [[ "${entry}" =~ ^[A-Za-z][A-Za-z]$ ]] || return 11
+
+    return 0
+}
+
+request-certificate-conf()
+{
+    test ${TERM} == ${WADMIN_TERM} || test "${__BATCH_MODE}" != yes || error 111
+
+    local default_names=${1}
+    local default_numbits=${2}
+    local default_days=${3}
+    local default_country=${4}
+    local default_province=${5}
+    local default_locality=${6}
+    local default_organisation=${7}
+    local default_unit=${8}
+
+    local numbits days names country province locality organisation unit
+    local max_names_len=$[${MAX_LEN}*2*${MAX_SAN_CERT_NB}]
+
+    request-object "Common Name(s) [${default_names}]" ; read names
+    request-object "Private Key size (bits) [${default_numbits}]" ; read numbits
+    request-object "Number of days validity [${default_days}]" ; read days
+    request-object "Country 2 letters code [${default_country}]" ; read country
+    request-object "Province Name [${default_province}]" ; read province
+    request-object "Locality Name [${default_locality}]" ; read locality
+    request-object "Organisation Name [${default_organisation}]" ; read organisation
+    request-object "Organisation Unit Name [${default_unit}]" ; read unit
+
+    names="${names:0:${max_names_len}}"
+    numbits="${numbits:0:4}"
+    days="${days:0:8}"
+    country="${country:0:2}"
+    province="${province:0:32}"
+    locality="${locality:0:32}"
+    organisation="${organisation:0:32}"
+    unit="${unit:0:32}"
+
+    test -n "${names}" || names="${default_names}"
+    test -n "${numbits}" || numbits="${default_numbits}"
+    test -n "${days}" || days="${default_days}"
+    test -n "${country}" || country="${default_country}"
+    test -n "${province}" || province="${default_province}"
+    test -n "${locality}" || locality="${default_locality}"
+    test -n "${organisation}" || organisation="${default_organisation}"
+    test -n "${unit}" || unit="${default_unit}"
+
+    export NAMES=${names}
+    export NUMBITS=${numbits}
+    export DAYS=${days}
+    export COUNTRY=${country}
+    export PROVINCE=${province}
+    export LOCALITY=${locality}
+    export ORGANISATION=${organisation}
+    export UNIT=${unit}
+}
+
+tls-generate-certificate()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    local in_conf_file=${1}
+    local out_conf_file=${2}
+    local id=${3}
+
+    local numbits days names country province locality organisation unit
+    local var val line=1
+
+    if test -f ${in_conf_file} ; then
+	while read var val
+	do
+	    case ${line} in
+		1)
+		    numbits=${val}
+		    ;;
+		2)
+		    days=${val}
+		    ;;
+		3)
+		    names=${val}
+		    ;;
+		4)
+		    country=${val}
+		    ;;
+		5)
+		    province=${val}
+		    ;;
+		6)
+		    locality=${val}
+		    ;;
+		7)
+		    organisation=${val}
+		    ;;
+		8)
+		    unit=${val}
+		    ;;
+		*)
+		    ;;
+	    esac
+	    ((line++))
+	done < ${in_conf_file}
+	names="${names,,}"
+    else
+	numbits='2048'
+	days='365'
+
+	if test -n "${id}" ; then
+	    names="${id,,}"
+	    test "${id}" != "${id//.}" || names=${names}.${DOMAIN_NAME}
+	else
+	    names='CA'
+	fi
+
+	country="${DEFAULT_COUNTRY_CODE}"
+	province=''
+	locality=''
+	organisation=''
+	unit='Security'
+    fi
+
+    request-certificate-conf "${names}" "${numbits}" "${days}" "${country}" "${province}" "${locality}" "${organisation}" "${unit}"
+
+    local errors error
+    local name names_nb=0
+
+    if test -n "${id}" ; then
+	for name in ${NAMES}
+	do
+	    ((names_nb++))
+	    if ! check-wildcard-sitename ${name} ; then
+		NAMES=${names}
+		errors="${errors} 16"
+		display-error 16
+		break
+	    fi
+	done
+    else
+	if ! check-cert-entry "${NAMES}" ; then
+	    PROVINCE=${province}
+	    errors="${errors} 145"
+	    display-error 145 "[COMMON NAME] "
+	fi
+    fi
+
+    if test ${names_nb} -gt ${MAX_SAN_CERT_NB} ; then
+	NAMES=${names}
+	errors="${errors} 144"
+	display-error 144
+    fi
+
+    if ! check-cert-country "${COUNTRY}" ; then
+	COUNTRY=${country}
+	errors="${errors} 53"
+	display-error 53
+    fi
+
+    if ! check-digit "${NUMBITS}" ; then
+	NUMBITS=${numbits}
+	errors="${errors} 248"
+	display-error 248
+    else
+	if test ${NUMBITS} -lt 512 -o ${NUMBITS} -gt 4096 ; then
+	    NUMBITS=${numbits}
+	    errors="${errors} 248"
+	    display-error 248
+	fi
+    fi
+
+    if ! check-digit "${DAYS}" ; then
+	DAYS=${days}
+	errors="${errors} 91"
+	display-error 91
+    fi
+
+    if ! check-cert-entry "${PROVINCE}" ; then
+	PROVINCE=${province}
+	errors="${errors} 114"
+	display-error 114 "[PROVINCE] "
+    fi
+
+    if ! check-cert-entry "${LOCALITY}" ; then
+	LOCALITY=${locality}
+	errors="${errors} 114"
+	display-error 114 "[LOCALITY] "
+    fi
+
+    if ! check-cert-entry "${ORGANISATION}" ; then
+	ORGANISATION=${organisation}
+	errors="${errors} 114"
+	display-error 114 "[ORGANISATION] "
+    fi
+
+    if ! check-cert-entry "${UNIT}" ; then
+	UNIT=${unit}
+	errors="${errors} 114"
+	display-error 114 "[UNIT] "
+    fi
+
+    test -z "${errors}" || return 182
+
+    gen-cert-conf "${NAMES}" "${NUMBITS}" "${DAYS}" "${COUNTRY}" "${PROVINCE}" "${LOCALITY}" "${ORGANISATION}" "${UNIT}" > ${out_conf_file}
+    NEWENV=1
+}
+
+tls-generate-ca-system-certificate()
+{
+    local in_conf_file=$(get-tls-ca-system-component-file conf)
+    local out_conf_file=${TMP_DIR}/${SYSTEM_CA}.conf
+    
+    tls-generate-certificate ${in_conf_file} ${out_conf_file}
+    local ret=${?}
+
+    clean-tls-ca-system-components
+    return ${ret}
+}
+
+tls-generate-server-certificate()
+{
+    test -n "${1}" || return 1
+    local tls=${1}
+
+    local in_conf_file=$(get-tls-server-component-file ${tls} conf)
+    local out_conf_file=${TMP_DIR}/${TLS_SERVER}.${tls}.conf
+
+    tls-generate-certificate ${in_conf_file} ${out_conf_file} ${tls}
+    local ret=${?}
+
+    clean-tls-server-components ${tls}
+    return ${ret}
+}
+
+tls-in-use()
+{
+    test -n "${1}" || return 1
+    local in_tls=${1}
+
+    local tls_id=${ADMIN_TLS/:*}
+
+    test ${in_tls} != ${tls_id} || return 0
+    test ${in_tls} != "${OCSP_TLS}" || return 0
+
+    local elt range i=0
+    local proto tls
+
+    if test ${VPN_IPSEC_AUTHENTICATE:0:3} != 'psk' ; then
+	if test ${VPN_IPSEC_AUTHENTICATE:0:3} == 'tls' ; then
+	    tls=${VPN_IPSEC_AUTHENTICATE:4}
+
+	elif test ${VPN_IPSEC_AUTHENTICATE:0:6} == 'eaptls' ; then
+	    tls=${VPN_IPSEC_AUTHENTICATE:7}
+	fi
+	tls=${tls/:*}
+	test ${tls} != ${in_tls} || return 0
+    fi
+
+    for elt in ${RWEB_SITE_LIST}
+    do
+	range=$[${i} % 5]
+	case ${range} in
+	    0|2)
+		;;
+	    1)
+		proto=${elt}
+		;;
+	    3)
+		tls=${elt}
+		;;
+	    4)
+		if test ${proto} == https ; then
+		    tls_id=${tls/:*}
+		    test ${tls_id} != ${in_tls} || return 0
+		fi
+		;;
+	    *)
+		return 2
+		;;
+	esac
+	((i++))
+    done
+
+    local auth_type auth_key1 auth_key2
+
+    i=0
+    for elt in ${VPN_IPSEC_SITE_LIST}
+    do
+	range=$[${i} % 12]
+	case ${range} in
+	    0|1|5|6|7|8|9|10)
+	       ;;
+	    2)
+		auth_type=${elt}
+		;;
+	    3)
+		auth_key1=${elt}
+		;;
+	    4)
+		auth_key2=${elt}
+		;;
+	    11)
+		case ${auth_type} in
+		    psk)
+			;;
+		    tls)
+			case ${auth_key1} in
+			    certificate)
+				test ${auth_key2} != ${in_tls} || return 0
+				;;
+			    fqdn|dn)
+				;;
+			    *)
+				return 255
+				;;
+			esac
+			;;
+		    *)
+			return 255
+			;;
+		esac
+		;;
+	    *)
+		return 1
+		;;
+	esac
+	((i++))
+    done
+    
+    return 11
+}
+
+manage-tls-server-component()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 1
+    test -n "${3}" || return 1
+    local tls=${1}
+    local op=${2}
+    local extension=${3}
+
+    case ${op} in
+	show)
+	    case ${extension} in
+		key)
+		    tls-key-exist ${tls} || tls-tmp-key-exist ${tls} || return 74
+		    show-tls-server-key ${tls}
+		    return 0
+		    ;;
+		certificate)
+		    tls-cert-exist ${tls} || tls-tmp-cert-exist ${tls} || return 74
+		    show-tls-server-cert ${tls}
+		    return 0
+		    ;;
+		csr)
+		    tls-csr-exist ${tls} || tls-tmp-csr-exist ${tls} || return 74
+		    show-tls-server-csr ${tls}
+		    return 0
+		    ;;
+		*)
+		    return 1
+		    ;;
+	    esac
+	    ;;
+	save)
+	    case ${extension} in
+		key)
+		    tls-key-exist ${tls} || tls-tmp-key-exist ${tls} || return 74
+		    ;;
+		certificate)
+		    tls-cert-exist ${tls} || tls-tmp-cert-exist ${tls} || return 74
+		    ;;
+		csr)
+		    tls-csr-exist ${tls} || tls-tmp-csr-exist ${tls} || return 74
+		    ;;
+		*)
+		    return 1
+		    ;;
+	    esac
+	    ;;
+	load)
+	    ;;
+	*)
+	    return 1
+	    ;;
+    esac
+
+    local proto=${4}
+    local ip=${5}
+    local fn=${6}
+
+    test -n "${proto}" || return 1
+    test -n "${ip}" || return 1
+    test -n "${fn}" || return 1
+
+    check-file-protocol ${proto} || return 63
+    check-ip-name ${ip} || return 113
+    check-filename ${fn} || return 19
+    check-file-ip ${ip} || return 27
+
+    user-has-admin-rights || return 31
+
+    case ${op} in
+	load)
+	    if test ${extension} == 'csr' ; then
+		! tls-in-use ${tls} || return 142
+		local days=${7}
+
+		if test -n "${days}" ; then
+		    if test ${days} != 'default' ; then
+			check-digit "${days}" || return 91
+			test ${days} -ge ${TLS_DAYS_MIN} -a ${days} -le ${TLS_DAYS_MAX} || return 192
+		    fi
+
+		    local ocsp=${8}
+		    test -z "${ocsp}" || test ${ocsp} == ocsp  || return 1
+		fi
+	    fi
+
+	    local tmp_file=${TMP_DIR}/work.${LOADED}.${TLS_SERVER}.${extension}.${tls}
+	    load-files ${proto} ${ip} "${fn} ${tmp_file}" '' ascii
+	    local ret=${?}
+
+	    if test ${ret} -eq 0 ; then
+
+		if ! check-ascii-file ${tmp_file} ; then
+		    rm -f ${tmp_file}
+		    return 220
+		fi
+
+		case ${extension} in
+		    certificate)
+			openssl x509 -in ${tmp_file} -noout > /dev/null 2>&1
+			if test ${?} -ne 0 ; then
+			    rm -f ${tmp_file}
+			    return 222
+			fi
+		        ;;
+
+		    key)
+			if ! private-key-is-unencrypted ${tmp_file} ; then
+			    rm -f ${tmp_file}
+			    return 221
+			fi
+
+			openssl rsa -check < ${tmp_file} -noout 2> /dev/null > ${ADMIN_TMP_DIR}/${TLS_SERVER}.${tls}.openssl.${$}
+			if test ${?} -ne 0 ; then
+			    rm -f ${ADMIN_TMP_DIR}/${TLS_SERVER}.${tls}.openssl.${$}
+			    rm -f ${tmp_file}
+			    return 222
+			fi
+
+			local rsa_check=$(tail -1 ${ADMIN_TMP_DIR}/${TLS_SERVER}.${tls}.openssl.${$} 2>/dev/null)
+			rm -f ${ADMIN_TMP_DIR}/${TLS_SERVER}.${tls}.openssl.${$}
+			if test "${rsa_check}" != "RSA key ok" ; then
+			    rm -f ${tmp_file}
+			    return 223
+			fi
+		        ;;
+
+		    csr)
+			openssl req -noout -verify -in ${tmp_file} > /dev/null 2>&1
+			if test ${?} -ne 0 ; then
+			    rm -f ${tmp_file}
+			    return 222
+			fi
+			;;
+		    *)
+			return 255
+			;;
+		esac
+
+		load-tls-server-commit ${tmp_file} || return ${?}
+	    else
+		rm -f ${tmp_file}
+		return ${ret}
+	    fi
+
+	    if test ${extension} == 'csr' ; then
+		rm -f ${TMP_DIR}/${LOADED}.${TLS_SERVER}.days.${tls}
+
+		if test -n "${days}" ; then
+
+		    test ${days} == 'default' || echo ${days} > ${TMP_DIR}/${LOADED}.${TLS_SERVER}.days.${tls}
+
+		    if test -n "${ocsp}" ; then
+			echo -n 'ocsp' > ${TMP_DIR}/${LOADED}.${TLS_SERVER}.${tls}.2sign
+		    else
+			rm -f ${TMP_DIR}/${LOADED}.${TLS_SERVER}.${tls}.2sign
+		    fi
+		fi
+		NEWENV=1
+	    fi
+	    ;;
+        save)
+	    local file=$(get-tls-server-component-file ${tls} ${extension})
+	    save-files ${proto} ${ip} "${file} ${fn}" "" ascii
+	    ;;
+	*)
+	    return 255
+	    ;;
+    esac
+}
+
+show-tls-ca-third1()
+{
+    local list=${2}
+
+    echo-command-form "tls ca third"
+    if test "${1}" == "new" ; then
+	echo-mark-new
+    else
+	echo-mark-cur
+    fi
+
+    if test -z "${list}" ; then
+	echo-value-null
+	return 0
+    fi
+
+    local i=0 n=0 elt range
+    local ca browsing
+
+    for elt in ${list}
+    do
+	range=$[${i} % 2]
+	case ${range} in
+	    0)
+		ca=${elt}
+		;;
+	    1)
+		browsing=${elt}
+		test ${n} -eq 0 || echo-blank-command
+		echo-value "${ca} ${browsing}"
+		((n++))
+		;;
+	    *)
+		return 1
+		;;
+	esac
+	((i++))
+    done
+}
+
+show-tls-ca-third()
+{
+    echo-begin-show
+    show-tls-ca-third1 'current' "${CURRENT_TLS_CA_LIST}"
+    if test "${CURRENT_TLS_CA_LIST}" != "${TLS_CA_LIST}" ; then
+	show-tls-ca-third1 'new' "${TLS_CA_LIST}"
+    fi
+    echo-end-show
+}
+
+show-tls-server1()
+{
+    local list=${2}
+
+    echo-command-form "tls server"
+    if test "${1}" == "new" ; then
+	echo-mark-new
+    else
+	echo-mark-cur
+    fi
+
+    if test -z "${list}" ; then
+	echo-value-null
+    else
+	local tls serial revoked generated i=0
+
+	for tls in ${list}
+	do
+	    unset serial revoked generated
+	    if test "${1}" == 'current' ; then
+		if test -f ${SSL_SERVER_DIR}/${tls}.serial ; then
+		    serial=" [serial:0x$(cat ${SSL_SERVER_DIR}/${tls}.serial 2> /dev/null)]"
+		    test ! -f ${SSL_SERVER_DIR}/${tls}.revoked || revoked=" revoked:$(cat ${SSL_SERVER_DIR}/${tls}.revoked 2> /dev/null)"
+		fi
+	    elif test "${1}" == 'new' ; then
+		test ! -f ${TMP_DIR}/${TLS_SERVER}.${tls}.conf || generated=" (generated)"
+		if test -f ${SSL_SERVER_DIR}/${tls}.serial ; then
+		    serial=" [serial:0x$(cat ${SSL_SERVER_DIR}/${tls}.serial 2> /dev/null)]"
+		    
+		    test ! -f ${TMP_DIR}/${TLS_SERVER}.${tls}.2rev || revoked=" revoked:$(cat ${TMP_DIR}/${TLS_SERVER}.${tls}.2rev 2> /dev/null)"
+		else
+		    test ! -f ${TMP_DIR}/${TLS_SERVER}.${tls}.2rev || revoked=" revoked:$(cat ${TMP_DIR}/${TLS_SERVER}.${tls}.2rev 2> /dev/null)"
+		fi
+	    fi
+	    test ${i} -eq 0 || echo-blank-command
+	    echo-value "${tls}${generated}${serial}${revoked}"
+	    ((i++))
+	done
+    fi
+}
+
+show-tls-server()
+{
+    echo-begin-show
+    show-tls-server1 'current' "${CURRENT_TLS_SERVER_LIST}"
+    test "${CURRENT_TLS_SERVER_LIST}" == "${TLS_SERVER_LIST}" || show-tls-server1 'new' "${TLS_SERVER_LIST}"
+    echo-end-show
+}
+
+show-days()
+{
+    echo-begin-show
+    echo-command-form "tls days"
+    echo-mark-cur
+    echo-value "${CURRENT_TLS_SERVER_DAYS}"
+    if test "${CURRENT_TLS_SERVER_DAYS}" != "${TLS_SERVER_DAYS}" ; then
+	echo-command-form "tls days"
+	echo-mark-new
+	echo-value "${TLS_SERVER_DAYS}"
+    fi
+    echo-end-show
+}
+
+manage-ca-system()
+{
+    local op=${1}
+    test -n "${op}" || return 1
+
+    case ${op} in
+	generate)
+	    user-has-admin-rights || return 31
+	    test -z "${TRANSACTION}" || return 106
+	    tls-generate-ca-system-certificate
+	    NEWENV=1
+	    return 0
+	    ;;
+
+	fingerprint)
+	    show-tls-ca-system-fp
+	    return 0
+	    ;;
+
+	show|load|save)
+	    local object=${2}
+	    test -n "${object}" || return 1
+
+	    case ${object} in
+		certificate|key|der)
+		    ;;
+		*)
+		    return 1
+		    ;;
+	    esac
+
+	    if test ${op} == show ; then
+		case ${object} in
+		    certificate)
+			show-tls-ca-system-cert
+			return 0
+			;;
+		    key)
+			show-tls-ca-system-key
+			return 0
+			;;
+		    der)
+			show-tls-ca-system-fp
+			return 0
+			;;
+		    *)
+			return 255
+			;;
+		esac
+	    fi
+	    ;;
+	*)
+	    return 1
+	    ;;
+    esac
+
+    test ${object} != der || test ${op} == save || return 233
+
+    local extension=${object}
+    local proto=${3}
+    local ip=${4}
+    local fn=${5}
+
+    test -n "${proto}" || return 1
+    test -n "${ip}" || return 1
+    test -n "${fn}" || return 1
+
+    check-file-protocol ${proto} || return 63
+    check-ip-name ${ip} || return 113
+    check-filename ${fn} || return 19
+    check-file-ip ${ip} || return 27
+
+    user-has-admin-rights || return 31
+
+    case ${op} in
+	load)
+	    local tmp_file=${TMP_DIR}/work.${LOADED}.${SYSTEM_CA}.${extension}
+	    load-files ${proto} ${ip} "${fn} ${tmp_file}" "" ascii
+	    local ret=${?}
+
+	    if test ${ret} -eq 0 ; then
+
+		if ! check-ascii-file ${tmp_file} ; then
+		    rm -f ${tmp_file}
+		    return 220
+		fi
+
+		case ${object} in
+
+		    certificate)
+			openssl x509 -in ${tmp_file} -noout > /dev/null 2>&1
+			if test ${?} -ne 0 ; then
+			    rm -f ${tmp_file}
+			    return 222
+			fi
+
+			openssl x509 -in ${tmp_file} -text -noout 2> /dev/null | grep --silent "CA:TRUE" > /dev/null 2>&1
+			if test ${?} -ne 0 ; then
+			    rm -f ${tmp_file}
+			    return 224
+			fi
+			;;
+
+		    key)
+			if ! private-key-is-unencrypted ${tmp_file} ; then
+			    rm -f ${tmp_file}
+			    return 221
+			fi
+
+			openssl rsa -check < ${tmp_file} -noout 2> /dev/null > ${ADMIN_TMP_DIR}/${SYSTEM_CA}.openssl.${$}
+			if test ${?} -ne 0 ; then
+			    rm -f ${ADMIN_TMP_DIR}/${SYSTEM_CA}.openssl.${$}
+			    rm -f ${tmp_file}
+			    return 222
+			fi
+
+			local rsa_check=$(tail -1 ${ADMIN_TMP_DIR}/${SYSTEM_CA}.openssl.${$} 2>/dev/null)
+			rm -f ${ADMIN_TMP_DIR}/${SYSTEM_CA}.openssl.${$}
+			if test "${rsa_check}" != "RSA key ok" ; then
+			    rm -f ${tmp_file}
+			    return 223
+			fi
+			;;
+
+		    *)
+			return 255
+			;;
+		esac
+
+		load-tls-ca-system-commit ${tmp_file}
+	    else
+		rm -f ${tmp_file}
+		return ${ret}
+	    fi
+	    ;;
+        save)
+	    local file=$(get-tls-ca-system-component-file ${extension})
+	    save-files ${proto} ${ip} "${file} ${fn}" "" ascii
+	    ;;
+	*)
+	    return 255
+	    ;;
+    esac
+}
+
+manage-ca-third()
+{
+    local keyword=${1}
+
+    if test -z "${keyword}" ; then
+	show-tls-ca-third
+	return 0
+    fi
+
+    case ${keyword} in
+	fingerprint)
+	    test -n "${2}" || return 1
+	    local ca_id=${2}
+	    test ${ca_id,,} != ${SYSTEM_CA_ID} || return 32
+	    local browsing
+	    browsing=$(tls-ca-object-exist ${ca_id})
+	    test ${?} -eq 0 || return 141
+	    tls-ca-third-exist ${ca_id} || tls-ca-third-tmp-exist ${ca_id} || return 74
+	    show-tls-ca-fp ${ca_id}
+	    return 0
+	    ;;
+
+	add|del|load|show)
+	    local ca_id=${2}
+	    test -n "${ca_id}" || return 1
+	    test ${ca_id,,} != 'system' || return 32
+	    check-id-length "${ca_id}" || return 127
+	    check-tls-id ${ca_id} || return 213
+
+	    local browsing
+
+	    case ${keyword} in
+		show)
+		    browsing=$(tls-ca-object-exist ${ca_id})
+		    test ${?} -eq 0 || return 141
+		    show-tls-ca-cert ${ca_id}
+		    return 0
+		    ;;
+		load)
+		    browsing=$(tls-ca-object-exist ${ca_id})
+		    test ${?} -eq 0 || return 141
+		    ;;
+		add)
+		    local browsing=${3}
+		    if test -z "${browsing}" ; then
+			if contextual-command-is-allowed ; then
+			   browsing='on'
+			else
+			    browsing='off'
+			fi
+		    else
+			
+			check-boolean ${browsing} || return 18
+			if ! contextual-command-is-allowed ; then
+			    test ${browsing} == off || return 214
+			fi
+		    fi
+
+		    local len=$(record2-length-list "${TLS_CA_LIST}")
+		    test ${len} -lt ${MAX_TLS_CA_NB} || return 90
+		    export TLS_CA_LIST=$(insert-record-in-slist 2 1 "${ca_id} ${browsing}" "${TLS_CA_LIST}")
+		    SAVENV=1
+		    return 0
+		    ;;
+		del)
+		    export TLS_CA_LIST=$(remove-record-from-list 2 1 "${ca_id}" "${TLS_CA_LIST}")
+		    SAVENV=1
+		    return 0
+		    ;;
+		*)
+		    return 255
+		    ;;
+	    esac
+	    ;;
+	raz)
+	    export TLS_CA_LIST=''
+	    SAVENV=1
+	    return 0
+	    ;;
+	load|save)
+	    ;;
+	*)
+	    return 1
+	    ;;
+    esac
+
+    local proto=${3}
+    local ip=${4}
+    local fn=${5}
+
+    test -n "${proto}" || return 1
+    test -n "${ip}" || return 1
+    test -n "${fn}" || return 1
+
+    check-file-protocol ${proto} || return 63
+    check-ip-name ${ip} || return 113
+    check-filename ${fn} || return 19
+    check-file-ip ${ip} || return 27
+
+    user-has-admin-rights || return 31
+
+    local tmp_file=${TMP_DIR}/work.${LOADED}.${THIRD_CA}.${ca_id}
+    load-files ${proto} ${ip} "${fn} ${tmp_file}" "" ascii
+    local ret=${?}
+
+    if test ${ret} -eq 0 ; then
+
+	if ! check-ascii-file ${tmp_file} ; then
+	    rm -f ${tmp_file}
+	    return 220
+	fi
+
+	openssl x509 -in ${tmp_file} -noout > /dev/null 2>&1
+	if test ${?} -ne 0 ; then
+	    rm -f ${tmp_file}
+	    return 222
+	fi
+
+	openssl x509 -in ${tmp_file} -text -noout 2> /dev/null | grep --silent "CA:TRUE" > /dev/null 2>&1
+	if test ${?} -ne 0 ; then
+	    rm -f ${tmp_file}
+	    return 224
+	fi
+
+	load-tls-ca-third-commit ${tmp_file}
+    else
+	rm -f ${tmp_file}
+	return ${ret}
+    fi
+}
+
+manage-ca()
+{
+    local keyword=${1}
+    test -n "${keyword}" || return 1
+    shift
+
+    case ${keyword} in
+	system)
+	    contextual-command-is-allowed || return 207
+	    manage-ca-system "${@}"
+	    ;;
+	third)
+	    manage-ca-third "${@}"
+	    ;;
+	*)
+	    return 1
+	    ;;
+    esac
+}
+
+show-tls-client()
+{
+    echo-begin-show
+
+    local client serial revoked
+    local curs=$(ls -1d *.cur 2> /dev/null) cur
+    local news=$(ls -1 *.new 2> /dev/null) new
+
+    if test -z "${curs}" ; then
+	echo-command-form "tls client"
+	echo-mark-cur
+	echo-value-null
+    else
+	for cur in ${curs}
+	do
+	    echo-command-form "tls client"
+	    client=${cur%\.cur}
+
+	    unset revoked
+
+	    serial=$(cat ${cur}/${client}.serial 2> /dev/null)
+
+	    test ! -f ${client}.revoked || revoked=" revoked:$(cat ${client}.revoked 2> /dev/null)"
+	    if test -f ${client}.2del ; then
+		echo-mark-del
+	    elif test -f ${TMP_DIR}/${TLS_CLIENT}.${client}.2rev ; then
+		revoked=" reason:$(cat ${TMP_DIR}/${TLS_CLIENT}.${client}.2rev 2> /dev/null)"
+		echo-mark-rev
+	    else
+		echo-mark-cur
+	    fi
+	    echo-value "${client} [serial:0x${serial}] ${revoked}"
+	done
+    fi
+
+    if test -n "${news}" ; then
+	local numbits days ocsp
+	for new in ${news}
+	do
+	    client=${new%\.new}
+	    echo-command-form "tls client"
+	    echo-mark-new
+
+	    ocsp=$(cat ${new} 2> /dev/null)
+
+	    unset days revoked
+
+	    if test -f ${client}.days ; then
+		days=$(cat ${client}.days 2> /dev/null)
+	    fi
+
+	    test -n "${days}" || days='default'
+
+	    if test -n "${ocsp}" ; then
+		ocsp='ocsp'
+	    else
+		ocsp='noocsp'
+	    fi
+
+	    numbits=$(cat ${client}.numbits 2> /dev/null)
+	    test -n "${numbits}" || numbits=2048
+
+	    test ! -f ${TMP_DIR}/${TLS_CLIENT}.${client}.2rev || revoked=" revoked:$(cat ${TMP_DIR}/${TLS_CLIENT}.${client}.2rev 2> /dev/null)"
+	    echo-value "${client} ${days}(days) ${ocsp} ${numbits}(bits)${revoked}"
+	done
+    fi
+
+    news=$(ls -1 ${TMP_DIR}/${LOADED}.${TLS_CLIENT}.certificate.* 2> /dev/null)
+    for new in ${news}
+    do
+	client=$(file-basename ${new})
+	client=${client/${LOADED}\.${TLS_CLIENT}\.certificate\.}
+	echo-command-form "tls client"
+	echo-mark-new
+	echo-value "${client}"
+    done
+
+    echo-end-show
+}
+
+show-tls-client-certificate()
+{
+    test -n "${1}" || return 1
+    local tls_file=${1}
+
+    echo
+    openssl x509 -in ${tls_file} -text 2> /dev/null
+    echo
+}
+
+show-tls-client-key()
+{
+    test -n "${1}" || return 1
+    local name=${1}
+
+    local file=$(get-tls-client-component-file ${name} key)
+
+    show-key-fingerprint ${file}
+}
+
+show-client-days()
+{
+    echo-begin-show
+    echo-command-form "tls client days"
+    echo-mark-cur
+    echo-value "${CURRENT_TLS_CLIENT_DAYS}"
+    if test "${CURRENT_TLS_CLIENT_DAYS}" != "${TLS_CLIENT_DAYS}" ; then
+	echo-command-form "tls client days"
+	echo-mark-new
+	echo-value "${TLS_CLIENT_DAYS}"
+    fi
+    echo-end-show
+}
+
+manage-client()
+{
+    local keyword=${1}
+
+    if test -z "${keyword}" ; then
+	show-tls-client
+	return 0
+    fi
+
+    case ${keyword} in
+	add|generate|del|revoke|raz|save|load)
+	    ;;
+	days|fingerprint|show)
+	    ;;
+	*)
+	    return 1
+	    ;;
+    esac
+
+    if test ${keyword} == raz ; then
+	user-has-admin-rights || return 31
+	raz-tls-client
+	return 0
+    fi
+
+    case ${keyword} in
+	add|generate|del|show|fingerprint|revoke|save|load)
+	    local tls_id=${2}
+	    test -n "${tls_id}" || return 1
+	    check-id-length "${tls_id}" || return 127
+	    check-tls-id ${tls_id} || return 213
+	    ;;
+	*)
+	    ;;
+    esac
+
+    case ${keyword} in
+	show|fingerprint)
+	    local tls_file=$(get-tls-client-component-file ${tls_id} certificate)
+	    test -f ${tls_file} || return 141
+	    ;;
+	*)
+	    ;;
+    esac
+
+    case ${keyword} in
+	days)
+	    local days=${2}
+	    if test -z "${days}" ; then
+		show-client-days
+	    else
+		if check-digit ${days} ; then
+		    test ${days} -ge ${TLS_DAYS_MIN} -a ${days} -le ${TLS_DAYS_MAX} || return 192
+		else
+		    return 192
+		fi
+
+		export TLS_CLIENT_DAYS=${days}
+		SAVENV=1
+	    fi
+	    return 0
+	    ;;
+
+	add|generate)
+	    user-has-admin-rights || return 31
+
+	    case ${keyword} in
+		add)
+		    if test -d ${tls_id}.cur ; then
+			rm -f ${tls_id}.2del
+			NEWENV=1
+			return 0
+		    fi
+		    ;;
+		generate)
+		    if test -n "${3}" ; then
+			test "${3}" == cancel || return 1
+			rm -f ${tls_id}.{new,days,numbits}
+			NEWENV=1
+			return 0
+		    fi
+		    touch ${tls_id}.new
+		    rm -f ${tls_id}.2del
+		    ;;
+		*)
+		    return 255
+		    ;;
+	    esac
+
+	    case ${keyword} in
+		add)
+		    check-tls-client-nb || return 90
+
+		    local days=${3}
+		    if test -n "${days}" ; then
+			if test ${days} != 'default' ; then
+			    check-digit "${days}" || return 91
+			    test ${days} -ge ${TLS_DAYS_MIN} -a ${days} -le ${TLS_DAYS_MAX} || return 192
+			    echo ${days} > ${tls_id}.days
+			fi
+
+			local ocsp=${4}
+			if test -n "${ocsp}" ; then
+			    case ${ocsp} in
+				ocsp)
+				    echo -n 'ocsp' > ${tls_id}.new
+				    ;;
+				noocsp)
+				    echo -n > ${tls_id}.new
+				    ;;
+				*)
+				    return 1
+				    ;;
+			    esac
+
+			    local numbits=${5}
+			    if test -z "${numbits}" ; then
+				numbits=2048
+			    else
+				if ! check-digit "${numbits}" ; then
+				    return 248
+				else
+				    if test ${numbits} -lt 512 -o ${numbits} -gt 4096 ; then
+					return 248
+				    fi
+				fi
+			    fi
+			    echo ${numbits} > ${tls_id}.numbits
+			    NEWENV=1
+			fi
+		    else
+			rm -f ${tls_id}.{days,numbits}
+			echo -n > ${tls_id}.new
+		    fi
+		    ;;
+
+		generate)
+		    rm -f ${TMP_DIR}/${LOADED}.${TLS_CLIENT}.certificate.${tls_id}
+		    test -d ${tls_id}.cur || return 0
+		    ;;
+
+		*)
+		    return 255
+		    ;;
+	    esac
+
+	    touch ${tls_id}.new && rm -f ${tls_id}.2del
+	    NEWENV=1
+	    return 0
+	    ;;
+
+	del)
+	    test -f ${tls_id}.new -o -d ${tls_id}.cur || return 0
+
+	    local private=${3}
+	    if test -n "${private}" ; then
+		test ${private} == 'private' || return 1
+	    fi
+
+	    user-has-admin-rights || return 31
+
+	    if test -d ${tls_id}.cur ; then
+		if test -n "${private}" ; then
+		    local cancel=${4}
+		    if test -n "${cancel}" ; then
+			test ${cancel} == 'cancel' || return 1
+			rm -f ${tls_id}.2del
+		    else
+			test ! -f ${tls_id}.cur/${tls_id}.key || echo ${private} > ${tls_id}.2del
+		    fi
+		else
+		    echo -n > ${tls_id}.2del
+		    rm -f \
+		       ${tls_id}.new \
+		       ${TMP_DIR}/${TLS_CLIENT}.${tls_id}.2rev
+		fi
+	    else
+		if test -z "${private}" ; then
+		    rm -f \
+		       ${tls_id}.{new,days,numbits} \
+		       ${TMP_DIR}/${TLS_CLIENT}.${tls_id}.2rev
+		fi
+	    fi
+
+	    rm -f ${TMP_DIR}/${LOADED}.${TLS_CLIENT}.certificate.${tls_id}
+
+	    NEWENV=1
+	    return 0
+	    ;;
+
+	save|load)
+	    test -f ${tls_id}.new -o -d ${tls_id}.cur || return 75
+	    ;;
+
+	show)
+	    local object=${3}
+	    test -n "${object}" || return 1
+
+	    case ${object} in
+		certificate)
+		    show-tls-client-certificate ${tls_file}
+		    ;;
+		key)
+		    show-tls-client-key ${tls_id}
+		    ;;
+		*)
+		    return 1
+		    ;;
+	    esac
+	    return 0
+	    ;;
+
+	fingerprint)
+	    show-certificate-fingerprint ${tls_file}
+	    return 0
+	    ;;
+
+	revoke)
+	    local reason=${3}
+	    if test "${reason}" == cancel ; then
+		user-has-admin-rights || return 31
+		unrevoke-client-certificate ${tls_id}
+		test ${?} -eq 0 || return 0
+		warning 7
+		return 0
+	    fi
+	    check-revoke-reason ${reason} || return 193
+	    check-tls-cert-signed-by-system-ca client ${tls_id} || return 124
+	    user-has-admin-rights || return 31
+	    revoke-client-certificate ${tls_id} ${reason}
+	    test ${?} -ne 0 || return 0
+	    warning 8
+	    return 0
+	    ;;
+
+	*)
+	    ;;
+    esac
+
+    local object=${3}
+    local extension=${object}
+    local format
+
+    case ${object} in
+	certificate|key|password|pfx)
+	    format=ascii
+	    ;;
+	pkcs12)
+	    ;;
+	*)
+	    return 1
+	    ;;
+    esac
+
+    case ${keyword} in
+	load)
+	    test ${object} == certificate || return 126
+	    ;;
+	save)
+	    test ${object} == certificate || user-has-admin-rights || return 31
+	    ;;
+	*)
+	    return 255
+	    ;;
+    esac
+
+    local proto=${4}
+    local ip=${5}
+    local fn=${6}
+
+    test -n "${proto}" || return 1
+    test -n "${ip}" || return 1
+    test -n "${fn}" || return 1
+
+    check-file-protocol ${proto} || return 63
+    check-ip-name ${ip} || return 113
+    check-filename ${fn} || return 19
+    check-file-ip ${ip} || return 27
+
+    case ${keyword} in
+	load)
+	    local tmp_file=${TMP_DIR}/work.${LOADED}.${TLS_CLIENT}.${extension}.${tls_id}
+	    load-files ${proto} ${ip} "${fn} ${tmp_file}" '' ${format}
+	    local ret=${?}
+
+	    if test ${ret} -eq 0 ; then
+
+		if ! check-ascii-file ${tmp_file} ; then
+		    rm -f ${tmp_file}
+		    return 220
+		fi
+
+		openssl x509 -in ${tmp_file} -noout > /dev/null 2>&1
+		if test ${?} -ne 0 ; then
+		    rm -f ${tmp_file}
+		    return 222
+		fi
+
+		load-tls-client-commit ${tmp_file} || return ${?}
+	    else
+		rm -f ${tmp_file}
+		return ${ret}
+	    fi
+	    ;;
+	save)
+	    local file=${tls_id}.cur/${tls_id}.${extension}
+	    test -f ${file} || return 74
+	    save-files ${proto} ${ip} "${file} ${fn}" '' ${format}
+	    ;;
+	*)
+	    return 255
+	    ;;
+    esac
+}
+
+show-ocsp-host()
+{
+    echo-command-form "tls ocsp host"
+    echo-mark-cur
+    echo-value "${CURRENT_OCSP_HOST}"
+    if test "${CURRENT_OCSP_HOST}" != "${OCSP_HOST}" ; then
+	echo-command-form "tls ocsp host"
+	echo-mark-new
+	echo-value "${OCSP_HOST}"
+    fi
+}
+
+show-ocsp-days()
+{
+    echo-command-form "tls ocsp days"
+    echo-mark-cur
+    echo-value "${CURRENT_OCSP_DAYS}"
+    if test "${CURRENT_OCSP_DAYS}" != "${OCSP_DAYS}" ; then
+	echo-command-form "tls ocsp days"
+	echo-mark-new
+	echo-value "${OCSP_DAYS}"
+    fi
+}
+
+echo-value-ocsp-tls()
+{
+    if test -z "${1}" ; then
+	echo-value-null
+    else
+	echo-value ${1}
+    fi
+}
+
+show-ocsp-tls()
+{
+    echo-command-form "tls ocsp tls"
+    echo-mark-cur
+    echo-value-ocsp-tls "${CURRENT_OCSP_TLS}"
+    if test "${CURRENT_OCSP_TLS}" != "${OCSP_TLS}" ; then
+	echo-command-form "tls ocsp tls"
+	echo-mark-new
+	echo-value-ocsp-tls "${OCSP_TLS}"
+    fi
+}
+
+show-ocsp()
+{
+    echo-begin-show
+    case "${1}" in
+	host|days|tls)
+	    show-ocsp-${1}
+	    ;;
+	"")
+	    show-ocsp-host
+	    show-ocsp-days
+	    show-ocsp-tls
+	    ;;	
+	*)
+	    error 255
+	    ;;
+    esac
+    echo-end-show
+}
+
+manage-ocsp()
+{
+    local key=${1}
+
+    if test -z "${key}" ; then
+	show-ocsp
+	return 0
+    fi
+
+    case ${key} in
+	host|days|tls)
+	    ;;
+	*)
+	    return 1
+	    ;;
+    esac
+
+    local value=${2}
+
+    if test -z "${value}" ; then
+	show-ocsp ${key}
+	return 0
+    fi
+
+    case ${key} in
+	host)
+	    check-ip-name ${value} || return 113
+	    export OCSP_HOST=${value}
+	;;
+	days)
+	    if check-digit ${value} ; then
+		test ${value} -ge ${OCSP_DAYS_MIN} -a ${value} -le ${OCSP_DAYS_MAX} || return 76
+	    else
+		return 76
+	    fi
+	    export OCSP_DAYS=${value}
+	    ;;
+	tls)
+	    case ${value} in
+		raz)
+		    export OCSP_TLS=''
+		    ;;
+		'set')
+		    test -n "${3}" || return 1
+		    local tls=${3}
+		    export OCSP_TLS="${tls}"
+		    ;;
+		*)
+		    return 1
+		    ;;
+	    esac
+	    ;;
+	*)
+	    return 255
+	    ;;
+    esac
+
+    SAVENV=1
+}
+
+manage-server()
+{
+    local key=${1}
+
+    if test -z "${key}" ; then
+	show-tls-server
+	return 0
+    fi
+    
+    case ${key} in
+	days)
+	    local days=${2}
+	    if test -z "${days}" ; then
+		show-days
+	    else
+		if check-digit ${days} ; then
+		    test ${days} -ge ${TLS_DAYS_MIN} -a ${days} -le ${TLS_DAYS_MAX} || return 192
+		else
+		    return 192
+		fi
+
+		export TLS_SERVER_DAYS=${days}
+		SAVENV=1
+	    fi
+	    ;;
+	raz)
+	    export TLS_SERVER_LIST="default"
+	    clean-all-tls-components
+	    clean-all-tls-conf
+	    SAVENV=1
+	    ;;
+
+	add|del|generate|fingerprint|load|save|show|revoke)
+
+	    case ${key} in
+		revoke)
+		    contextual-command-is-allowed || return 207
+		    ;;
+		*)
+		    ;;
+	    esac
+
+	    local tls=${2}
+	    test -n "${tls}" || return 1
+	    shift ; shift
+
+	    check-id-length "${tls}" || return 127
+	    check-tls-id ${tls} || return 213
+
+	    case ${key} in
+		generate|revoke)
+		    user-has-admin-rights || return 31
+		    ;;
+		*)
+		    ;;
+	    esac
+
+	    if test ${key} == add ; then
+		test ${tls} != default || return 32
+		check-tls-server-nb || return 90
+		export TLS_SERVER_LIST=$(insert-record-in-slist 1 1 "${tls}" "${TLS_SERVER_LIST}")
+		SAVENV=1
+		return 0
+	    fi
+
+	    case ${key} in
+		del)
+		    tls-server-id-exist ${tls} || return 0
+		    ;;
+		*)
+		    tls-server-id-exist ${tls} || return 141
+		    ;;
+	    esac
+
+	    case ${key} in
+		del)
+		    test ${tls} != default || return 147
+		    export TLS_SERVER_LIST=$(remove "${TLS_SERVER_LIST}" ${tls})
+		    SAVENV=1
+		    if user-has-admin-rights ; then
+			clean-tls-server-components ${tls}
+			clean-tls-conf ${tls}
+		    fi
+		    return 0
+		    ;;
+
+		generate)
+		    test -z "${TRANSACTION}" || return 106
+		    local sign=${1}
+		    if test -n "${sign}" ; then
+			test ${sign} == sign || return 1
+			contextual-command-is-allowed || return 207
+		    fi
+
+		    user-has-admin-rights || return 31
+
+		    tls-generate-server-certificate ${tls}
+		    local ocsp=${2}
+		    test -z "${ocsp}" || test ${ocsp} == ocsp || return 1
+		    sign-certificate ${tls} ${sign} ${ocsp}
+		    ;;
+
+		revoke)
+		    local reason=${1}
+		    if test "${reason}" == cancel ; then
+			user-has-admin-rights || return 31
+			unrevoke-server-certificate ${tls}
+			test ${?} -eq 0 || return 0
+			warning 7
+			return 0
+		    fi
+		    check-revoke-reason ${reason} || return 193
+		    check-tls-cert-signed-by-system-ca server ${tls} || return 124
+		    user-has-admin-rights || return 31
+		    revoke-server-certificate ${tls} ${reason}
+		    test ${?} -ne 0 || return 0
+		    warning 8
+		    return 0
+		    ;;
+
+		fingerprint)
+		    tls-cert-exist ${tls} || tls-tmp-cert-exist ${tls} || return 74
+		    show-tls-server-fp ${tls}
+		    return 0
+		    ;;
+
+		load|save|show)
+		    manage-tls-server-component ${tls} ${key} "${@}"
+		    ;;
+		*)
+		    return 255
+		    ;;
+	    esac
+	    ;;
+	*)
+	    return 1
+	    ;;
+    esac
+}
+
+run()
+{
+    local key=${ARGS[1]}
+    test -n "${key}" || return 1
+
+    case ${key} in
+	server)
+	    shift-args
+	    manage-server ${ALLARGS}
+	    ;;
+
+	report)
+	    local tls_nb=$(length-list "${CURRENT_TLS_SERVER_LIST}")
+	    local timeout=$[250000 + ${tls_nb} * 100000]
+	    update-report health-tls 5 ${timeout} || return 104
+	    test "${TERM}" == "${WADMIN_TERM}" || show-report-tls
+	    ;;
+
+	ca)
+	    shift-args
+	    manage-ca ${ALLARGS}
+	    ;;
+
+	client)
+	    contextual-command-is-allowed gateway || return 239
+	    shift-args
+	    cd ${SSL_CLIENT_DIR}
+	    manage-client ${ALLARGS}
+	    local ret=${?}
+	    cd ${HOME}
+	    return ${ret}
+	    ;;
+
+	ocsp)
+	    contextual-command-is-allowed || return 207
+	    shift-args
+	    manage-ocsp ${ALLARGS}
+	    ;;
+	*)
+	    return 1
+	    ;;
+    esac
+}
+
+main "${@}"

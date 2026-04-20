@@ -1,0 +1,78 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       GUI
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+set-manager-template()
+{
+    local pos=0 entry_pos id_pos source_pos del_pos
+    local id source source_context source_id
+    local del_issue
+
+    local transaction=/tmp/${TRANSACTION_FILE}.wadmin.${REMOTE_USER}.${$}
+    rm -f ${transaction}
+
+    while test ${pos} -lt ${ATTRIBUTE_NB}
+    do
+	entry_pos=${pos}
+	id_pos=$[${pos} + 1]
+	source_pos=$[${pos} + 2]
+	del_pos=$[${pos} + 3]
+
+	id=${VALUES[${id_pos}]}
+
+	[[ "${ATTRIBUTES[${del_pos}]}" =~ ^del_[0-9]+$ ]]
+
+	if test ${?} -ne 0 ; then
+	    if test "${VALUES[${entry_pos}]}" == anew -a -n "${id}" ; then
+		source=${VALUES[${source_pos}]}
+		if test -z "${source}" ; then
+		    echo "manager template add ${VALUES[${id_pos}]}" >> ${transaction}
+		else
+		    source_context=${source/\>*}
+		    source_id=${source/*\>}
+		    source_context=${source_context,,}
+		    echo "manager template add ${VALUES[${id_pos}]} ${source_context} ${source_id}" >> ${transaction}
+		fi
+	    fi
+	    pos=$[${pos} + 3]
+	else
+	    if gui-context-is-edited template ${id} ; then
+		del_issue='yes'
+	    else
+		echo "manager template del ${id} force" >> ${transaction}
+	    fi
+	    pos=$[${pos} + 4]
+	fi
+    done
+
+    if test -n "${del_issue}" ; then
+	gen-gui-error 20
+	rm -f ${transaction}
+    else
+	execute-transaction ${transaction}
+    fi
+}
+
+# Main()
+
+set-manager-template

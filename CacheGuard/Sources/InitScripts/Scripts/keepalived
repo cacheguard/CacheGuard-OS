@@ -1,0 +1,89 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       InitScript
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+source /lib/lsb/init-functions
+
+CACHEGUARD_DIR=/etc/sysconfig/cacheguard
+source ${CACHEGUARD_DIR}/constant
+source ${APPLIANCE_DIR}/etc/role
+
+PROG="keepalived"
+FPROG=/usr/sbin/${PROG}
+
+[ -x ${FPROG} ] || exit 0
+[ -f /usr/etc/${PROG}/${PROG}.conf ] || exit 0
+
+RETVAL=0
+SERV="VRRP Service"
+
+case "${1}" in
+    start)
+	# Start daemons.
+	if [ -n "$(pidof ${PROG})" ]; then
+	    echo $"${PROG}: already running"
+	    exit 11
+	fi
+	log_info_msg "Starting ${SERV}... "
+	if test -f ${RUN_DIR}/${HEALTH_STATE_FILENAME} ; then
+	    RETVAL=13
+	else
+	    start_daemon -n -19 ${FPROG} -f /usr/etc/${PROG}/${PROG}.conf --vrrp
+	    RETVAL=${?}
+	fi
+	[ ${RETVAL} -eq 0 ] && touch /var/lock/${PROG}
+	evaluate_retval
+	exit ${RETVAL}
+	;;
+    stop)
+	# Stop daemons.
+	log_info_msg "Stopping ${SERV}... "
+	pids=$(pidof ${PROG})
+	if test -n "${pids}" ; then
+	    pid=$(echo ${pids/* })
+	    if test -n "${pid}" ; then
+		kill ${pid}
+		RETVAL=${?}
+		usleep 500000
+	    else
+		RETVAL=10
+	    fi
+	else
+	    RETVAL=11
+	fi
+	[ ${RETVAL} -eq 0 ]
+	evaluate_retval
+	rm -f /var/lock/${PROG}
+	;;
+    restart)
+	${0} stop
+	${0} start
+	;;
+    status)
+	statusproc ${PROG}
+	;;
+    *)
+	echo "Usage: ${0} {start|stop|restart|status}"
+	exit 1
+	;;
+esac

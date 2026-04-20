@@ -1,0 +1,93 @@
+<a name='main' class='doc-title'></a><h1>General Modes</h1>
+A CacheGuard appliance is an integrated system that secures and optimises Internet traffic by providing a comprehensive range of features. To achieve an optimised configuration, it is recommended that you activate only the features you actually need and deactivate all others. However, if required, it is possible to activate all available features simultaneously on the same appliance, and all activated features will operate seamlessly and efficiently together.
+<p>
+The <a href="/doc/command/mode.html">mode</a> command allows you to activate or deactivate different features known as modes. For almost all modes, there is a command with the same name that allows you to configure that mode. For example, the embedded firewall can be activated using the <a href="/doc/command/mode.html">mode firewall on</a> command, and the firewall can be configured using the <a href="/doc/command/firewall.html">firewall</a> command. There are two main groups of modes: network modes and function modes. The sections below provide a brief description of all available modes. Note that the <a href="/doc/command/apply.html">apply</a> command must be invoked after activating or deactivating a mode.
+
+<a name='network' class='doc-title'></a><h2>Network Modes</h2>
+This section provides a brief description of all network modes. Available network modes operate at the TCP/UDP IP layer and are as follows:
+<ul>
+  <li><a href='#dhcp'>DHCP Server</a></li>
+  <li><a href='#dns'>Caching DNS</a></li>
+  <li><a href='#ha'>High Availability</a></li>
+  <li><a href='#ftppassive'>Passive FTP</a></li>
+  <li><a href='#qos'>Quality of Service</a></li>
+  <li><a href='#router'>Network Router</a></li>
+  <li><a href='#snat'>Source NAT</a></li>
+  <li><a href='#tweb'>Transparent Web</a></li>
+  <li><a href='#tnat'>Transparent Web SNAT</a></li>
+  <li><a href='#vlan'>Tagged VLANs</a></li>
+</ul>
+
+<center><img width='600' src="/doc/image/configuration.png" class="schema" /></center>
+
+<a name='dhcp' class='doc-title'></a><h3>DHCP Server</h3>
+A CacheGuard appliance integrates a DHCP server to dynamically assign IP addresses to connected devices. To activate the DHCP server, use the <a href="/doc/command/mode.html">mode dhcp on</a> command. You can configure the DHCP server using the <a href="/doc/command/dhcp.html">dhcp</a> command. This command allows you to define dynamic IP ranges and, if necessary, reserve IP addresses for specific devices.
+
+<a name='dns' class='doc-title'></a><h3>Caching DNS</h3>
+A CacheGuard appliance integrates a caching-only Domain Name Server that can be used by all other integrated services as well as by external clients. To activate the integrated DNS server and make it available for external use, execute the following commands:
+<ul>    
+  <li><i>dns raz</i></li>
+  <li><i>dns add localhost</i></li>
+  <li><i>mode dns on</i></li>
+</ul>
+
+<a name='ha' class='doc-title'></a><h3>High Availability</h3>
+Two or more CacheGuard appliances can be deployed in HA (High Availability) mode using the VRRP protocol. In addition, network interfaces (<strong>external</strong>, <strong>internal</strong>, etc.) of a CacheGuard appliance can be associated with multiple physical interfaces to provide link redundancy. To activate HA mode, use the <a href="/doc/command/mode.html">mode ha on</a> command. Once HA mode is activated, use the <a href="/doc/command/vrrp.html">vrrp</a> command to associate one or more VRRP IP addresses with at least one network interface. To associate more than one physical network interface with a logical interface, use the <a href="/doc/command/link.html">link</a> command.
+
+<a name='ftppassive' class='doc-title'></a><h3>Passive FTP</h3>
+By default, a CacheGuard appliance uses the passive FTP protocol to initiate FTP sessions with external FTP servers. To use active FTP mode instead, you must deactivate passive FTP mode by using the <a href="/doc/command/mode.html">mode ftppassive off</a> command. Please note that switching between passive and active FTP modes is done globally (it cannot be set per FTP session).
+
+<a name='qos' class='doc-title'></a><h3>Quality of Service</h3>
+A CacheGuard appliance can shape and schedule network traffic to offer QoS (Quality of Service) to users and applications. Using the QoS manager in a CacheGuard appliance allows you to reserve network bandwidth for critical applications. To activate QoS mode, use the <a href="/doc/command/mode.html">mode qos on</a> command. You can then configure traffic shaping using the <a href="/doc/command/qos.html">qos</a> command. All traffic destined for services (proxy, antivirus, etc.) running on the appliance itself, as well as routed traffic passing through it, is managed by the QoS system.
+
+<a name='router' class='doc-title'></a><h3>Network Router</h3>
+A CacheGuard appliance can act as a network router supporting static routes and multi-gateway configurations. Use the <a href="/doc/command/mode.html">mode router on</a> command to activate router mode. To configure routing, use the <a href="/doc/command/ip.html">ip route</a> command.
+
+<a name='snat' class='doc-title'></a><h3>Source NAT</h3>
+A CacheGuard appliance can perform Source Network Address Translation (SNAT) on all outgoing traffic through its external interface, replacing the source IP with its own external IP address. This mode is called <strong>snat</strong> and can be activated using the <a href="/doc/command/mode.html">mode snat on</a> command.
+
+<a name='tweb' class='doc-title'></a><h3>Transparent Web</h3>
+A CacheGuard appliance can be transparently deployed in a network to intercept Web traffic for management (caching, filtering, etc.). In transparent mode, there is no need to configure Web browsers to use the CacheGuard appliance as a Web proxy. The simplest way to implement a CacheGuard appliance transparently is to use it as the default gateway to the Internet. This mode is called <strong>tweb</strong> (transparent) and can be activated using the <a href="/doc/command/mode.html">mode tweb on</a> (or <a href="/doc/command/mode.html">mode transparent on</a>) command. The <a href="/doc/command/transparent.html">transparent</a> (or <a href="/doc/command/tweb.html">tweb</a>) command can then be used to selectively intercept Web traffic.
+<p>
+As HTTP is increasingly being replaced by HTTPS, the capabilities of transparent mode are significantly reduced. Fortunately, a CacheGuard appliance can also intercept HTTPS traffic. The transparent interception of HTTPS traffic is referred to as <strong>sslmediate</strong> mode and is described in the <u>Function Modes</u> section below. This mode is considered a function mode rather than a network mode because it involves managing SSL CA certificates in addition to network configuration.
+
+<a name='tnat' class='doc-title'></a><h3>Transparent Web SNAT</h3>
+In transparent mode (<strong>tweb</strong>), intercepted Web traffic can either preserve real source IP addresses or be Source NATed with the CacheGuard appliance’s external IP address. The <strong>tnat</strong> (transparent NAT) mode activates (<strong>on</strong>) source IP address translation for transparently intercepted Web traffic. The <strong>tnat</strong> mode is activated by default. To deactivate it, use the <a href="/doc/command/mode.html">mode tnat off</a> command. Note that when <strong>tnat</strong> is deactivated, routed Web traffic must not be asymmetric with respect to the CacheGuard appliance (i.e. all incoming and outgoing Web traffic exchanged with clients should pass through the same network interface).
+
+<a name='vlan' class='doc-title'></a><h3>Tagged VLANs</h3>
+A CacheGuard appliance supports IEEE 802.1Q VLAN (Virtual LAN) tagging on its internal network interface to secure and isolate predefined functional traffic (<strong>admin</strong>, <strong>web</strong>, <strong>rweb</strong>, etc.). To activate VLAN mode, use the <a href="/doc/command/mode.html">mode vlan on</a> command. Once VLAN mode is activated, use the <a href="/doc/command/vlan.html">vlan</a> and <a href="/doc/command/ip.html">ip</a> commands to define VLANs and assign IP addresses.
+<p>
+If both <strong>web</strong> and <strong>rweb</strong> modes are activated on the same appliance, and SSL offloading is configured (where HTTPS traffic between the CacheGuard appliance and real Web servers is unencrypted), it is recommended to use a distinct VLAN for <strong>rweb</strong> traffic. Refer to the <a href="/doc/command/rweb.html">rweb</a> command to learn how to configure the <strong>rweb</strong> mode for SSL offloading.
+
+<a name='feature' class='doc-title'></a><h2>Function Modes</h2>
+This section provides a brief description of all function modes. Available function modes operate at the application layer and are as follows:
+<ul>
+  <li><a href='#anonymous'>Anonymous Browsing</a></li>
+  <li><a href='#antivirus'>Antivirus</a></li>
+  <li><a href='#authenticate'>Web Authentication</a></li>
+  <li><a href='#firewall'>Stateful Firewall</a></li>
+  <li><a href='#web'>Forwarding Web Proxy</a></li>
+  <li><a href='#compress'>HTTP Compression</a></li>
+  <li><a href='#ocsp'>OCSP Responder</a></li>
+  <li><a href='#rweb'>Reverse Web Proxy</a></li>
+  <li><a href='#sslmediate'>SSL Mediation</a></li>
+  <li><a href='#log'>Traffic Logging</a></li>
+  <li><a href='#guard'>URL Guarding</a></li>
+  <li><a href='#vpnipsec'>IPsec VPN</a></li>
+  <li><a href='#waf'>Web Application Firewall</a></li>
+  <li><a href='#cache'>Web Caching</a></li>
+</ul>
+
+<center><img width='600' src="/doc/image/utm.png" class="schema" /></center>
+
+<a name='anonymous' class='doc-title'></a><h3>Anonymous Browsing</h3>
+A CacheGuard appliance can modify certain HTTP headers to make Web requests anonymous. To activate anonymous browsing mode, use the <a href="/doc/command/mode.html">mode anonymous on</a> command. Please note that activating this mode may lead to being blocked by certain websites; therefore, it is recommended to keep this mode deactivated unless required.
+
+<a name='antivirus' class='doc-title'></a><h3>Antivirus</h3>
+A CacheGuard appliance embeds an antivirus that blocks malware (viruses, trojans, and worms) in Web traffic destined for Web clients (human or machine) as well as Web servers. The antivirus can also be used as a service by external systems such as an MTA (Mail Transfer Agent). To activate the antivirus, use the <a href="/doc/command/mode.html">mode antivirus on</a> command. The <a href="/doc/command/antivirus.html">antivirus</a> command is used to configure it.
+
+<a name='authenticate' class='doc-title'></a><h3>Web Authentication</h3>
+The embedded Web proxy in a CacheGuard appliance can request LDAP or Kerberos servers to authenticate Web clients before granting them access to the Web (or Web servers in reverse mode). To activate authentication mode, use the <a href="/doc/command/mode.html">mode authenticate on</a> command. You must then configure authentication using the <a href="/doc/command/authenticate.html">authenticate</a> command.
+
+<a name='firewall' class='doc-title'></a><h3>Stateful Firewall</h3>
+A CacheGuard appliance integrates a stateful firewall that enables control of routed network traffic based on source and/or destination IP addresses and protocols. In addition, the firewall supports source and destination NAT. To activate firewall mode, use the <a href="/doc/command/mode.html">mode firewall on</a> command. The firewall is configured using the <a href="/doc/command/firewall.html">firewall</a> command.

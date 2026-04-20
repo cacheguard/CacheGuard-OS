@@ -1,0 +1,205 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       Commands
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+source functions
+
+check-transparent-list-nb()
+{
+    local len=$(record3-length-list "${TRANSPARENT_WEB_LIST}")
+    test ${len} -lt ${MAX_TRANSPARENT_WEB_NB}
+}
+
+transparent-remove()
+{
+    test -n "${1}" || return 1
+    local record=${1}
+
+    local out_list
+    local f0 f1 f2 f3
+    local elt i=0 range
+
+    for elt in ${TRANSPARENT_WEB_LIST}
+    do
+	range=$[${i} % 4]
+	case ${range} in
+	    0)
+		f0=${elt}
+		;;
+	    1)
+		f1=${elt}
+		;;
+	    2)
+		f2=${elt}
+		;;
+	    3)
+		f3=${elt}
+		test "${f0} ${f1} ${f2}" == "${record}" || out_list="${out_list} ${f0} ${f1} ${f2} ${f3}"
+		;;
+	    *)
+		return 1
+		;;
+	esac
+	((i++))
+    done
+
+    out_list=${out_list:1}
+    echo "${out_list}"
+    return 0
+}
+
+show-transparent1()
+{
+    local networks=${2}
+
+    echo-command-form "transparent"
+    if test "${1}" == "new" ; then
+	echo-mark-new
+    else
+	echo-mark-cur
+    fi
+
+    if test -z "${networks}" ; then
+	echo-value-null
+    else
+	local interface ip netmask qos
+	local range elt i=0 n=0
+
+	for elt in ${networks}
+	do
+	    range=$[${i} % 4]
+	    case ${range} in
+		0)
+		    interface=${elt}
+		    ;;
+		1)
+		    ip=${elt}
+		    ;;
+		2)
+		    netmask=${elt}
+		    ;;
+		3)
+		    qos=${elt}
+		    test ${n} -eq 0 || echo-blank-command
+		    echo-value "${interface} ${ip} ${netmask} ${qos}%"
+		    ((n++))
+		    ;;
+		*)
+		    return 1
+		    ;;
+	    esac
+	    ((i++))
+	done
+    fi
+}
+
+show-transparent()
+{
+    echo-begin-show
+    show-transparent1 'current' "${CURRENT_TRANSPARENT_WEB_LIST}"
+    test "${CURRENT_TRANSPARENT_WEB_LIST}" == "${TRANSPARENT_WEB_LIST}" || show-transparent1 'new' "${TRANSPARENT_WEB_LIST}"
+    echo-end-show
+}
+
+run()
+{
+    contextual-command-is-allowed || return 207
+
+    if test -z "${ARGS[1]}" ; then show-transparent ; return 0 ; fi
+    
+    local act=${ARGS[1]}
+    
+    case ${act} in
+	raz)
+	    unset TRANSPARENT_WEB_LIST
+	    ;;
+	
+	add|del)
+	    test ${act} == del || check-transparent-list-nb || return 90
+
+	    test -n "${ARGS[2]}" || return 1
+	    local interface=${ARGS[2]}
+	    check-interface ${interface} || return 43
+	    test ${interface} != external || return 43
+
+	    test -n "${ARGS[3]}" || return 1
+	    local ip=${ARGS[3]}
+	    local px=${ip/*\/}
+	    local mk
+
+	    if test ${ip} != ${px} ; then
+		check-prefix ${px} || return 158
+		ip=${ip/\/*}
+	    else
+		unset px
+	    fi
+	    
+	    check-ip ${ip} || return 12
+
+	    if test -z "${px}" ; then
+		if test -z "${ARGS[4]}" ; then
+		    mk=255.255.255.0
+		else
+		    mk=${ARGS[4]}
+		    check-mask ${mk} || return 13
+
+		fi
+	    else
+		if test ${px} == 32 ; then
+		    mk='255.255.255.255'
+		elif test ${px} == 0 ; then
+		    mk='0.0.0.0'
+		else
+		    local mk=$(ipcalc -s ${ip}/${px} -m)
+		    mk=${mk/NETMASK=/}
+		fi
+	    fi
+
+	    check-net-ip-address ${ip} ${mk} || return 70
+
+	    if test -z "${px}" ; then
+		local qos=${ARGS[5]}
+	    else
+		local qos=${ARGS[4]}
+	    fi
+
+	    if test -z "${qos}" ; then
+		local qos=100
+	    else
+		qos=$(remove-leading-zeros ${qos})
+		qos=$(get-percent-value ${qos})
+		check-percentage ${qos} || return 11
+	    fi
+
+	    export TRANSPARENT_WEB_LIST=$(transparent-remove "${interface} ${ip} ${mk}")
+	    test ${act} == del || export TRANSPARENT_WEB_LIST="${TRANSPARENT_WEB_LIST} ${interface} ${ip} ${mk} ${qos}"
+	    ;;
+	*)
+	    return 1
+	    ;;
+    esac
+    
+    SAVENV=1
+}
+
+main "${@}"

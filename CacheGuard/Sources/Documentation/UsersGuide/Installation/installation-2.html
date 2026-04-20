@@ -1,0 +1,165 @@
+<a name='machine' class='doc-title'></a><h3>Machine Compatibility</h3>
+CacheGuard-OS supports most popular x86/x64-based devices available on the market. If your device is not detected during installation, please contact us — we will endeavour to integrate the appropriate drivers into the OS to ensure compatibility.
+<p>
+<a name='os' class='doc-title'></a><h2>OS Installation</h2>
+The same installation CD-ROM can be used to install the appliance as either a Gateway system or a Manager system. Simply follow the on-screen instructions during installation to select the desired system type.
+<p>
+
+<a name='cdrom' class='doc-title'></a><h3>CD-ROM Drive Installation</h3>
+To install CacheGuard-OS from a CD-ROM drive, follow these steps:
+<ul>
+  <li>Download the appropriate x64 or x86 ISO image file.</li>
+  <li>Burn the ISO image to a CD-ROM using your preferred disc-burning tool.</li>
+  <li>Boot your target appliance from the CD-ROM and follow the installation instructions.</li>
+</ul>
+<p>
+
+<a name='usb' class='doc-title'></a><h3>USB Memory Stick Installation</h3>
+To install CacheGuard-OS from a USB memory stick, follow these steps:
+<ul>
+  <li>Download the x64 or x86 ISO image file.</li>
+  <li>Create a bootable USB stick from the ISO file. You can use <a href="https://unetbootin.github.io/" target=_blank>UNetbootin</a> or run the following Linux command:<br><i>sudo dd if=CacheGuard-OS.iso of=/dev/sdX conv=fdatasync status=progress</i><br>Replace <i>CacheGuard-OS.iso</i> with the downloaded ISO file and <i>/dev/sdX</i> with the device path of your USB stick. <strong>CAUTION:</strong> identify your USB device path with great care to avoid erasing your workstation’s disks.</li>
+  <li>Boot the target appliance from the USB stick and follow the installation process.</li>
+  <li>To avoid conflicts with other USB storage devices, plug in the installation USB stick last. This helps the installer distinguish it from other devices.</li>
+</ul>
+<p>
+
+<a name='network' class='doc-title'></a><h3>Network Installation</h3>
+To install CacheGuard-OS over a network, the target machine must support PXE boot. An installation server is also required, running the following services:
+<ul>
+  <li>A DHCP server</li>
+  <li>A TFTP server</li>
+</ul>
+To perform a network installation:
+<ul>
+  <li>Copy the <u>cacheguard</u> directory from the installation CD-ROM to the root directory of your TFTP server (usually <u>/srv/tftp</u> on Linux).</li>
+  <li>Copy the <u>cacheguard-boot</u> directory from the CD-ROM to the TFTP root.</li>
+  <li>Copy the <u>isolinux</u> directory from the CD-ROM into the <u>cacheguard-boot</u> directory on your TFTP server.</li>
+  <li>For example, on a Linux system with the CD-ROM mounted at <u>/mnt/cdrom</u> and TFTP root at <u>/srv/tftp</u>, run:</li>
+  <br>
+  <ul>
+    <li>sudo cp -rf /mnt/cdrom/cacheguard /srv/tftp/</li>
+    <li>sudo cp -rf /mnt/cdrom/cacheguard-boot /srv/tftp/</li>
+    <li>sudo cp -rf /mnt/cdrom/isolinux /srv/tftp/cacheguard-boot/</li>
+    <br>
+    <li>Update your DHCP configuration as follows:<br>
+      <pre>
+...
+allow booting;
+allow bootp;
+filename "/cacheguard-boot/isolinux/pxelinux.0";
+subnet &lt;network-ip-address&gt; netmask &lt;network-mask&gt; {
+    range &lt;first-ip-address&gt; &lt;last-ip-address&gt;;
+    next-server &lt;tftp-ip-address&gt;;
+}
+...
+      </pre>
+    </li>
+    <li>For BIOS-based systems, use <u>/cacheguard-boot/isolinux/pxelinux.0</u> as the filename. For UEFI systems, use <u>/cacheguard-boot/pxeboot.efi</u>.</li>
+  </ul>
+  <br>
+  <li>Finally, boot the target machine from its PXE-enabled network interface (preferably the first one).</li>
+</ul>
+<p>
+
+<a name='ova' class='doc-title'></a><h3>The OVA & VHD Distribution Forms</h3>
+The Gateway OVA (Open Virtual Appliance) version uses two network interfaces, which should be connected to the appropriate networks as per your configuration requirements. The VHD (Virtual Hard Drive) version can be attached to a virtual machine with at least two network interfaces. Typically, the CacheGuard <strong>external</strong> interface connects to an internet router or DMZ, while the <strong>internal</strong> interface connects to the LAN.  
+<p>
+After booting the VM, log in as <i>admin</i> (default password: <i>admin</i>) and follow the setup procedure.
+<p>
+
+<h4>VMware&reg; Notes</h4>
+For security reasons, VMware Tools are not installed and cannot be installed on a CacheGuard appliance.
+<p>
+
+<h4>Oracle VirtualBox&reg; Note</h4>
+CacheGuard is fully compatible with Oracle VirtualBox&reg;.
+<p>
+
+<h4>Microsoft Hyper-V&reg; Note</h4>
+When installing CacheGuard on Microsoft Hyper-V&reg;, ensure that MAC address spoofing is disabled on the virtual machine.
+<p>
+
+<a name='connect' class='doc-title'></a><h2>Gateway Connection</h2>
+In a standard configuration, CacheGuard Gateway divides your network into two zones: an external, untrusted zone (connected to the Internet) and an internal, trusted LAN zone.  
+<p>
+CacheGuard uses two logical interfaces: <strong>external</strong> and <strong>internal</strong>. Each logical interface must map to at least one physical network interface.
+<center><img width='600' src="/doc/image/configuration.png" class="schema" /></center>
+Use the <a href="/doc/command/link.html">link</a> command (without arguments) to list detected network interfaces, or <a href="/doc/command/link.html">link bond</a> to view interface associations. By default, <i>eth0</i> is assigned to the external interface and <i>eth1</i> to the internal interface.
+<p>
+Connect the internal interface to your LAN and the external interface to your WAN (typically your Internet router).
+<p>
+
+<a name='configuration' class='doc-title'></a><h2>Gateway Configuration</h2>
+
+<a name='configuration_first' class='doc-title'></a><h3>First Configuration</h3>
+To begin, connect to the CacheGuard console interface and log in as the <i>admin</i> user.  
+<p>
+The console can be accessed via:
+<ul>
+  <li>A directly attached monitor and keyboard</li>
+  <li>An RS232 serial port (configured as 115200 8N1)</li>
+</ul>
+<p>
+Upon first login, the <a href="/doc/command/setup.html">setup</a> command is automatically launched to guide you through basic network configuration. Alternatively, you can use CLI commands directly:
+<ul>
+  <li><i>ip external 192.168.1.1 255.255.255.0</i></li>
+  <li><i>ip internal 10.20.0.254 255.255.255.0</i></li>
+  <li><i>ip route add default 192.168.1.254</i></li>
+  <li><i>dns add 127.0.0.1</i></li>
+</ul>
+Apply the configuration using:
+<ul>
+  <li><i>apply</i></li>
+</ul>
+<p>
+
+<a name='conf' class='doc-title'></a><h3>Basic Configuration</h3>
+Configuration in CacheGuard-OS is transactional: you define settings, then commit them with the <a href="/doc/command/apply.html">apply</a> command. This ensures stability and allows pre-validation before activation.  
+<p>
+The <a href="/doc/command/apply.html">apply</a> command verifies consistency before deployment, taking between 5–180 seconds depending on hardware and operation type.  
+It runs in the background, allowing other commands to be executed (except configuration changes). Check progress using <a href="/doc/command/apply.html">apply report</a>.
+<p>
+Accurate timekeeping is vital, as many services depend on the system clock. To set time and date:
+<ul>
+  <li><i>clock &lt;YYYY/MM/DD-hh:mm:ss&gt;</i></li>
+  <li><i>apply</i></li>
+</ul>
+You may also use NTP servers — refer to <a href='clock_ntp.html'>Date & Time</a> for details.
+<p>
+Only trusted administrators can remotely manage the appliance. Use <a href="/doc/command/access.html">access</a> to define trusted networks. Example:
+<ul>
+  <li><i>access admin add internal 10.20.0.0 255.255.255.0</i></li>
+  <li><i>apply</i></li>
+</ul>
+<p>
+To enable SSH and Web administration interfaces:
+<ul>
+  <li><i>admin ssh on</i></li>
+  <li><i>admin wadmin on</i></li>
+  <li><i>apply</i></li>
+</ul>
+<p>
+Connect remotely using SSH:
+<i>ssh admin@10.20.0.254</i><br>
+Or via the Web GUI at:  
+<i><strong>https</strong>://10.20.0.254:8090</i>
+<p>
+Verify the SSL fingerprint with <a href="/doc/command/tls.html">tls server fingerprint default</a>.  
+For enhanced security, set distinct passwords for console/SSH and Web administration using <a href="/doc/command/password.html">password login</a>.
+<p>
+Features (or “modes”) can be enabled or disabled with the <a href="/doc/command/mode.html">mode</a> command. By default, both <strong>web</strong> (proxy) and <strong>transparent</strong> modes are enabled.  
+Transparent mode intercepts HTTP traffic without browser configuration, while non-transparent mode requires proxy settings (e.g. <i>10.20.0.254:8080</i>).
+<p>
+Enable caching with:
+<ul>
+  <li><i>mode cache on</i></li>
+  <li><i>apply</i></li>
+</ul>
+<p>
+Refer to the <a href="/doc/guide/features.html">General Modes</a> section for a summary of available features.  
+To secure Web servers, enable reverse mode (<i>mode rweb on</i>) and configure it via <a href="/doc/command/rweb.html">rweb</a>.  
+To disable unused features (e.g. forwarding proxy), use <a href="/doc/command/mode.html">mode web off</a>.
+<p>
+For command assistance, use <a href="/doc/command/help.html">help</a> or <i>help &lt;command&gt;</i> (e.g. <i>help ip</i>).  
+Press &lt;TAB&gt; to autocomplete or list available parameters.

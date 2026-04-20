@@ -1,0 +1,103 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       Tuner
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+source constant
+
+set-environment()
+{
+    INSTALL_TYPE=${1}
+    APL_ROLE=${2}
+
+    test -n "${GENERATED_DIR}" || GENERATED_DIR=ModelGenerated
+    test -n "${INSTALL_TYPE}" || INSTALL_TYPE=install
+    test -n "${APL_ROLE}" || APL_ROLE=gateway
+}
+
+install-complete-conf()
+{
+    install -m 400 -o root -g root ${GENERATED_DIR}/logrotate-daily.conf		${APL}/etc/logrotate-daily.conf
+    install -m 400 -o root -g root ${GENERATED_DIR}/logrotate-hourly.conf		${APL}/etc/logrotate-hourly.conf
+    install -m 644 -o root -g root ${GENERATED_DIR}/logrotate-daily.system		${APL}/etc/logrotate-daily.d/system
+    install -m 644 -o root -g root ${GENERATED_DIR}/logrotate-hourly.system		${APL}/etc/logrotate-hourly.d/system
+    install -m 644 -o root -g root ${GENERATED_DIR}/at.allow				${APL}${ETC_DIR}/at.allow
+
+    case ${APL_ROLE} in
+	gateway)
+	    install -m 644 -o root -g root ${GENERATED_DIR}/logrotate-daily.gateway	${APL}/etc/logrotate-daily.d/gateway
+	    install -m 644 -o root -g root ${GENERATED_DIR}/logrotate-hourly.gateway	${APL}/etc/logrotate-hourly.d/gateway
+
+	    ln -sf ${LOCAL_DIR}/bin/apl_data_update					${APL}/etc/cron.monthly/dataupdate.cron
+	    ln -sf ${LOCAL_DIR}/bin/apl_cache_reconfigure				${APL}/etc/cron.daily/cachereconfigure.cron
+	    ln -sf ${LOCAL_DIR}/bin/apl_kerberos_update					${APL}/etc/cron.daily/kerberos.cron
+	    ;;
+	manager)
+	    rm -f ${APL}/etc/cron.monthly/dataupdate.cron
+	    rm -f ${APL}/etc/cron.daily/cachereconfigure.cron
+	    rm -f ${APL}/etc/cron.daily/kerberos.cron
+	    ;;
+	*)
+	    ;;
+    esac
+
+    test ${INSTALL_TYPE} != retune || return 0
+
+    install -m 644 -o root -g root ${GENERATED_DIR}/model.conf				${APL}${HARD_DIR}/model.conf
+    install -m 644 -o root -g root ${GENERATED_DIR}/fs-info				${APL}/etc/fs-info
+    install -m 644 -o root -g root ${GENERATED_DIR}/etc.fstab.uuid			${APL}/etc/fstab
+    install -m 644 -o root -g root ${GENERATED_DIR}/grub.cfg				${APL}/boot/grub/grub.cfg
+    install -m 444 -o root -g root ${GENERATED_DIR}/role				${APL}${APPLIANCE_DIR}/etc/role
+}
+
+install-partial-conf()
+{
+    install -m 400 -o root -g root ${GENERATED_DIR}/sshd_config-tuned			${APL}${CONF_DIR}/sshd_config-tuned
+    install -m 400 -o root -g root ${GENERATED_DIR}/named.conf-tuned			${APL}${CONF_DIR}/named.conf-tuned
+    install -m 400 -o root -g root ${GENERATED_DIR}/dhcpd.conf-tuned			${APL}${CONF_DIR}/dhcpd.conf-tuned
+    install -m 400 -o root -g root ${GENERATED_DIR}/${WADMIND_NAME}.conf-tuned		${APL}${CONF_DIR}/${WADMIND_NAME}.conf-tuned
+    install -m 400 -o root -g root ${GENERATED_DIR}/httpd-noproxy.conf-tuned		${APL}${CONF_DIR}/httpd-noproxy.conf-tuned
+    install -m 400 -o root -g root ${GENERATED_DIR}/httpd-proxy.conf-tuned		${APL}${CONF_DIR}/httpd-proxy.conf-tuned
+    install -m 400 -o root -g root ${GENERATED_DIR}/httpd-proxy.conf-cache-tuned	${APL}${CONF_DIR}/httpd-proxy.conf-cache-tuned
+    install -m 400 -o root -g root ${GENERATED_DIR}/slapd.conf-tuned			${APL}${CONF_DIR}/slapd.conf-tuned
+    install -m 400 -o root -g root ${GENERATED_DIR}/squid.conf-tuned			${APL}${CONF_DIR}/squid.conf-tuned
+    install -m 400 -o root -g root ${GENERATED_DIR}/c-icap.conf-tuned			${APL}${CONF_DIR}/c-icap.conf-tuned
+    install -m 400 -o root -g root ${GENERATED_DIR}/clamd.conf-tuned			${APL}${CONF_DIR}/clamd.conf-tuned
+    install -m 400 -o root -g root ${GENERATED_DIR}/snmpd.conf-tuned			${APL}${CONF_DIR}/snmpd.conf-tuned
+    install -m 400 -o root -g root ${GENERATED_DIR}/snmpd.conf-c-icap-tuned		${APL}${CONF_DIR}/snmpd.conf-c-icap-tuned
+    install -m 400 -o root -g root ${GENERATED_DIR}/snmpd.conf-httpd-tuned		${APL}${CONF_DIR}/snmpd.conf-httpd-tuned
+    install -m 400 -o root -g root ${GENERATED_DIR}/snmpd.conf-squidGuard-tuned		${APL}${CONF_DIR}/snmpd.conf-squidGuard-tuned
+    install -m 400 -o root -g root ${GENERATED_DIR}/ipsec.charon.conf-tuned		${APL}${CONF_DIR}/ipsec.charon.conf-tuned
+    install -m 400 -o root -g root ${GENERATED_DIR}/sysconfig.squid-tuned		${APL}${CONF_DIR}/sysconfig.squid-tuned
+
+    install -m 644 -o root -g root ${GENERATED_DIR}/sysconfig.htcacheclean-tuned	${APL}/etc/sysconfig/htcacheclean
+
+    test ${INSTALL_TYPE} == install || return 0
+
+    install -m 400 -o root -g root ${GENERATED_DIR}/squid.conf-cache-tuned		${APL}${CONF_DIR}/squid.conf-cache-tuned
+}
+
+# Main()
+
+set-environment "${@}"
+install-partial-conf
+install-complete-conf

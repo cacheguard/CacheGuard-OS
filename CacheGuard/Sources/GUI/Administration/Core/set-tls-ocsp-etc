@@ -1,0 +1,66 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       GUI
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+set-tls-etc()
+{
+    local transaction=/tmp/${TRANSACTION_FILE}.wadmin.${REMOTE_USER}.${$}
+    rm -f ${transaction}
+
+    if test -n "${VALUES[1]}" ; then
+	echo "admin tls ${VALUES[0]}:${VALUES[1]}" >> ${transaction}
+    else
+	echo "admin tls ${VALUES[0]}" >> ${transaction}
+    fi
+
+    if gui-contextual-is-allowed ; then
+
+	echo "tls server days ${VALUES[2]}" >> ${transaction}
+	echo "tls client days ${VALUES[3]}" >> ${transaction}
+	echo "tls ocsp host ${VALUES[4]}" >> ${transaction}
+	echo "port ocsp ${VALUES[5]}" >> ${transaction}
+	echo "tls ocsp days ${VALUES[6]}" >> ${transaction}
+
+	if test -z "${VALUES[7]}" ; then
+	    echo "tls ocsp tls raz" >> ${transaction}
+	else
+	    echo "tls ocsp tls set ${VALUES[7]}" >> ${transaction}
+	fi
+
+	if test -z "${VALUES[8]}" ; then
+	    echo "authenticate ldaps ca raz" >> ${transaction}
+	else
+	    echo "authenticate ldaps ca set ${VALUES[8]}" >> ${transaction}
+	fi
+
+	if test -z "${VALUES[9]}" ; then
+	    echo "log syslog ca raz" >> ${transaction}
+	else
+	    echo "log syslog ca set ${VALUES[9]}" >> ${transaction}
+	fi
+    fi
+
+    execute-transaction ${transaction}
+}
+
+set-tls-etc

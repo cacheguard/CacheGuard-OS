@@ -1,0 +1,72 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       InitScript
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+source /lib/lsb/init-functions
+
+CACHEGUARD_DIR=/etc/sysconfig/cacheguard
+source ${CACHEGUARD_DIR}/constant
+source ${APPLIANCE_DIR}/etc/role
+
+PROG=acpid
+FPROG=/sbin/${PROG}
+
+[ -x ${FPROG} ] || exit 0
+[ -f /proc/acpi/event ] || exit 0
+[ -d /etc/acpi/events ] || exit 0
+
+RETVAL=0
+SERV="ACPI"
+
+case "${1}" in
+    start)
+	log_info_msg "Starting ${SERV}..."
+	# Start daemons.
+	start_daemon ${FPROG} --nosocket /var/run/acpid.socket
+	RETVAL=${?}
+	[ ${RETVAL} -eq 0 ]
+	evaluate_retval
+	exit $RETVAL
+	;;
+    stop)
+	# Stop daemons.
+	log_info_msg "Stopping ${SERV}... "
+	killproc ${FPROG}
+	RETVAL=${?}
+	usleep 300000
+	[ $RETVAL -eq 0 ]
+	evaluate_retval
+	exit $RETVAL
+	;;
+    restart)
+	${0} stop
+	${0} start
+	;;
+    status)
+	statusproc ${PROG}
+	;;
+    *)
+	echo "Usage: ${0} {start|stop|restart|status}"
+	exit 1
+	;;
+esac

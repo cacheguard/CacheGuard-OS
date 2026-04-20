@@ -1,0 +1,5188 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       Configurator
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+_i=0
+SERVICE_NAME_KEY[${_i}]="ntpd"			; SERVICE_NAME_VALUE[${_i}]="NTP"			; ((_i++))
+SERVICE_NAME_KEY[${_i}]="dhcpd"			; SERVICE_NAME_VALUE[${_i}]="DHCP"			; ((_i++))
+SERVICE_NAME_KEY[${_i}]="clamd"			; SERVICE_NAME_VALUE[${_i}]="Antivirus"			; ((_i++))
+SERVICE_NAME_KEY[${_i}]="c-icap"		; SERVICE_NAME_VALUE[${_i}]="ICAP"			; ((_i++))
+SERVICE_NAME_KEY[${_i}]="freshclam"	  	; SERVICE_NAME_VALUE[${_i}]="AV updater"		; ((_i++))
+SERVICE_NAME_KEY[${_i}]="named"			; SERVICE_NAME_VALUE[${_i}]="DNS"			; ((_i++))
+SERVICE_NAME_KEY[${_i}]="sshd"			; SERVICE_NAME_VALUE[${_i}]="SSH"			; ((_i++))
+SERVICE_NAME_KEY[${_i}]="supervisor"		; SERVICE_NAME_VALUE[${_i}]="Supervisor"		; ((_i++))
+SERVICE_NAME_KEY[${_i}]="snmpd"			; SERVICE_NAME_VALUE[${_i}]="SNMP"			; ((_i++))
+SERVICE_NAME_KEY[${_i}]="keepalived"		; SERVICE_NAME_VALUE[${_i}]="HA"			; ((_i++))
+SERVICE_NAME_KEY[${_i}]="${WADMIND_NAME}"	; SERVICE_NAME_VALUE[${_i}]="Web Administration"	; ((_i++))
+SERVICE_NAME_KEY[${_i}]="httpd"			; SERVICE_NAME_VALUE[${_i}]="Web"			; ((_i++))
+SERVICE_NAME_KEY[${_i}]="htcacheclean"		; SERVICE_NAME_VALUE[${_i}]="rCache Cleaner"		; ((_i++))
+SERVICE_NAME_KEY[${_i}]="localnet"		; SERVICE_NAME_VALUE[${_i}]="Loopback"			; ((_i++))
+SERVICE_NAME_KEY[${_i}]="network"		; SERVICE_NAME_VALUE[${_i}]="Networking"		; ((_i++))
+SERVICE_NAME_KEY[${_i}]="statistics"		; SERVICE_NAME_VALUE[${_i}]="Statistics"		; ((_i++))
+SERVICE_NAME_KEY[${_i}]="health"		; SERVICE_NAME_VALUE[${_i}]="Health Check"		; ((_i++))
+SERVICE_NAME_KEY[${_i}]="path"			; SERVICE_NAME_VALUE[${_i}]="Path Check"		; ((_i++))
+SERVICE_NAME_KEY[${_i}]="slapd"			; SERVICE_NAME_VALUE[${_i}]="LDAP Proxy"		; ((_i++))
+SERVICE_NAME_KEY[${_i}]="squid"			; SERVICE_NAME_VALUE[${_i}]="Proxy" 			; ((_i++))
+SERVICE_NAME_KEY[${_i}]="iptables"		; SERVICE_NAME_VALUE[${_i}]="Firewall"			; ((_i++))
+SERVICE_NAME_KEY[${_i}]="sysctl"		; SERVICE_NAME_VALUE[${_i}]="Kernel Tuner"		; ((_i++))
+SERVICE_NAME_KEY[${_i}]="sysnetctl"		; SERVICE_NAME_VALUE[${_i}]="Kernel Network Tuner"	; ((_i++))
+SERVICE_NAME_KEY[${_i}]="rsyslogd"		; SERVICE_NAME_VALUE[${_i}]="System Logger" 		; ((_i++))
+SERVICE_NAME_KEY[${_i}]="rlogger"		; SERVICE_NAME_VALUE[${_i}]="Relaying Logger"		; ((_i++))
+SERVICE_NAME_KEY[${_i}]="tc"			; SERVICE_NAME_VALUE[${_i}]="QoS"   			; ((_i++))
+SERVICE_NAME_KEY[${_i}]="ocspd"			; SERVICE_NAME_VALUE[${_i}]="OCSP"			; ((_i++))
+SERVICE_NAME_KEY[${_i}]="smanager"		; SERVICE_NAME_VALUE[${_i}]="Manager Synchroniser"	; ((_i++))
+SERVICE_NAME_KEY[${_i}]="iked"			; SERVICE_NAME_VALUE[${_i}]="IPsec"			; ((_i++))
+SERVICE_NAME_KEY[${_i}]="lcd4linux"		; SERVICE_NAME_VALUE[${_i}]="LCD"			; ((_i++))
+SERVICE_NAME_NB=${_i}
+unset _i
+
+init-account-environment()
+{
+    local account=${1}
+    test -n "${account}" || account=${ADMIN_NAME}
+
+    USERENV_DIR=${BASE_DIR}/${account}/${ENV_RDIR}
+
+    USERENV_FILE=${USERENV_DIR}/${ENV_NAME}
+    USERENV_FILE_CANCEL=${USERENV_DIR}/${ENV_CANCEL_NAME}
+
+    CONFIGURATION_DB_FILE=${USERENV_DIR}/${CONFIGURATION_DB_NAME}
+    CONFIGURATION_DB_FILE_CURRENT=${USERENV_DIR}/${CONFIGURATION_CURRENT_DB_NAME}
+
+    ACCOUNT=${account}
+
+    test -d ${USERENV_DIR} || exit 111
+}
+
+is-command-locked-files()
+{
+    test -n "${1}" || return 1
+    files=${*}
+
+    local file base
+    for file in ${files}
+    do
+	base=${file##*/}
+	! ls ${LOCK_DIR}/${ACCOUNT}.${base} > /dev/null 2>&1 || return 0
+    done
+
+    return 1
+}
+
+set-implicit-parameters()
+{
+    set-global-parameters
+    set-embedded-rweb-parameters
+    set-admin-parameters
+    set-usage-parameters
+    set-network-parameters
+    set-network-routes-parameters
+    set-qos-parameters
+    set-access-list-parameters
+    set-rweb-access-list-parameters
+    set-dns-parameters
+    set-proxy-parameters
+    set-guard-parameters
+    set-waf-parameters
+    set-web-parameters
+    set-architecture-parameters
+    set-dhcp-parameters
+    set-ntp-parameters
+    set-av-parameters
+    set-av-extended-parameters
+    set-rweb-list
+    set-net-names-list
+    set-fw-rule-parameters
+    set-admin-fingerprint
+    set-ocsp-parameters
+    set-smanager-parameters
+    set-ipsec-parameters
+    set-auth-parameters
+    set-memory-parameters
+    set-syslog-parameters
+    set-ha-parameters
+    set-flag-service-start-stop
+}
+
+wait-files-unlocking()
+{
+    test -n "${1}" || return 1
+    files=${*}
+
+    while true
+    do
+	is-command-locked-files ${files} || break
+	usleep 300000
+    done
+}
+
+conf-unlock-apl-file()
+{
+    local base=$(file-basename ${0})
+    manage-appliance-unlock ${base}
+    rm -f /var/run/${base}.pid
+}
+
+conf-lock-file()
+{
+    test -n "${1}" || return 1
+    local file=${1}
+
+    local base=$(file-basename ${file})
+    touch ${LOCK_DIR}/${ACCOUNT}.${base}.super
+}
+
+conf-unlock-file()
+{
+    test -n "${1}" || return 1
+    local file=${1}
+
+    local base=$(file-basename ${file})
+    rm -f ${LOCK_DIR}/${ACCOUNT}.${base}.super
+}
+
+conf-lock-env()
+{
+    local name
+
+    for name in ${ENV_CURRENT_NAME} \
+		${ENV_CANCEL_NAME} \
+		${ENV_NAME}
+    do
+	conf-lock-file ${USERENV_DIR}/${name}
+    done
+
+    fuser -s -k -INT \
+	${USERENV_DIR}/${ENV_CURRENT_NAME} \
+	${USERENV_DIR}/${ENV_CANCEL_NAME} \
+	${USERENV_DIR}/${ENV_NAME}
+
+    # At this point users of above files are running their trap programs : cleaning and unlocking
+    # The file "${USERENV_DIR}/${ENV_NAME}" is a modifiable file by a administrators
+    # Wait the termination of cleaning and unlocking process for this file
+
+    wait-files-unlocking ${USERENV_DIR}/${ENV_NAME}
+}
+
+conf-unlock-env()
+{
+    local name
+
+    for name in ${ENV_CURRENT_NAME} \
+		${ENV_CANCEL_NAME} \
+		${ENV_NAME}
+    do
+	conf-unlock-file ${USERENV_DIR}/${name}
+    done
+}
+
+unlock-filter-rules()
+{
+    local base_filter=${USERENV_DIR}/${WAF_RDIR}
+    local rules=$(ls ${base_filter}/*.rules 2> /dev/null)
+    local rule
+
+    for rule in ${rules}
+    do
+	conf-unlock-file ${rule}
+    done
+}
+
+conf-backup-env()
+{
+    cp -f ${USERENV_DIR}/${ENV_NAME} ${USERENV_DIR}/${ENV_NAME}.old || return 1
+    cp -f ${USERENV_DIR}/${ENV_CURRENT_NAME} ${USERENV_DIR}/${ENV_CURRENT_NAME}.old || return 3
+    cp -f ${USERENV_DIR}/${ENV_CANCEL_NAME} ${USERENV_DIR}/${ENV_CANCEL_NAME}.old || return 5
+
+    if test ${APL_ROLE} == gateway ; then
+	local psk_file=${VPN_IPSEC_DIR}/${IPSEC_AUTHENTICATE_PSK_FILENAME}
+	install -m 600 -o root -g root ${psk_file} ${psk_file}.old || return 7
+	install -m 600 -o root -g root ${psk_file}.current ${psk_file}.current.old || return 9
+    fi
+}
+
+conf-restore-files()
+{
+    local name
+
+    for name in ${ENV_CURRENT_NAME} \
+		${ENV_CANCEL_NAME} \
+		${ENV_NAME}
+    do	    
+	if test -f ${USERENV_DIR}/${name}.old ; then
+	    cp -f ${USERENV_DIR}/${name}.old ${USERENV_DIR}/${name}
+	    chown ${ACCOUNT}:${GROUP_NAME} ${USERENV_DIR}/${name}
+	fi
+    done
+
+    if test ${APL_ROLE} == gateway ; then
+	local psk_file=${VPN_IPSEC_DIR}/${IPSEC_AUTHENTICATE_PSK_FILENAME}
+	test ! -f ${psk_file}.old || \
+	    install -m 600 -o ${ACCOUNT} -g ${GROUP_NAME} ${psk_file}.old ${psk_file}
+
+	test ! -f ${psk_file}.current.old || \
+	    install -m 600 -o ${ACCOUNT} -g ${GROUP_NAME} ${psk_file}.current.old ${psk_file}.current
+    fi
+}
+
+clean-userenv-backup()
+{
+    rm -f \
+       ${USERENV_DIR}/${ENV_CANCEL_NAME}.old \
+       ${USERENV_DIR}/${ENV_CURRENT_NAME}.old \
+       ${USERENV_DIR}/${ENV_NAME}.old
+
+    if test ${APL_ROLE} == gateway ; then
+	local psk_file=${VPN_IPSEC_DIR}/${IPSEC_AUTHENTICATE_PSK_FILENAME}
+	rm -f \
+	   ${psk_file}.old \
+	   ${psk_file}.current.old
+    fi
+}
+
+restore-admin-level-configuration-files()
+{
+    conf-restore-files
+    clean-userenv-backup
+    conf-unlock-env
+    unlock-filter-rules
+}
+
+conf-backup-db-configuration()
+{
+    cp -f ${USERENV_DIR}/${CONFIGURATION_DB_NAME} ${USERENV_DIR}/${CONFIGURATION_DB_NAME}.old || return 1
+    cp -f ${USERENV_DIR}/${CONFIGURATION_CURRENT_DB_NAME} ${USERENV_DIR}/${CONFIGURATION_CURRENT_DB_NAME}.old || return 1
+}
+
+clean-db-configuration-backup()
+{
+    rm -f \
+       ${USERENV_DIR}/${CONFIGURATION_DB_NAME}.old \
+       ${USERENV_DIR}/${CONFIGURATION_CURRENT_DB_NAME}.old
+}
+
+restore-db-configuration()
+{
+    local name
+
+    for name in ${CONFIGURATION_DB_NAME} \
+		${CONFIGURATION_CURRENT_DB_NAME}
+    do
+	if test -f ${USERENV_DIR}/${name}.old ; then
+	    cp -f ${USERENV_DIR}/${name}.old ${USERENV_DIR}/${name}
+	    chown ${ACCOUNT}:${GROUP_NAME} ${USERENV_DIR}/${name}
+	fi
+    done
+}
+
+conf-unlock-db-configuration()
+{
+    local name
+
+    for name in ${CONFIGURATION_CURRENT_DB_NAME} \
+		${CONFIGURATION_DB_NAME}
+    do
+	conf-unlock-file ${USERENV_DIR}/${name}
+    done
+
+}
+
+restore-admin-level-db-configuration()
+{
+    restore-db-configuration
+    clean-db-configuration-backup
+    conf-unlock-db-configuration
+}
+
+restore-admin-level-configuration()
+{
+    # Must be executed in a non interruptible process (trap "" INT...)
+    trap "" INT QUIT TERM
+
+    restore-admin-level-configuration-files
+    restore-admin-level-db-configuration
+    clean-backup-conf
+}
+
+gen-userenv1()
+{
+    local var
+    for var in ${USERENV_VARS}
+    do
+	echo -n "export ${var}='"
+	eval eval 'echo -n \$"${var}"'
+	echo "'"
+    done || return 1
+
+    return 0
+}
+
+gen-userenv()
+{
+    gen-userenv1 || return 1
+    echo -n "export USERENV_VARS='"
+    eval eval 'echo -n "${USERENV_VARS}"'
+    echo "'"
+}
+
+conf-save-new-env()
+{
+    gen-userenv > ${USERENV_DIR}/${ENV_NAME}
+}
+
+conf-load-env()
+{
+    conf-lock-env
+
+    source ${USERENV_DIR}/${ENV_NAME}
+    source ${USERENV_DIR}/${ENV_CURRENT_NAME}
+
+    conf-unlock-env
+    set-implicit-parameters
+}
+
+conf-load-cancel-env()
+{
+    conf-lock-env
+
+    source ${USERENV_DIR}/${ENV_CANCEL_NAME}
+    source ${USERENV_DIR}/${ENV_CURRENT_NAME}
+
+    conf-unlock-env
+
+    set-implicit-parameters
+}
+
+initialise()
+{
+    # First clean for a new session to prevent to restore from an old file if interrupted before saving the current env
+    clean-userenv-backup || return 11
+    # clean-db-configuration-backup || return 13
+    clean-backup-conf || return 15
+    conf-load-env || return 17
+}
+
+set-flag-servie-start-stop-path()
+{
+    test \
+	${FLAG_NETWORK} -eq 1 -o \
+	${FLAG_IPTABLES} -eq 1 || return 0
+    FLAG_PATH=1
+}
+
+set-flag-servie-start-stop-multi-gateways()
+{
+    is-multi-gateways cur ; local cur=${?}
+    is-multi-gateways new ; local new=${?}
+
+    test ${cur} -eq 0 -o ${new} -eq 0 || return 0
+
+    test ${FLAG_NETWORK} -eq 0 || FLAG_IPTABLES=1
+    test ${FLAG_IPTABLES} -eq 0 || FLAG_NETWORK=1
+}
+
+set-flag-service-start-stop-sslmediate-urllist()
+{
+    test "${SSLMEDIATE_MODE}" == True || return 0
+    cd ${TMP_DIR}
+    local guards=$(ls -1 ${LOADED}.*.domains.gz 2> /dev/null)
+    test -n "${guards}" || return 0
+    FLAG_SQUID=1
+}
+
+set-flag-service-start-stop-guard-urllist()
+{
+    test "${GUARD_MODE}" == True || return 0
+    cd ${TMP_DIR}
+    local guards=$(ls -1 ${LOADED}.${URLLIST}.*.gz ${URLLIST_CLEAR}.*.* 2> /dev/null)
+    test -n "${guards}" || return 0
+    FLAG_GUARD_RELOAD=1
+}
+
+set-flag-service-start-stop-snmp-ssl()
+{
+    if test -f ${TMP_DIR}/${LOADED}.${SNMP_SSL}.certificate ; then
+	FLAG_SNMPD=1
+	return 0
+    fi
+
+    if test ${SNMP_CLIENT_CERTIFICATE} != ${CURRENT_SNMP_CLIENT_CERTIFICATE} ; then
+	test ${SNMP_CLIENT_CERTIFICATE} == True || FLAG_SNMPD=1
+    fi
+}
+
+set-flag-service-start-stop-ike-auth()
+{
+    ! vpnipsec-authenticate-modified || FLAG_IKE=1
+}
+
+set-flag-service-start-stop-httpd-waf()
+{
+    if test "${WAF_RWEB_BYPASS_RULE_LIST}" != "${CURRENT_WAF_RWEB_BYPASS_RULE_LIST}" ; then
+	FLAG_HTTPD_RELOAD=1
+    fi
+
+    if test "${WAF_RWEB_BYPASS_APPLICATION_LIST}" != "${CURRENT_WAF_RWEB_BYPASS_APPLICATION_LIST}" ; then
+	FLAG_HTTPD_RELOAD=1
+    fi
+
+    if test "${WAF_LEVEL}" != "${CURRENT_WAF_LEVEL}" ; then
+	FLAG_HTTPD=1
+	return 0
+    fi
+
+    if test "${WAF_NO_SCORING_LEVEL}" != "${CURRENT_WAF_NO_SCORING_LEVEL}" ; then
+	FLAG_HTTPD=1
+	return 0
+    fi
+
+    if test "${WAF_REQUEST_SCORE}" != "${CURRENT_WAF_REQUEST_SCORE}" ; then
+	FLAG_HTTPD=1
+	return 0
+    fi
+
+    if test "${WAF_RESPONSE_SCORE}" != "${CURRENT_WAF_RESPONSE_SCORE}" ; then
+	FLAG_HTTPD=1
+	return 0
+    fi
+
+    if test "${WAF_GENERIC}" != "${CURRENT_WAF_GENERIC}" ; then
+	FLAG_HTTPD=1
+	return 0
+    fi
+
+    if test "${WAF_REWRITE_HTTP_ERRORS}" != "${CURRENT_WAF_REWRITE_HTTP_ERRORS}" ; then
+	FLAG_HTTPD=1
+	return 0
+    fi
+
+    if test "${WAF_IMETHODS}" != "${CURRENT_WAF_IMETHODS}" ; then
+	FLAG_HTTPD=1
+	return 0
+    fi
+
+    if test "${WAF_RWEB_AUDIT_LIST}" != "${CURRENT_WAF_RWEB_AUDIT_LIST}" ; then
+	FLAG_HTTPD=1
+	return 0
+    fi
+
+    if test "${WAF_RESPONSE_BODY}" != "${CURRENT_WAF_RESPONSE_BODY}" ; then
+	FLAG_HTTPD=1
+	return 0
+    fi
+
+    if test "${WAF_REQUEST_BODY}" != "${CURRENT_WAF_REQUEST_BODY}" ; then
+	FLAG_HTTPD=1
+	return 0
+    fi
+
+    if test "${WAF_NUM_ARG}" != "${CURRENT_WAF_NUM_ARG}" ; then
+	FLAG_HTTPD=1
+	return 0
+    fi
+
+    if test "${WAF_ARG_NAME_LENGTH}" != "${CURRENT_WAF_ARG_NAME_LENGTH}" ; then
+	FLAG_HTTPD=1
+	return 0
+    fi
+
+    if test "${WAF_ARG_LENGTH}" != "${CURRENT_WAF_ARG_LENGTH}" ; then
+	FLAG_HTTPD=1
+	return 0
+    fi
+
+    if test "${WAF_TOTAL_ARG_LENGTH}" != "${CURRENT_WAF_TOTAL_ARG_LENGTH}" ; then
+	FLAG_HTTPD=1
+	return 0
+    fi
+
+    if test "${WAF_FILES_SIZE}" != "${CURRENT_WAF_FILES_SIZE}" ; then
+	FLAG_HTTPD=1
+	return 0
+    fi
+
+    local waf_reputation_countries=$(sqlite3 ${USERENV_DIR}/${CONFIGURATION_DB_NAME} \
+					     "SELECT * FROM waf_reputation_country;")
+
+    local current_waf_reputation_countries=$(sqlite3 ${USERENV_DIR}/${CONFIGURATION_CURRENT_DB_NAME} \
+						     "SELECT * FROM waf_reputation_country;")
+
+    if test "${waf_reputation_countries}" != "${current_waf_reputation_countries}" ; then
+	FLAG_HTTPD=1
+	FLAG_WADMIN=1
+	return 0
+    fi
+
+    if test "${WAF_REPUTATION_RBL_KEY}" != "${CURRENT_WAF_REPUTATION_RBL_KEY}" ; then
+	FLAG_HTTPD=1
+	FLAG_WADMIN=1
+	return 0
+    fi
+
+    if test "${WAF_REPUTATION_RBL}" != "${CURRENT_WAF_REPUTATION_RBL}" ; then
+	FLAG_HTTPD=1
+	return 0
+    fi
+
+    if test "${WAF_DOS_LIMIT}" != "${CURRENT_WAF_DOS_LIMIT}" ; then
+	FLAG_HTTPD=1
+	return 0
+    fi
+
+    local rule_dir=${USERENV_DIR}/${WAF_RDIR}
+    local rules=$(ls ${rule_dir}/*.rules 2> /dev/null)
+
+    local rule name
+
+    for rule in ${rules}
+    do
+	name=$(file-basename ${rule} .rules)
+	if test -f ${WEB_WAF_DIR}/${name}.rules ; then
+	    if test ${rule} -nt ${WEB_WAF_DIR}/${name}.rules ; then
+		FLAG_HTTPD=1
+		break
+	    fi
+	else
+	    FLAG_HTTPD=1
+	    break
+	fi
+    done
+    test ${FLAG_HTTPD} -eq 0 || return 0
+    
+    rules=$(ls ${rule_dir}/*.rules.current 2> /dev/null)
+    for rule in ${rules}
+    do
+	name=$(file-basename ${rule} .rules.current)
+	if test ! -f ${USERENV_DIR}/${WAF_RDIR}/${name}.rules ; then
+	    FLAG_HTTPD=1
+	    break
+	fi
+    done
+}
+
+set-flag-monitoring-on()
+{
+    FLAG_KEEPALIVED=1
+    FLAG_HEALTH=1
+    FLAG_SNMPD=1
+}
+
+set-flag-monitoring()
+{
+    test -z "${NTP_SERVER_LIST}" -o ${FLAG_NTP} -eq 0 || set-flag-monitoring-on
+
+    test ${SELF_NS} == False -o ${FLAG_NS} -eq 0 || set-flag-monitoring-on
+    test ${DHCP_IS_ACTIVE} == False -o ${FLAG_DHCP} -eq 0 || set-flag-monitoring-on
+    test ${ADMIN_SSH} == False -o ${FLAG_SSH} -eq 0 || set-flag-monitoring-on
+    test ${ADMIN_WADMIN} == False -o ${FLAG_WADMIN} -eq 0 || set-flag-monitoring-on
+    test ${ADMIN_SNMP} == False -o ${FLAG_SNMPD} -eq 0 || set-flag-monitoring-on
+    test ${FLAG_HTTPD} -eq 0 || set-flag-monitoring-on
+    test ${FLAG_CACHE_CLEAN} -eq 0 || set-flag-monitoring-on
+    test ${AV_MODE} == False -o ${FLAG_AV} -eq 0 || set-flag-monitoring-on
+    test ${AV_MODE} == False -o ${FLAG_ICAP} -eq 0 || set-flag-monitoring-on
+    test ${AV_MODE} == False -o ${FLAG_FRESH_AV} -eq 0 || set-flag-monitoring-on
+    test ${OCSP_IS_ACTIVE} == False -o ${FLAG_OCSP} -eq 0 || set-flag-monitoring-on
+    test ${SMANAGER_IS_ACTIVE} == False -o ${FLAG_SMANAGER} -eq 0 || set-flag-monitoring-on
+    test ${IKE_IS_ACTIVE} == False -o ${FLAG_IKE} -eq 0 || set-flag-monitoring-on
+    test ${LDAP_PROXY_IS_ACTIVE} == False -o ${FLAG_LDAP_PROXY} -eq 0 || set-flag-monitoring-on
+    test ${GUARD_MODE} == False -o ${FLAG_GUARD} -eq 0 || set-flag-monitoring-on
+    test ${SQUID_IS_ACTIVE} == False -o ${FLAG_SQUID} -eq 0 || set-flag-monitoring-on
+}
+
+set-flag-service-start-stop()
+{
+    FLAG_SYSLOG=0 FLAG_SYSLOG_RELOAD=0
+    FLAG_RLOGGER=0 FLAG_RLOGGER_RELOAD=0
+    FLAG_SYSCTL=0 FLAG_SYSCTL_RELOAD=0
+    FLAG_SYSNETCTL=0 FLAG_SYSNETCTL_RELOAD=0
+    FLAG_HEALTH=0 FLAG_HEALTH_RELOAD=0
+    FLAG_PATH=0 FLAG_PATH_RELOAD=0
+    FLAG_SNMPD=0 FLAG_SNMPD_RELOAD=0
+    FLAG_KEEPALIVED=0 FLAG_KEEPALIVED_RELOAD=0
+    FLAG_SQUID=0 FLAG_SQUID_RELOAD=0 FLAG_SQUID_CLEARSSL=0
+    FLAG_SQUID_LDAP_PASSWD=0 FLAG_SQUID_LDAP_PASSWD_RELOAD=0
+    FLAG_KERBEROS=0
+    FLAG_HTTPD=0 FLAG_HTTPD_RELOAD=0
+    FLAG_CACHE_CLEAN=0 FLAG_CACHE_CLEAN_RELOAD=0
+    FLAG_ICAP=0 FLAG_ICAP_RELOAD=0
+    FLAG_AV=0 FLAG_AV_RELOAD=0
+    FLAG_FRESH_AV=0 FLAG_FRESH_AV_RELOAD=0
+    FLAG_FRESH_AV_EXTENDED=0
+    FLAG_GUARD=0 FLAG_GUARD_RELOAD=0
+    FLAG_LDAP_PROXY=0 FLAG_LDAP_PROXY_RELOAD=0
+    FLAG_NTP=0 FLAG_NTP_RELOAD=0
+    FLAG_DHCP=0 FLAG_DHCP_RELOAD=0
+    FLAG_NS=0 FLAG_NS_RELOAD=0
+    FLAG_WADMIN=0 FLAG_WADMIN_RELOAD=0
+    FLAG_SSH=0 FLAG_SSH_RELOAD=0 FLAG_SSH_MANAGER_KEYGEN=0
+    FLAG_TC=0 FLAG_TC_RELOAD=0
+    FLAG_LOCALNET=0 FLAG_LOCALNET_RELOAD=0
+    FLAG_NETWORK=0 FLAG_NETWORK_RELOAD=0
+    FLAG_NETWORK_IO=0 FLAG_NETWORK_IO_RELOAD=0
+    FLAG_NETWORK_STATISTICS=0
+    FLAG_IPTABLES=0 FLAG_IPTABLES_RELOAD=0
+    FLAG_IKE=0 FLAG_IKE_RELOAD=0
+    FLAG_LCD4LINUX=0 FLAG_LCD4LINUX_RELOAD=0
+    FLAG_CRON=0 FLAG_CRON_RELOAD=0
+    FLAG_SSLMEDIATE_EXCEPTIONS=0
+    FLAG_OCSP=0 FLAG_OCSP_RELOAD=0
+    FLAG_SMANAGER=0 FLAG_SMANAGER_RELOAD=0
+
+    if test "${SYSLOG_CA}" != "${CURRENT_SYSLOG_CA}" ; then
+	FLAG_SYSLOG=1
+    fi
+
+    if test "${SYSLOG_SERVER_LIST}" != "${CURRENT_SYSLOG_SERVER_LIST}" ; then
+	FLAG_TC=1
+	FLAG_IPTABLES=1
+	FLAG_SYSLOG=1
+	FLAG_RLOGGER=1
+	FLAG_HTTPD=1
+    fi
+
+    if test "${TIMEZONE}" != "${CURRENT_TIMEZONE}" ; then
+	FLAG_SYSLOG=1
+	FLAG_RLOGGER=1
+	FLAG_NS=1
+	FLAG_NTP=1
+	FLAG_DHCP=1
+	FLAG_AV=1
+	FLAG_FRESH_AV=1
+	FLAG_SQUID=1
+	FLAG_HTTPD=1
+	FLAG_OCSP=1
+    fi
+
+    if test "${GUARD_LOG_MODE}" != "${CURRENT_GUARD_LOG_MODE}" ; then
+	FLAG_SYSLOG=1
+	FLAG_RLOGGER=1
+    fi
+
+    if test "${CACHE_MIN_OBJECT_SZ}" != "${CURRENT_CACHE_MIN_OBJECT_SZ}" ; then
+	FLAG_SQUID_RELOAD=1
+    fi
+
+    if test "${CACHE_MAX_OBJECT_SZ}" != "${CURRENT_CACHE_MAX_OBJECT_SZ}" ; then
+	FLAG_SQUID_RELOAD=1
+    fi
+
+    if test "${CACHE_BIG_OBJECT}" != "${CURRENT_CACHE_BIG_OBJECT}" ; then
+	FLAG_SQUID_RELOAD=1
+    fi
+
+    if test "${CACHE_BIG_MIN_OBJECT_SZ}" != "${CURRENT_CACHE_BIG_MIN_OBJECT_SZ}" ; then
+	FLAG_SQUID_RELOAD=1
+    fi
+
+    if test "${CACHE_BIG_MAX_OBJECT_SZ}" != "${CURRENT_CACHE_BIG_MAX_OBJECT_SZ}" ; then
+	FLAG_SQUID_RELOAD=1
+    fi
+
+    if test "${DOMAIN_NAME}" != "${CURRENT_DOMAIN_NAME}" ; then
+	FLAG_SQUID_RELOAD=1
+	FLAG_DHCP=1
+	FLAG_HTTPD_RELOAD=1
+	FLAG_WADMIN_RELOAD=1
+	FLAG_KERBEROS=1
+    fi
+
+    if test "${ADMIN_USER_LIST}" != "${CURRENT_ADMIN_USER_LIST}" ; then
+	FLAG_SSH=1
+	FLAG_WADMIN=1
+	FLAG_HTTPD=1
+	FLAG_SSH=1
+    fi
+
+    if test "${ADMIN_SNMP}" != "${CURRENT_ADMIN_SNMP}" ; then
+	FLAG_TC=1
+	FLAG_IPTABLES=1
+	FLAG_SQUID_RELOAD=1
+	FLAG_SNMPD=1
+    fi
+
+    if test "${ADMIN_SSH}" != "${CURRENT_ADMIN_SSH}" ; then
+	FLAG_TC=1
+	FLAG_IPTABLES=1
+	FLAG_SYSLOG=1
+	FLAG_SSH=1
+    fi
+
+    if test "${ADMIN_SSH_PASSWORD}" != "${CURRENT_ADMIN_SSH_PASSWORD}" ; then
+	FLAG_SSH=1
+    fi
+
+    if test "${ADMIN_WADMIN}" != "${CURRENT_ADMIN_WADMIN}" ; then
+	FLAG_TC=1
+	FLAG_IPTABLES=1
+	FLAG_WADMIN=1
+	FLAG_HTTPD_RELOAD=1
+	FLAG_SQUID_RELOAD=1
+    fi
+
+    local cur_2fa=$(get-admin-2fa ${ACCOUNT} cur)
+    local new_2fa=$(get-admin-2fa ${ACCOUNT} new)
+
+    if test ${new_2fa} != ${cur_2fa} ; then
+	FLAG_SSH=1
+    fi
+
+    if test "${ADMIN_INTERNAL}" != "${CURRENT_ADMIN_INTERNAL}" ; then
+	FLAG_TC=1
+	FLAG_IPTABLES=1
+	FLAG_SSH=1
+	FLAG_WADMIN=1
+	FLAG_HTTPD=1
+    fi
+
+    if test "${ADMIN_VPN_IPSEC}" != "${CURRENT_ADMIN_VPN_IPSEC}" ; then
+	FLAG_TC=1
+	FLAG_IPTABLES=1
+	FLAG_SSH=1
+	FLAG_WADMIN=1
+	FLAG_HTTPD=1
+    fi
+
+    if test "${ADMIN_EXTERNAL}" != "${CURRENT_ADMIN_EXTERNAL}" ; then
+	FLAG_TC=1
+	FLAG_IPTABLES=1
+	FLAG_SSH=1
+	FLAG_WADMIN=1
+	FLAG_HTTPD=1
+    fi
+
+    if test "${ADMIN_AUXILIARY}" != "${CURRENT_ADMIN_AUXILIARY}" ; then
+	FLAG_TC=1
+	FLAG_IPTABLES=1
+	FLAG_WADMIN=1
+	FLAG_HTTPD=1
+	FLAG_SSH=1
+    fi
+
+    if test "${ADMIN_WAUDIT}" != "${CURRENT_ADMIN_WAUDIT}" ; then
+	FLAG_TC=1
+	FLAG_IPTABLES=1
+	FLAG_HTTPD=1
+	FLAG_SQUID=1
+    fi
+
+    if test "${ROUTER_MODE}" != "${CURRENT_ROUTER_MODE}" ; then
+	FLAG_SYSCTL=1
+	FLAG_IPTABLES=1
+	FLAG_NETWORK_IO=1
+	FLAG_FRESH_AV=1
+    fi
+
+    if test "${VLAN_MODE}" != "${CURRENT_VLAN_MODE}" ; then
+	FLAG_TC=1
+	FLAG_IPTABLES=1
+	FLAG_NETWORK=1
+	FLAG_LOCALNET=1
+	FLAG_IKE=1
+	FLAG_KEEPALIVED=1
+	FLAG_FRESH_AV=1
+	FLAG_AV=1
+	FLAG_SSH=1
+	FLAG_NS=1
+	FLAG_SQUID=1
+	FLAG_HTTPD=1
+	FLAG_WADMIN=1
+    fi
+
+    if test "${HA_MODE}" != "${CURRENT_HA_MODE}" ; then
+	FLAG_SYSCTL=1
+	FLAG_TC=1
+	FLAG_IPTABLES=1
+	FLAG_IKE=1
+	FLAG_KEEPALIVED=1
+	FLAG_NETWORK=1
+	FLAG_LOCALNET=1
+	FLAG_NS=1
+	FLAG_AV=1
+	FLAG_SQUID=1
+	FLAG_HTTPD=1
+    fi
+
+    if test "${SNAT_MODE}" != "${CURRENT_SNAT_MODE}" ; then
+	FLAG_TC=1
+	FLAG_IPTABLES=1
+	FLAG_NETWORK_IO=1
+    fi
+
+    if test "${FIREWALL_MODE}" != "${CURRENT_FIREWALL_MODE}" ; then
+	FLAG_IPTABLES=1
+    fi
+
+    if test "${FTP_PASSIVE_MODE}" != "${CURRENT_FTP_PASSIVE_MODE}" ; then
+	FLAG_TC=1
+	FLAG_IPTABLES=1
+	FLAG_SQUID_RELOAD=1
+    fi
+
+    if test "${TRANSPARENT_MODE}" != "${CURRENT_TRANSPARENT_MODE}" ; then
+	FLAG_TC=1
+	FLAG_IPTABLES=1
+	FLAG_NS=1
+	FLAG_SQUID=1
+	FLAG_HTTPD=1
+    fi
+
+    if test "${TNAT_MODE}" != "${CURRENT_TNAT_MODE}" ; then
+	FLAG_SYSCTL=1
+	FLAG_SYSNETCTL=1
+	FLAG_IPTABLES=1
+	FLAG_NETWORK=1
+	FLAG_SQUID=1
+    fi
+
+    if test "${CACHE_MODE}" != "${CURRENT_CACHE_MODE}" ; then
+	FLAG_SQUID=1
+	FLAG_HTTPD=1
+    fi
+
+    if test "${COMPRESS_MODE}" != "${CURRENT_COMPRESS_MODE}" ; then
+	FLAG_SQUID=1
+	FLAG_HTTPD=1
+    fi
+
+    if test "${WAF_MODE}" != "${CURRENT_WAF_MODE}" ; then
+	FLAG_SQUID=1
+	FLAG_HTTPD=1
+    fi
+
+    if test "${LOG_MODE}" != "${CURRENT_LOG_MODE}" ; then
+	FLAG_IPTABLES=1
+	FLAG_SQUID=1
+	FLAG_GUARD_RELOAD=1
+	FLAG_HTTPD=1
+	FLAG_ICAP=1
+    fi
+
+    if test "${LOG_TYPE_WEB}" != "${CURRENT_LOG_TYPE_WEB}" ; then
+	FLAG_SQUID=1
+	FLAG_HTTPD=1
+	FLAG_SYSLOG=1
+    fi
+
+    if test "${LOG_TYPE_RWEB}" != "${CURRENT_LOG_TYPE_RWEB}" ; then
+	FLAG_SQUID=1
+	FLAG_HTTPD=1
+	FLAG_SYSLOG=1
+    fi
+
+    if test "${LOG_TYPE_GUARD}" != "${CURRENT_LOG_TYPE_GUARD}" ; then
+	FLAG_GUARD_RELOAD=1
+	FLAG_SYSLOG=1
+	FLAG_RLOGGER=1
+    fi
+
+    if test "${LOG_TYPE_ANTIVIRUS}" != "${CURRENT_LOG_TYPE_ANTIVIRUS}" ; then
+	FLAG_ICAP=1
+	FLAG_SYSLOG=1
+    fi
+
+    if test "${LOG_TYPE_ANTIVIRUS_SERVER}" != "${CURRENT_LOG_TYPE_ANTIVIRUS_SERVER}" ; then
+	FLAG_AV=1
+	FLAG_SYSLOG=1
+    fi
+
+    if test "${LOG_TYPE_WAF}" != "${CURRENT_LOG_TYPE_WAF}" ; then
+	FLAG_HTTPD=1
+	FLAG_SYSLOG=1
+    fi
+
+    if test "${LOG_TYPE_FIREWALL}" != "${CURRENT_LOG_TYPE_FIREWALL}" ; then
+	FLAG_IPTABLES=1
+	FLAG_SYSLOG=1
+    fi
+
+    if test "${GUARD_MODE}" != "${CURRENT_GUARD_MODE}" ; then
+	FLAG_GUARD_RELOAD=1
+	FLAG_RLOGGER=1
+	FLAG_SQUID=1
+	FLAG_HTTPD=1
+	FLAG_LDAP_PROXY=1
+    fi
+
+    if test "${AV_MODE}" != "${CURRENT_AV_MODE}" ; then
+	FLAG_TC=1
+	FLAG_IPTABLES=1
+	FLAG_AV=1
+	FLAG_FRESH_AV=1
+	FLAG_ICAP=1
+	FLAG_SQUID=1
+	FLAG_HTTPD=1
+    fi
+
+    if test "${AV_PUA}" != "${CURRENT_AV_PUA}" ; then
+	FLAG_AV=1
+    fi
+
+    if test "${AV_MAX_OBJECT_SZ}" != "${CURRENT_AV_MAX_OBJECT_SZ}" ; then
+	FLAG_AV=1
+	FLAG_ICAP=1
+	FLAG_SQUID=1
+    fi
+
+    if test "${AV_RESTRICT}" != "${CURRENT_AV_RESTRICT}" ; then
+	FLAG_SQUID=1
+    fi
+
+    if test "${AV_COUNTRY_CODE}" != "${CURRENT_AV_COUNTRY_CODE}" ; then
+	FLAG_TC=1
+	FLAG_IPTABLES=1
+	FLAG_FRESH_AV=1
+    fi
+
+    if test "${AV_INTERNAL}" != "${CURRENT_AV_INTERNAL}" ; then
+	FLAG_TC=1
+	FLAG_IPTABLES=1
+	FLAG_AV=1
+    fi
+
+    if test "${AV_VPN_IPSEC}" != "${CURRENT_AV_VPN_IPSEC}" ; then
+	FLAG_TC=1
+	FLAG_IPTABLES=1
+	FLAG_AV=1
+    fi
+
+    if test "${AV_EXTERNAL}" != "${CURRENT_AV_EXTERNAL}" ; then
+	FLAG_TC=1
+	FLAG_IPTABLES=1
+	FLAG_AV=1
+    fi
+
+    if test "${AV_AUXILIARY}" != "${CURRENT_AV_AUXILIARY}" ; then
+	FLAG_TC=1
+	FLAG_IPTABLES=1
+	FLAG_AV=1
+    fi
+
+    if test "${ANONYMOUS_MODE}" != "${CURRENT_ANONYMOUS_MODE}" ; then
+	FLAG_SQUID_RELOAD=1
+    fi
+
+    if test "${QOS_MODE}" != "${CURRENT_QOS_MODE}" ; then
+	FLAG_TC=1
+	FLAG_IPTABLES=1
+    fi
+
+    if test "${BOND_EXTERNALS}" != "${CURRENT_BOND_EXTERNALS}" ; then
+	FLAG_SYSNETCTL=1
+	FLAG_TC=1
+	FLAG_IPTABLES=1
+	FLAG_IKE=1
+	FLAG_KEEPALIVED=1
+	FLAG_NETWORK=1
+	FLAG_NETWORK_STATISTICS=1
+	FLAG_LCD4LINUX=1
+	FLAG_FRESH_AV=1
+    fi
+
+    if test "${BOND_INTERNALS}" != "${CURRENT_BOND_INTERNALS}" ; then
+	FLAG_TC=1
+	FLAG_IPTABLES=1
+	FLAG_NETWORK=1
+	FLAG_IKE=1
+	FLAG_NETWORK_STATISTICS=1
+	FLAG_KEEPALIVED=1
+    fi
+
+    if test "${BOND_AUXILIARIES}" != "${CURRENT_BOND_AUXILIARIES}" ; then
+	FLAG_TC=1
+	FLAG_IPTABLES=1
+	FLAG_KEEPALIVED=1
+	FLAG_NETWORK=1
+	FLAG_NETWORK_STATISTICS=1
+	FLAG_WADMIN=1
+	FLAG_SSH=1
+	FLAG_SNMPD=1
+	FLAG_SQUID_RELOAD=1
+    fi
+
+    if test "${VLAN_FLOW_LIST}" != "${CURRENT_VLAN_FLOW_LIST}" ; then
+	FLAG_TC=1
+	FLAG_IPTABLES=1
+	FLAG_NETWORK=1
+	FLAG_KEEPALIVED=1
+    fi
+
+    if test "${IP_WEB_IP}" != "${CURRENT_IP_WEB_IP}" -o \
+	"${IP_WEB_MASK}" != "${CURRENT_IP_WEB_MASK}" ; then
+	FLAG_TC=1
+	FLAG_IPTABLES=1
+	FLAG_KEEPALIVED=1
+	FLAG_NETWORK=1
+	FLAG_IKE=1
+	FLAG_NS=1
+	FLAG_SQUID=1
+	FLAG_HTTPD=1
+    fi
+
+    if test "${IP_RWEB_IP}" != "${CURRENT_IP_RWEB_IP}" -o \
+	"${IP_RWEB_MASK}" != "${CURRENT_IP_RWEB_MASK}" ; then
+	FLAG_TC=1
+	FLAG_IPTABLES=1
+	FLAG_NETWORK=1
+	FLAG_KEEPALIVED=1
+	FLAG_IKE=1
+	FLAG_NS=1
+	FLAG_SQUID=1
+	FLAG_HTTPD=1
+    fi
+
+    if test "${IP_PEER_IP}" != "${CURRENT_IP_PEER_IP}" -o \
+	"${IP_PEER_MASK}" != "${CURRENT_IP_PEER_MASK}" ; then
+	FLAG_TC=1
+	FLAG_IPTABLES=1
+	FLAG_NETWORK=1
+	FLAG_IKE=1
+	FLAG_SQUID=1
+    fi
+
+    if test "${IP_ADMIN_IP}" != "${CURRENT_IP_ADMIN_IP}" -o \
+	"${IP_ADMIN_MASK}" != "${CURRENT_IP_ADMIN_MASK}" ; then
+	FLAG_TC=1
+	FLAG_IPTABLES=1
+	FLAG_NETWORK=1
+	FLAG_IKE=1
+	FLAG_SSH=1
+	FLAG_HTTPD=1
+	FLAG_WADMIN=1
+    fi
+
+    if test "${IP_FILE_IP}" != "${CURRENT_IP_FILE_IP}" -o \
+	"${IP_FILE_MASK}" != "${CURRENT_IP_FILE_MASK}" ; then
+	FLAG_TC=1
+	FLAG_IPTABLES=1
+	FLAG_NETWORK=1
+	FLAG_IKE=1
+    fi
+
+    if test "${IP_MON_IP}" != "${CURRENT_IP_MON_IP}" -o \
+	"${IP_MON_MASK}" != "${CURRENT_IP_MON_MASK}" ; then
+	FLAG_TC=1
+	FLAG_IPTABLES=1
+	FLAG_NETWORK=1
+	FLAG_IKE=1
+	FLAG_SNMPD=1
+    fi
+
+    if test "${IP_AV_IP}" != "${CURRENT_IP_AV_IP}" -o \
+	"${IP_AV_MASK}" != "${CURRENT_IP_AV_MASK}" ; then
+	FLAG_TC=1
+	FLAG_IPTABLES=1
+	FLAG_NETWORK=1
+	FLAG_IKE=1
+	FLAG_AV=1
+    fi
+
+    if test "${VRRP_INTERNAL_LIST}" != "${CURRENT_VRRP_INTERNAL_LIST}" ; then
+	FLAG_TC=1
+	FLAG_IPTABLES=1
+	FLAG_LOCALNET=1
+	FLAG_KEEPALIVED=1
+	FLAG_NS=1
+	FLAG_AV=1
+	FLAG_SQUID=1
+	FLAG_HTTPD=1
+    fi
+
+    if test "${IP_INTERNAL_IP}" != "${CURRENT_IP_INTERNAL_IP}" -o \
+	"${IP_INTERNAL_MASK}" != "${CURRENT_IP_INTERNAL_MASK}" ; then
+	FLAG_TC=1
+	FLAG_IPTABLES=1
+	FLAG_NETWORK=1
+	FLAG_KEEPALIVED=1
+	FLAG_IKE=1
+	FLAG_NS=1
+	FLAG_WADMIN=1
+	FLAG_SSH=1
+	FLAG_AV=1
+	FLAG_SQUID=1
+	FLAG_HTTPD=1
+    fi
+
+    if test "${IP_EXTERNAL_IP}" != "${CURRENT_IP_EXTERNAL_IP}" -o \
+	"${IP_EXTERNAL_MASK}" != "${CURRENT_IP_EXTERNAL_MASK}" ; then
+	FLAG_TC=1
+	FLAG_IPTABLES=1
+	FLAG_NETWORK=1
+	FLAG_KEEPALIVED=1
+	FLAG_OCSP=1
+	FLAG_IKE=1
+	FLAG_WADMIN=1
+	FLAG_SSH=1
+	FLAG_AV=1
+	FLAG_FRESH_AV=1
+	FLAG_SQUID=1
+	FLAG_HTTPD=1
+    fi
+
+    if test "${IF_AUXILIARY}" != "${CURRENT_IF_AUXILIARY}" ; then
+	FLAG_TC=1
+	FLAG_IPTABLES=1
+	FLAG_NETWORK=1
+	FLAG_KEEPALIVED=1
+	FLAG_WADMIN=1
+	FLAG_SSH=1
+	FLAG_AV=1
+	FLAG_SQUID_RELOAD=1
+    fi
+
+    if test "${IP_AUXILIARY_IP}" != "${CURRENT_IP_AUXILIARY_IP}" -o \
+	"${IP_AUXILIARY_MASK}" != "${CURRENT_IP_AUXILIARY_MASK}" ; then
+	FLAG_TC=1
+	FLAG_IPTABLES=1
+	FLAG_NETWORK=1
+	FLAG_KEEPALIVED=1
+	FLAG_IKE=1
+	FLAG_WADMIN_RELOAD=1
+	FLAG_SSH=1
+	FLAG_AV=1
+	FLAG_SQUID_RELOAD=1
+    fi
+
+    if test "${IP_ROUTE_LIST}" != "${CURRENT_IP_ROUTE_LIST}" ; then
+	FLAG_NETWORK=1
+	FLAG_IKE_RELOAD=1
+	FLAG_FRESH_AV=1
+    fi
+
+    if test "${IP_VIA_LIST}" != "${CURRENT_IP_VIA_LIST}" ; then
+	FLAG_IPTABLES=1
+	FLAG_IKE_RELOAD=1
+    fi
+
+    if test -f /var/lock/apl_health_check_routing ; then
+	FLAG_NETWORK=1
+	FLAG_IPTABLES=1
+	rm -f /var/lock/apl_health_check_routing
+    fi
+
+    if test "${VPN_IPSEC_MODE}" != "${CURRENT_VPN_IPSEC_MODE}" ; then
+	FLAG_NETWORK=1
+	FLAG_TC=1
+	FLAG_IPTABLES=1
+	FLAG_IKE=1
+	FLAG_WADMIN_RELOAD=1
+	FLAG_SQUID_RELOAD=1
+    fi
+
+    if test "${VPN_IPSEC_MODE}" == True ; then
+
+	if test "${VPN_IPSEC_AUTHENTICATE}" != "${CURRENT_VPN_IPSEC_AUTHENTICATE}" ; then
+	    FLAG_IKE=1
+	fi
+
+	if test ${VPN_IPSEC_ACCESS_MODE} != ${CURRENT_VPN_IPSEC_ACCESS_MODE} ; then
+	    FLAG_NETWORK=1
+	    FLAG_TC=1
+	    FLAG_IPTABLES=1
+	    FLAG_IKE=1
+	else
+	    if test ${VPN_IPSEC_ACCESS_MODE} == True ; then
+		if test "${VPN_IPSEC_ACCESS}" != "${CURRENT_VPN_IPSEC_ACCESS}" ; then
+		    FLAG_IKE=1
+		fi
+	    fi
+	fi
+
+	if test ${VPN_IPSEC_ACCESS_MODE} == False ; then
+	    if test "${VPN_IPSEC_SITE_LIST}" != "${CURRENT_VPN_IPSEC_SITE_LIST}" ; then
+		FLAG_NETWORK=1
+		FLAG_TC=1
+		FLAG_IPTABLES=1
+		FLAG_IKE=1
+	    fi
+	fi
+
+	if test "${VPN_IPSEC_NETWORK_LIST}" != "${CURRENT_VPN_IPSEC_NETWORK_LIST}" ; then
+	    FLAG_NETWORK=1
+	    FLAG_TC=1
+	    FLAG_IPTABLES=1
+	    FLAG_IKE=1
+	fi
+
+	if test "${VPN_IPSEC_VIA_LIST}" != "${CURRENT_VPN_IPSEC_VIA_LIST}" ; then
+	    FLAG_IPTABLES=1
+	    FLAG_IKE=1
+	fi
+
+	if test "${VPN_IPSEC_TO_LIST}" != "${CURRENT_VPN_IPSEC_TO_LIST}" ; then
+	    FLAG_IPTABLES=1
+	    FLAG_IKE=1
+	fi
+
+	if test "${VPN_IPSEC_BEHIND_NAT_ROLE_LIST}" != "${CURRENT_VPN_IPSEC_BEHIND_NAT_ROLE_LIST}" ; then
+	    FLAG_IKE=1
+	fi
+
+	if test "${VPN_IPSEC_BEHIND_NAT_IP_LIST}" != "${CURRENT_VPN_IPSEC_BEHIND_NAT_IP_LIST}" ; then
+	    FLAG_IKE=1
+	fi
+
+	if test "${FW_VPN_IPSEC_RULE_LIST}" != "${CURRENT_FW_VPN_IPSEC_RULE_LIST}" ; then
+	    FLAG_IPTABLES=1
+	fi
+    fi
+
+    if test "${ALIAS_IP_EXTERNAL_LIST}" != "${CURRENT_ALIAS_IP_EXTERNAL_LIST}" ; then
+	FLAG_NETWORK=1
+    fi
+
+    if test "${VRRP_WEB_LIST}" != "${CURRENT_VRRP_WEB_LIST}" ; then
+	FLAG_TC=1
+	FLAG_IPTABLES=1
+	FLAG_LOCALNET=1
+	FLAG_KEEPALIVED=1
+	FLAG_NS=1
+	FLAG_SQUID=1
+	FLAG_HTTPD=1
+    fi
+
+    if test "${VRRP_RWEB_LIST}" != "${CURRENT_VRRP_RWEB_LIST}" ; then
+	FLAG_TC=1
+	FLAG_IPTABLES=1
+	FLAG_LOCALNET=1
+	FLAG_KEEPALIVED=1
+	FLAG_NS=1
+    fi
+
+    if test "${VRRP_AV_LIST}" != "${CURRENT_VRRP_AV_LIST}" ; then
+	FLAG_TC=1
+	FLAG_IPTABLES=1
+	FLAG_LOCALNET=1
+	FLAG_KEEPALIVED=1
+	FLAG_AV=1
+    fi
+
+    if test "${VRRP_EXTERNAL_LIST}" != "${CURRENT_VRRP_EXTERNAL_LIST}" ; then
+	FLAG_TC=1
+	FLAG_IPTABLES=1
+	FLAG_LOCALNET=1
+	FLAG_KEEPALIVED=1
+	FLAG_IKE=1
+	FLAG_NS=1
+	FLAG_AV=1
+	FLAG_SQUID=1
+	FLAG_HTTPD=1
+    fi
+
+    if test "${VRRP_AUXILIARY_LIST}" != "${CURRENT_VRRP_AUXILIARY_LIST}" ; then
+	FLAG_TC=1
+	FLAG_IPTABLES=1
+	FLAG_LOCALNET=1
+	FLAG_KEEPALIVED=1
+	FLAG_NS=1
+	FLAG_AV=1
+    fi
+
+    if test "${PROXY_PORT}" != "${CURRENT_PROXY_PORT}" ; then
+	FLAG_TC=1
+	FLAG_IPTABLES=1
+	FLAG_HTTPD=1
+	FLAG_SQUID=1
+    fi
+
+    if test "${THTTP_PORT}" != "${CURRENT_THTTP_PORT}" ; then
+	FLAG_TC=1
+	FLAG_IPTABLES=1
+	FLAG_HTTPD=1
+	FLAG_SQUID=1
+    fi
+
+    if test "${THTTPS_PORT}" != "${CURRENT_THTTPS_PORT}" ; then
+	FLAG_TC=1
+	FLAG_IPTABLES=1
+	FLAG_HTTPD=1
+	FLAG_SQUID=1
+    fi
+
+    if test "${AV_PORT}" != "${CURRENT_AV_PORT}" ; then
+	FLAG_TC=1
+	FLAG_IPTABLES=1
+	FLAG_AV=1
+    fi
+
+    if test "${PEER_HTTP_PORT}" != "${CURRENT_PEER_HTTP_PORT}" ; then
+	FLAG_TC=1
+	FLAG_IPTABLES=1
+	FLAG_SQUID=1
+    fi
+
+    if test "${PEER_HTCP_PORT}" != "${CURRENT_PEER_HTCP_PORT}" ; then
+	FLAG_TC=1
+	FLAG_IPTABLES=1
+	FLAG_SQUID=1
+    fi
+
+    if test "${DHCP_PEER_PORT}" != "${CURRENT_DHCP_PEER_PORT}" ; then
+	FLAG_TC=1
+	FLAG_IPTABLES=1
+	FLAG_DHCP=1
+    fi
+
+    if test "${WADMIN_PORT}" != "${CURRENT_WADMIN_PORT}" ; then
+	FLAG_TC=1
+	FLAG_IPTABLES=1
+	FLAG_WADMIN=1
+    fi
+
+    if test "${WAUDIT_PORT}" != "${CURRENT_WAUDIT_PORT}" ; then
+	FLAG_TC=1
+	FLAG_IPTABLES=1
+	FLAG_HTTPD=1
+    fi
+
+    if test "${ISAKMP_PORT}" != "${CURRENT_ISAKMP_PORT}" ; then
+	FLAG_TC=1
+	FLAG_IPTABLES=1
+	FLAG_IKE=1
+    fi
+
+    if test "${NATT_PORT}" != "${CURRENT_NATT_PORT}" ; then
+	FLAG_TC=1
+	FLAG_IPTABLES=1
+	FLAG_IKE=1
+    fi
+
+    if test "${NAME_SERVER_LIST}" != "${CURRENT_NAME_SERVER_LIST}" ; then
+	FLAG_IPTABLES=1
+	FLAG_NETWORK_IO=1
+	FLAG_NS=1
+	FLAG_DHCP=1
+	FLAG_SQUID=1
+    fi
+
+    if test "${NTP_SERVER_LIST}" != "${CURRENT_NTP_SERVER_LIST}" ; then
+	FLAG_NS=1
+	FLAG_NTP=1
+	FLAG_DHCP=1
+	FLAG_NETWORK_STATISTICS=1
+	FLAG_OCSP=1
+	FLAG_SQUID=1
+    fi
+
+    if test "${NTP_MODE}" != "${CURRENT_NTP_MODE}" ; then
+	FLAG_TC=1
+	FLAG_IPTABLES=1
+	FLAG_NETWORK_STATISTICS=1
+	FLAG_OCSP=1
+    fi
+
+    if test -f ${TMP_DIR}/${CLOCK_2SAVE} ; then
+	FLAG_NETWORK_STATISTICS=1
+	FLAG_NS=1
+    fi
+
+    if test "${PEER_SHARE_LIST}" != "${CURRENT_PEER_SHARE_LIST}" ; then
+	FLAG_TC=1
+	FLAG_IPTABLES=1
+	FLAG_SQUID=1
+    fi
+
+    if test "${PEER_HA_LIST}" != "${CURRENT_PEER_HA_LIST}" ; then
+	FLAG_TC=1
+	FLAG_IPTABLES=1
+	FLAG_SQUID=1
+    fi
+
+    if test "${PEER_NEXT_LIST}" != "${CURRENT_PEER_NEXT_LIST}" ; then
+	FLAG_TC=1
+	FLAG_IPTABLES=1
+	FLAG_SQUID=1
+    fi
+
+    if test "${PEER_PREVIOUS_LIST}" != "${CURRENT_PEER_PREVIOUS_LIST}" ; then
+	FLAG_TC=1
+	FLAG_IPTABLES=1
+	FLAG_SQUID=1
+    fi
+
+    if test "${ACCESS_WEB_LIST}" != "${CURRENT_ACCESS_WEB_LIST}" ; then
+	FLAG_TC=1
+	FLAG_IPTABLES=1
+	FLAG_NS=1
+	FLAG_SQUID=1
+	FLAG_HTTPD=1
+    fi
+
+    if test "${TRANSPARENT_WEB_LIST}" != "${CURRENT_TRANSPARENT_WEB_LIST}" ; then
+	FLAG_TC=1
+	FLAG_IPTABLES=1
+	FLAG_NS=1
+	FLAG_SQUID_RELOAD=1
+    fi
+
+    if test "${ACCESS_FILE_LIST}" != "${CURRENT_ACCESS_FILE_LIST}" ; then
+	FLAG_TC=1
+	FLAG_IPTABLES=1
+    fi
+
+    if test "${ACCESS_ADMIN_LIST}" != "${CURRENT_ACCESS_ADMIN_LIST}" ; then
+	FLAG_IPTABLES=1
+	FLAG_WADMIN_RELOAD=1
+	test ${ADMIN_WAUDIT} == False || FLAG_HTTPD_RELOAD=1
+    fi
+
+    if test "${ACCESS_MANAGER_LIST}" != "${CURRENT_ACCESS_MANAGER_LIST}" ; then
+	FLAG_IPTABLES=1
+    fi
+
+    if test "${MANAGER_SYNC_ROLE}" != "${CURRENT_MANAGER_SYNC_ROLE}" ; then
+	FLAG_IPTABLES=1
+	FLAG_SMANAGER=1
+	FLAG_SSH=1
+    fi
+
+    if test "${MANAGER_SYNC_PEER_IP}" != "${CURRENT_MANAGER_SYNC_PEER_IP}" ; then
+	FLAG_IPTABLES=1
+	FLAG_SMANAGER=1	
+	FLAG_SSH=1
+    fi
+
+    if test "${ACCESS_MON_LIST}" != "${CURRENT_ACCESS_MON_LIST}" ; then
+	FLAG_TC=1
+	FLAG_IPTABLES=1
+	FLAG_SQUID=1
+    fi
+
+    if test "${ACCESS_AV_LIST}" != "${CURRENT_ACCESS_AV_LIST}" ; then
+	FLAG_TC=1
+	FLAG_IPTABLES=1
+    fi
+
+    if test "${IP_NAME_IP_LIST}" != "${CURRENT_IP_NAME_IP_LIST}" ; then
+	FLAG_TC=1
+	FLAG_IPTABLES=1
+	FLAG_SYSLOG=1
+	FLAG_SQUID_RELOAD=1
+	FLAG_HTTPD_RELOAD=1
+    fi
+
+    if test "${URLLIST_LIST}" != "${CURRENT_URLLIST_LIST}" ; then
+	:
+    fi
+
+    if test "${GUARD_FILTER_IP_LIST}" != "${CURRENT_GUARD_FILTER_IP_LIST}" ; then
+	FLAG_GUARD_RELOAD=1
+    fi
+
+    if test "${GUARD_FILTER_TIME_LIST}" != "${CURRENT_GUARD_FILTER_TIME_LIST}" ; then
+	FLAG_GUARD_RELOAD=1
+    fi
+
+    if test "${GUARD_FILTER_LDAP_LIST}" != "${CURRENT_GUARD_FILTER_LDAP_LIST}" ; then
+	FLAG_GUARD_RELOAD=1
+	FLAG_LDAP_PROXY=1
+    fi
+
+    if test "${PROXY_LDAP_MODE}" != "${CURRENT_PROXY_LDAP_MODE}" ; then
+	FLAG_LDAP_PROXY=1
+    fi
+    
+    if test "${GUARD_POLICY_LIST}" != "${CURRENT_GUARD_POLICY_LIST}" ; then
+	FLAG_GUARD_RELOAD=1
+	FLAG_LDAP_PROXY=1
+    fi
+
+    if test "${GUARD_RULE_LIST}" != "${CURRENT_GUARD_RULE_LIST}" ; then
+	FLAG_GUARD_RELOAD=1
+	FLAG_LDAP_PROXY=1
+    fi
+    
+    if test "${GUARD_IP}" != "${CURRENT_GUARD_IP}" ; then
+	FLAG_GUARD_RELOAD=1
+    fi
+
+    if test "${SNMP_USER}" != "${CURRENT_SNMP_USER}" ; then
+	FLAG_SNMPD=1
+    fi
+
+    if test "${SNMP_COMMUNITY}" != "${CURRENT_SNMP_COMMUNITY}" ; then
+	FLAG_SNMPD=1
+    fi
+
+    if test "${SNMP_PRIVACY}" != "${CURRENT_SNMP_PRIVACY}" ; then
+	FLAG_SNMPD=1
+    fi
+
+    if test "${SNMP_TLS}" != "${CURRENT_SNMP_TLS}" ; then
+	FLAG_TC=1
+	FLAG_IPTABLES=1
+	FLAG_SNMPD=1
+    fi
+
+    if test "${SNMP_UDP}" != "${CURRENT_SNMP_UDP}" ; then
+	FLAG_TC=1
+	FLAG_IPTABLES=1
+	FLAG_SNMPD=1
+    fi
+
+    if test "${SNMP_TCP}" != "${CURRENT_SNMP_TCP}" ; then
+	FLAG_TC=1
+	FLAG_IPTABLES=1
+	FLAG_SNMPD=1
+    fi
+
+    if test "${SNMP_VERSION}" != "${CURRENT_SNMP_VERSION}" ; then
+	FLAG_SNMPD=1
+    fi
+
+    if test "${SNMP_TRAP_SERVER_LIST}" != "${CURRENT_SNMP_TRAP_SERVER_LIST}" ; then
+	FLAG_TC=1
+	FLAG_IPTABLES=1
+	FLAG_SNMPD=1
+    fi
+
+    if test "${QOS_BW_INTERNAL_INGRESS}" != "${CURRENT_QOS_BW_INTERNAL_INGRESS}" ; then
+	FLAG_TC=1
+    fi
+
+    if test "${QOS_BW_INTERNAL_EGRESS}" != "${CURRENT_QOS_BW_INTERNAL_EGRESS}" ; then
+	FLAG_TC=1
+    fi
+
+    if test "${QOS_BW_EXTERNAL_INGRESS}" != "${CURRENT_QOS_BW_EXTERNAL_INGRESS}" ; then
+	FLAG_TC=1
+	FLAG_LCD4LINUX=1
+    fi
+
+    if test "${QOS_BW_AUXILIARY_EGRESS}" != "${CURRENT_QOS_BW_AUXILIARY_EGRESS}" ; then
+	FLAG_TC=1
+    fi
+
+    if test "${QOS_BW_AUXILIARY_INGRESS}" != "${CURRENT_QOS_BW_AUXILIARY_INGRESS}" ; then
+	FLAG_TC=1
+    fi
+
+    if test "${QOS_BW_EXTERNAL_EGRESS}" != "${CURRENT_QOS_BW_EXTERNAL_EGRESS}" ; then
+	FLAG_TC=1
+	FLAG_LCD4LINUX=1
+    fi
+
+    if test "${QOS_SHAPE_INTERNAL_INGRESS_LIST}" != "${CURRENT_QOS_SHAPE_INTERNAL_INGRESS_LIST}" ; then
+	FLAG_TC=1
+	FLAG_IPTABLES=1
+    fi
+
+    if test "${QOS_SHAPE_INTERNAL_EGRESS_LIST}" != "${CURRENT_QOS_SHAPE_INTERNAL_EGRESS_LIST}" ; then
+	FLAG_TC=1
+	FLAG_IPTABLES=1
+    fi
+
+    if test "${QOS_SHAPE_EXTERNAL_INGRESS_LIST}" != "${CURRENT_QOS_SHAPE_EXTERNAL_INGRESS_LIST}" ; then
+	FLAG_TC=1
+	FLAG_IPTABLES=1
+    fi
+
+    if test "${QOS_SHAPE_EXTERNAL_EGRESS_LIST}" != "${CURRENT_QOS_SHAPE_EXTERNAL_EGRESS_LIST}" ; then
+	FLAG_TC=1
+	FLAG_IPTABLES=1
+    fi
+
+    if test "${QOS_SHAPE_AUXILIARY_INGRESS_LIST}" != "${CURRENT_QOS_SHAPE_AUXILIARY_INGRESS_LIST}" ; then
+	FLAG_TC=1
+	FLAG_IPTABLES=1
+    fi
+
+    if test "${QOS_SHAPE_AUXILIARY_EGRESS_LIST}" != "${CURRENT_QOS_SHAPE_AUXILIARY_EGRESS_LIST}" ; then
+	FLAG_TC=1
+	FLAG_IPTABLES=1
+    fi
+
+    if test "${QOS_SHAPE_ROUTER_LIST}" != "${CURRENT_QOS_SHAPE_ROUTER_LIST}" ; then
+	FLAG_TC=1
+	FLAG_IPTABLES=1
+    fi
+
+    if test "${QOS_BORROW_INTERNAL_INGRESS}" != "${CURRENT_QOS_BORROW_INTERNAL_INGRESS}" ; then
+	FLAG_TC=1
+    fi
+
+    if test "${QOS_BORROW_INTERNAL_EGRESS}" != "${CURRENT_QOS_BORROW_INTERNAL_EGRESS}" ; then
+	FLAG_TC=1
+    fi
+
+    if test "${QOS_BORROW_EXTERNAL_INGRESS}" != "${CURRENT_QOS_BORROW_EXTERNAL_INGRESS}" ; then
+	FLAG_TC=1
+    fi
+
+    if test "${QOS_BORROW_EXTERNAL_EGRESS}" != "${CURRENT_QOS_BORROW_EXTERNAL_EGRESS}" ; then
+	FLAG_TC=1
+    fi
+
+    if test "${QOS_BORROW_AUXILIARY_INGRESS}" != "${CURRENT_QOS_BORROW_AUXILIARY_INGRESS}" ; then
+	FLAG_TC=1
+    fi
+
+    if test "${QOS_BORROW_AUXILIARY_EGRESS}" != "${CURRENT_QOS_BORROW_AUXILIARY_EGRESS}" ; then
+	FLAG_TC=1
+    fi
+
+    if test "${ADMINISTRATOR_EMAIL}" != "${CURRENT_ADMINISTRATOR_EMAIL}" ; then
+	FLAG_KEEPALIVED=1
+	FLAG_SQUID=1
+	FLAG_GUARD_RELOAD=1
+	FLAG_HTTPD=1
+	FLAG_WADMIN_RELOAD=1
+	FLAG_SNMPD=1
+    fi
+
+    if test "${EMAIL_ACCOUNT_SERVER_FQDN}" != "${CURRENT_EMAIL_ACCOUNT_SERVER_FQDN}" ; then
+	FLAG_TC=1
+	FLAG_IPTABLES=1
+    fi
+
+    if test "${EMAIL_ACCOUNT_SERVER_PORT}" != "${CURRENT_EMAIL_ACCOUNT_SERVER_PORT}" ; then
+	FLAG_TC=1
+	FLAG_IPTABLES=1
+    fi
+
+    if test "${SHOSTNAME}" != "${CURRENT_SHOSTNAME}" ; then
+	FLAG_DHCP=1
+	FLAG_KEEPALIVED=1
+	FLAG_SQUID=1
+	FLAG_HTTPD_RELOAD=1
+	FLAG_WADMIN_RELOAD=1
+	FLAG_SNMPD=1
+	FLAG_ICAP=1
+	FLAG_KERBEROS=1
+    fi
+
+    if test "${ANONYMOUS_FTP_EMAIL}" != "${CURRENT_ANONYMOUS_FTP_EMAIL}" ; then
+	FLAG_SQUID_RELOAD=1
+    fi
+
+    if test "${FW_DOS_TCP_FLOOD}" != "${CURRENT_FW_DOS_TCP_FLOOD}" ; then
+	FLAG_IPTABLES=1
+    fi
+
+    if test "${FW_DOS_UDP_FLOOD}" != "${CURRENT_FW_DOS_UDP_FLOOD}" ; then
+	FLAG_IPTABLES=1
+    fi
+
+    if test "${FW_DOS_WEB_FLOOD}" != "${CURRENT_FW_DOS_WEB_FLOOD}" ; then
+	FLAG_IPTABLES=1
+    fi
+
+    if test "${FW_DOS_RWEB_FLOOD}" != "${CURRENT_FW_DOS_RWEB_FLOOD}" ; then
+	FLAG_IPTABLES=1
+    fi
+
+    if test "${FW_DOS_TCP_LIMIT}" != "${CURRENT_FW_DOS_TCP_LIMIT}" ; then
+	FLAG_IPTABLES=1
+    fi
+
+    if test "${FW_DOS_WEB_LIMIT}" != "${CURRENT_FW_DOS_WEB_LIMIT}" ; then
+	FLAG_IPTABLES=1
+    fi
+
+    if test "${FW_DOS_RWEB_LIMIT}" != "${CURRENT_FW_DOS_RWEB_LIMIT}" ; then
+	FLAG_IPTABLES=1
+    fi
+
+    if test "${FW_DOS_DNS_LIMIT}" != "${CURRENT_FW_DOS_DNS_LIMIT}" ; then
+	FLAG_IPTABLES=1
+    fi
+
+    if test "${FW_DOS_OCSP_LIMIT}" != "${CURRENT_FW_DOS_OCSP_LIMIT}" ; then
+	FLAG_IPTABLES=1
+    fi
+
+    if test "${FW_EXTERNAL_RULE_LIST}" != "${CURRENT_FW_EXTERNAL_RULE_LIST}" ; then
+	FLAG_IPTABLES=1
+    fi
+
+    if test "${FW_WEB_RULE_LIST}" != "${CURRENT_FW_WEB_RULE_LIST}" ; then
+	FLAG_IPTABLES=1
+    fi
+
+    if test "${FW_RWEB_RULE_LIST}" != "${CURRENT_FW_RWEB_RULE_LIST}" ; then
+	FLAG_IPTABLES=1
+    fi
+
+    if test "${FW_ADMIN_RULE_LIST}" != "${CURRENT_FW_ADMIN_RULE_LIST}" ; then
+	FLAG_IPTABLES=1
+    fi
+
+    if test "${FW_MON_RULE_LIST}" != "${CURRENT_FW_MON_RULE_LIST}" ; then
+	FLAG_IPTABLES=1
+    fi
+
+    if test "${FW_FILE_RULE_LIST}" != "${CURRENT_FW_FILE_RULE_LIST}" ; then
+	FLAG_IPTABLES=1
+    fi
+
+    if test "${FW_PEER_RULE_LIST}" != "${CURRENT_FW_PEER_RULE_LIST}" ; then
+	FLAG_IPTABLES=1
+    fi
+
+    if test "${FW_AV_RULE_LIST}" != "${CURRENT_FW_AV_RULE_LIST}" ; then
+	FLAG_IPTABLES=1
+    fi
+
+    if test "${FW_AUXILIARY_RULE_LIST}" != "${CURRENT_FW_AUXILIARY_RULE_LIST}" ; then                                         
+	FLAG_IPTABLES=1
+    fi
+
+    if test "${DHCP_MODE}" != "${CURRENT_DHCP_MODE}" ; then
+	FLAG_DHCP=1
+	FLAG_IPTABLES=1
+    fi
+
+    if test "${DNS_MODE}" != "${CURRENT_DNS_MODE}" ; then
+	FLAG_TC=1
+	FLAG_IPTABLES=1
+	FLAG_DHCP=1
+	FLAG_NS=1
+    fi
+
+    if test "${DHCP_FIXED_LIST}" != "${CURRENT_DHCP_FIXED_LIST}" ; then
+	FLAG_DHCP=1
+    fi
+
+    if test "${DHCP_RANGE_LIST}" != "${CURRENT_DHCP_RANGE_LIST}" ; then
+	FLAG_DHCP=1
+    fi
+
+    if test "${DHCP_PEER_LIST}" != "${CURRENT_DHCP_PEER_LIST}" ; then
+	FLAG_TC=1
+	FLAG_IPTABLES=1
+	FLAG_DHCP=1
+    fi
+
+    if test "${WEB_MODE}" != "${CURRENT_WEB_MODE}" ; then
+	FLAG_TC=1
+	FLAG_IPTABLES=1
+	FLAG_LOCALNET=1
+	FLAG_KEEPALIVED=1
+	FLAG_DHCP=1
+	FLAG_NS=1
+	FLAG_SQUID=1
+	FLAG_HTTPD=1
+    fi
+
+    if test "${SSLMEDIATE_MODE}" != "${CURRENT_SSLMEDIATE_MODE}" ; then
+	FLAG_TC=1
+	FLAG_IPTABLES=1
+	FLAG_SQUID=1
+	FLAG_GUARD_RELOAD=1
+	test "${SSLMEDIATE_MODE}" == False || FLAG_SSLMEDIATE_EXCEPTIONS=1
+    fi
+
+    if test "${SSLMEDIATE_TRANSPARENT}" != "${CURRENT_SSLMEDIATE_TRANSPARENT}" ; then
+	FLAG_TC=1
+	FLAG_IPTABLES=1
+	FLAG_SQUID=1
+    fi
+
+    if test "${SSLMEDIATE_POLICY}" != "${CURRENT_SSLMEDIATE_POLICY}" ; then
+	FLAG_SQUID=1
+    fi
+
+    if test "${SSLMEDIATE_EXCEPTION_URLLIST_LIST}" != "${CURRENT_SSLMEDIATE_EXCEPTION_URLLIST_LIST}" ; then
+	FLAG_SQUID=1
+	FLAG_SSLMEDIATE_EXCEPTIONS=1
+    fi
+
+    if test "${SSLMEDIATE_EXCEPTION_DOMAINNAME_LIST}" != "${CURRENT_SSLMEDIATE_EXCEPTION_DOMAINNAME_LIST}" ; then
+	FLAG_SQUID=1
+	FLAG_SSLMEDIATE_EXCEPTIONS=1
+    fi
+
+    if test "${AV_WHITELIST_DOMAINNAME_LIST}" != "${CURRENT_AV_WHITELIST_DOMAINNAME_LIST}" ; then
+	test ${AV_MODE} == False || FLAG_SQUID_RELOAD=1
+    fi
+
+    if test "${SSLMEDIATE_PREMATURE}" != "${CURRENT_SSLMEDIATE_PREMATURE}" ; then
+	FLAG_SQUID_RELOAD=1
+    fi
+
+    if test "${SSLMEDIATE_EXPIRED}" != "${CURRENT_SSLMEDIATE_EXPIRED}" ; then
+	FLAG_SQUID_RELOAD=1
+    fi
+
+    if test "${SSLMEDIATE_SELFSIGNED}" != "${CURRENT_SSLMEDIATE_SELFSIGNED}" ; then
+	FLAG_SQUID_RELOAD=1
+    fi
+
+    if test "${RWEB_MODE}" != "${CURRENT_RWEB_MODE}" ; then
+	FLAG_TC=1
+	FLAG_IPTABLES=1
+	FLAG_LOCALNET=1
+	FLAG_NETWORK=1
+	FLAG_NS=1
+	FLAG_KEEPALIVED=1
+	FLAG_SQUID=1
+	FLAG_HTTPD=1
+	test -z "${RWEB_SITE_NAME_LIST}" || FLAG_SSLMEDIATE_EXCEPTIONS=1
+    fi
+
+    if test "${ADMIN_TLS}" != "${CURRENT_ADMIN_TLS}" ; then
+	test ${ADMIN_WADMIN} == False || FLAG_WADMIN=1
+	test ${ADMIN_WAUDIT} == False || FLAG_HTTPD=1
+	test ${ADMIN_SNMP} == False -o ${SNMP_TLS} == False || FLAG_SNMPD=1
+    fi
+
+    if test "${TLS_CA_LIST}" != "${CURRENT_TLS_CA_LIST}" ; then
+	FLAG_SQUID=1
+	test ${ADMIN_SNMP} == False -o ${SNMP_TLS} == False || FLAG_SNMPD=1
+	test ${VPN_IPSEC_MODE} == False || FLAG_IKE=1
+    fi
+
+    if test ${PROXY2_MODE} != ${CURRENT_PROXY2_MODE} ; then
+	FLAG_SQUID=1
+	FLAG_HTTPD=1
+	test "${RWEB_SITE_NAME_LIST}" == "${CURRENT_RWEB_SITE_NAME_LIST}" || FLAG_SSLMEDIATE_EXCEPTIONS=1
+    fi
+
+    if test "${AUTHENTICATE_MODE}" != "${CURRENT_AUTHENTICATE_MODE}" ; then
+	FLAG_TC=1
+	FLAG_IPTABLES=1
+	FLAG_SQUID=1
+	FLAG_HTTPD=1
+	FLAG_GUARD_RELOAD=1
+	FLAG_LDAP_PROXY=1
+    fi
+
+    if test "${AUTHENTICATE_LDAP}" != "${CURRENT_AUTHENTICATE_LDAP}" ; then
+	FLAG_TC=1
+	FLAG_IPTABLES=1
+	FLAG_SQUID=1
+	FLAG_HTTPD=1
+    fi
+
+    if test "${AUTHENTICATE_KERBEROS}" != "${CURRENT_AUTHENTICATE_KERBEROS}" ; then
+	FLAG_TC=1
+	FLAG_IPTABLES=1
+	FLAG_SQUID=1
+	FLAG_HTTPD=1
+    fi
+
+    if test "${KERBEROS_RWEB_LIST}" != "${CURRENT_KERBEROS_RWEB_LIST}" ; then
+	FLAG_SQUID=1
+	FLAG_HTTPD=1
+    fi
+
+    if test "${AUTHENTICATE_WEB}" != "${CURRENT_AUTHENTICATE_WEB}" ; then
+	FLAG_SQUID=1
+	FLAG_HTTPD=1
+    fi
+
+    if test "${AUTHENTICATE_RWEB}" != "${CURRENT_AUTHENTICATE_RWEB}" ; then
+	FLAG_SQUID=1
+	FLAG_HTTPD=1
+    fi
+
+    if test "${LDAP_BIND_MODE}" != "${CURRENT_LDAP_BIND_MODE}" ; then
+	FLAG_TC=1
+	FLAG_IPTABLES=1
+	FLAG_SQUID=1
+	FLAG_HTTPD=1
+	FLAG_GUARD_RELOAD=1
+	FLAG_LDAP_PROXY=1
+    fi
+
+    if test "${LDAP_BASE_DN}" != "${CURRENT_LDAP_BASE_DN}" ; then
+	FLAG_TC=1
+	FLAG_IPTABLES=1
+	FLAG_SQUID=1
+	FLAG_HTTPD=1
+	FLAG_GUARD_RELOAD=1
+	FLAG_LDAP_PROXY=1
+    fi
+
+    if test "${LDAP_BIND_PASSWORD}" != "${CURRENT_LDAP_BIND_PASSWORD}" ; then
+	FLAG_HTTPD=1
+	FLAG_GUARD_RELOAD=1
+	FLAG_SQUID_LDAP_PASSWD=1
+    fi
+
+    if test "${LDAP_LOGIN}" != "${CURRENT_LDAP_LOGIN}" ; then
+	FLAG_TC=1
+	FLAG_IPTABLES=1
+	FLAG_SQUID=1
+	FLAG_HTTPD=1
+	FLAG_GUARD_RELOAD=1
+	FLAG_LDAP_PROXY=1
+    fi
+
+    if test "${LDAP_PASSWORD}" != "${CURRENT_LDAP_PASSWORD}" ; then
+	FLAG_TC=1
+	FLAG_IPTABLES=1
+	FLAG_SQUID=1
+	FLAG_HTTPD=1
+    fi
+
+    if test "${LDAP_FILTER}" != "${CURRENT_LDAP_FILTER}" ; then
+	FLAG_TC=1
+	FLAG_IPTABLES=1
+	FLAG_SQUID=1
+	FLAG_HTTPD=1
+	FLAG_GUARD_RELOAD=1
+	FLAG_LDAP_PROXY=1
+    fi
+
+    if test "${LDAP_GROUP_DN}" != "${CURRENT_LDAP_GROUP_DN}" ; then
+	FLAG_TC=1
+	FLAG_IPTABLES=1
+	FLAG_SQUID=1
+	FLAG_HTTPD=1
+	FLAG_GUARD_RELOAD=1
+    fi
+
+    if test "${AUTHENTICATE_LDAP_TTL}" != "${CURRENT_AUTHENTICATE_LDAP_TTL}" ; then
+	FLAG_SQUID=1
+	FLAG_HTTPD=1
+	FLAG_GUARD_RELOAD=1
+    fi
+
+    if test "${LDAP_BIND_DN}" != "${CURRENT_LDAP_BIND_DN}" ; then
+	FLAG_TC=1
+	FLAG_IPTABLES=1
+	FLAG_SQUID=1
+	FLAG_HTTPD=1
+	FLAG_GUARD_RELOAD=1
+	FLAG_LDAP_PROXY=1
+    fi
+
+    if test "${LDAP_SERVER_LIST}" != "${CURRENT_LDAP_SERVER_LIST}" ; then
+	FLAG_TC=1
+	FLAG_IPTABLES=1
+	FLAG_SQUID=1
+	FLAG_HTTPD=1
+	FLAG_LDAP_PROXY=1
+    fi
+
+    if test "${LDAPS_CA}" != "${CURRENT_LDAPS_CA}" ; then
+	FLAG_HTTPD=1
+	FLAG_LDAP_PROXY=1
+    fi
+
+    if test "${KERBEROS_SERVER_LIST}" != "${CURRENT_KERBEROS_SERVER_LIST}" ; then
+	FLAG_TC=1
+	FLAG_IPTABLES=1
+	FLAG_KERBEROS=1
+    fi
+
+    if test "${KERBEROS_ENCRYPT_TYPE}" != "${CURRENT_KERBEROS_ENCRYPT_TYPE}" ; then
+	FLAG_KERBEROS=1
+    fi
+
+    if test "${KERBEROS_SERVICE_NAME}" != "${CURRENT_KERBEROS_SERVICE_NAME}" ; then
+	FLAG_KERBEROS=1
+	FLAG_SQUID=1
+	FLAG_HTTPD=1
+    fi
+
+    if test "${KERBEROS_HA_SHARED_PASSWORD}" != "${CURRENT_KERBEROS_HA_SHARED_PASSWORD}" ; then
+	FLAG_KERBEROS=1
+    fi
+
+    if test "${RWEB_MODE}" == True ; then
+	if test "${RWEB_SITE_LIST}" != "${CURRENT_RWEB_SITE_LIST}" ; then
+	    FLAG_TC=1
+	    FLAG_IPTABLES=1
+	    FLAG_LOCALNET=1
+	    FLAG_NETWORK=1
+	    FLAG_KEEPALIVED=1
+
+	    if test ${PROXY2_MODE} == False ; then
+		FLAG_SQUID=1
+		FLAG_SSLMEDIATE_EXCEPTIONS=1
+	    else
+		FLAG_HTTPD=1
+	    fi
+	fi
+    fi
+
+    if test "${RWEB_SITE_HOSTS_LIST}" != "${CURRENT_RWEB_SITE_HOSTS_LIST}" ; then
+        FLAG_TC=1
+        FLAG_IPTABLES=1
+	FLAG_NS=1
+	if test "${RWEB_MODE}" == True ; then
+	    if test ${PROXY2_MODE} == False ; then
+		FLAG_SQUID=1
+	    else
+		FLAG_HTTPD=1
+	    fi
+	fi
+    fi
+
+    if test "${RWEB_SITE_HTTPX_LIST}" != "${CURRENT_RWEB_SITE_HTTPX_LIST}" ; then
+	if test "${RWEB_MODE}" == True ; then
+	    if test ${PROXY2_MODE} == False ; then
+		FLAG_SQUID=1
+	    else
+		FLAG_HTTPD=1
+	    fi
+	fi
+    fi
+
+    if test "${RWEB_SITE_BALANCER_LIST}" != "${CURRENT_RWEB_SITE_BALANCER_LIST}" ; then
+	if test "${RWEB_MODE}" == True ; then
+	    if test ${PROXY2_MODE} == False ; then
+		FLAG_SQUID=1
+	    else
+		FLAG_HTTPD=1
+	    fi
+	fi
+    fi
+
+    if test "${RWEB_SITE_VIA_LIST}" != "${CURRENT_RWEB_SITE_VIA_LIST}" ; then
+	FLAG_IPTABLES=1
+    fi
+
+    if test "${RWEB_SITE_DENYURL_LIST}" != "${CURRENT_RWEB_SITE_DENYURL_LIST}" ; then
+	if test "${RWEB_MODE}" == True ; then
+	    FLAG_HTTPD=1
+	fi
+    fi
+
+    if test "${RWEB_SITE_STANDBY_LIST}" != "${CURRENT_RWEB_SITE_STANDBY_LIST}" ; then
+	if test ${PROXY2_MODE} == False ; then
+	    FLAG_SQUID_RELOAD=1
+	else
+	    FLAG_HTTPD_RELOAD=1
+	fi
+    fi
+
+    if test "${OCSP_MODE}" != "${CURRENT_OCSP_MODE}" ; then
+	FLAG_TC=1
+	FLAG_IPTABLES=1
+	FLAG_IKE=1
+	FLAG_OCSP=1
+    fi
+
+    if test "${OCSP_PORT}" != "${CURRENT_OCSP_PORT}" ; then
+	FLAG_TC=1
+	FLAG_IPTABLES=1
+	FLAG_IKE=1
+	FLAG_OCSP=1
+    fi
+
+    if test "${OCSP_DAYS}" != "${CURRENT_OCSP_DAYS}" ; then
+	FLAG_OCSP=1
+    fi
+
+    if test "${OCSP_HOST}" != "${CURRENT_OCSP_HOST}" ; then
+	FLAG_OCSP=1
+	FLAG_IKE=1
+    fi
+
+    if test "${OCSP_TLS}" != "${CURRENT_OCSP_TLS}" ; then
+	FLAG_OCSP=1
+    fi
+
+    if test "${PROXY2_MODE}" != "${CURRENT_PROXY2_MODE}" -o "${CACHE_MODE}" != "${CURRENT_CACHE_MODE}" ; then
+	FLAG_CACHE_CLEAN=1
+    fi
+
+    if test "${DEFAULT_GATEWAY_WEIGHTS}" != "${CURRENT_DEFAULT_GATEWAY_WEIGHTS}" ; then
+	FLAG_IPTABLES=1
+	FLAG_IPTABLES=1
+    fi
+
+    if test "${EXTERNAL_GATEWAY_WEIGHTS}" != "${CURRENT_EXTERNAL_GATEWAY_WEIGHTS}" ; then
+	FLAG_IPTABLES=1
+	FLAG_IPTABLES=1
+    fi
+
+    if test "${CURRENT_AV_EXTENDED_MODE}" != "${AV_EXTENDED_MODE}" ; then
+	FLAG_AV_RELOAD=1
+    fi
+
+    if test ${CURRENT_EMBEDDED_VPNSUBSCR_IS_ACTIVE} != ${EMBEDDED_VPNSUBSCR_IS_ACTIVE} ; then
+	FLAG_IPTABLES=1
+	FLAG_HTTPD=1
+	test ${PROXY2_MODE} == True || FLAG_SQUID=1
+    else
+	if test ${EMBEDDED_VPNSUBSCR_IS_ACTIVE} = True ; then
+	    if test "${CURRENT_EMBEDDED_VPNSUBSCR_RWEB_SITE_NAME}" != "${EMBEDDED_VPNSUBSCR_RWEB_SITE_NAME}" ; then
+		FLAG_HTTPD=1
+		test ${PROXY2_MODE} == True || FLAG_SQUID=1
+	    fi
+
+	    if test "${CURRENT_EMBEDDED_VPNSUBSCR_RWEB_TLS_ID}" != "${EMBEDDED_VPNSUBSCR_RWEB_TLS_ID}" ; then	   
+		if test ${PROXY2_MODE} == False ; then
+		    FLAG_SQUID=1
+		else
+		    FLAG_HTTPD=1
+		fi
+	    fi
+	fi	
+    fi
+
+    local av_extended_condition
+
+    case ${APL_ROLE} in
+	gateway)
+	    if test ${AV_MODE} == True -a ${AV_EXTENDED_METHOD} != push ; then
+		av_extended_condition=True
+	    else
+		av_extended_condition=False
+	    fi
+	    ;;
+	manager)
+	    av_extended_condition=True
+	    ;;
+	*)
+	    ;;
+    esac
+
+    if test "${AV_EXTENDED_MODE}" == True -a ${av_extended_condition} == True ; then
+	if test ! -f ${AV_VAR_DIR}/${AV_EXTENDED_LAST_UPDATE_FILENAME} ; then
+	    FLAG_FRESH_AV_EXTENDED=1
+	else
+	    local last_update_date=$(cat ${AV_VAR_DIR}/${AV_EXTENDED_LAST_UPDATE_FILENAME} 2> /dev/null)
+	    check-digit ${last_update_date} || last_update_date=0
+	    local current_date=$(date +"%s" 2> /dev/null)
+	    local interval=$((current_date - last_update_date))
+	    test ${interval} -le 3600 || FLAG_FRESH_AV_EXTENDED=1
+	fi
+
+	if test ${FLAG_FRESH_AV_EXTENDED} -eq 0 ; then
+	    local av_extended_credentials=$(get-file-server-credentials new ${AV_EXTENDED_PROTOCOL} ${AV_EXTENDED_SERVER})
+	    local current_av_extended_credentials=$(get-file-server-credentials cur ${CURRENT_AV_EXTENDED_PROTOCOL} ${CURRENT_AV_EXTENDED_SERVER})
+	    test "${av_extended_credentials}" == "${current_av_extended_credentials}" || FLAG_FRESH_AV_EXTENDED=1
+	fi
+    fi
+
+    set-flag-servie-start-stop-path
+    set-flag-servie-start-stop-multi-gateways
+    set-flag-service-start-stop-sslmediate-urllist
+    set-flag-service-start-stop-guard-urllist
+    set-flag-service-start-stop-snmp-ssl
+    set-flag-service-start-stop-ike-auth
+
+    if tls-rweb-dep-file-is-modified ; then
+	if test ${PROXY2_MODE} == False ; then
+	    FLAG_SQUID=1
+	else
+	    FLAG_HTTPD=1
+	fi
+    fi
+
+    ! tls-ipsec-dep-file-is-modified || FLAG_IKE=1
+    ! tls-ocsp-dep-file-is-modified || FLAG_OCSP=1
+
+    if tls-admin-dep-file-is-modified ; then
+	test ${ADMIN_WADMIN} == False || FLAG_WADMIN=1
+	test ${ADMIN_WAUDIT} == False || FLAG_HTTPD=1
+	test ${ADMIN_SNMP} == False -o ${SNMP_TLS} == False || test FLAG_SNMPD=1
+    fi
+
+    if tls-self-ca-file-is-modified ; then
+	FLAG_IKE=1
+	FLAG_SQUID=1
+	FLAG_SQUID_CLEARSSL=1
+    fi
+
+    if tls-ca-file-is-modified ; then
+	FLAG_IKE=1
+	FLAG_SQUID=1
+	FLAG_LDAP_PROXY=1
+    fi
+
+    set-flag-service-start-stop-httpd-waf
+
+    if get-conf-not-resolved ; then
+	FLAG_TC=1
+	FLAG_IPTABLES=1
+    fi
+
+    if test -f ${TMP_DIR}/${NAME_2RESOLVE} ; then
+	FLAG_TC=1
+	FLAG_IPTABLES=1
+	FLAG_NTP=1
+    fi
+
+    if test -f ${TMP_DIR}/${SSH_HOST_ARM_NEW} ; then
+	FLAG_SSH=1
+	rm -f \
+	   ${SSH_HOST_RSA_KEY_FILE} \
+	   ${HARD_DIR}/${SSH_HOST_RSA_FP} \
+	   ${TMP_DIR}/${SSH_HOST_ARM_NEW}
+    fi
+
+    if test -f ${TMP_DIR}/${SSH_MANAGER_ARM_NEW} ; then
+	FLAG_SSH_MANAGER_KEYGEN=1
+	rm -f \
+	   ${ABASE_DIR}/.ssh/id_rsa \
+	   ${SSH_MANAGER_RSA_FP_FILE} \
+	   ${TMP_DIR}/${SSH_MANAGER_ARM_NEW}
+    fi
+
+    test ${FLAG_NETWORK} -eq 0 || FLAG_NETWORK_IO=1
+
+    if test ${FLAG_NETWORK_IO} -eq 1 ; then
+	FLAG_DHCP=1
+	FLAG_FRESH_AV=1
+    fi
+
+    set-flag-monitoring
+}
+
+check-memory()
+{
+    test ${FREE_MEMORY_SZ} -ge 0
+}
+
+check-applicability()
+{
+    local ret
+
+    log "Checking the RAM capacity"
+    check-memory ; ret=${?}
+    log-result ${ret}
+    return ${ret}
+}
+
+safe-generate()
+{
+    # ${1}: The function to execute
+    # ${2}, ${3}... : Arguments for the function
+    # ${n}: Output file
+
+    test -n "${1}" || return 0
+
+    gen_function=${1}
+    shift
+
+    local nb=$[${#} - 1]
+    local args i
+
+    for ((i=0 ; i<${nb} ; i++))
+    do args="${args} ${1}"
+	shift
+    done
+
+    local file=${1}
+
+    test ! -f ${file} || cp ${file} ${file}.old
+    eval ${gen_function} ${args} > ${file}.work
+    local ret=${?}
+
+    mv -f ${file}.work ${file}.new
+    return ${ret}
+}
+
+commit-classic-conf()
+{
+    local dir news new base
+
+    for dir in ${CONF_DIR} ${CONF_DIR}/${IPSEC_CONNECTION_DIR_NAME}
+    do
+	news=$(find ${dir} -maxdepth 1 -type f -name "*.new" 2> /dev/null)
+	for new in ${news}
+	do
+	    base=$(file-basename ${new} .new)
+	    mv -f ${new} ${dir}/${base}
+	done
+    done
+
+    chmod 600 lcd4linux.conf
+
+    news=$(find ${CONF_RUN_DIR} -maxdepth 1 -type f -name "*.new" 2> /dev/null)
+    for new in ${news}
+    do
+	base=$(file-basename ${new} .new)
+	mv -f ${new} ${CONF_RUN_DIR}/${base}
+	cp -f ${CONF_RUN_DIR}/${base} ${CONF_RUN_DIR}/${base}.backup
+    done
+
+    STATE_CLASSIC_CONFIG_COMMIT=yes
+}
+
+restore-classic-conf()
+{
+    cd ${CONF_DIR}
+
+    local dir olds old base
+    local news new
+
+    for dir in ${CONF_DIR} ${CONF_DIR}/${IPSEC_CONNECTION_DIR_NAME}
+    do
+	olds=$(find ${dir} -maxdepth 1 -type f -name "*.old" 2> /dev/null)
+	for old in ${olds}
+	do
+	    base=$(file-basename ${old} .old)
+	    cp -f ${old} ${dir}/${base}
+	    rm -f ${dir}/${base}.new
+	done
+    done
+
+    rm -f ${CONF_RUN_DIR}/*.new
+}
+
+set-owner-mod-chroot-conf()
+{
+    chmod 440 /etc/sudoers
+    chmod 440 ${ETC_DIR}/sudoers
+}
+
+commit-copy-conf()
+{
+    cd ${CONF_DIR}
+
+    if test -f var.snmpd.conf.new ; then
+	cp -f var.snmpd.conf.new /var/snmp/snmpd.conf
+	mv -f var.snmpd.conf.new var.snmpd.conf
+    fi
+
+    if test -f sudoers.new ; then
+	cp -f sudoers.new /etc/sudoers
+	mv -f sudoers.new sudoers
+    fi
+
+    if test -f admin.sudoers.new ; then
+	cp -f admin.sudoers.new ${ETC_DIR}/sudoers
+	mv -f admin.sudoers.new admin.sudoers
+    fi
+
+    if test -f squid.conf.new ; then
+	if test "${SUSPENSION_STATE}" == none ; then
+	    cp -f squid.conf.new ${PROXY_DIR}/etc/squid.conf
+	    mv -f squid.conf.new squid.conf
+	else
+	    mv -f squid.conf.new squid.conf.${SUSPEND_BACKUP}
+	fi
+    fi
+
+    if test -f squidGuard.conf.new ; then
+	if test "${SUSPENSION_STATE}" == none ; then
+	    cp -f squidGuard.conf.new ${PROXY_DIR}/etc/squidGuard.conf
+	    mv -f squidGuard.conf.new squidGuard.conf
+	else
+	    mv -f squidGuard.conf.new squidGuard.conf.${SUSPEND_BACKUP}
+	fi
+    fi
+
+    if test -f proxy.krb5.conf.new ; then
+	cp -f proxy.krb5.conf.new ${PROXY_DIR}/etc/krb5.conf
+	mv -f proxy.krb5.conf.new proxy.krb5.conf
+    fi
+
+    if test -f web.krb5.conf.new ; then
+	cp -f web.krb5.conf.new ${WEB_SERVER_DIR}/etc/krb5.conf
+	mv -f web.krb5.conf.new web.krb5.conf
+    fi
+
+    if test -f named.conf.new ; then
+	cp -f named.conf.new ${NAMED_DIR}/etc/named.conf
+	mv -f named.conf.new named.conf
+    fi
+
+    if test -f ha.pac.new ; then
+	cp -f ha.pac.new ${WEB_WWW_DIR}/ha.pac
+	mv -f ha.pac.new ha.pac
+    fi
+
+    if test -f admin.at.allow.new ; then
+	cp -f admin.at.allow.new ${ETC_DIR}/at.allow
+	mv -f admin.at.allow.new admin.at.allow
+    fi
+
+    if test -f resolv.conf.new ; then
+	cp -f resolv.conf.new ${ETC_DIR}/resolv.conf
+	cp -f resolv.conf.new ${PROXY_DIR}/etc/resolv.conf
+	cp -f resolv.conf.new ${WEB_SERVER_DIR}/etc/resolv.conf
+	mv -f resolv.conf.new resolv.conf
+    fi
+
+    if test -f ${WADMIND_NAME}.hosts.new ; then
+	cp -f ${WADMIND_NAME}.hosts.new ${ETC_DIR}/hosts
+	mv -f ${WADMIND_NAME}.hosts.new ${WADMIND_NAME}.hosts
+    fi
+
+    if test -f httpd.hosts.new ; then
+	cp -f httpd.hosts.new ${WEB_SERVER_DIR}/etc/hosts
+	mv -f httpd.hosts.new httpd.hosts
+    fi
+
+    if test -f squid.hosts.new ; then
+	cp -f squid.hosts.new ${PROXY_DIR}/etc/hosts.squid
+	cp -f squid.hosts.new ${PROXY_DIR}/etc/hosts
+	mv -f squid.hosts.new squid.hosts
+    fi
+
+    if test -f hostname.new ; then
+	cp -f hostname.new ${WEB_SERVER_DIR}/etc/hostname
+	mv -f hostname.new hostname
+    fi
+
+    if test -f domainname.new ; then
+	cp -f domainname.new ${WEB_SERVER_DIR}/etc/domainname
+	mv -f domainname.new domainname
+    fi
+
+    if test -f ldap.conf.new ; then
+	cp -f ldap.conf.new ${PROXY_DIR}${LDAP_DIR}/ldap.conf
+	mv -f ldap.conf.new ldap.conf
+    fi
+
+    if test -f clamd.conf.new ; then
+	cp -f clamd.conf.new ${WEB_SERVER_DIR}${LOCAL_DIR}/etc/clamd.conf
+	mv -f clamd.conf.new clamd.conf
+    fi
+
+    if test ${EMBEDDED_VPNSUBSCR_IS_ACTIVE} == True ; then
+	if test -f ${EMBEDDED_VPNSUBSCR_NAME}-constant.php.new ; then
+
+	    chattr-copy \
+	       ${EMBEDDED_VPNSUBSCR_NAME}-constant.php.new \
+	       ${WEB_SERVER_DIR}/${EMBEDDED_APPLICATIONS_NAME}/${EMBEDDED_VPNSUBSCR_NAME}/constant.php
+
+	    mv -f \
+	       ${EMBEDDED_VPNSUBSCR_NAME}-constant.php.new \
+	       ${EMBEDDED_VPNSUBSCR_NAME}-constant.php
+	fi
+    fi
+
+    set-owner-mod-chroot-conf
+}
+
+restore-chroot-conf()
+{
+    local file base
+    for file in \
+	    /var/snmp/snmpd.conf \
+	    /etc/sudoers \
+	    ${ETC_DIR}/sudoers \
+	    ${PROXY_DIR}/etc/squidGuard.conf \
+	    ${PROXY_DIR}/etc/squid.conf \
+	    ${NAMED_DIR}/etc/named.conf \
+	    ${WEB_WWW_DIR}/ha.pac \
+	    ${ETC_DIR}/at.allow \
+	    ${ETC_DIR}/resolv.conf \
+	    ${PROXY_DIR}/etc/resolv.conf \
+	    ${WEB_SERVER_DIR}/etc/resolv.conf \
+	    ${PROXY_DIR}${LDAP_DIR}/ldap.conf \
+	    ${PROXY_DIR}${LDAP_DIR}/clamd.conf
+    do
+	base=$(file-basename ${file})
+	test ! -f ${CONF_DIR}/${base}.old || cp -f ${CONF_DIR}/${base}.old ${file}
+    done
+
+    test ! -f ${CONF_DIR}/proxy.krb5.conf.old		|| cp -f ${CONF_DIR}/proxy.krb5.conf.old	${PROXY_DIR}/etc/krb5.conf
+    test ! -f ${CONF_DIR}/web.krb5.conf.old		|| cp -f ${CONF_DIR}/web.krb5.conf.old		${WEB_SERVER_DIR}/etc/krb5.conf
+    test ! -f ${CONF_DIR}/${WADMIND_NAME}.hosts.old	|| cp -f ${CONF_DIR}/${WADMIND_NAME}.hosts.old	${ETC_DIR}/hosts
+    test ! -f ${CONF_DIR}/httpd.hosts.old		|| cp -f ${CONF_DIR}/httpd.hosts.old		${WEB_SERVER_DIR}/etc/hosts
+    test ! -f ${CONF_DIR}/squid.hosts.old		|| cp -f ${CONF_DIR}/squid.hosts.old		${PROXY_DIR}/etc/hosts.squid
+    test ! -f ${CONF_DIR}/squid.hosts.old		|| cp -f ${CONF_DIR}/squid.hosts.old		${PROXY_DIR}/etc/hosts
+    test ! -f ${CONF_DIR}/hostname.old			|| cp -f ${CONF_DIR}/hostname.old		${PROXY_DIR}/etc/hostname
+    test ! -f ${CONF_DIR}/domainname.old		|| cp -f ${CONF_DIR}/domainname.old		${PROXY_DIR}/etc/domainname
+
+    if test ${EMBEDDED_VPNSUBSCR_IS_ACTIVE} == True ; then
+	if test -f ${CONF_DIR}/${EMBEDDED_VPNSUBSCR_NAME}-constant.php.old ; then
+	    chattr-copy \
+	       ${CONF_DIR}/${EMBEDDED_VPNSUBSCR_NAME}-constant.php.old \
+	       ${WEB_SERVER_DIR}/${EMBEDDED_APPLICATIONS_NAME}/${EMBEDDED_VPNSUBSCR_NAME}/constant.php
+	fi
+    fi
+
+    set-owner-mod-chroot-conf
+}
+
+commit-network-conf()
+{
+    clean-current-network-devices
+    copy-network-device-from new
+    clean-network-statistics
+    gen-network-interfaces-file
+}
+
+restore-network-device()
+{
+    clean-current-network-devices
+    copy-network-device-from old
+}
+
+set-classic-config-files1()
+{
+    test -n "${1}" || return 1
+    local mode=${1}
+
+    cd ${CONF_DIR}
+
+    if test ${FLAG_SYSLOG} -eq 1 -o ${mode} == force -o \
+	    "${STATE_CFG_SYSLOG}" == modified ; then
+
+	STATE_CFG_SYSLOG=modified
+
+	safe-generate	gen-rsyslog-conf		rsyslog.conf			|| return 11
+    fi
+
+    if test ${FLAG_RLOGGER} -eq 1 -o ${mode} == force -o \
+	    "${STATE_CFG_RLOGGER}" == modified ; then
+
+	STATE_CFG_RLOGGER=modified
+
+	safe-generate	gen-sysconfig-rlogger		sysconfig.rlogger		|| return 13
+    fi
+
+    if test ${FLAG_NETWORK} -eq 1 -o ${mode} == force -o \
+	    "${STATE_CFG_NETWORK}" == modified ; then
+
+	STATE_CFG_NETWORK=modified
+
+	safe-generate-network-conf							|| return 15
+    fi
+
+    if test ${FLAG_LOCALNET} -eq 1 -o ${mode} == force -o \
+	    "${STATE_CFG_LOCALNET}" == modified ; then
+
+	STATE_CFG_LOCALNET=modified
+
+	safe-generate	gen-loopback-conf		network.lo			|| return 17
+    fi
+
+    safe-generate	gen-network			network				|| return 19
+    safe-generate	gen-route-table-names		rt_tables			|| return 21
+    safe-generate	gen-hosts			hosts				|| return 23
+    safe-generate	gen-at-allow			admin.at.allow			|| return 25
+    safe-generate	gen-modprobe-bonding-conf	modprobe.bonding.conf		|| return 27
+    safe-generate	gen-issue			issue				|| return 29
+
+    if test ${FLAG_SYSCTL} -eq 1 -o ${mode} == force -o \
+	    "${STATE_CFG_SYSCTL}" == modified ; then
+
+	STATE_CFG_SYSCTL=modified
+
+	safe-generate	gen-sysctl			sysctl.conf			|| return 31
+    fi
+
+    if test ${FLAG_SYSNETCTL} -eq 1 -o ${mode} == force -o \
+	    "${STATE_CFG_SYSNETCTL}" == modified ; then
+
+	STATE_CFG_SYSNETCTL=modified
+
+	safe-generate	gen-sysnetctl			sysnetctl.conf			|| return 33
+    fi
+
+    if test ${FLAG_IPTABLES} -eq 1 -o ${mode} == force -o \
+	    "${STATE_CFG_IPTABLES}" == modified ; then
+
+	STATE_CFG_IPTABLES=modified
+
+	safe-generate	gen-iptables-raw		sysconfig.iptables.raw		|| return 35
+	safe-generate	gen-iptables-nat		sysconfig.iptables.nat		|| return 37
+	safe-generate	gen-iptables-mangle		sysconfig.iptables.mangle	|| return 39
+	safe-generate	gen-iptables-filter		sysconfig.iptables.filter	|| return 41
+	safe-generate	gen-iptables-apl		sysconfig.iptables.apl		|| return 43
+	safe-generate	gen-iptables			sysconfig.iptables		|| return 45
+    fi
+
+    if test ${FLAG_TC} -eq 1 -o ${mode} == force \
+	    -o "${STATE_CFG_TC}" == modified ; then
+
+	STATE_CFG_TC=modified
+
+	safe-generate	gen-tc				sysconfig.tc			|| return 47
+    fi
+
+    if test ${FLAG_NTP} -eq 1 -o ${mode} == force -o \
+	    "${STATE_CFG_NTP}" == modified ; then
+
+	STATE_CFG_NTP=modified
+
+	safe-generate	gen-ntp-conf			ntp.conf			|| return 49
+	safe-generate	gen-sysconfig-ntpd		sysconfig.ntpd			|| return 51
+    fi
+
+    if test ${FLAG_SQUID} -eq 1 -o \
+	    ${FLAG_SQUID_RELOAD} -eq 1 -o \
+	    ${mode} == force -o "${STATE_CFG_SQUID}" == modified ; then
+
+	STATE_CFG_SQUID=modified
+
+	safe-generate	gen-squid-no-cache-dir		squid.conf-no-cache-dir		|| return 53
+	safe-generate	gen-squid-cache-dir		squid.conf-cache-dir		|| return 55
+	safe-generate	gen-squid-conf			squid.conf			|| return 57
+	safe-generate   gen-suspend-squid-conf		squid.conf.${SUSPEND}		|| return 59
+	safe-generate   gen-sysconfig-squid		sysconfig.squid			|| return 60
+    fi
+
+    if test ${FLAG_KERBEROS} -eq 1 -o \
+	${mode} == force -o "${STATE_CFG_KERBEROS}" == modified ; then
+
+	STATE_CFG_KERBEROS=modified
+
+	safe-generate	gen-kerberos-conf global	global.krb5.conf		|| return 61
+	safe-generate	gen-kerberos-conf proxy		proxy.krb5.conf			|| return 63
+	safe-generate	gen-kerberos-conf web		web.krb5.conf			|| return 65
+    fi
+
+    if test ${FLAG_LDAP_PROXY} -eq 1 -o ${mode} == force -o \
+	    "${STATE_CFG_LDAP_PROXY}" == modified ; then
+
+	STATE_CFG_LDAP_PROXY=modified
+
+	safe-generate	gen-slapd-conf			slapd.conf			|| return 67
+    fi
+
+    if test ${FLAG_GUARD} -eq 1 -o \
+	    ${FLAG_GUARD_RELOAD} -eq 1 -o \
+	    ${mode} == force -o "${STATE_CFG_GUARD}" == modified ; then
+
+	STATE_CFG_GUARD=modified
+
+	safe-generate	gen-guard-conf			squidGuard.conf			|| return 69
+	safe-generate	gen-suspend-squidGuard-conf	squidGuard.conf.${SUSPEND}	|| return 71
+    fi
+    
+    if test ${FLAG_ICAP} -eq 1 -o \
+	    ${mode} == force -o "${STATE_CFG_ICAP}" == modified ; then
+
+	STATE_CFG_ICAP=modified
+
+	safe-generate	gen-virus-scan-conf		virus_scan.conf			|| return 73
+	safe-generate	gen-c-icap-conf			c-icap.conf			|| return 75
+    fi
+
+    if test ${FLAG_AV} -eq 1 -o \
+	    ${mode} == force -o "${STATE_CFG_AV}" == modified ; then
+
+	STATE_CFG_AV=modified
+
+	safe-generate	gen-clamd-conf			clamd.conf			|| return 77
+    fi
+
+    if test ${FLAG_FRESH_AV} -eq 1 -o \
+	    ${mode} == force -o "${STATE_CFG_FRESH_AV}" == modified ; then
+
+	STATE_CFG_FRESH_AV=modified
+
+	safe-generate	gen-freshclam-conf		freshclam.conf			|| return 79
+    fi
+
+    safe-generate	gen-resolv-conf			resolv.conf			|| return 81
+    safe-generate	gen-login-access		login.access			|| return 83
+
+    if test ${FLAG_SSH} -eq 1 -o ${mode} == force -o \
+	    "${STATE_CFG_SSH}" == modified ; then
+
+	STATE_CFG_SSH=modified
+
+	safe-generate	gen-sshd-conf			sshd_config			|| return 85
+	test "${APL_MODEL}" != 'test' || allow-permissive-ssh-login sshd_config.new	|| return 87
+    fi
+
+    if test ${FLAG_WADMIN} -eq 1 -o \
+	    ${FLAG_WADMIN_RELOAD} -eq 1 -o \
+	    ${mode} == force -o \
+	    "${STATE_CFG_WADMIN}" == modified ; then
+
+	STATE_CFG_WADMIN=modified
+
+	safe-generate	gen-wadmin-conf			${WADMIND_NAME}.conf		|| return 89
+    fi
+
+    if test ${FLAG_HTTPD} -eq 1 -o \
+	    ${FLAG_HTTPD_RELOAD} -eq 1 -o \
+	    ${mode} == force -o "${STATE_CFG_HTTPD}" == modified ; then
+
+	STATE_CFG_HTTPD=modified
+
+	safe-generate	gen-httpd-conf			httpd.conf			|| return 91
+    fi
+
+    if test ${FLAG_KEEPALIVED} -eq 1 -o \
+	    ${mode} == force -o "${STATE_CFG_KEEPALIVED}" == modified ; then
+
+	STATE_CFG_KEEPALIVED=modified
+
+	safe-generate	gen-keepalived-conf		keepalived.conf			|| return 93
+    fi
+
+    safe-generate	gen-sudoers			sudoers				|| return 95
+    safe-generate	gen-admin-sudoers		admin.sudoers			|| return 97
+    safe-generate	gen-health-check-srv		${SERVICES_HEALTH_FILENAME}	|| return 99
+    safe-generate	gen-ha-pac			ha.pac				|| return 101
+
+    if test ${FLAG_SNMPD} -eq 1 -o \
+	    ${mode} == force -o "${STATE_CFG_SNMPD}" == modified ; then
+
+	STATE_CFG_SNMPD=modified
+
+	safe-generate	gen-snmpd-conf			snmpd.conf			|| return 103
+	safe-generate	gen-snmp-conf			snmp.conf			|| return 105
+	safe-generate	gen-var-snmpd-conf		var.snmpd.conf			|| return 107
+	safe-generate	gen-sysconfig-snmpd		sysconfig.snmpd			|| return 109
+    fi
+
+    if test ${FLAG_DHCP} -eq 1 -o ${mode} == force -o \
+	    "${STATE_CFG_DHCP}" == modified ; then
+
+	STATE_CFG_DHCP=modified
+
+	safe-generate	gen-sysconfig-dhcpd		sysconfig.dhcpd			|| return 111
+	safe-generate	gen-dhcpd-conf			dhcpd.conf			|| return 113
+    fi
+
+    if test ${FLAG_NS} -eq 1 -o ${mode} == force -o \
+	    "${STATE_CFG_NS}" == modified ; then
+
+	STATE_CFG_NS=modified
+
+	safe-generate	gen-named-conf			named.conf			|| return 115
+    fi
+
+    if test ${FLAG_OCSP} -eq 1 -o ${mode} == force -o \
+	    "${STATE_CFG_OCSP}" == modified ; then
+
+	STATE_CFG_OCSP=modified
+
+	safe-generate	gen-sysconfig-ocspd		sysconfig.ocspd			|| return 117
+    fi
+
+    if test ${FLAG_SMANAGER} -eq 1 -o ${mode} == force -o \
+	    "${STATE_CFG_SMANAGER}" == modified ; then
+
+	STATE_CFG_SMANAGER=modified
+
+	safe-generate	gen-sysconfig-smanager		sysconfig.smanager		|| return 119
+    fi
+
+    safe-generate	gen-admin-hosts			${WADMIND_NAME}.hosts		|| return 121
+    safe-generate	gen-httpd-hosts			httpd.hosts			|| return 123
+    safe-generate	gen-squid-hosts			squid.hosts			|| return 125
+    safe-generate	gen-hostname			hostname			|| return 127
+    safe-generate	gen-domainname			domainname			|| return 129
+    safe-generate	gen-wadmin-rules		${WADMIN_NAME}.rules		|| return 131
+    safe-generate	gen-waudit-rules		${WAUDIT_NAME}.rules		|| return 133
+    safe-generate	gen-ldap-conf			ldap.conf			|| return 135
+
+    if test ${FLAG_LCD4LINUX} -eq 1 -o ${mode} == force -o \
+	"${STATE_CFG_LCD4LINUX}" == modified ; then
+
+	STATE_CFG_LCD4LINUX=modified
+
+	safe-generate	gen-lcd4linux-conf		lcd4linux.conf			|| return 137
+    fi
+
+    if test ${APL_ROLE} == gateway ; then
+	if test ${FLAG_IKE} -eq 1 -o ${FLAG_IKE_RELOAD} -eq 1 -o ${mode} == force -o \
+		"${STATE_CFG_IKE}" == modified ; then
+
+	    STATE_CFG_IKE=modified
+
+	    safe-generate	gen-sysconfig-ipsec		sysconfig.ipsec			|| return 139
+	    safe-generate	gen-ipsec-global-conf		ipsec.global.conf		|| return 141
+	    safe-generate	gen-ipsec-ca-conf		ipsec.ca.conf			|| return 143
+	    safe-generate	gen-ipsec-charon-conf		ipsec.charon.conf		|| return 145
+	    safe-generate	gen-ipsec-dhcp-conf		ipsec.dhcp.conf			|| return 147
+	    safe-generate	gen-ipsec-ha-conf		ipsec.ha.conf			|| return 149
+	    safe-generate	gen-ipsec-whitelist-conf	ipsec.whitelist.conf		|| return 151
+	    safe-generate	gen-ipsec-charon-logging	ipsec.charon-logging.conf	|| return 153
+	    safe-generate	gen-ipsec-secrets		ipsec.secrets			|| return 155
+	    safe-generate-ipsec-connection-conf							|| return 157
+	fi
+    fi
+
+    safe-generate	gen-sysconfig-health			sysconfig.health		|| return 201
+    safe-generate	gen-sysconfig-path			sysconfig.path			|| return 203
+
+    safe-generate	gen-php-ini				php.ini				|| return 205
+
+    safe-generate	gen-embedded-vpnsubscr-web-conf		${EMBEDDED_VPNSUBSCR_NAME}.conf		|| return 207
+    safe-generate	gen-embedded-vpnsubscr-php-constant	${EMBEDDED_VPNSUBSCR_NAME}-constant.php	|| return 209
+    safe-generate	gen-sysconfig-vpnsubscr			sysconfig.vpnsubscr			|| return 211
+
+    return 0
+}
+
+commit-conf1()
+{
+    test -n "${1}" || return 1
+    local mode=${1}
+
+    commit-copy-conf || return 11
+
+    if test ${FLAG_NETWORK} -eq 1 -o ${mode} == force ; then
+	commit-network-conf || return 11
+    fi
+
+    commit-classic-conf || return 13
+    commit-waf-rweb-rules || return 15
+    commit-guards || return 17
+    commit-qos-index || return 19
+    commit-clamav-extended ${mode} || return 21
+    commit-ssh-keys || return 23
+    commit-dhcp-leases || return 25
+    commit-dynamic-dns ${mode} || return 27
+}
+
+commit-conf()
+{
+    test -n "${1}" || return 1
+    local mode=${1}
+
+    log "Committing the configuration"
+    commit-conf1 ${mode}
+    local ret=${?}
+    log-result ${ret}
+    return ${ret}
+}
+
+save-runtime-parameters()
+{
+    echo -n ${TOTAL_IN_MEMORY_CACHED_OBJECT_SZ} > ${RUN_DIR}/${TOTAL_IN_MEMORY_CACHED_OBJECT_SZ_FILENAME}
+}
+
+set-classic-config-files()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    local context=${1}
+    local mode=${2}
+
+    local ret
+    
+    case ${context} in
+	apply|configure)
+	    log "Building the configuration"
+	    set-classic-config-files1 ${mode} ; ret=${?}
+	    log-result ${ret}
+	    if test ${ret} -eq 0 ; then
+		commit-conf ${mode}
+		save-runtime-parameters
+	    else
+		restore-conf
+	    fi
+	    ;;
+
+	restore)
+	    log "Regenerating the configuration"
+	    set-classic-config-files1 ${mode} ; ret=${?}
+	    log-result ${ret}
+	    commit-conf ${mode}
+	    ;;
+	
+	rollback)
+	    if test -z "${STATE_CLASSIC_CONFIG_COMMIT}" ; then
+		restore-conf
+	    else
+		log "Regenerating the configuration"
+		set-classic-config-files1 ${mode} ; ret=${?}
+		log-result ${ret}
+		commit-conf ${mode}
+	    fi
+	    ;;
+	*)
+	    ;;
+    esac
+}
+
+restore-conf1()
+{
+    restore-chroot-conf || return 1
+    restore-network-device || return 3
+    restore-classic-conf || return 5
+    restore-waf-rweb-rules || return 7
+    restore-guards || return 9
+    restore-clamav-extended || return 11
+    restore-ssh-keys || return 13
+    restore-dhcp-leases || return 15
+}
+
+restore-conf()
+{
+    log "Restoring the configuration"
+    restore-conf1
+    log-result ${?}
+}
+
+clean-backup-conf()
+{
+    cd ${CONF_DIR}
+    find . -type f -name "*.old" -exec rm -f {} \; 2> /dev/null
+}
+
+is-service-active()
+{
+    test -n "${1}" || return 1
+    local service=${1}
+
+    local file
+
+    for file in \
+	/etc/rc.d/rc3.d/S[0-9][0-9]${service} \
+	/etc/rc.d/rc0.d/K[0-9][0-9]${service} \
+	/etc/rc.d/rc6.d/K[0-9][0-9]${service}
+    do
+	test -f ${file} || return 1
+    done
+
+    return 0
+}
+
+is-service-deactivated()
+{
+    test -n "${1}" || return 1
+    local service=${1}
+
+    local file
+
+    for file in \
+	/etc/rc.d/rc3.d/_S[0-9][0-9]${service} \
+	/etc/rc.d/rc0.d/_K[0-9][0-9]${service} \
+	/etc/rc.d/rc1.d/_K[0-9][0-9]${service} \
+	/etc/rc.d/rc6.d/_K[0-9][0-9]${service}
+    do
+	test -f ${file} || return 1
+    done
+
+    return 0
+}
+
+deactivate-service()
+{
+    test -n "${1}" || return 1
+    local service=${1}
+    local nolog=${2}
+
+    ! is-service-deactivated ${service} || return 0
+
+    local extname=$(get-external-service-name ${service}) ret=0
+
+    test -n "${nolog}" || log "Deactivating the service ${extname}"
+
+    cd /etc/rc.d/rc3.d
+    local filename=$(ls S[0-9][0-9]${service} 2> /dev/null)
+    if test -n "${filename}" ; then
+	mv -f ${filename} _${filename} 2> /dev/null
+	ret=${?}
+    fi
+
+    for level in 0 1 2 4 5 6
+    do
+	cd /etc/rc.d/rc${level}.d
+	filename=$(ls K[0-9][0-9]${service} 2> /dev/null)
+	if test -n "${filename}" ; then
+	    mv -f ${filename} _${filename} 2> /dev/null
+	    ret=$[${ret} + ${?}]
+	fi
+    done
+    
+    test -n "${nolog}" || log-result ${ret}
+}
+
+activate-service()
+{
+    test -n "${1}" || return 1
+    local service=${1}
+
+    ! is-service-active ${service} || return 0
+
+    local extname=$(get-external-service-name ${service}) ret=0
+
+    log "Activating the service ${extname}"
+
+    cd /etc/rc.d/rc3.d
+    local filename=$(ls _S[0-9][0-9]${service} 2> /dev/null)
+    if test -n "${filename}" ; then
+	mv -f ${filename} ${filename:1}  2> /dev/null
+	ret=${?}
+    fi
+
+    for level in 0 1 2 4 5 6
+    do
+	cd /etc/rc.d/rc${level}.d
+	filename=$(ls _K[0-9][0-9]${service} 2> /dev/null)
+	if test -n "${filename}" ; then
+	    mv -f ${filename} ${filename:1} 2> /dev/null
+	    ret=$[${ret} + ${?}]
+	fi
+    done
+    log-result ${ret}
+}
+
+service-nolog()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 1
+    local service=${1}
+    local action=${2}
+
+    /etc/rc.d/init.d/${service} ${action} < /dev/console
+}
+
+service()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    local service=${1}
+    local action=${2}
+
+    local extname=$(get-external-service-name ${service})
+
+    case ${action} in
+	start)
+	    message=Starting
+	    ;;
+	stop)
+	    message=Stopping
+	    ;;
+	restart)
+	    message=Restarting
+	    ;;
+	reload)
+	    message=Reloading
+	    ;;
+	*)
+	    return 1
+	    ;;
+    esac
+
+    log "${message} the ${extname} service"
+    service-nolog ${service} ${action}
+    log-result ${?}
+}
+
+backup-proxy-guard-conf()
+{
+    cd ${CONF_DIR} &&
+	cp -f squid.conf squid.conf.${SUSPEND_BACKUP} &&
+	cp -f squidGuard.conf squidGuard.conf.${SUSPEND_BACKUP}
+}
+
+restore-proxy-guard-conf()
+{
+    cd ${CONF_DIR} &&
+    test \
+	-f squid.conf.${SUSPEND_BACKUP} -a \
+	-f squidGuard.conf.${SUSPEND_BACKUP} &&
+    mv -f squid.conf.${SUSPEND_BACKUP} squid.conf.new &&
+    mv -f squidGuard.conf.${SUSPEND_BACKUP} squidGuard.conf.new &&
+    commit-copy-conf
+}
+
+reactivate-web-gateway()
+{
+    if test ${CURRENT_SQUID_IS_ACTIVE} == True ; then
+	service-nolog health stop
+	service-nolog squid stop ; local ret1=${?}
+    fi
+
+    restore-proxy-guard-conf ; local ret2=${?}
+
+    if test ${CURRENT_SQUID_IS_ACTIVE} == True ; then
+	service-nolog squid start ; local ret3=${?}
+	service-nolog health start
+    fi
+
+    local ret=$[${ret1}*100 + ${ret2}*10 + ${ret3}]
+    return ${ret}
+}
+
+suspend-web-gateway()
+{
+    test -n "${1}" || return 1
+    local state=${1}
+
+    local message
+   
+    service-nolog health stop
+    service-nolog squid stop
+    local ret1=${?}
+
+    case ${state} in
+	trial)
+	    message=$(cat ${WEB_MESSAGE_DIR}/.file0 2> /dev/null)
+	    ;;
+	renew)
+	    message=$(cat ${WEB_MESSAGE_DIR}/.file1 2> /dev/null)
+	    ;;
+	license)
+	    message=$(cat ${WEB_MESSAGE_DIR}/.file2 2> /dev/null)
+	    ;;
+	error)
+	    message=$(cat ${WEB_MESSAGE_DIR}/.file3 2> /dev/null)
+	    ;;
+	cloudip)
+	    message=$(cat ${WEB_MESSAGE_DIR}/.file4 2> /dev/null)
+	    ;;
+	*)
+	    message=$(cat ${WEB_MESSAGE_DIR}/.file5 2> /dev/null)
+	    ;;
+    esac
+
+    echo ${message} > ${WEB_SERVER_DIR}/${CGI_MESSAGE_FILE}
+
+    cd ${CONF_DIR} &&
+	backup-proxy-guard-conf &&
+	cp -f squid.conf.${SUSPEND} squid.conf.new &&
+	cp -f squidGuard.conf.${SUSPEND} squidGuard.conf.new &&
+        commit-copy-conf ; local ret2=${?}
+
+    service-nolog squid start
+    local ret3=${?}
+    service-nolog health start
+
+    local ret=$[${ret1}*100 + ${ret2}*10 + ${ret3}]
+    return ${ret}
+}
+
+save-admin-level-configuration-files1()
+{
+    test -n "${1}" || return 1
+    local current_env=${1}
+
+    test -f ${current_env} || return 11
+
+    local export assertion
+    local current_var var
+
+    while read export assertion
+    do
+	test -n "${assertion}" || continue
+
+	current_var=${assertion/=*/}
+	var=${current_var/CURRENT_/}
+
+	echo -n "export ${current_var}='"
+	eval eval 'echo -n \$"${var}"'
+	echo "'"
+    done < ${current_env}
+}
+
+save-admin-level-configuration-files()
+{
+    # The save-admin-level-configuration() function is mono user:
+    # We must kill all users of "Environment Files" in conf-lock-env() before proceed
+
+    conf-lock-env || return 11
+    conf-backup-env || return 13
+    conf-save-new-env || return 15
+
+    case ${APL_ROLE} in
+	gateway)
+	    save-waf-rules || return 17
+	    save-ipsec-psk || return 19
+	    ;;
+	manager)
+	    ;;
+	*)
+	    ;;
+    esac
+
+    save-admin-level-configuration-files1 ${USERENV_DIR}/${ENV_CURRENT_NAME}.old > ${USERENV_DIR}/${ENV_CURRENT_NAME} || return 21
+
+    cat ${USERENV_DIR}/${ENV_CURRENT_NAME} | sed -e "s/CURRENT_//g" > /tmp/${ENV_CANCEL_NAME} || return 23
+    mv -f /tmp/${ENV_CANCEL_NAME} ${USERENV_DIR}/${ENV_CANCEL_NAME} || return 25
+    chown ${ACCOUNT}:${GROUP_NAME} ${USERENV_DIR}/${ENV_CANCEL_NAME} || return 27
+
+    clean-userenv-backup || return 29
+    conf-unlock-env || return 31
+    clean-backup-conf || return 33
+    return 0
+}
+
+conf-lock-db-configuration()
+{
+    local name
+
+    for name in ${CONFIGURATION_CURRENT_DB_NAME} \
+		${CONFIGURATION_DB_NAME}
+    do
+	conf-lock-file ${USERENV_DIR}/${name}
+    done
+}
+
+save-admin-level-db-configuration()
+{
+    conf-lock-db-configuration || return 11
+    conf-backup-db-configuration || return 13
+    cp -f ${USERENV_DIR}/${CONFIGURATION_DB_NAME} ${USERENV_DIR}/${CONFIGURATION_CURRENT_DB_NAME} || return 15
+    clean-db-configuration-backup || return 27
+    conf-unlock-db-configuration || return 19
+}
+
+save-admin-level-configuration()
+{
+    local save_file_state
+    # local save_db_state
+    local save_db_state=0
+
+    log "Saving the configuration"
+    save-admin-level-configuration-files ; save_file_state=${?}
+    save-admin-level-db-configuration ; save_db_state=${?}
+    log-result $[${save_file_state} + ${save_db_state}]
+}
+
+set-system-files()
+{
+    test -n "${1}" || return 1
+    local mode=${1}
+
+    set-self-urllist
+    set-hostname ${mode}
+    set-local-time ${mode}
+    set-admin-users ${mode}
+    set-passwords
+    set-sshkeys
+    set-manager-sshkeys
+    set-prompt
+}
+
+build-os-configuration()
+{
+    test -n "${1}" || return 1
+    local context=${1}
+
+    local mode
+
+    case ${context} in
+	apply|rollback)
+	    mode=auto
+	    ;;
+
+	configure|restore)
+	    mode=force
+	    ;;
+	*)
+	    mode=auto
+	    ;;
+    esac
+
+    set-tls-certificates ${mode} || return 11
+    set-filter-audit ${mode} || return 13
+    set-custom-waf-rules ${mode} || return 15
+    set-ldap-passwd ${context} || return 17
+    set-file-server-passwd || return 19
+    set-system-files ${mode} || return 21
+    set-classic-config-files ${context} ${mode} || return 23
+    set-waudit-mode ${mode} || return 25
+    set-services-conf ${mode} || return 27
+    set-health-conf ${context} || return 29
+
+    return 0
+}
+
+service-icap1()
+{
+    test -n "${1}" || return 1
+    local action=${1}
+
+    STATE_SRV_ICAP=${action}
+
+    case ${action} in
+	start|stop)
+	    getpids c-icap > /dev/null
+	    test ${?} -ne 0 -o ${action} != stop || service c-icap stop
+	    test ${action} != start -o "${AV_MODE}" == False || service c-icap start
+	    ;;
+	reload)
+	    service c-icap reload
+	    ;;
+	*)
+	    return 1
+	    ;;
+    esac
+}
+
+service-icap()
+{
+    test -n "${FLAG_ICAP}" || return 0
+
+    test -n "${1}" || return 1
+    local action=${1}
+
+    case ${action} in
+	start|stop)
+	    test ${FLAG_ICAP} -eq 1 || return 0
+	    service-icap1 ${action}
+	    ;;
+	reload)
+	    test ${FLAG_ICAP} -eq 0 || return 0
+	    service-icap1 ${action}
+	    ;;
+	*)
+	    return 1
+	    ;;
+    esac
+}
+
+service-conf-icap()
+{
+    local mode=${1}
+    if test "${mode}" != force ; then
+	test "${AV_MODE}" != "${CURRENT_AV_MODE}" -o \
+	    "${STATE_CFG_ICAP_MODE}" == modified || return 0
+    fi
+
+    STATE_CFG_ICAP_MODE=modified
+
+    if test "${AV_MODE}" == True ; then
+	activate-service c-icap
+    else
+	deactivate-service c-icap
+    fi
+}
+
+service-av1()
+{
+    test -n "${1}" || return 1
+    local action=${1}
+
+    STATE_SRV_AV=${action}
+
+    case ${action} in
+	start|stop)
+	    getpids clamd > /dev/null
+	    test ${?} -ne 0 -o ${action} != stop || service clamd stop
+	    test ${action} != start -o "${AV_MODE}" == False || service clamd start
+	    ;;
+	reload)
+	    service clamd reload
+	    ;;
+	*)
+	    return 1
+	    ;;
+    esac
+}
+
+service-av()
+{
+    test -n "${FLAG_AV}" || return 0
+    test -n "${FLAG_AV_RELOAD}" || return 0
+
+    test -n "${1}" || return 1
+    local action=${1}
+
+    case ${action} in
+	start|stop)
+	    test ${FLAG_AV} -eq 1 || return 0
+	    ;;
+	reload)
+	    test ${AV_MODE} == True || return 0
+	    test ${FLAG_AV} -eq 0 || return 0
+	    test ${FLAG_AV_RELOAD} -eq 1 || return 0
+	    ;;
+	*)
+	    return 1
+	    ;;
+    esac
+
+    service-av1 ${action}
+}
+
+service-conf-av()
+{
+    local mode=${1}
+    if test "${mode}" != force ; then
+	test "${AV_MODE}" != "${CURRENT_AV_MODE}" -o \
+	    "${STATE_CFG_AV_MODE}" == modified || return 0
+    fi
+
+    STATE_CFG_AV_MODE=modified
+
+    if test "${AV_MODE}" == True ; then
+	activate-service clamd
+    else
+	deactivate-service clamd
+    fi
+}
+
+service-fresh-av-start()
+{
+    local extended_index_ret
+    local pid_freshclam pid_extended ret1=0 ret2=0 ret
+
+    case ${APL_ROLE} in
+	gateway)
+	    if test ${FLAG_FRESH_AV} -eq 1 ; then
+
+		local main_location daily_location
+		local service_name=$(get-external-service-name freshclam)
+
+		log "Starting the ${service_name} service" ${LOG_TAG_AV_REGULAR}
+
+		if verify-av-signature main ; then
+		    main_location=local
+		else
+		    main_location=remote
+		fi
+
+		if verify-av-signature daily ; then
+		    daily_location=local
+		else
+		    daily_location=remote
+		fi
+
+		refresh-av-regular-db-sz ${main_location} ${daily_location}
+
+		if test ${FLAG_FRESH_AV_EXTENDED} -eq 1 ; then
+		    service-nolog freshclam start & pid_freshclam=${!}
+		else
+		    service-nolog freshclam start
+		fi
+		log-result 0
+	    fi
+	    ;;
+	manager)
+	    refresh-av-regular-db-sz local local
+	    ;;
+	*)
+	    ;;
+    esac
+
+    if test ${FLAG_FRESH_AV_EXTENDED} -eq 1 ; then
+
+	if test -f ${AV_EXTENDED_CACHE_DIR}/${AV_EXTENDED_INDEX_FILENAME} ; then
+	    log "Updating the Extended AV signatures Index"
+	    download-av-extended-index new
+	    ret=${?}
+	    log-result ${ret}
+
+	    if test ${ret} -eq 0 ; then
+		echo 0 > ${RUN_DIR}/${AV_EXTENDED_DB_DOWNLOADED_SZ_FILENAME}
+		log "Refreshing AV extended signatures" ${LOG_TAG_AV_EXTENDED_UPDATE}
+
+		NO_RELOAD_AV=yes apl_av_extended_update new update noindex & pid_extended=${!}
+		log-result 0
+	    fi
+	else
+	    echo 0 > ${RUN_DIR}/${AV_EXTENDED_PACK_DOWNLOADED_SZ_FILENAME}
+	    log "Downloading AV extended signatures" ${LOG_TAG_AV_EXTENDED_CREATE}
+	    log-result 0
+
+	    echo 0 > ${RUN_DIR}/${AV_EXTENDED_DB_DOWNLOADED_SZ_FILENAME}
+	    log "Installing AV extended signatures" ${LOG_TAG_AV_EXTENDED_UPDATE}
+	    log-result 0
+	    NO_RELOAD_AV=yes apl_av_extended_update new create noindex & pid_extended=${!}
+	fi
+    else
+	reset-av-extended-db-sz
+    fi
+
+    if test -n "${pid_freshclam}" ; then
+	wait ${pid_freshclam} 2> /dev/null
+	ret1=${?}
+	test ${ret1} -ne 127 || ret1=0
+    fi
+
+    if test -n "${pid_extended}" ; then
+	wait ${pid_extended} 2> /dev/null
+	ret2=${?}
+	test ${ret2} -ne 127 || ret2=0
+	test ${ret2} -eq 0 || ((ret2 += 120))
+    fi
+}
+
+service-fresh-av1()
+{
+    test -n "${1}" || return 1
+    local action=${1}
+
+    test ${FLAG_FRESH_AV} -eq 0 || STATE_SRV_FRESH_AV=${action}
+
+    if test ${FLAG_FRESH_AV} -eq 1 ; then
+	getpids freshclam > /dev/null
+	test ${?} -ne 0 -o ${action} != stop || service freshclam ${action}
+    fi
+
+    if test ${action} = start ; then
+	case ${APL_ROLE} in
+	    gateway)
+		test ${AV_MODE} == False || service-fresh-av-start
+		;;
+	    manager)
+		service-fresh-av-start
+		;;
+	    *)
+		;;
+	esac
+    fi
+}
+
+service-fresh-av()
+{
+    test -n "${FLAG_FRESH_AV}" || return 0
+    test -n "${FLAG_FRESH_AV_EXTENDED}" || return 0
+
+    test ${FLAG_FRESH_AV} -eq 1 -o \
+	 ${FLAG_FRESH_AV_EXTENDED} -eq 1 || return 0
+
+    test -n "${1}" || return 1
+    local action=${1}
+
+    service-fresh-av1 ${action}
+}
+
+service-conf-fresh-av()
+{
+    local mode=${1}
+    if test "${mode}" != force ; then
+	test "${AV_MODE}" != "${CURRENT_AV_MODE}" -o \
+	    "${STATE_CFG_FRESH_AV_MODE}" == modified || return 0
+    fi
+
+    STATE_CFG_FRESH_AV_MODE=modified
+    
+    if test "${AV_MODE}" == True ; then
+	activate-service freshclam
+    else
+	deactivate-service freshclam
+    fi
+}
+
+service-ntp1()
+{
+    test -n "${1}" || return 1
+    local action=${1}
+
+    STATE_SRV_NTP=${action}
+
+    getpids ntpd > /dev/null
+    test ${?} -ne 0 -o ${action} != stop || service ntpd stop
+
+    if test ${action} == start -a -n "${NTP_SERVER_LIST}" ; then
+	log "Resetting network statistics"
+	reset-network-statistics
+	log-result ${?}
+	service ntpd start
+    fi
+}
+
+service-ntp()
+{
+    test -n "${FLAG_NTP}" || return 0
+    test ${FLAG_NTP} -eq 1 || return 0
+
+    test -n "${1}" || return 1
+    local action=${1}
+
+    service-ntp1 ${action}
+}
+
+service-conf-ntp()
+{
+    local mode=${1}
+    if test "${mode}" != force ; then
+	test "${NTP_SERVER_LIST}" != "${CURRENT_NTP_SERVER_LIST}" -o \
+	    "${STATE_CFG_NTP_SERVER_LIST}" == modified || return 0
+    fi
+
+    STATE_CFG_NTP_SERVER_LIST=modified
+
+    if test "${NTP_MODE}" == False; then
+	deactivate-service ntpd
+    else
+	activate-service ntpd
+    fi
+}
+
+service-dhcp1()
+{
+    test -n "${1}" || return 1
+    local action=${1}
+
+    STATE_SRV_DHCP=${action}
+
+    getpids dhcpd > /dev/null
+    test ${?} -ne 0 -o ${action} != stop || service dhcpd stop
+    test ${action} != start -o "${DHCP_IS_ACTIVE}" == False || service dhcpd start
+}
+
+service-dhcp()
+{
+    test -n "${FLAG_DHCP}" || return 0
+    test -n "${DHCP_IS_ACTIVE}" || return 0
+
+    test ${FLAG_DHCP} -eq 1 || return 0
+
+    test -n "${1}" || return 1
+    local action=${1}
+
+    service-dhcp1 ${action}
+}
+
+service-conf-dhcp()
+{
+    local mode=${1}
+    if test "${mode}" != force ; then
+	test "${DHCP_IS_ACTIVE}" != "${CURRENT_DHCP_IS_ACTIVE}" -o \
+	    "${STATE_CFG_DHCP}" == modified || return 0
+    fi
+
+    STATE_CFG_DHCP=modified
+
+    if test "${DHCP_IS_ACTIVE}" == True ; then
+	activate-service dhcpd
+    else
+	deactivate-service dhcpd
+    fi
+}
+
+service-slapd1()
+{
+    test -n "${1}" || return 1
+    local action=${1}
+
+    STATE_SRV_LDAP_PROXY=${action}
+
+    getpids slapd > /dev/null
+    test ${?} -ne 0 -o ${action} != stop || service slapd stop
+    test ${action} != start -o "${LDAP_PROXY_IS_ACTIVE}" == False || service slapd start
+}
+
+service-slapd()
+{
+    test -n "${FLAG_LDAP_PROXY}" || return 0
+    test -n "${LDAP_PROXY_IS_ACTIVE}" || return 0
+
+    test ${FLAG_LDAP_PROXY} -eq 1 || return 0
+
+    test -n "${1}" || return 1
+    local action=${1}
+
+    service-slapd1 ${action}
+}
+
+service-conf-slapd()
+{
+    local mode=${1}
+    if test "${mode}" != force ; then
+	test "${LDAP_PROXY_IS_ACTIVE}" != "${CURRENT_LDAP_PROXY_IS_ACTIVE}" -o \
+	    "${STATE_CFG_LDAP_PROXY}" == modified || return 0
+    fi
+
+    STATE_CFG_LDAP_PROXY=modified
+
+    if test "${LDAP_PROXY_IS_ACTIVE}" == True ; then
+	activate-service slapd
+    else
+	deactivate-service slapd
+    fi
+}
+
+service-named1()
+{
+    test -n "${1}" || return 1
+    local action=${1}
+
+    STATE_SRV_NS=${action}
+
+    getpids named > /dev/null
+    test ${?} -ne 0 -o ${action} != stop || service named stop
+    test ${action} != start -o "${SELF_NS}" == False || service named start
+}
+
+service-named()
+{
+    test -n "${FLAG_NS}" || return 0
+    test -n "${SELF_NS}" || return 0
+    test ${FLAG_NS} -eq 1 || return 0
+
+    test -n "${1}" || return 1
+    local action=${1}
+
+    service-named1 ${action}
+}
+
+service-conf-ns()
+{
+    local mode=${1}
+    if test "${mode}" != force ; then
+	test "${SELF_NS}" != "${CURRENT_SELF_NS}" -o \
+	    "${STATE_CFG_SELF_NS}" == modified || return 0
+    fi
+
+    STATE_CFG_SELF_NS=modified
+
+    if test "${SELF_NS}" == True ; then
+	activate-service named
+    else
+	deactivate-service named
+    fi
+}
+
+service-ssh1()
+{
+    test -n "${1}" || return 1
+    local action=${1}
+
+    if test ${action} == manager-keygen ; then
+	
+	local extname=$(get-external-service-name ${service})
+	local message="Generating Manager's SSH Keys"
+
+	log "${message} the ${extname} service"
+	service-nolog sshd ${action}
+	log-result ${?}
+	return 0
+    fi
+
+    STATE_SRV_SSH=${action}
+
+    getpids sshd > /dev/null
+    test ${?} -ne 0 -o ${action} != stop || service sshd stop
+    test ${action} != start -o "${ADMIN_SSH}" == False || service sshd start
+}
+
+service-ssh()
+{
+    test -n "${FLAG_SSH}" || return 0
+    test -n "${FLAG_SSH_MANAGER_KEYGEN}" || return 0
+
+    test -n "${1}" || return 1
+    local action=${1}
+
+    case ${action} in
+	start|stop)
+	    test ${FLAG_SSH} -eq 1 || return 0
+	    service-ssh1 ${action}
+	    ;;
+	manager-keygen)
+	    test ${FLAG_SSH_MANAGER_KEYGEN} -eq 1 || return 0
+	    service-ssh1 ${action}
+	    ;;
+	*)
+	    return 1
+	    ;;
+    esac
+}
+
+service-conf-ssh()
+{
+    local mode=${1}
+    if test "${mode}" != force ; then
+	test "${ADMIN_SSH}" != "${CURRENT_ADMIN_SSH}" -o \
+	    "${STATE_CFG_ADMIN_SSH}" == modified || return 0
+    fi
+
+    STATE_CFG_ADMIN_SSH=modified
+
+    if test "${ADMIN_SSH}" == True ; then
+	activate-service sshd
+    else
+	deactivate-service sshd
+    fi
+}
+
+service-snmp1()
+{
+    test -n "${1}" || return 1
+    local action=${1}
+
+    STATE_SRV_SNMPD=${action}
+
+    getpids snmpd > /dev/null
+    test ${?} -ne 0 -o ${action} != stop || service snmpd stop
+    test ${action} != start -o "${ADMIN_SNMP}" == False || service snmpd start
+}
+
+service-snmp()
+{
+    test -n "${FLAG_SNMPD}" || return 0
+    test ${FLAG_SNMPD} -eq 1 || return 0
+
+    test -n "${1}" || return 1
+    local action=${1}
+
+    service-snmp1 ${action}
+}
+
+service-conf-snmp()
+{
+    local mode=${1}
+    if test "${mode}" != force ; then
+	test "${ADMIN_SNMP}" != "${CURRENT_ADMIN_SNMP}" -o \
+	    "${STATE_CFG_ADMIN_SNMP}" == modified || return 0
+    fi
+
+    STATE_CFG_ADMIN_SNMP=modified
+
+    if test "${ADMIN_SNMP}" == True ; then
+	activate-service snmpd
+    else
+	deactivate-service snmpd
+    fi
+}
+
+service-keepalived1()
+{
+    test -n "${1}" || return 1
+    local action=${1}
+
+    STATE_SRV_KEEPALIVED=${action}
+
+    getpids keepalived > /dev/null
+    test ${?} -ne 0 -o ${action} != stop || service keepalived stop
+    test ${action} != start -o "${HA_MODE}" == False || service keepalived start
+}
+
+service-keepalived()
+{
+    test -n "${FLAG_KEEPALIVED}" || return 0
+    test ${FLAG_KEEPALIVED} -eq 1 || return 0
+
+    test -n "${1}" || return 1
+    local action=${1}
+
+    service-keepalived1 ${action}
+}
+
+service-conf-keepalived()
+{
+    local mode=${1}
+    if test "${mode}" != force ; then
+	test "${HA_MODE}" != "${CURRENT_HA_MODE}" -o \
+	    "${STATE_CFG_HA_MODE}" == modified || return 0
+    fi
+
+    STATE_CFG_HA_MODE=modified
+
+    if test "${HA_MODE}" == True ; then
+	activate-service keepalived
+    else
+	deactivate-service keepalived
+    fi
+}
+
+service-conf-rlogger()
+{
+    local mode=${1}
+
+    if test "${mode}" != force ; then
+	test "${RLOGGER_IS_ACTIVE}" != "${CURRENT_RLOGGER_IS_ACTIVE}" -o \
+	     "${STATE_CFG_RLOGGER}" == modified || return 0
+    fi
+
+    STATE_CFG_RLOGGER=modified
+
+    if test "${GUARD_MODE}" == True -a "${GUARD_LOG_MODE}" == True ; then
+	activate-service rlogger
+    else
+	deactivate-service rlogger
+    fi
+}
+
+set-health-conf()
+{
+    test -n "${1}" || return 1
+    local context=${1}
+
+    case ${context} in
+	apply|rollback)
+	    test "${HA_MODE}" != "${CURRENT_HA_MODE}" -o \
+		"${STATE_CFG_HEALTH_MODE}" == modified || return 0
+
+	    if test ${context} == apply ; then
+		test "${HA_MODE}" == True || rm -f ${RUN_DIR}/${HEALTH_STATE_FILENAME}
+	    fi
+	    ;;
+
+	configure|restore)
+	    STATE_CFG_HEALTH_MODE=modified
+	    test "${HA_MODE}" == True || rm -f ${RUN_DIR}/${HEALTH_STATE_FILENAME}
+	    ;;
+	*)
+	    ;;
+    esac
+}
+
+service-wadmind1()
+{
+    test -n "${1}" || return 1
+    local action=${1}
+
+    STATE_SRV_WADMIN=${action}
+    
+    case ${action} in
+	stop)
+	    test ${FLAG_WADMIN} -eq 1 || return 0
+	    getpids ${WADMIND_NAME} > /dev/null
+	    test ${?} -ne 0 || service ${WADMIND_NAME} ${action}
+	    ;;
+	start)
+	    test ${ADMIN_WADMIN} == True || return 0
+	    test ${FLAG_WADMIN} -eq 0 || service ${WADMIND_NAME} ${action}
+	    ;;
+	reload)
+	    test ${ADMIN_WADMIN} == True || return 0
+	    test ${FLAG_WADMIN} -eq 0 || return 0
+	    test ${FLAG_WADMIN_RELOAD} -eq 0 || service ${WADMIND_NAME} ${action}
+	    ;;
+	*)
+	    ;;
+    esac
+}
+
+service-wadmind()
+{
+    test -n "${FLAG_WADMIN}" || return 0
+    test -n "${FLAG_WADMIN_RELOAD}" || return 0
+    test ${FLAG_WADMIN} -eq 1 -o ${FLAG_WADMIN_RELOAD} -eq 1 || return 0
+
+    test -n "${1}" || return 1
+    local action=${1}
+
+    service-wadmind1 ${action}
+}
+
+service-conf-wadmind()
+{
+    local mode=${1}
+    if test "${mode}" != force ; then
+	test "${ADMIN_WADMIN}" != "${CURRENT_ADMIN_WADMIN}" -o \
+	    "${STATE_CFG_ADMIN_WADMIN}" == modified || return 0
+    fi
+
+    STATE_CFG_ADMIN_WADMIN=modified
+
+    if test "${ADMIN_WADMIN}" = True ; then
+	activate-service ${WADMIND_NAME}
+    else
+	deactivate-service ${WADMIND_NAME}
+    fi
+}
+
+service-httpd1()
+{
+    test ${APL_ROLE} == 'gateway' || return 0
+
+    test -n "${1}" || return 1
+    local action=${1}
+
+    STATE_SRV_HTTPD=${action}
+
+    case ${action} in
+	start|stop)
+	    getpids httpd > /dev/null
+	    test ${?} -ne 0 -o ${action} != stop || service httpd stop
+	    test ${action} != start || service httpd start
+	    ;;
+	reload)
+	    service httpd reload
+	    ;;
+	*)
+	    return 1
+	    ;;
+    esac
+}
+
+service-httpd()
+{
+    test -n "${FLAG_HTTPD}" || return 0
+    test -n "${FLAG_HTTPD_RELOAD}" || return 0
+
+    test -n "${1}" || return 1
+    local action=${1}
+
+    case ${action} in
+	start|stop)
+	    test ${FLAG_HTTPD} -eq 1 || return 0
+	    service-httpd1 ${action}
+	    ;;
+	reload)
+	    test ${FLAG_HTTPD} -eq 0 || return 0
+	    test ${FLAG_HTTPD_RELOAD} -eq 1 || return 0
+	    service-httpd1 ${action}
+	    ;;
+	*)
+	    return 1
+	    ;;
+    esac
+}
+
+service-htcacheclean1()
+{
+    test -n "${1}" || return 1
+    local action=${1}
+
+    STATE_SRV_CACHE_CLEAN=${action}
+
+    case ${action} in
+	stop)
+	    getpids htcacheclean > /dev/null
+	    test ${?} -ne 0 || service htcacheclean stop
+	    ;;
+	start)
+	    test "${PROXY2_MODE}" == False -o "${CACHE_MODE}" == False || service htcacheclean start
+	    ;;
+	*)
+	    ;;
+    esac
+}
+
+service-htcacheclean()
+{
+    test -n "${FLAG_CACHE_CLEAN}" || return 0
+    test ${FLAG_CACHE_CLEAN} -eq 1 || return 0
+
+    test -n "${1}" || return 1
+    local action=${1}
+
+    service-htcacheclean1 ${action}
+}
+
+service-conf-squid()
+{
+    local mode=${1}
+
+    if test "${mode}" != force ; then
+	test "${SQUID_IS_ACTIVE}" != "${CURRENT_SQUID_IS_ACTIVE}" -o \
+	     "${STATE_CFG_SQUID}" == modified || return 0
+    fi
+
+    STATE_CFG_SQUID=modified
+
+    if test "${SQUID_IS_ACTIVE}" == True ; then
+	activate-service squid
+    else
+	deactivate-service squid
+    fi
+}
+
+service-conf-htcacheclean()
+{
+    local mode=${1}
+    if test "${mode}" != force ; then
+	test "${PROXY2_MODE}" != "${CURRENT_PROXY2_MODE}" -o "${CACHE_MODE}" != "${CURRENT_CACHE_MODE}" || return 0
+    fi
+
+    if test "${PROXY2_MODE}" == True -a "${CACHE_MODE}" == True ; then
+	activate-service htcacheclean
+    else
+	deactivate-service htcacheclean
+    fi
+}
+
+service-localnet1()
+{
+    test -n "${1}" || return 1
+    local action=${1}
+
+    STATE_SRV_LOOPBACK=${action}
+
+    service localnet ${action}
+}
+
+service-localnet()
+{
+    test -n "${FLAG_LOCALNET}" || return 0
+    test ${FLAG_LOCALNET} -eq 1 || return 0
+
+    test -n "${1}" || return 1
+    local action=${1}
+ 
+    service-localnet1 ${action}
+}
+
+service-ip-network()
+{
+    test check-ip-modified || return 0
+
+    test -n "${1}" || return 1
+    local action=${1}
+ 
+    service network ${action}
+}
+
+service-network-dev()
+{
+    test -n "${1}" || return 1
+    local action=${1}
+ 
+    case ${action} in
+	start)
+	    service-ip-network start
+	    ;;
+	stop)
+	    service-ip-network stop
+	    test ${CURRENT_BOND_MODE} == False || rmmod bonding
+	    ;;
+	*)
+	    return 2
+	    ;;
+    esac
+}
+
+service-network-conf()
+{
+    test -n "${1}" || return 1
+    local action=${1}
+
+    case ${action} in
+	start)
+	    set-ip-forwarding
+	    set-arp-ignore
+	    ;;
+	*)
+	    ;;
+    esac
+
+}
+
+service-network1()
+{
+    test -n "${1}" || return 1
+    local action=${1}
+
+    STATE_SRV_NETWORK=${action}
+
+    service-network-dev ${action}
+    service-network-conf ${action}
+}
+
+service-network()
+{
+    test -n "${FLAG_NETWORK}" || return 0
+    test ${FLAG_NETWORK} -eq 1 || return 0
+
+    test -n "${1}" || return 1
+    local action=${1}
+
+    service-network1 ${action}
+}
+
+service-statistics1()
+{
+    test ${APL_ROLE} == 'gateway' || return 0
+
+    test -n "${1}" || return 1
+    local action=${1}
+
+    STATE_SRV_STATISTICS=${action}
+
+    service statistics ${action}
+}
+
+service-statistics()
+{
+    test -n "${FLAG_NETWORK_STATISTICS}" || return 0
+    test ${FLAG_NETWORK_STATISTICS} -eq 1 || return 0
+
+    test -n "${1}" || return 1
+    local action=${1}
+
+    service-statistics1 ${action}
+}
+
+service-health1()
+{
+    test -n "${1}" || return 1
+    local action=${1}
+
+    STATE_SRV_HEALTH=${action}
+
+    getpids apl_healthd > /dev/null
+    test ${?} -ne 0 -o ${action} != stop || service health stop
+
+    if test ${action} == start ; then
+	usleep 1000000
+	service health start
+    fi
+}
+
+service-health()
+{
+    test -n "${FLAG_HEALTH}" || return 0
+    test ${FLAG_HEALTH} -eq 1 || return 0
+
+    test -n "${1}" || return 1
+    local action=${1}
+
+    service-health1 ${action}
+}
+
+service-path1()
+{
+    test -n "${1}" || return 1
+    local action=${1}
+
+    STATE_SRV_PATH=${action}
+
+    getpids apl_pathd > /dev/null
+    test ${?} -ne 0 -o ${action} != stop || service path stop
+    test ${action} != start -o "${PATH_IS_ACTIVE}" == False || service path start
+}
+
+service-path()
+{
+    test -n "${FLAG_PATH}" || return 0
+    test ${FLAG_PATH} -eq 1 || return 0
+
+    test -n "${1}" || return 1
+    local action=${1}
+
+    service-path1 ${action}
+}
+
+service-conf-path()
+{
+    local mode=${1}
+    if test "${mode}" != force ; then
+	test "${PATH_IS_ACTIVE}" != "${CURRENT_PATH_IS_ACTIVE}" -o \
+	     "${STATE_CFG_PATH}" == modified || return 0
+    fi
+
+    STATE_CFG_PATH=modified
+
+    if test "${PATH_IS_ACTIVE}" == True ; then
+	activate-service path
+    else
+	deactivate-service path
+    fi
+}
+
+service-squid1()
+{
+    test ${APL_ROLE} == 'gateway' || return 0
+
+    test -n "${1}" || return 1
+    local action=${1}
+
+    STATE_SRV_SQUID=${action}
+
+    case ${action} in
+	start|stop)
+	    getpids squid > /dev/null
+	    test ${?} -ne 0 -o ${action} != stop || service squid stop
+	    test ${action} != start -o "${SQUID_IS_ACTIVE}" == False || service squid start
+	    ;;
+	reload)
+	    service squid reload
+	    ;;
+	clearssl)
+	    log "Clearing the SSL certificate cache"
+	    service-nolog squid ${action}
+	    log-result ${?}
+	    ;;
+	*)
+	    return 1
+	    ;;
+    esac
+}
+
+service-squid()
+{
+    test -n "${FLAG_SQUID}" || return 0
+    test -n "${FLAG_SQUID_RELOAD}" || return 0
+    test -n "${FLAG_GUARD}" || return 0
+    test -n "${FLAG_GUARD_RELOAD}" || return 0
+    test -n "${FLAG_SQUID_LDAP_PASSWD}" || return 0
+
+    test -n "${1}" || return 1
+    local action=${1}
+
+    case ${action} in
+	start|stop)
+	    test ${FLAG_SQUID} -eq 1 -o ${FLAG_GUARD} -eq 1 || return 0
+	    service-squid1 ${action}
+	    ;;
+	reload)
+	    test ${SQUID_IS_ACTIVE} == True || return 0
+	    test ${FLAG_SQUID} -eq 0 || return 0
+	    test ${FLAG_SQUID_RELOAD} -eq 1 -o ${FLAG_GUARD_RELOAD} -eq 1 -o ${FLAG_SQUID_LDAP_PASSWD} -eq 1 || return 0
+	    service-squid1 ${action}
+	    ;;
+	clearssl)
+	    test ${FLAG_SQUID_CLEARSSL} -eq 1 || return 0
+	    service-squid1 ${action}
+	    ;;
+	*)
+	    return 1
+	    ;;
+    esac
+}
+
+service-sysctl1()
+{
+    test -n "${1}" || return 1
+    local action=${1}
+
+    STATE_SRV_SYSCTL=${action}
+
+    test ${action} == stop || service sysctl ${action}
+}
+
+service-sysctl()
+{
+    test -n "${FLAG_SYSCTL}" || return 0
+    test ${FLAG_SYSCTL} -eq 1 || return 0
+
+    test -n "${1}" || return 1
+    local action=${1}
+
+    service-sysctl1 ${action}
+}
+
+service-sysnetctl1()
+{
+    test -n "${1}" || return 1
+    local action=${1}
+
+    STATE_SRV_SYSNETCTL=${action}
+
+    service sysnetctl ${action}
+}
+
+service-sysnetctl()
+{
+    test -n "${FLAG_SYSNETCTL}" || return 0
+    test ${FLAG_SYSNETCTL} -eq 1 || return 0
+
+    test -n "${1}" || return 1
+    local action=${1}
+
+    service-sysnetctl1 ${action}
+}
+
+service-syslog1()
+{
+    test -n "${1}" || return 1
+    local action=${1}
+
+    STATE_SRV_SYSLOG=${action}
+
+    case ${action} in
+	start)
+	    service rsyslogd ${action}
+	    ;;
+	stop)
+	    service rsyslogd ${action}
+	    ;;
+	*)
+	    ;;
+    esac
+}
+
+service-syslog()
+{
+    test -n "${FLAG_SYSLOG}" || return 0
+    test ${FLAG_SYSLOG} -eq 1 || return 0
+
+    test -n "${1}" || return 1
+    local action=${1}
+
+    service-syslog1 ${action}
+}
+
+service-rlogger1()
+{
+    test -n "${1}" || return 1
+    local action=${1}
+
+    STATE_SRV_RLOGGER=${action}
+
+    local process=$(get-rlogger-process)
+    test -z "${process}" -o ${action} != stop || service rlogger stop
+    test ${action} != start -o "${RLOGGER_IS_ACTIVE}" == False || service rlogger start
+}
+
+service-rlogger()
+{
+    test -n "${FLAG_RLOGGER}" || return 0
+    test -n "${RLOGGER_IS_ACTIVE}" || return 0
+
+    test ${FLAG_RLOGGER} -eq 1 || return 0
+
+    test -n "${1}" || return 1
+    local action=${1}
+
+    service-rlogger1 ${action}
+}
+
+service-iptables1()
+{
+    test -n "${1}" || return 1
+    local action=${1}
+
+    STATE_SRV_IPTABLES=${action}
+
+    service iptables ${action}
+}
+
+service-iptables()
+{
+    test -n "${FLAG_IPTABLES}" || return 0
+    test ${FLAG_IPTABLES} -eq 1 || return 0
+
+    test -n "${1}" || return 1
+    local action=${1}
+
+    service-iptables1 ${action}
+}
+
+service-tc1()
+{
+    test -n "${1}" || return 1
+    local action=${1}
+
+    STATE_SRV_TC=${action}
+
+    service tc ${action}
+}
+
+service-tc()
+{
+    test -n "${FLAG_TC}" || return 0
+
+    test ${FLAG_TC} -eq 1 || return 0
+
+    test -n "${1}" || return 1
+    local action=${1}
+
+    service-tc1 ${action}
+}
+
+service-ocspd1()
+{
+    test -n "${1}" || return 1
+    local action=${1}
+
+    STATE_SRV_OCSP=${action}
+
+    local process=$(get-ocsp-process)
+    test -z "${process}" -o ${action} != stop || service ocspd stop
+    test ${action} != start -o "${OCSP_IS_ACTIVE}" == False || service ocspd start
+}
+
+service-ocspd()
+{
+    test -n "${FLAG_OCSP}" || return 0
+    test ${FLAG_OCSP} -eq 1 || return 0
+
+    test -n "${1}" || return 1
+    local action=${1}
+
+    service-ocspd1 ${action}
+}
+
+service-conf-ocsp()
+{
+    local mode=${1}
+    if test "${mode}" != force ; then
+	test "${OCSP_IS_ACTIVE}" != "${CURRENT_OCSP_IS_ACTIVE}" -o \
+	     "${STATE_CFG_OCSP}" == modified || return 0
+    fi
+
+    STATE_CFG_OCSP=modified
+
+    if test "${OCSP_IS_ACTIVE}" == True ; then
+	activate-service ocspd
+    else
+	deactivate-service ocspd
+    fi
+}
+service-smanager1()
+{
+    test -n "${1}" || return 1
+    local action=${1}
+
+    STATE_SRV_SMANAGER=${action}
+
+    local process=$(get-smanager-process)
+    test -z "${process}" -o ${action} != stop || service smanager stop
+    test ${action} != start -o "${SMANAGER_IS_ACTIVE}" == False || service smanager start
+}
+
+service-smanager()
+{
+    test -n "${FLAG_SMANAGER}" || return 0
+    test ${FLAG_SMANAGER} -eq 1 || return 0
+
+    test -n "${1}" || return 1
+    local action=${1}
+
+    service-smanager1 ${action}
+}
+
+service-conf-smanager()
+{
+    local mode=${1}
+    if test "${mode}" != force ; then
+	test "${SMANAGER_IS_ACTIVE}" != "${CURRENT_SMANAGER_IS_ACTIVE}" -o \
+	     "${STATE_CFG_SMANAGER}" == modified || return 0
+    fi
+
+    STATE_CFG_SMANAGER=modified
+
+    if test "${SMANAGER_IS_ACTIVE}" == True ; then
+	activate-service smanager
+    else
+	deactivate-service smanager
+    fi
+}
+
+service-iked1()
+{
+    test -n "${1}" || return 1
+    local action=${1}
+
+    STATE_SRV_IKE=${action}
+
+    case ${action} in
+	start|stop)
+	    local process=$(get-ike-process)
+	    test -z "${process}" -o ${action} != stop || service iked stop
+	    test ${action} != start -o "${IKE_IS_ACTIVE}" == False || service iked start
+	    ;;
+	reload)
+	    service iked reload
+	    ;;
+	*)
+	    return 1
+	    ;;
+    esac
+}
+
+service-iked()
+{
+    test -n "${FLAG_IKE}" || return 0
+    test -n "${FLAG_IKE_RELOAD}" || return 0
+    test -n "${IKE_IS_ACTIVE}" || return 0
+
+    test -n "${1}" || return 1
+    local action=${1}
+
+    case ${action} in
+	start|stop)
+	    test ${FLAG_IKE} -eq 1 || return 0
+	    service-iked1 ${action}
+	    ;;
+	reload)
+	    test ${VPN_IPSEC_MODE} == True || return 0
+	    test ${FLAG_IKE} -eq 0 || return 0
+	    test ${FLAG_IKE_RELOAD} -eq 1 || return 0
+	    service-iked1 ${action}
+	    ;;
+	*)
+	    return 1
+	    ;;
+    esac
+}
+
+service-conf-ike()
+{
+    local mode=${1}
+    if test "${mode}" != force ; then
+	test "${IKE_IS_ACTIVE}" != "${CURRENT_IKE_IS_ACTIVE}" -o \
+	     "${STATE_CFG_IKE}" == modified || return 0
+    fi
+
+    STATE_CFG_IKE=modified
+
+    if test "${IKE_IS_ACTIVE}" == True ; then
+	activate-service iked
+    else
+	deactivate-service iked
+    fi
+}
+
+service-lcd4linux1()
+{
+    test -n "${1}" || return 1
+    local action=${1}
+
+    STATE_SRV_LCD4LINUX=${action}
+
+    service lcd4linux ${action}
+}
+
+service-lcd4linux()
+{
+    test -n "${FLAG_LCD4LINUX}" || return 0
+    test ${FLAG_LCD4LINUX} -eq 1 || return 0
+
+    test -n "${1}" || return 1
+    local action=${1}
+
+    service-lcd4linux1 ${action}
+}
+
+service-cron1()
+{
+    test -n "${1}" || return 1
+    local action=${1}
+
+    STATE_SRV_CRON=${action}
+
+    case ${action} in
+	start)
+	    service-nolog crond ${action}
+	    ;;
+	stop)
+	    service-nolog crond ${action}
+	    ;;
+	*)
+	    ;;
+    esac
+}
+
+service-cron()
+{
+    test -n "${FLAG_CRON}" || return 0
+    test ${FLAG_CRON} -eq 1 || return 0
+
+    test -n "${1}" || return 1
+    local action=${1}
+
+    service-cron1 ${action}
+}
+
+set-services-conf()
+{
+    test -n "${1}" || return 1
+    local mode=${1}
+
+    service-conf-rlogger ${mode}
+    service-conf-path ${mode}
+    service-conf-keepalived ${mode}
+    service-conf-snmp ${mode}
+    service-conf-ssh ${mode}
+    service-conf-wadmind ${mode}
+    service-conf-ntp ${mode}
+    service-conf-ns ${mode}
+    service-conf-dhcp ${mode}
+    service-conf-ocsp ${mode}
+    service-conf-smanager ${mode}
+    service-conf-ike ${mode}
+    service-conf-slapd ${mode}
+    service-conf-av ${mode}
+    service-conf-fresh-av ${mode}
+    service-conf-icap ${mode}
+    service-conf-squid ${mode}
+    service-conf-htcacheclean ${mode}
+
+    test ${APL_ROLE} == 'manager' || return 0
+
+    deactivate-service httpd
+}
+
+services-start-network()
+{
+    service-sysctl start
+    service-iptables start
+    service-localnet start
+    service-network start
+    service-tc start
+    service-named start
+}
+
+services-start-services()
+{
+    service-syslog start
+    service-rlogger start
+    service-smanager start
+    service-ocspd start
+    service-iked reload
+    service-iked start
+    service-sysnetctl start
+    service-statistics start
+    service-ntp start
+    service-dhcp start
+    service-ssh start
+    service-ssh manager-keygen
+    service-wadmind reload
+    service-wadmind start
+    service-fresh-av start
+    service-av reload
+    service-av start
+    service-slapd start
+    service-icap start
+    service-httpd start
+    service-httpd reload
+    service-squid start
+    service-squid clearssl
+    service-squid reload
+    service-htcacheclean start
+    service-keepalived start
+    service-cron start
+    test -n "${SNMP_TRAP_SERVER_DN_LIST}" || service-snmp start
+    service-lcd4linux restart
+    service-path start
+}
+
+services-start()
+{
+    services-start-network
+    services-start-services
+}
+
+services-stop()
+{
+    service-health stop
+    service-path stop
+    service-snmp stop
+    service-cron stop
+    service-keepalived stop
+    service-htcacheclean stop
+    service-squid stop
+    service-httpd stop
+    service-icap stop
+    service-slapd stop
+    service-av stop
+    service-fresh-av stop
+    service-wadmind stop
+    service-ssh stop
+    service-dhcp stop
+    service-ntp stop
+    service-named stop
+    service-statistics stop
+    service-iked stop
+    service-ocspd stop
+    service-smanager stop
+    service-tc stop
+    service-network stop
+    service-localnet stop
+    service-iptables stop
+    service-rlogger stop
+    service-syslog stop
+
+    test ${FLAG_HEALTH} -eq 1 || return 0
+
+    log "Updating Health Checks"
+    apl_health_check ${$} < /dev/console
+    log-result ${?}
+}
+
+firewall-if-modified-restart()
+{
+    test "${STATE_CFG_IPTABLES}" == modified -o "${STATE_CFG_TC}" == modified || return 0
+
+    service tc stop
+    service iptables stop
+
+    service iptables start
+    service tc start
+}
+
+services-state-start()
+{
+    test -z "${STATE_SRV_SYSCTL}"	|| service-sysctl1 start
+    test -z "${STATE_SRV_SYSLOG}"	|| service-syslog1 start
+    test -z "${STATE_SRV_RLOGGER}"	|| service-rlogger1 start
+    test -z "${STATE_SRV_IPTABLES}"	|| service-iptables1 start
+    test -z "${STATE_SRV_LOOPBACK}"	|| service-localnet1 start
+    test -z "${STATE_SRV_NETWORK}"	|| service-network1 start
+    test -z "${STATE_SRV_TC}"		|| service-tc1 start
+    test -z "${STATE_SRV_SMANAGER}"	|| service-smanager1 start
+    test -z "${STATE_SRV_OCSP}"		|| service-ocspd1 start
+    test -z "${STATE_SRV_IKE}"		|| service-iked1 start
+    test -z "${STATE_SRV_SYSNETCTL}"	|| service-sysnetctl1 start
+    test -z "${STATE_SRV_STATISTICS}"	|| service-statistics1 start
+    test -z "${STATE_SRV_SSH}"		|| service-ssh1 start
+    test -z "${STATE_SRV_WADMIN}"	|| service-wadmind1 start
+    test -z "${STATE_SRV_NTP}"		|| service-ntp1 start
+    test -z "${STATE_SRV_NS}"		|| service-named1 start
+    test -z "${STATE_SRV_DHCP}"		|| service-dhcp1 start
+    test -z "${STATE_SRV_FRESH_AV}"	|| service-fresh-av1 start
+    test -z "${STATE_SRV_AV}"		|| service-av1 start
+    test -z "${STATE_SRV_LDAP_PROXY}"	|| service-slapd1 start
+    test -z "${STATE_SRV_ICAP}"		|| service-icap1 start
+    test -z "${STATE_SRV_SQUID}"	|| service-squid1 start
+    test -z "${STATE_SRV_HTTPD}"	|| service-httpd1 start
+    test -z "${STATE_SRV_CACHE_CLEAN}"  || service-htcacheclean1 start
+    test -z "${STATE_SRV_KEEPALIVED}"	|| service-keepalived1 start
+    test -z "${STATE_SRV_CRON}"		|| service-cron1 start
+    test -z "${STATE_SRV_SNMPD}"	|| service-snmp1 start
+    test -z "${STATE_SRV_PATH}"		|| service-path1 start
+    test -z "${STATE_SRV_HEALTH}"	|| service-health1 start
+    test -z "${STATE_SRV_LCD}"		|| service-lcd4linux1 restart
+}
+
+services-state-stop()
+{
+    test -z "${STATE_SRV_HEALTH}"	|| service-health1 stop
+    test -z "${STATE_SRV_PATTH}"	|| service-path1 stop
+    test -z "${STATE_SRV_SNMPD}"	|| service-snmp1 stop
+    test -z "${STATE_SRV_CRON}"		|| service-cron1 stop
+    test -z "${STATE_SRV_DHCP}"		|| service-dhcp1 stop
+    test -z "${STATE_SRV_KEEPALIVED}"	|| service-keepalived1 stop
+    test -z "${STATE_SRV_CACHE_CLEAN}"  || service-htcacheclean1 stop
+    test -z "${STATE_SRV_HTTPD}" 	|| service-httpd1 stop
+    test -z "${STATE_SRV_SQUID}"	|| service-squid1 stop
+    test -z "${STATE_SRV_ICAP}"		|| service-icap1 stop
+    test -z "${STATE_SRV_LDAP_PROXY}"	|| service-slapd1 stop
+    test -z "${STATE_SRV_AV}"		|| service-av1 stop
+    test -z "${STATE_SRV_FRESH_AV}"	|| service-fresh-av1 stop
+    test -z "${STATE_SRV_NTP}"		|| service-ntp1 stop
+    test -z "${STATE_SRV_NS}"		|| service-named1 stop
+    test -z "${STATE_SRV_WADMIN}"	|| service-wadmind1 stop
+    test -z "${STATE_SRV_SSH}"		|| service-ssh1 stop
+    test -z "${STATE_SRV_STATISTICS}"	|| service-statistics1 stop
+    test -z "${STATE_SRV_IKE}"		|| service-iked1 stop
+    test -z "${STATE_SRV_OCSP}"		|| service-ocspd1 stop
+    test -z "${STATE_SRV_SMANAGER}"	|| service-smanager1 stop
+    test -z "${STATE_SRV_TC}"		|| service-tc1 stop
+    test -z "${STATE_SRV_NETWORK}"	|| service-network1 stop
+    test -z "${STATE_SRV_LOOPBACK}"	|| service-localnet1 stop
+    test -z "${STATE_SRV_IPTABLES}"	|| service-iptables1 stop
+    test -z "${STATE_SRV_RLOGGER}"	|| service-rlogger1 stop
+    test -z "${STATE_SRV_SYSLOG}"	|| service-syslog1 stop
+}
+
+clean-stop-cb()
+{
+    trap "" INT QUIT TERM
+    caller_program=$(file-basename ${0})
+
+    rm -f ${ADMIN_DIR}${GUI_ERRORS_FILE}.*
+    manage-appliance-unlock ${caller_program}
+    exit 100
+}
+
+apl-reboot-core()
+{
+    sync
+    /etc/rc.d/init.d/lcd4linux stop < /dev/console
+    lcd-print restart
+    init 6 > /dev/null 2> /dev/null
+}
+
+apl-reboot()
+{
+    manage-appliance-lock
+    trap "clean-stop-cb" INT QUIT TERM
+    apl-reboot-core
+}
+
+apl-halt()
+{
+    manage-appliance-lock
+    trap "clean-stop-cb" INT QUIT TERM
+    sync
+    /etc/rc.d/init.d/lcd4linux stop < /dev/console
+    lcd-print stop
+    poweroff -d
+}
+
+clean-abort-cb()
+{
+    rm -f ${ADMIN_DIR}${GUI_ERRORS_FILE}.*
+    apl-rollback-core
+    conf-unlock-env
+    conf-unlock-apl-file
+}
+
+clean-abort-apply-cb()
+{
+    trap "" INT QUIT TERM USR1
+    log-abort-begin
+    services-state-stop
+    clean-abort-cb
+    services-state-start
+    log "Ending the Abort operation"
+    log-result 0
+    kill -s SIGUSR1 -- -${$}
+    exit ${?}
+}
+
+clean-abort-configure-cb()
+{
+    trap "" INT QUIT TERM
+    log-abort-begin
+    clean-abort-cb
+    log "Ending the Abort operation"
+    log-result 0
+    exit 100
+}
+
+end-rollback()
+{
+    local ret=${1}
+    test -n "${ret}" || ret=0
+
+    log "Ending the Rollback operation"
+    manage-appliance-unlock apl_rollback
+    log-ret ${?}
+    exit ${ret}
+}
+
+set-accessed-names-resolved()
+{
+    test "${STATE_CFG_IPTABLES}" == modified -o "${STATE_CFG_TC}" == modified || return 0
+
+    cd ${CONF_DIR}
+
+    test "${STATE_CFG_IPTABLES}" != modified || safe-generate	gen-iptables-resolved	sysconfig.iptables	|| return 11
+    test "${STATE_CFG_TC}" != modified	     || safe-generate	gen-tc-resolved		sysconfig.tc		|| return 13
+
+    commit-classic-conf					  							|| return 15
+    clean-backup-conf												|| return 17
+}
+
+set-snmp-trap-names-resolved()
+{
+    test "${STATE_CFG_SNMPD}" == modified || return 0
+    is-dn-present-in-snmp-conf || return 0
+
+    service-snmp 	start						|| return 11
+}
+
+apl-rollback-core()
+{
+    local context=rollback
+
+    restore-admin-level-configuration || return 1
+    conf-load-cancel-env || return 3
+    prebuild-urllist
+    clean-loaded-urllist user
+    build-os-configuration ${context}
+    clean-patch
+    update-modification-state
+
+    return 0
+}
+
+apl-rollback()
+{
+    init-account-environment ${1}
+
+    trap "" INT QUIT TERM
+    manage-appliance-lock
+
+    log-reset
+    log "Begining the Rollback operation" ; log-ret 0
+    apl-rollback-core || end-rollback 1
+    end-rollback 0
+}
+
+end-configure()
+{
+    test -n "${1}" || return 1
+    local ret=${1}
+
+    log "Ending the Configure operation"
+    conf-unlock-env
+    conf-unlock-apl-file
+    log-ret ${?}
+    exit ${ret}
+}
+
+apl-configure-core()
+{
+    local failed context=configure
+
+    initialise || end-configure 11
+    check-applicability || end-configure 13
+    prebuild-urllist
+    build-all-urllists user
+    build-av-whitelist
+    update-proxy-av-whitelist ${context}
+    update-sslmediation-exceptions new ${context}
+    build-os-configuration ${context} || failed='yes'
+    vpnipsec-reset-access-db
+    set-embedded-applications
+    do-names-resolution
+    set-kerberos-create-state
+
+    if test -z "${failed}" ; then
+	save-admin-level-configuration
+	update-modification-state
+    fi
+}
+
+apl-configure()
+{
+    init-account-environment ${1}
+
+    trap 'clean-abort-configure-cb' INT QUIT TERM
+    manage-appliance-lock
+    echo ${$} > /var/run/apl_configure.pid
+
+    log-reset
+    log "Begining the Configure operation" ; log-result 0
+    apl-configure-core
+    end-configure 0
+}
+
+apl-backup()
+{
+    reset-backup-log
+    backup-log "Beginig the Backup operation" ; backup-log-ret ${?}
+
+    backup-log "Initialising the backup operation"
+    init-account-environment ${1} &&
+	manage-appliance-lock &&
+	conf-load-env
+    backup-log-ret ${?}
+
+    backup-system-files ; local ret=${?}
+    test ${ret} -eq 0 || clean-backup-files
+    manage-appliance-unlock
+
+    backup-log "Ending the Backup operation" ; backup-log-ret ${?}
+    return ${ret}
+}
+
+end-apply()
+{
+    test -n "${1}" || return 1
+    local ret=${1}
+
+    log "Ending the Apply operation"
+    conf-unlock-env
+    conf-unlock-apl-file
+    update-modification-state
+    log-result ${ret}
+    exit ${ret}
+}
+
+apl-kill-av-signature-mgt()
+{
+    killall freshclam 2> /dev/null
+}
+
+apl-kill-urllist-mgt()
+{
+    killall squidGuard 2> /dev/null
+
+    find ${PROXY_GUARD_DIR} -name "*.tmp.db" -exec rm -f {} \; 2> /dev/null
+}
+
+apl-kill-apply()
+{
+    local pidfile=/var/run/apl_apply.pid
+    test -f ${pidfile} || return 0
+    local pid=$(cat ${pidfile} 2> /dev/null)
+    test -n "${pid}" || return 0
+
+    apl-kill-av-signature-mgt
+    apl-kill-urllist-mgt
+
+    manage-all-but-apply-lock
+
+    kill -TERM ${pid} 2> /dev/null
+    manage-appliance-unlock
+}
+
+end-restore()
+{
+    local ret=${1}
+    test -n "${ret}" || ret=0
+
+    log "Checking the consistency of the operation"
+    if test ${ret} -ne 0 ; then
+	log-result ${ret}
+    	log "Starting all services"
+	apl_services start < /dev/console
+	log-result ${?}
+    else
+	log-result 0
+    fi
+
+    log "Ending the Restore operation"
+
+    conf-unlock-apl-file
+    log-result ${ret}
+    exit ${ret}
+}
+
+restore-system()
+{
+    log "Begining the restore operation"
+    log-result 0
+
+    log "Stopping all services"
+    apl_services stop < /dev/console
+    log-result ${?}
+
+    log "Updating Health Checks"
+    apl_health_check ${$} < /dev/console
+    log-result ${?}
+
+    restore-system-before
+    log "Restoring backed up files"
+    restore-system-files
+    log-result ${?}
+    restore-system-after
+    clean-restore-files
+
+    initialise || end-restore 1
+    check-applicability || end-restore 3
+    
+    apl-apply-core restore
+
+    log "Starting all services"
+    apl_services start < /dev/console
+    log-result ${?}
+
+    do-names-resolution
+    firewall-if-modified-restart
+    set-kerberos-create-state
+    update-modification-state
+    end-restore 0
+}
+
+apl-apply-core()
+{
+    local context=${1}
+    test -n "${context}" || context=apply
+
+    prebuild-urllist
+    build-all-urllists user
+    build-av-whitelist
+    update-proxy-av-whitelist ${context}
+    update-sslmediation-exceptions new ${context}
+    build-os-configuration ${context}
+    vpnipsec-reset-access-db
+    set-embedded-applications
+}
+
+apl-apply()
+{
+    init-account-environment ${1}
+
+    check-new-restore || trap 'clean-abort-apply-cb' INT QUIT TERM
+    manage-appliance-lock
+    echo ${$} > /var/run/apl_apply.pid
+
+    log-reset
+    log "Begining the Apply operation" ; log-result 0
+    initialise || end-apply 11
+    verify-new-usage || end-apply 13
+    verify-new-embedded-usage || end-apply 15
+    check-applicability || end-apply 17
+
+    set-clock
+
+    if check-new-restore ; then
+	restore-system || end-apply 19
+    else
+	services-stop
+	apl-apply-core apply
+	services-start-network
+	do-names-resolution
+	firewall-if-modified-restart
+	services-start-services
+	update-ipsec-whitelist
+	service-health start
+	set-kerberos-create-state
+	save-admin-level-configuration
+	set-registration
+	set-embedded-registration
+	apl-manage-patch ${1}
+    fi
+
+    verify-usage active log
+    end-apply 0
+}
+
+LIB_APL_CONF=Yes

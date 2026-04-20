@@ -1,0 +1,341 @@
+#!/bin/bash
+
+set-lfs-env()
+{
+    set +h
+    umask 022
+
+    export CHECK=no
+    export LC_ALL=POSIX
+    export MAKEFLAGS="-j4"
+    export LFS_TGT=${SYS_ARCHITECTURE}-lfs-linux-gnu
+}
+
+file-basename()
+{
+    test -n "${1}" || return 1
+    local name=${1}
+
+    local base=${name##*/}
+    if test -n "${2}" ; then
+	base=${base/${2}/}
+    fi
+    echo ${base}
+}
+
+file-dirname()
+{
+    test -n "${1}" || return 1
+    local name=${1}
+
+    local len=${#name} ; ((len--))
+    test ${name:${len}:1} != '/' || name=${name:0:${len}}
+    
+    local dir=${name%\/*}
+
+    if test "${dir}" == "${name}" ; then
+	echo .
+    else
+	echo ${dir}
+    fi
+}
+
+member()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 1
+    local list=${1}
+    local elt=${2}
+
+    local exp="^${elt}$|[ ]${elt}$|^${elt}[ ]|[ ]${elt}[ ]"
+    [[ "${list}" =~ ${exp} ]]
+}
+
+if-error-clean-return()
+{
+    test -n "${1}" || return 1
+    local code=${1}
+
+    test ${code} -ne 0 || return 0
+    echo "*** Last function call exited with the error code ${code}."
+    umount-lfs
+    return ${code}
+}
+
+configure-message()
+{
+    echo "+++ Configuring ${PACKAGE_NAME}..."
+}
+
+compile-message()
+{
+    echo "+++ Compiling ${PACKAGE_NAME}..."
+}
+
+test-message-begin()
+{
+    echo "+++ Testing ${PACKAGE_NAME} - Begin..."
+}
+
+test-message-end()
+{
+    echo "+++ Testing ${PACKAGE_NAME} - End"
+}
+
+install-message()
+{
+    echo "+++ Installing ${PACKAGE_NAME}..."
+}
+
+mount-lfs()
+{
+    sudo mount -v --bind /dev ${LFS}/dev
+    sudo mount -v --bind /dev/pts ${LFS}/dev/pts
+    sudo mount -vt sysfs sysfs ${LFS}/sys
+    sudo mount -vt tmpfs tmpfs ${LFS}/run
+    sudo mount -vt proc proc ${LFS}/proc
+
+    test -h ${LFS}/dev/shm || return 0
+
+    local link=$(readlink ${LFS}/dev/shm)
+    sudo mkdir -p ${LFS}/${link}
+}
+
+umount-lfs()
+{
+    if test -h ${LFS}/dev/shm ; then
+	local link=$(readlink ${LFS}/dev/shm)
+	sudo umount -v ${LFS}/${link}
+    fi
+
+    sudo umount -v ${LFS}/proc
+    sudo umount -v ${LFS}/run
+    sudo umount -v ${LFS}/sys
+    sudo umount -v ${LFS}/dev/pts
+    sudo umount -v ${LFS}/dev
+}
+
+move-log()
+{
+    local log logs base
+
+    test -d ${LFS}/tmp/${COMPILE_LOG_DIR} || return 0
+
+    logs=$(ls -1 ${LFS}/tmp/${COMPILE_LOG_DIR}/*.log 2> /dev/null)
+    for log in ${logs}
+    do
+	base=$(file-basename ${log})
+	cp -vf ${log} ${LOG_DIR}
+	sudo rm -vf ${log}
+    done
+    sudo rmdir -v ${LFS}/tmp/${COMPILE_LOG_DIR}
+}
+
+run()
+{
+    test -n "{1}" || return 1
+    test -n "{2}" || return 2
+    local shell=${1}
+    local script=${2}
+
+    shift ; shift
+    local files=${*} file
+
+    sudo install -m 755 -o root -g root ${script} ${LFS}/tmp
+ 
+    for file in ${files}
+    do
+	sudo install -m 644 -o root -g root ${file} ${LFS}/tmp
+    done
+
+    sudo chroot ${LFS} \
+	 /usr/bin/env -i \
+	 HOME=/root \
+	 TERM=${TERM} \
+	 PS1='\u:\w # ' \
+	 PATH=/bin:/usr/bin:/sbin:/usr/sbin:/usr/local/bin:/usr/local/sbin \
+	 ${shell} --login +h /tmp/${script}
+    local ret=${?}
+
+    sudo rm -f ${LFS}/tmp/${script}
+    for file in ${files}
+    do
+	sudo rm -f ${LFS}/tmp/${file}
+    done
+
+    return ${ret}
+}
+
+prepare-package()
+{
+    test -n "${1}" || return 1
+    local package=${1}
+    shift
+    local patches_list=${*}
+
+    unset PACKAGE_FILE PACKAGE_NAME PACKAGE_VERSION
+    local files file version name
+
+    files=$(ls -1r ${package}[-_][0-9]*.tar.* 2> /dev/null)
+
+    for file in ${files}
+    do
+	[[ "${file}" =~ ^${package}[-_][0-9A-Za-z.-]+\.tar\.(xz|gz|bz2)$ ]]
+	if test ${?} -eq 0 ; then
+	    name=${file}
+	    break
+	fi
+    done
+
+    if test -z "${name}" ; then
+	echo "*** No '${package}' compressed package was found!"
+	return 11
+    fi
+
+    version=${name/\.tar\.*}
+    version=${version/${package}-}
+
+    PACKAGE_FILE=${name}
+    PACKAGE_NAME=${package}
+    PACKAGE_VERSION=${version}
+
+    echo "+++ Unpacking ${PACKAGE_NAME}..."
+
+    local patches_file_name
+    local patch patch_file_name
+    for patch in ${patches_list}
+    do
+	patch_file_name=$(ls -1 ${package}[-_][0-9]*${patch}*patch.bz2 2> /dev/null)
+	if test -n "${patch_file_name}" ; then
+	    patch_file_name=$(file-basename ${patch_file_name} .bz2)
+	    patches_file_name="${patches_file_name} ${patch_file_name}"
+	fi
+    done
+
+    local package_dir=$(find . -maxdepth 1 -name "${package}[-_][0-9]*" -type d)
+    test -z "${package_dir}" || rm -rf ${package_dir}
+    tar xf ${PACKAGE_FILE}
+
+    package_dir=$(find . -maxdepth 1 -name "${package}[-_][0-9]*" -type d)
+    test -n "${package_dir}" || return 13
+    cd ${package_dir}
+    
+    local patch_name
+    for patch_name in ${patches_file_name}
+    do
+	rm -vf	../${patch_name}
+	bunzip2	--stdout ../${patch_name}.bz2 > ../${patch_name}
+	
+	echo "+++ Applying the patch ${patch_name}"
+	patch -Np1 -i ../${patch_name}
+	rm -vf ../${patch_name}
+    done
+}
+
+clean-package()
+{
+    test -n "${1}" || return 1
+    test -n "${SOURCE_DIRECTORY}" || return 1
+    
+    local package=${1}
+    
+    echo "+++ Cleaning ${PACKAGE_NAME}"
+
+    cd ${SOURCE_DIRECTORY}
+    local package_dir=$(find . -maxdepth 1 -name "${package}[-_][0-9]*" -type d 2> /dev/null)
+
+    test -z "${package_dir}" || rm -rf ${package_dir}
+}
+
+create-minimal-dev()
+{
+    mknod -m 622 /dev/console c 5 1
+    mknod -m 666 /dev/null c 1 3
+    mknod -m 666 /dev/zero c 1 5
+    mknod -m 666 /dev/ptmx c 5 2
+    mknod -m 666 /dev/tty c 5 0
+    mknod -m 444 /dev/random c 1 8
+    mknod -m 444 /dev/urandom c 1 9
+    
+    chown root:tty /dev/{console,ptmx,tty}
+}
+
+prepare-build-package()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    test -n "${3}" || return 3
+    local package=${1}
+    local clean_flag=${2}
+    local build_pass=${3}
+    shift ; shift ; shift
+    local patches_list=${*}
+
+    prepare-package ${package} ${patches_list} &&
+	echo "+++ Building ${PACKAGE_NAME} - Pass ${build_pass}..." &&
+	build${build_pass}_${package} || return 1
+
+    test "${clean_flag}" == "noclean" || clean-package ${package}
+}
+
+install-packages()
+{
+    test -n "${1}" || return 1
+    log_dir=${1}
+
+    log_dir=${log_dir}
+
+    test -n "${SOURCE_DIRECTORY}" || return 3
+    test -n "${PACKAGES_NB}" || return 5
+
+    local pack pass log i
+
+    cd ${SOURCE_DIRECTORY}
+
+    for ((i=0 ; i < ${PACKAGES_NB} ; i++))
+    do
+	pack=${PACKAGES[${i}]/ *}
+	pass=${PACKAGES[${i}]#* }
+	pass=${pass#* }
+	pass=${pass/ *}
+	log=${log_dir}/${pack}-p${pass}.log
+	prepare-build-package ${PACKAGES[${i}]} 2>&1 | tee ${log}
+	test ${PIPESTATUS[0]} -eq 0 || return 11
+	cd ${SOURCE_DIRECTORY}
+    done
+}
+
+gcc-sanity-check()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    cc=${1}
+    check=${2}
+    
+    echo "+++ GCC sanity check:"
+    
+    echo 'int main(){}' > dummy.c
+    ${cc} dummy.c || return 11
+
+    echo "+++ Running: readelf -l a.out | grep '/ld-linux'"
+    readelf -l a.out | grep "${check}" || return 13
+    rm -vf dummy.c a.out
+}
+
+init-install-env()
+{
+    case ${SYS_ARCHITECTURE} in
+	x86_64)
+	    PKGCONFIG_DIR=/usr/lib64/pkgconfig
+	    ;;
+	*)
+	    PKGCONFIG_DIR=/usr/lib/pkgconfig
+	    ;;
+    esac
+}
+
+do-stripe()
+{
+    echo "+++ Stripping..."
+    run /bin/bash local-strip.bash
+}

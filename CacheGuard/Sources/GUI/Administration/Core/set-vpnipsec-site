@@ -1,0 +1,90 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       GUI
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+set-vpnipsec-site()
+{
+    local pos=0 entry_pos del_pos
+    local vpn_id_pos remote_address_pos authenticate_pos tls_authenticate_pos tls_id_pos psk_dn_fqdn_pos
+
+    local transaction=/tmp/${TRANSACTION_FILE}.wadmin.${REMOTE_USER}.${$}
+    rm -f ${transaction}
+
+    while test ${pos} -lt ${ATTRIBUTE_NB}
+    do
+	entry_pos=${pos}
+	vpn_id_pos=$[${pos} + 1]
+	remote_address_pos=$[${pos} + 2]
+	authenticate_pos=$[${pos} + 3]
+	tls_authenticate_pos=$[${pos} + 4]
+	tls_id_pos=$[${pos} + 5]
+	psk_dn_fqdn_pos=$[${pos} + 6]
+	del_pos=$[${pos} + 7]
+
+	[[ "${ATTRIBUTES[${del_pos}]}" =~ ^del_[0-9]+$ ]]
+
+	if test ${?} -ne 0 ; then
+	    if test "${VALUES[${entry_pos}]}" == anew -a \
+		    -n "${VALUES[${vpn_id_pos}]}" -a \
+		    -n "${VALUES[${remote_address_pos}]}" -a \
+		    -n "${VALUES[${authenticate_pos}]}" ; then
+
+		case ${VALUES[${authenticate_pos}]} in
+		    psk)
+			if test -z "${VALUES[${psk_dn_fqdn_pos}]}" ; then
+			    gen-gui-error 21
+			else
+			    echo "vpnipsec site add '${VALUES[${vpn_id_pos}]}' '${VALUES[${remote_address_pos}]}' '${VALUES[${authenticate_pos}]}' '${VALUES[${psk_dn_fqdn_pos}]}'" >> ${transaction}
+			fi
+			;;
+		    tls)
+			case ${VALUES[${tls_authenticate_pos}]} in
+			    certificate)
+				test -z "${VALUES[${tls_id_pos}]}" || \
+				    echo "vpnipsec site add '${VALUES[${vpn_id_pos}]}' '${VALUES[${remote_address_pos}]}' '${VALUES[${authenticate_pos}]}' '${VALUES[${tls_authenticate_pos}]}' '${VALUES[${tls_id_pos}]}'" >> ${transaction}
+				;;
+			    dn|fqdn)
+				test -z "${VALUES[${psk_dn_fqdn_pos}]}" || \
+				    echo "vpnipsec site add '${VALUES[${vpn_id_pos}]}' '${VALUES[${remote_address_pos}]}' '${VALUES[${authenticate_pos}]}' '${VALUES[${tls_authenticate_pos}]}' '${VALUES[${psk_dn_fqdn_pos}]}'" >> ${transaction}
+				;;
+			    *)
+				;;
+			esac
+			;;
+		    *)
+			;;
+		esac
+	    fi
+	    ((pos += 7))
+	else
+	    echo "vpnipsec site del '${VALUES[${vpn_id_pos}]}'" >> ${transaction}
+	    ((pos += 8))
+	fi
+    done
+    
+    execute-transaction ${transaction}
+}
+
+# Main()
+
+set-vpnipsec-site

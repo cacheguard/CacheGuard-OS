@@ -1,0 +1,46 @@
+Manage the SSL mediation
+.SH SYNOPSIS
+
+[1] \fBsslmediate\fR [\fBtransparent\fR [(\fBon\fR | \fBoff\fR)]]
+
+[2] \fBsslmediate\fR [(\fBexpired\fR | \fBpremature\fR | \fBselfsigned\fR) [(\fBon\fR | \fBoff\fR)]]
+
+[3] \fBsslmediate policy\fR [(\fBallow\fR | \fBdeny\fR)]
+
+[4] \fBsslmediate exception\fR [\fBdomainname\fR [(\fBadd\fR | \fBdel\fR) \fI<domain-name>\fR | \fBraz\fR]]
+
+[5] \fBsslmediate exception\fR [\fBurllist\fR [(\fBadd\fR | \fBdel\fR) \fI<urllist-name>\fR | \fBraz\fR]]
+
+.SH DESCRIPTION
+
+The SSL mediation allows you to decrypt HTTPS traffic at the gateway point in order to cache, inspect its contents and possibly block unwanted contents. The \fBsslmediate\fR command is used to configure the SSL mediation at the gateway point.
+
+The first [1] usage form allows you to activate or deactivate the transparent SSL mediation. When the transparent mode is turned off the proxy IP address and its port number must be set at the client side (Firefox, Chrome...) for HTTPS. When the transparent mode is turned on this setting is not required as long as HTTPS traffic are routed via the appliance.
+
+The second [2] usage form allows you to configure the tolerance of the system to allow or deny some errors in original certificates transmitted by HTTPS servers. The following errors can be allowed or denied at the gateway level:
+
+\(bu \fBexpired\fR: the certificate has expired and is no longer valid.
+
+\(bu \fBpremature\fR: the certificate is not yet valid because its validity period is in the future.
+
+\(bu \fBselfsigned\fR: the certificate is self signed or an intermediary certificate used to sign it is self signed (not signed by a know CA: Certificate Authority).
+
+To allow an error use the keyword \fBon\fR. To deny an error use the keyword \fBoff\fR.
+
+The third [3] usage form allows you to configure the SSL mediation policy. In this way the gateway can bypass the SSL mediation for some websites (\fBdeny\fR policy) or only act as an SSL mediator for some given websites (\fBallow\fR policy). The fourth [4] and fifth [5] usage form are used to define domain name exceptions to be treated or bypassed by the SSL mediation. Please note that exception lists can't contain a domain name and one of its sub domains at the same time. In such a case sub domains are simply ignored.
+
+To add a domain name to the list of exceptions use the keywords \fBdomain\fR \fBadd\fR followed by the domain name. To add a URL list of domain names (see the command \fBurllist\fR) use the keywords \fBurllist\fR \fBadd\fR followed by the URL list name (as defined by the command \fBurllist\fR). To delete an entry use keyword \fBdel\fR instead on \fBadd\fR. To completely erase the exception list use the keyword \fBraz\fR.
+
+\fBCAUTION\fR: please note that as HTTPS aims to give users privacy and security, its decrypting in the middle (before reaching the final client) may violate ethical norms and should be used with caution.
+
+.SH SEE ALSO
+.B apply
+(1)
+.B mode
+(1)
+.B tls
+(1)
+.B transparent
+(1)
+.B urllist
+(1)

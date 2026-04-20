@@ -1,0 +1,108 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       Commands
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+source functions
+
+check-ntp-nb()
+{
+    local len=$(length-list "${NTP_SERVER_LIST}")
+    test ${len} -lt ${MAX_NTP_SERVER_NB}
+}
+
+show-ntps1()
+{
+    local ntps=${2}
+
+    echo-command-form "ntp"
+    if test "${1}" == "new" ; then
+	echo-mark-new
+    else
+	echo-mark-cur
+    fi
+
+    if test -z "${ntps}" ; then
+	echo-value-null
+    else
+	local ip i=0
+	for ip in ${ntps}
+	do
+	    test ${i} -eq 0 || echo-blank-command
+	    echo-value "${ip}"
+	    ((i++))
+	done
+    fi
+}
+
+show-ntps()
+{
+    echo-begin-show
+    show-ntps1 'cur' "${CURRENT_NTP_SERVER_LIST}"
+    test "${CURRENT_NTP_SERVER_LIST}" == "${NTP_SERVER_LIST}" || show-ntps1 'new' "${NTP_SERVER_LIST}"
+    echo-end-show
+}
+
+run()
+{
+    if test -z "${ARGS[1]}" ; then show-ntps ; return 0 ; fi
+    local act=${ARGS[1]}
+    
+    case ${act} in
+	raz)
+	    export NTP_SERVER_LIST=""
+	    SAVENV=1
+	    ;;
+
+	add|del)
+	    test -n "${ARGS[2]}" || return 1
+	    local ip=${ARGS[2]}
+	    check-ip-name ${ip} || return 113
+	    
+	    if test ${act} == add ; then
+		check-ntp-nb || return 90
+		test ${ip} != "127.0.0.1" || return 38
+	    fi
+	    export NTP_SERVER_LIST=$(remove "${NTP_SERVER_LIST}" "${ip}")
+	    test ${act} == add && export NTP_SERVER_LIST="${NTP_SERVER_LIST} ${ip}"
+	    SAVENV=1
+	    ;;
+
+	update)
+	    user-has-admin-rights || return 31
+	    if test -n "${CURRENT_NTP_SERVER_LIST}" ; then
+		check-lock || return 123
+		supervisor-action "ntp-restart"
+		test ${?} -eq 0 || return 104
+		return 0
+	    else
+		test -z "${NTP_SERVER_LIST}" || return 134
+		return 135
+	    fi
+	    ;;
+	*)
+	    return 1
+	    ;;
+    esac
+}
+
+main "${@}"

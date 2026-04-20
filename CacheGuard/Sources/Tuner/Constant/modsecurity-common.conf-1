@@ -1,0 +1,48 @@
+SecRuleInheritance Off
+SecRuleEngine On
+SecRulePerfTime 3000
+SecConnEngine On
+SecContentInjection On 
+
+SecChrootDir /
+SecTmpDir /tmp
+SecDataDir /tmp
+
+SecAuditEngine Off
+SecAuditLogParts ABIHZ
+SecAuditLogType Concurrent
+SecAuditLogRelevantStatus "^(?:5|4(?!04))"
+SecAuditLogDirMode 0750
+SecAuditLogFileMode 0640
+
+SecUnicodeCodePage 20127
+SecCacheTransformations Off
+SecDisableBackendCompression Off
+SecHashEngine Off
+SecHashKey rand KeyOnly
+SecHashParam "hmac"
+SecUploadKeepFiles Off
+SecTmpSaveUploadedFiles On
+SecArgumentSeparator &
+SecCookieFormat 0
+SecCookieV0Separator ;
+SecUploadFileMode 0600
+SecUploadFileLimit 100
+SecPcreMatchLimit 10000
+SecPcreMatchLimitRecursion 10000
+
+SecRequestBodyAccess On
+SecRequestBodyLimitAction Reject
+SecRequestBodyInMemoryLimit 131072
+SecRequestBodyJsonDepthLimit 512
+
+SecResponseBodyAccess On
+SecResponseBodyMimeTypesClear
+SecResponseBodyMimeType text/html text/plain text/xml
+SecResponseBodyLimitAction ProcessPartial
+SecStatusEngine Off
+SecStreamInBodyInspection Off
+SecStreamOutBodyInspection Off
+SecInterceptOnError On
+SecSensorId CGWAF
+SecXmlExternalEntity Off

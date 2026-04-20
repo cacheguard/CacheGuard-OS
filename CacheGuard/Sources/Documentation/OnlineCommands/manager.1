@@ -1,0 +1,138 @@
+Configure a manager system
+.SH SYNOPSIS
+
+[1] \fBmanager ssh\fR [(\fBfingerprint\fR | \fBgenerate\fR | \fBshow\fR | (\fBload\fR | \fBsave\fR) (\fBprivate\fR \fBpublic\fR) (\fBftp\fR | \fBsftp\fR | \fBtftp\fR) \fI<file-server>\fR \fI<file-path>\fR)]
+
+[2] \fBmanager template\fR [\fBraz\fR | (\fBadd\fR \fI<template-id>\fR [(\fBtemplate\fR | \fBgateway\fR) \fI<source-id>\fR] | (\fBdel\fR \fI<template-id>\fR)]
+
+[3] \fBmanager template\fR [\fBbegin conf\fR \fI<template-id>\fR]
+
+[4] \fBmanager template\fR [\fBbegin exec\fR [\fI<template-id>\fR]]
+
+[5] \fBmanager gateway\fR [\fBraz\fR | (\fBadd\fR \fI<domain-id>\fR \fI<gateway-id>\fR \fI<gateway-ip>\fR) | (\fBdel\fR \fI<gateway-id>\fR)]
+
+[6] \fBmanager gateway\fR [\fBbegin conf\fR \fI<gateway-id>\fR]
+
+[7] \fBmanager gateway\fR [(\fBpush\fR | \fBpull\fR) [\fI<domain-id>\fR [\fI<gateway-id>\fR]]]
+
+[8] \fBmanager gateway\fR [\fBbegin exec\fR (\fBremote\fR | \fBlocal\fR) [\fI<domain-id>\fR [\fI<gateway-id>\fR]]]
+
+[9] \fBmanager template report exec\fR
+
+[10] \fBmanager gateway report\fR (\fBpush\fR | \fBpull\fR | \fBexec\fR (\fBremote\fR | \fBlocal\fR))
+
+[11] \fBmanager sync\fR [(\fBrole\fR [\fBalone\fR | \fBmaster\fR | \fBslave\fR]) | (\fBpeer\fR [\fI<peer-ip>\fR ["\fI<peer-manager-public-ssh-key>\fR"]]) | \fBreport\fR]
+
+.SH DESCRIPTION
+
+This command is only available on a system installed as a \fIManager\fR system (as opposed to a system installed as a \fIGateway\fR system). A \fIManager\fR system allows you to configure remote \fIGateway\fR systems without having to directly connect to them.
+
+A manager uses the SSH protocol to connect to remote gateways. In order to be automatically authenticated by remote gateways, a manger uses SSH private/public key pairs. In this operation mode, the manager's SSH public key should be exported to remote gateways using the \fBaccess\fR command on remote  gateways. The first [1] usage form allows you to:
+
+\(bu Show the fingerprint of the active public RSA key used to connect to \fIGateway\fR systems.
+
+\(bu Regenerate that RSA key.
+
+\(bu Show the active RSA key.
+
+\(bu Load or save the managers' SSH public and private SSH keys.
+
+If you are managing a group of gateways that have almost the same configuration, you will notice that you have to execute the same command as many times as you have gateways in that group. To avoid that, you can use templates. A template is a set of commands forming a generic configuration that you can apply to a group of gateways. This ways, you can quickly configure a group of gateways that differ little by just executing commands that make differences.
+
+Configuring a group of managed gateways with the aid of a template is done in four steps:
+
+\(bu First you create a template identified by a \fI<template-id>\fR and you configure it as if it was a gateway.
+
+\(bu Secondly you enrol (add) remote gateways on the manager and pull their current configuration from remote gateways.
+
+\(bu Then you can configure gateways by applying the template to them. At this step you can optionally make specific configuration for each gateway.
+
+\(bu And finally you can push gateway configurations made on the manager to remote gateways.
+
+Please note that unlike most commands that require an apply to take effect (by using the \fBapply\fR command), the following operations on a manager have an immediate effect:
+
+\(bu Adding and deleting templates and managed gateways.
+
+\(bu Pushing and Pulling gateway configurations.
+
+The second [2] usage form allows you to \fBadd\fR a new template, delete (\fBdel\fR) and existing template or erase (\fBraz\fR) the list of all existing templates. When adding a new template, you can set its configuration from a source template or gateway. To do so, you should use the keyword \fBtemplate\fR or \fBgateway\fR followed by the source template or gateway identifier (\fI<source-id>\fR). If no source template or gateway is specified, a blank template based on the default factory configuration is created. Without any arguments, this usage form shows the list of all existing templates.
+
+The third [3] usage form allows you to configure a template. To configure a template, you must specify the beginning of the template configuration by using the keywords \fBtemplate begin conf\fR followed by the \fI<template-id>\fR to configure. Then you can use commands that you normally use to configure \fIGateway\fR systems. When you finished configuring the template, you must use the \fBend\fR keyword to mark the end of the template configuration (and go back to the manager configuration level). Before ending a template configuration, please do not forget to validate it by using the \fBapply\fR command. Otherwise you will not be able to use it to configure a \fIGateway\fR system.
+
+The fourth [4] usage allows you to execute a set of commands on all templates or an identified template. You can use this usage form to modify settings related to entered commands on all templates without impacting other settings on templates.
+
+Usage forms five to eight allow you to manage \fIGateway\fR systems. The fifth [5] usage form allows you to enrol new remote gateways and \fBadd\fR them to the list of managed gateways. During the gateway enrolment process, the \fImanager\fR should connect to the remote \fIgateway\fR (using the SSH protocol) in order to get some key information that uniquely identifies that remote \fIgateway. To allow this process working, the remote \fIgateway\fR should accept connections from the \fImanager\fR. Please refer to the \fBaccess\fR command on remote \fIGateway\fR systems to get information on how to accept connections from a \fIManager\fR system. To add a gateway to the list of managed gateways, use the keywords \fBgateway add\fR followed by a domain group identifier (\fI<domain-id>\fR), a gateway identifier (\fI<gateway-id>\fR) and the remote gateway IP address. The gateway identifier uniquely identifies a gateway and it must begin with an alpha character and may contains alpha numeric characters as well as the characters "_" and "-". The domain group identifier allows you to place the enrolled gateway in a group identified by an identifier (\fI<domain-id>\fR). You can then apply operations like push or pull (see below) on a group of gateways that belong to a particular group (a group identifier syntax is the same as a gateway identifier syntax). To remove (and definitely forget) a gateway from the list of managed gateways use the keywords \fBgateway del\fR followed by the \fI<gateway-id>\fR to remove. To erase the list of all managed gateways use the keywords \fBgateway raz\fR.
+
+The sixth [6] usage form allows you to make a configuration for an enrolled gateway. To configure a gateway, you must specify the beginning of the gateway configuration by using the keywords \fBgateway begin conf\fR followed by the identifier of the gateway (\fI<gateway-id>\fR) to configure. Then you can use almost all configuration commands to configure the gateway. In addition, you have the possibility to use the \fBconf template\fR \fI<template-id>\fR command to initialise the gateway configuration with settings in the specified template. When you finished configuring the gateway, you must use the \fBend\fR keyword to mark the end of the gateway configuration to go back to the manager configuration level. Before ending a gateway configuration, please do not forget to validate it by using the \fBapply\fR command. Otherwise you will not be able to push that configuration on the remote \fIGateway\fR system.
+
+The seventh [7] usage form allows you to pull configurations from or push configurations to remote gateways. It should be noted that to push or pull configurations to remote gateways, remote gateways should run the same OS version as the manager. To \fBpush\fR a gateway configuration to a remote gateway, use the \fBgateway push\fR keywords followed by the domain and gateway identifiers (\fI<domain-id>\fR \fI<gateway-id>\fR) of that gateway. If no \fI<domain-id>\fR and \fI<gateway-id>\fR are specified, configuration of all gateways are pushed to remote gateways. If only a \fI<domain-id>\fR is specified, configuration of all gateways that belong to that \fI<domain-id>\fR are pushed to remote gateways. During a gateway \fBpush\fR operation, the manager performs the following tasks in sequence and in the event of an error, the operation on the gateway in question is stopped.
+
+\(bu The local gateway configuration and all related files to that configuration are pushed to the remote gateway using SFTP.
+
+\(bu The \fBapply force\fR command is executed on the remote gateway (an \fBapply check\fR is automatically executed first).
+
+When pushing a gateway configuration, you also push all files related to the configuration except the following files:
+
+\(bu Private parts of TLS client objects (key, password...).
+
+\(bu All antivirus signatures files.
+
+To pull the running configuration from a remote gateway use the keywords \fBgateway pull\fR followed by the domain and gateway identifiers (\fI<domain-id>\fR \fI<gateway-id>\fR) of that gateway. If no \fI<domain-id>\fR and \fI<gateway-id>\fR are specified, the configuration of all gateways are pulled. If only a \fI<domain-id>\fR is specified, the configuration of all gateways that belong to that \fI<domain-id>\fR are pulled. When pulling a gateway configuration, you also pull all files related to the configuration except the following files:
+
+\(bu URL list files (including \fBdomains\fR, \fBurls\fR and \fBexpressions\fR)
+
+\(bu All antivirus signatures files.
+
+\(bu The antivirus white list file.
+
+The eighth [8] usage form allows you to execute a set of commands on managed gateways. You have the possibility to directly execute commands on remote gateways (without affecting gateway configurations stored on the \fIManager\fR system) or execute commands on local gateway configurations stored on the \fIManager\fR system. To mark the beginning of a remote execution session use the keywords \fBgateway begin exec remote\fR followed by the domain and gateway identifiers (\fI<domain-id>\fR \fI<gateway-id>\fR) of the target gateway. If no \fI<domain-id>\fR and \fI<gateway-id>\fR are specified, commands are executed on all enrolled gateways. If only a \fI<domain-id>\fR is specified, commands are executed on all gateways that belong to that \fI<domain-id>\fR.
+
+Once the beginning of an execution session is marked, you can enter commands (one command per line) to execute on gateways. Entered commands are not executed until you mark the end of the execution session using the \fBend\fR keyword. If for any reasons you decide to do not execute specified commands, you can use the \fBend cancel\fR command (or alternatively press the CTRL+C keys). Please note that:
+
+\(bu A set of commands is executed in background and in parallel on specified remote gateways.
+
+\(bu Commands in a set are executed sequentially on a gateway and in case of an error on a command, following commands are ignored.
+
+\(bu As commands are executed in background, there is no possibility to read from the standard input. Hence, commands that require to read from the standard input return an error.
+
+\(bu Standard and error outputs are redirected to the execution report file (see the ninth usage form).
+
+To execute commands on local gateway configurations stored on the \fIManager\fR system, replace the \fBremote\fR keyword by the keyword \fBlocal\fR.
+
+The ninth [9] and tenth [10] usage forms allow you to display a report on the last \fBpush\fR, \fBpull\fR or \fBexec\fR operations.
+
+Finally, the eleventh [11] usage form allows you to activate and configure the synchronisation mode between two peer managers. In this mode a peer manager should take the \fBmaster\fR role while the other should be configured as its \fBslave\fR. If you configure manager as a master manager, the other manager should be configured as a slave manager and vice-versa. When the synchronisation is activated, all modifications on a the master manager are automatically replicated to the slave manager. This way, is case of a failure on the master manager, the slave manager can be used as a backup manager. In order to preserve consistency between a master manager and a slave manger, operations like pulling a configuration from a remote gateways or modifying a template configuration are not allowed on a slave manager. To allow a slave manger to perform those operation its role should be modified to \fBmaster\fR or \fBalone\fR. However you can use a salve manager to execute commands on remote gateways.
+
+Please note that both master and salves managers should be allowed on managed gateways. Master and slave managers on gateways are respectively referenced as \fBmaster\fR and \fBbackup\fR. Automatic data replications between peer managers use the SSH protocol. That's why the peer that acts as a slave manager should know the SSH public key of its master. In practice, each peer should know the SSH public key of the other to allow them to quickly swap their roles. It should also be noted that the peering relation between a master and a slave managers can only be established if both run the same OS version.
+
+To activate the synchronisation mode on a peer manager, use the keywords \fBsync role\fR followed by the \fBmaster\fR or \fBslave\fR keywords. To disable the synchronisation mode use the keywords \fBsync role alone\fR. To allow peers to be synchronised, each peer should know the IP address and the SSH public key of the other. To set them on a peer, use the \fBsync peer\fR keywords followed by the IP address of the remote peer and its SSH public key.
+
+On a master manager you can display a report on the latest synchronisation operation. To do so use the \fBsync report\fR keywords.
+
+.SH URL LISTS PUSH TO REMOTE GATEWAYS
+Loaded full or update URL list files present on the manager at the time of the push operation are pushed to remote gateways. If URL lists are configured to be automatically updated on the manager, the \fBmanager\fR command will always push the latest URL lists alongside other configurations to remote gateways. URL lists files can be full lists as well as updates depending on chosen configuration. Please refer to the\fBurllist\fR command for further information.
+
+.SH PUSH OF EXTENDED ANTIVIRUS SIGNATURES TO REMOTE GATEWAYS
+Extended antivirus signatures can be loaded on a \fIManager\fR system and automatically pushed to  managed \fIGateway\fR systems whenever they are updated on the manager. Please note that the automatic push of extended antivirus signatures can only be activated on a commercial installation of a manager system. Please refer to the \fBantivirus\fR command for further information.
+
+.SH SEE ALSO
+.B access
+(1)
+.B antivirus
+(1)
+.B apply
+(1)
+.B conf
+(1)
+.B end
+(1)
+.B error
+(1)
+.B file
+(1)
+.B information
+(1)
+.B urllist
+(1)
+.B warning
+(1)

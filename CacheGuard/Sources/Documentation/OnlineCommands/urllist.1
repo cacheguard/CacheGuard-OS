@@ -1,0 +1,225 @@
+Manage URL lists
+.SH SYNOPSIS
+
+[1] \fBurllist\fR [\fBraz\fR | (\fBadd\fR | \fBdel\fR) \fI<urllist-name>\fR | \fBupdate\fR | \fBreport\fR]
+
+[2] \fBurllist\fR [(\fBload\fR | \fBvload\fR) [(\fBcreate\fR | \fBupdate\fR | \fBauto\fR) \fI<urllist-name>\fR (\fBftp\fR | \fBsftp\fR | \fBtftp\fR) \fI<file-server>\fR \fI<base-file-name>\fR [(\fBdomains\fR | \fBurls\fR | \fBexpressions\fR)*]]]
+
+[3] \fBurllist\fR [\fBclear\fR \fI<urllist-name>\fR [(\fBdomains\fR | \fBurls\fR | \fBexpressions\fR)*]]
+
+[4] \fBurllist auto\fR [\fI<urllist-name>\fR [\fBoff\fR | (\fBon\fR (\fBload\fR | \fBvload\fR) (\fBcreate\fR | \fBupdate\fR) (\fBdaily\fR | \fBweekly\fR) (\fBpush\fR | (\fBftp\fR | \fBsftp\fR | \fBtftp\fR) \fI<file-server>\fR \fI<base-file-name>\fR))]]
+
+.SH DESCRIPTION
+This system allows you to filter the access to URLs and domain names according to policies and rules (see the \fBguard\fR command). The command \fBurllist\fR allows you to manage those lists of URLs and domain names. A URL list is represented by a unique name in the system. First, an empty URL list must be created. The first [1] usage form allows you to create, delete or update URL lists. To create an empty URL list use the keyword \fBadd\fR followed by a URL list name. A URL list name must begin with an alpha character and may contains alpha numeric characters as well as the characters "_" and "-". To delete a URL list use the keyword \fBdel\fR followed by the URL list name to delete. The keyword \fBraz\fR allows you to delete all URL lists.
+
+The system can be configured to periodically update URL list contents (see later). In the first usage form the keyword \fBupdate\fR allows you to explicitly update URL list contents without having to wait for the periodic automatic updates. This could be useful for instance with a suspended virtual machine having a non updated system time (in this case do not forgetgorget to update the system time prior to updating URL list contents). Using the keyword \fBreport\fR allows you to display the latest report of the automatic URL list content updating. During such an update if a URL list can't be loaded, an error is occurred. For error explanations see the section \fBDOWNLOAD ERROR CODES\fR below.
+
+The second [2] usage form allows you to load URL lists from files located on a file server. Only trusted file servers are allowed. Trusted file servers are defined with the command \fBaccess\fR. To load and build a URL list from scratch use the keyword \fBload\fR followed by the keyword \fBcreate\fR. The content of a URL list to load should be defined in three compressed (gzip format) text files having the same base name and three different extensions. The first file has the \fI.domains.gz\fR extension and contains a list of domain base names (one domain base name per line). Only domain \fBbase\fR name should be specified (for instance "example.com" is a valid domain base name while "www.example.com" is not). The second file has the extension \fI.urls.gz\fR and contains a list of URLs (one URL per line). A URL is in the form \fI<domain-name>/<loaction>\fR. Please note that the protocol part (for instance "http://") of the URL should not be specified in that file. Finally the third file has the extension \fI.expressions.gz\fR and contains a list of regular expressions (one regular expression per line). See the section \fBREGULAR EXPRESSIONS\fR below.
+
+When defining a domain name, do not specify the prefixes www, web and ftp. For a URL definition, protocol parts (http://, ftp://...), prefixes (www, web, ftp) and ports (:80, :443...) should not be specified. An expression is a regular expression as described in regex (see the regex (5) manual on a UNIX system). Note that complex regular expressions require large CPU resources.
+
+A \fBdomain\fR or \fBurl\fR diff file contains lines beginning with "-" (minus) or "+" (plus). To add a domain or a URL precede it with the character "-". To delete a domain or a URL precede it with the character "+". The \fI<base-file-name>\fR parameter is the base file name (without extensions \fI.domains.gz\fR, \fI .urls.gz\fR or \fI.expressions.gz\fR) of a defined URL list. File(s) must exist and be accessible on the file server. The optional last arguments specify which URL list types to load. URL list types are: \fBdomains\fR, \fBurls\fR and \fBexpressions\fR. If no URL list types are specified, \fBdomains\fR and \fBurls\fR URL list types are loaded.
+
+To update an existing URL list use the keyword \fBupdate\fR. In this case downloaded files are diff files. Only \fBdomains\fR and \fBurls\fR files can be updated. If more than one update file is loaded for the same URL list, updates well be successively applied to that URL list. In this case the order in which update files are loaded is important.
+
+To automatically download all updates since the last create or update operation, use the keyword \fBauto\fR. In this case downloaded files are diff files and should be named as follows: \fI<base-file-name>.<yyyymmdd>.(domains | urls).gz\fR where \fI<yyyymmdd>\fR is the date (\fIyyyy\fR is the year, \fImm\fR is the month and \fIdd\fR is the day). In the case where the URL list has never been loaded before and the update mode is used, the create mode is used (the URL list is entirely loaded from scratch).
+
+The \fBvload\fR (verify load) option allows you to secure downloads. This is useful when you download URL lists from a file server managed by CacheGuard Technologies or one of its referenced partners. When using the \fBvload\fR method, a signature file is downloaded alongside the URL list file and the URL list file is verified using that signature file to assure that the downloaded URL list file has not been altered during its transfer. The signature file name has the same name as the downloaded URL list file followed by the extension \fI.sig\fR. You can print a list of all downloaded files by using the keyword \fBload\fR (or \fBvload\fR) without any other options.
+
+Please note a URL list file in gzip compressed format can't be larger than than 128 MB. In case where \fBdomains\fR, \fBurls\fR and \fBexpressions\fR files are all loaded (separately or at the same time), if one of them exceeds the allowed limit, all of them are deleted and the current load operation is immediately cancelled. To load files larger than the allowed limit, you have the possibility to split them into smaller pieces.
+
+The third [3] usage form allows you clear the content of a URL list without completely deleting that list. You can select what parts of the URL list should be cleared by specifying the \fBdomains\fR, \fBurls\fR \fBexpressions\fR keywords. If no part name is specified, all parts are cleared.
+
+The fourth [4] usage form allows you to program the system to automatically download and apply URL list contents. This can be done \fBdaily\fR or \fBweekly\fR. To activate the automatic updating for a URL list use the \fBauto on\fR keywords followed by download specifications. To download the complete URL list use the \fBcreate\fR keyword. In case where a complete URL list is downloaded, files to download should be named as follows: \fI<base-file-name>.(domains | urls).gz\fR. Please note that both domains and urls files should exist on the remote file server. To only download updates (diff files) use the \fBupdate\fR keyword. Because downloading and rebuilding a complete URL list can be quite time and bandwidth consuming, always prefer the \fBupdate\fR mode rather than the \fBcreate\fR mode. The \fBupdate\fR mode allows the periodical download of all updates since the last \fBcreate\fR or \fBupdate\fR operation. This way, in case of an unavailability of a file server, not update files are lost. To allow the system to automatically download all update files since the last automatic update, files should be named as follows: \fI<base-file-name>.<yyyymmdd>.(domains | urls).gz\fR where \fI<yyyymmdd>\fR is the date (\fIyyyy\fR is the year, \fImm\fR is the month and \fIdd\fR is the day).
+
+Automatic downloads can be done using the \fBftp\fR, \fBsftp\fR or \fBtftp\fR protocols. In case where the system is managed by a remote \fImanager\fR system, the manager can be configured to download URL lists and push them to all gateways that it manages. In this case, you must specify the \fBpush\fR method as the used protocol. The \fBAUTO UPDATES ON A MANAGER SYSTEM\fR section below gives more information regarding automatic URL lists updates on a \fImanager\fR system.
+
+To deactivate the automatic updating for a URL list use the keywords \fBauto\fR followed by the keyword \fBoff\fR.
+
+.SH DOWNLOAD ERROR CODES
+\(bu Transfer error 1: Unsupported protocol. This build of the program has no support for this protocol.
+
+\(bu Transfer error 2: Failed to initialize.
+
+\(bu Transfer error 3: URL malformed. The syntax was not correct.
+
+\(bu Transfer error 5: Couldn't resolve proxy. The given proxy host could not be resolved.
+
+\(bu Transfer error 6: Couldn't resolve host. The given remote host was not resolved.
+
+\(bu Transfer error 7: Failed to connect to host.
+  
+\(bu Transfer error 8: FTP weird server reply. The server sent data the program couldn't parse.
+  
+\(bu Transfer error 9: FTP/SFTP access denied. The server denied login or denied access to the particular resource or directory you wanted to reach. Most often you tried to change to a directory that doesn't exist on the server. To save on an SFTP server always specify the full target path.
+
+\(bu Transfer error 11: FTP weird PASS reply. The Program couldn't parse the reply sent to the PASS request.
+
+\(bu Transfer error 13: FTP weird PASV reply, The Program couldn't parse the reply sent to the PASV request.
+
+\(bu Transfer error 14: FTP weird 227 format. The Program couldn't parse the 227-line the server sent.
+
+\(bu Transfer error 15: FTP can't get host. Couldn't resolve the host IP we got in the 227-line.
+
+\(bu Transfer error 17: FTP couldn't set binary. Couldn't change transfer method to binary.
+
+\(bu Transfer error 18: Partial file. Only a part of the file was transferred.
+
+\(bu Transfer error 19: FTP couldn't download/access the given file, the RETR (or similar) command failed.
+
+\(bu Transfer error 21: FTP quote error. A quote command returned error from the server.
+
+\(bu Transfer error 22: HTTP page not retrieved. The requested url was not found or returned another error with the HTTP error code being 400 or above. This return code only appears if -f/--fail is used.
+
+\(bu Transfer error 23: Write error. The Program couldn't write data to a local filesystem or similar.
+
+\(bu Transfer error 25: FTP couldn't STOR file. The server denied the STOR operation, used for FTP uploading.
+
+\(bu Transfer error 26: Read error. Various reading problems.
+
+\(bu Transfer error 27: Out of memory. A memory allocation request failed.
+
+\(bu Transfer error 28: Operation timeout. The specified timeout period was reached according to the conditions.
+
+\(bu Transfer error 30: FTP PORT failed. The PORT command failed. Not all FTP servers support the PORT command, try doing a transfer using PASV instead!
+
+\(bu Transfer error 31: FTP couldn't use REST. The REST command failed. This command is used for resumed FTP transfers.
+
+\(bu Transfer error 33: HTTP range error. The range "command" didn't work.
+
+\(bu Transfer error 34: HTTP post error. Internal post-request generation error.
+
+\(bu Transfer error 35: SSL connect error. The SSL handshaking failed.
+
+\(bu Transfer error 36: FTP bad download resume. Couldn't continue an earlier aborted download.
+
+\(bu Transfer error 37: FILE couldn't read file. Failed to open the file. Permissions?
+
+\(bu Transfer error 38: LDAP cannot bind. LDAP bind operation failed.
+
+\(bu Transfer error 39: LDAP search failed.
+
+\(bu Transfer error 41: Function not found. A required LDAP function was not found.
+
+\(bu Transfer error 42: Aborted by callback. An application told the program to abort the operation.
+
+\(bu Transfer error 43: Internal error. A function was called with a bad parameter.
+
+\(bu Transfer error 45: Interface error. A specified outgoing interface could not be used.
+
+\(bu Transfer error 47: Too many redirects. When following redirects, the program hit the maximum amount.
+
+\(bu Transfer error 48: Unknown TELNET option specified.
+
+\(bu Transfer error 49: Malformed telnet option.
+
+\(bu Transfer error 51: The peer's SSL certificate or SSH MD5 fingerprint was not ok.
+
+\(bu Transfer error 52: The server didn't reply anything, which here is considered an error.
+
+\(bu Transfer error 53: SSL cryptographic engine not found.
+
+\(bu Transfer error 54: Cannot set SSL cryptographic engine as default.
+
+\(bu Transfer error 55: Failed sending network data.
+
+\(bu Transfer error 56: Failure in receiving network data.
+
+\(bu Transfer error 58: Problem with the local certificate.
+
+\(bu Transfer error 59: Couldn't use specified SSL cipher.
+
+\(bu Transfer error 60: Peer certificate cannot be authenticated with known CA certificates.
+
+\(bu Transfer error 61: Unrecognised transfer encoding.
+
+\(bu Transfer error 62: Invalid LDAP URL.
+
+\(bu Transfer error 63: Maximum file size exceeded.
+
+\(bu Transfer error 64: Requested FTP SSL level failed.
+
+\(bu Transfer error 65: Sending the data requires a rewind that failed.
+
+\(bu Transfer error 66: Failed to initialise SSL Engine.
+
+\(bu Transfer error 67: The user name, password, or similar was not accepted and the program failed to log in.
+
+\(bu Transfer error 68: File not found on TFTP server.
+
+\(bu Transfer error 69: Permission problem on TFTP server.
+
+\(bu Transfer error 70: Out of disk space on TFTP server.
+
+\(bu Transfer error 71: Illegal TFTP operation.
+
+\(bu Transfer error 72: Unknown TFTP transfer ID.
+
+\(bu Transfer error 73: File already exists (TFTP).
+
+\(bu Transfer error 74: No such user (TFTP).
+
+\(bu Transfer error 75: Character conversion failed.
+
+\(bu Transfer error 76: Character conversion functions required.
+
+\(bu Transfer error 77: Problem with reading the SSL CA certificate (path? access rights?).
+
+\(bu Transfer error 78: The resource referenced in the URL does not exist.
+
+\(bu Transfer error 79: An unspecified error occurred during the SSH session.
+
+\(bu Transfer error 80: Failed to shut down the SSL connection.
+
+\(bu Transfer error 82: Could not load CRL file, missing or wrong format.
+
+\(bu Transfer error 83: Issuer check failed.
+
+.SH REGULAR EXPRESSIONS
+An expression list file contains regular expressions with one regular expression per line. The command guard uses Posix regular expressions.  The Posix Regular Expression language is a notation for describing textual patterns. Of most interest is:
+
+.TP
+\fB.\fR Matches any single character (use "\." to match a ".").
+
+.TP
+\fB[abc]\fR Matches one of the characters ("[abc]" matches a single "a" or "b" or  "c").
+
+.TP
+\fB[c-g]\fR Matches one of the characters in the range ("[c-g]" matches a single "c" or "d" or  "e" or "f" or "g". "[a-z0-9]" matches any single letter or digit. "[-/.:?]" matches any single "-" or "/" or "." or ":" or "?".).
+
+.TP
+\fB?\fR None or one of the preceding ("words?" will match "word" and "words". "[abc]?" matches a single "a" or "b" or "c" or nothing (i.e. "")).
+
+.TP
+\fB*\fR None or more of the preceding ("words*" will match "words" and "wordsssssss". ".*" will match anything including nothing).
+
+.TP
+\fB+\fR One or more of the preceding ("xxx+" will match a sequence of 3 or more "x").
+
+.TP
+\fB(expr1|expr2)\fR One of the expressions, which in turn may contain a similar construction ("(foo|bar)" will match "foo" or "bar". "(foo|bar)?" will match "foo" or "bar" or nothing (i.e. "")).
+
+.TP
+\fB$\fR The end of the line ("(foo|bar)$" will match "foo" or "bar" only at the end of a line).
+
+.TP
+\fB\\x\fR Disable the special meaning of x where x is one of the special regex characters \fB".?*+()^$[]{}\\"\fR (\\. will match a single ".", "\\\\" a single "\\" etc.)
+
+.SH AUTO UPDATES ON A MANAGER SYSTEM
+On a \fImanager\fR system, the automatic URL lists update can be activated depending on the installed license level. The activation is normally possible for non-free installation only. This feature on a manager allows you to periodically download URL lists from one or more remote file servers and then automatically push them on all remote gateways. Please refer to the \fBmanager\fR command for further information.
+
+If on a manager, an automatic URL list download is configured to download updates (diff files and not the complete content) and after a successful download from a remote file server, its push to a remote gateway fails (because of an unavailability of that gateway at the time of the push operation), the next time (the day or week after) the system will download and push the complete content for that URL list.
+
+.SH SEE ALSO
+.B access
+(1)
+.B apply
+(1)
+.B file
+(1)
+.B guard
+(1)
+.B manager
+(1)
+.B sslmediate
+(1)

@@ -1,0 +1,20 @@
+Halt the Operating System
+.SH SYNOPSIS
+
+[1] \fBhalt\fR [\fBforce\fR]
+
+.SH DESCRIPTION
+This command is used to shut down and then power off the system. It is only enabled for the
+.I admin
+user. During asynchronous operations (apply, log rotate...) this command is inoperable. You must wait until the end of these operations before calling the
+.B halt
+command (usually asynchronous commands have a
+.B report
+option that displays the execution statement).
+
+Without the optional argument \fBforce\fR the user is invited to confirm the halt action. The optional argument \fBforce\fR allows you to bypass this confirmation.
+
+Caution: It is highly recommended to use this command (or the Clean Power Button) to turn off the system. Turning the power supply directly off may damage your system.
+.SH SEE ALSO
+.B reboot
+(1)

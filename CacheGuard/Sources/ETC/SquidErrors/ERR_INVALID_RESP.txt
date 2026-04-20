@@ -1,0 +1,2 @@
+Invalid Response
+The HTTP Response message received from the contacted server could not be understood

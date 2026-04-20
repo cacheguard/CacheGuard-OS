@@ -1,0 +1,238 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       Configurator
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+encrypt()
+{
+    local key=${1}
+    echo -n "${key}" | openssl rsautl -encrypt -inkey /etc/appliance-public-key.pem -pubin 2> /dev/null | openssl enc -A -base64 2> /dev/null
+}
+
+get-baseboard-sn()
+{
+    local sn=$(dmidecode --string baseboard-serial-number 2> /dev/null)
+    test "${sn}" != "Default string" || sn="Unknown"
+    echo ${sn}
+}
+
+register-appliance()
+{
+    test -n "${1}" || return 101
+    local register_type=${1}
+
+    local integrity=sha1
+
+    local otp cloud usage email first last run
+    local embedded fps
+    local certificate_file fp
+    local timeout
+    local tls_id
+
+    case ${register_type} in
+	new|old)
+	    test -n "${2}" || return 101
+	    otp=${2}
+	    if test ${register_type} == new ; then
+		test -n "${3}" || return 103
+		email=${3}
+	    fi
+	    timeout=7
+	    ;;
+	cld)
+	    test -n "${2}" || return 105
+
+	    cloud=${CLOUD_NAME}
+	    usage=${CLOUD_USAGE}
+	    email=${2}
+	    first=${3}
+	    last=${4}
+	    run=${5}
+
+	    for embedded in ${CLOUD_EMBEDDED_APPLICATIONS}
+	    do
+		case ${embedded} in
+		    ${EMBEDDED_VPNSUBSCR_NAME})
+			tls_id=${EMBEDDED_VPNSUBSCR_RWEB_TLS_ID/:*}
+			certificate_file=${SSL_SERVER_DIR}/${tls_id}.certificate
+			if test -f ${certificate_file} ; then
+			    fp=$(openssl x509 -noout -fingerprint -${integrity} -in ${certificate_file} 2> /dev/null)
+			    fp=${fp/* Fingerprint=}
+			    fps="${fps}&${EMBEDDED_VPNSUBSCR_NAME}_${integrity}=${fp}"
+			fi
+			;;
+		    *)
+			;;
+		esac
+	    done
+	    embedded=${CLOUD_EMBEDDED_APPLICATIONS// /:}
+	    timeout=15
+	    ;;
+	*)
+	    return 107
+	    ;;
+    esac
+
+    update-link-mac || return 109
+
+    local phrase=$(random-phrase-base62)
+    local encrypted=$(encrypt "${phrase}")
+
+    local hid=$(get-hardware-id)
+    local memory_sz=$(get-installed-memory-sz)
+    local mac0=${hid/,*}
+    local mac1=${hid/*,}
+    local cpu=${CPU_NB}
+    local ram=$[${memory_sz}/1024]
+    local version=$(cat ${HARD_DIR}/os-version 2> /dev/null)
+    local idate=$(cat ${HARD_DIR}/${INSTALL_DATE} 2> /dev/null)
+
+    local arole=${APL_ROLE}
+    local mgateways=${MANAGER_GATEWAY_NB}
+    local fusers=${USERS_NB}
+    local rusers=${RUSERS_NB}
+    local guard=${URLLIST_RECORDS_NB}
+
+    test -n "${phrase}" || return 121
+    test -n "${encrypted}" || return 123
+    test -n "${mac0}" || return 125
+    test -n "${mac1}" || return 127
+    test -n "${cpu}" || return 129
+    test -n "${ram}" || return 131
+    test -n "${mgateways}" || return 133
+    test -n "${fusers}" || return 135
+    test -n "${rusers}" || return 137
+    test -n "${guard}" || return 139
+    test -n "${version}" || return 141
+    test -n "${idate}" || return 143
+
+    local curl_command=$(get-curl-command)
+    ${curl_command} --connect-timeout ${timeout} --max-time 45 --data "register=${phrase}&appliance=${encrypted}&cloud=${cloud}&usage=${usage}&embedded=${embedded}${fps}&first=${first}&last=${last}&run=${run}&email=${email}&otp=${otp}&mac0=${mac0}&mac1=${mac1}&cpu=${cpu}&ram=${ram}&arole=${arole}&mgateways=${mgateways}&fusers=${fusers}&rusers=${rusers}&guard=${guard}&version=${version}&idate=${idate}" --url ${REGISTER_APL_URL} 2> /dev/null
+}
+
+register-serial()
+{
+    local phrase=$(random-phrase-base62)
+    local encrypted=$(encrypt "${phrase}")
+    local arole=${APL_ROLE}
+    local sn=$(cat /etc/${TECHNICAL_NAME}/${SN_SN} 2>/dev/null)
+    local password=$(cat /etc/${TECHNICAL_NAME}/${SN_PASSWD} 2>/dev/null)
+    local hid=$(get-hardware-id)
+    local mac0=${hid/,*}
+    local level=$(get-usage-level)
+
+    test -n "${phrase}" || return 201
+    test -n "${encrypted}" || return 201
+    test -n "${mac0}" || return 201
+    test -n "${level}" || return 201
+
+    local curl_command=$(get-curl-command)
+
+    ${curl_command} --connect-timeout 7 --max-time 15 --data "register=${phrase}&serial=${encrypted}&role=${arole}&sn=${sn}&password=${password}&mac0=${mac0}&level=${level}" --url ${REGISTER_SN_URL} 2> /dev/null
+}
+
+register-embedded-application()
+{
+    test -n "${1}" || return 101
+    local embedded=${1}
+
+    case ${embedded} in
+	${EMBEDDED_VPNSUBSCR_NAME})
+	    ;;
+	*)
+	    return 103
+	    ;;
+    esac
+
+    local phrase=$(random-phrase-base62)
+    local encrypted=$(encrypt "${phrase}")
+    local sn=$(cat /etc/${TECHNICAL_NAME}/${SN_SN} 2>/dev/null)
+    local password=$(cat /etc/${TECHNICAL_NAME}/${SN_PASSWD} 2>/dev/null)
+
+    test -n "${phrase}" || return 201
+    test -n "${encrypted}" || return 201
+
+    local curl_command=$(get-curl-command)
+
+    ${curl_command} --connect-timeout 7 --max-time 15 --data "register=${phrase}&embedded=${encrypted}&sn=${sn}&password=${password}&pcode=${embedded}" --url ${EMBEDDED_REGISTER_URL} 2> /dev/null
+}
+
+register-check()
+{
+    local phrase=$(random-phrase-base62)
+    local encrypted=$(encrypt "${phrase}")
+    local sn=$(cat /etc/${TECHNICAL_NAME}/${SN_SN} 2>/dev/null)
+    local password=$(cat /etc/${TECHNICAL_NAME}/${SN_PASSWD} 2>/dev/null)
+
+    test -n "${phrase}" || return 201
+    test -n "${encrypted}" || return 203
+
+    local curl_command=$(get-curl-command)
+
+    ${curl_command} --connect-timeout 7 --max-time 15 --data "register=${phrase}&check=${encrypted}&sn=${sn}&password=${password}" --url ${REGISTER_CHECK_URL} 2> /dev/null
+}
+
+alive-check()
+{
+    test -n "${1}" || return 101
+    local date=${1}
+    local trial=${2}
+    test -n "${trial}" || trial='no'
+
+    test -s /etc/${TECHNICAL_NAME}/${SN_SN} || return 103
+
+    if test -s ${ETC_DIR}/${ALIVE_DATE} ; then
+	local old_date=$(cat ${ETC_DIR}/${ALIVE_DATE} 2> /dev/null)
+
+	if check-digit ${old_date} ; then
+	    local diff_date week_seconds precision=180
+
+	    ((week_seconds = 3600 * 24 * 7))
+	    ((diff_date = date - old_date - week_seconds))
+
+	    test ${diff_date} -ge -${precision} || return 105
+	else
+	    return 107
+	fi
+    fi
+
+    local phrase=$(random-phrase-base62)
+    local encrypted=$(encrypt "${phrase}")
+    local sn=$(cat /etc/${TECHNICAL_NAME}/${SN_SN} 2>/dev/null)
+
+    test -n "${phrase}" || return 121
+    test -n "${encrypted}" || return 123
+
+    update-link-mac || return 125
+
+    local hid mac0 level
+
+    hid=$(get-hardware-id)
+    mac0=${hid/,*}
+    level=$(get-usage-level)
+
+    local curl_command=$(get-curl-command)
+
+    ${curl_command} --connect-timeout 7 --max-time 15 --data "alive=${phrase}&check=${encrypted}&sn=${sn}&mac0=${mac0}&level=${level}&trial=${trial}" --url ${ALIVE_CHECK_URL} 
+}
+
+LIB_APL_REGISTER=Yes

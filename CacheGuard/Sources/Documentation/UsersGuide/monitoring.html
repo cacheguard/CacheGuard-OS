@@ -1,0 +1,31 @@
+<a name='main' class='doc-title'></a>
+<h1>CacheGuard Monitoring</h1>
+
+CacheGuard services and the machine on which CacheGuard OS is operating can be monitored at any time to provide a quick overview of the status of a CacheGuard appliance. Monitoring enables you to detect failures and malfunctions early enough to take corrective action and maintain service continuity for your users. You can monitor the system using SNMP (Simple Network Management Protocol) or by connecting directly to the appliance and using online commands or the equivalent Web Administration GUI pages.
+<p>
+Note that essential services are internally monitored by a dedicated service known as the "<i>Health Checker</i>". In the event of a failure in an essential service, the "<i>Health Checker</i>" attempts to restart the failed service. This operation is logged internally, and, if configured, an SNMP manager can receive a trap notification reporting the status of the restart operation.
+
+<a name='direct' class='doc-title'></a><h2>Direct Access</h2>
+
+You can use several commands combined with the <strong>report</strong> keyword to obtain a report on the underlying function of those commands. For example, you can use the following commands:
+
+<ul>
+  <li><i>system report</i></li>
+  <li><i>urllist report</i></li>
+  <li><i>antivirus report</i></li>
+</ul>
+
+You can refer to the Commands Manual for more information on commands that support the reporting feature.
+
+<a name='snmp' class='doc-title'></a><h2>Using SNMP</h2>
+
+A CacheGuard appliance integrates an SNMP agent that can be polled by an SNMP manager. It is also possible to configure the appliance to send SNMP traps to an SNMP receiver. Please note that a CacheGuard appliance uses TCP-based SNMP traps, referred to as SNMP notifications. To allow an SNMP manager with the IP address <i>172.18.2.1</i> to poll your CacheGuard appliance, and to send SNMP notifications version 1 to a receiver with the IP address <i>172.18.2.2</i>, use the following commands:
+
+<ul>
+  <li><i>admin snmp on</i></li>
+  <li><i>access mon add internal 172.18.2.1</i></li>
+  <li><i>admin snmp trap add v1 172.18.2.2</i></li>
+  <li><i>apply</i></li>
+</ul>
+
+When invoking the <i>admin snmp trap add v1 172.18.2.2</i> command, the administrator will be prompted to enter a password (the SNMP community string) to connect to the SNMP receiver. SNMP versions v1, v2c, and v3 are supported by CacheGuard OS, and the SNMP agent can be configured to operate over UDP, TCP, or TCP tunnelled over TLS. Commonly used MIBs for monitoring Linux systems are supported, as well as a dedicated MIB known as the CacheGuard-MIB. The ASN.1 MIB description for CacheGuard-MIB can be obtained via the Web Administration GUI (menu option <i>[NETWORK] &gt; [Monitoring Configuration] &gt; [SNMP Agent Settings]</i>), from the original installation CD-ROM, or from the official CacheGuard website.

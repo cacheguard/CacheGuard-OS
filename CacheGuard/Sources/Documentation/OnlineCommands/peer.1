@@ -1,0 +1,51 @@
+Manage connected peer Web proxies
+.SH SYNOPSIS
+
+[1] \fBpeer\fR [(\fBshare\fR | \fBha\fR | \fBprevious\fR) [\fBadd\fR \fI<ip>\fR [\fI<qos>\fR]]]
+
+[2] \fBpeer\fR [\fBnext\fR [\fBadd\fR \fI<ip>\fR [\fI<port-number>\fR]]]
+
+[3] \fBpeer\fR [(\fBshare\fR | \fBha\fR | \fBnext\fR | \fBprevious\fR) [\fBraz\fR | \fBdel\fR \fI<ip>\fR]]
+
+.SH DESCRIPTION
+A peer appliance is a remote Web proxy interacting with the local Web proxy. There are three types of peer:
+
+* Share peer,
+
+* HA (High Availability) peer
+
+* Chained peers (next and previous)
+
+A share peer is a remote proxy that is requested from the local proxy when it does not have a requested object (by a client) in its cache. Several share peers may be defined to share their caches. In this case, each peer must be configured adequately with regards to the others. Share peers work together in order to deliver Web object to end-users from their caches rather than searching them on the internet and hence optimise the bandwidth usage.
+
+An HA (High Availability) peer is a specific share peer, the difference being that Web objects retrieved from a share peer are not cached on the requesting proxy while Web objects retrieved from a HA peer are cached. HA peers should be used when peers are configured in a HA mode. In this case, when a master HA node fails, the newly elected master contains all Web objects as in the failed system (see the \fBmode\fR and \fBvrrp\fR commands for further information).
+
+Share and HA peers works in parallel to provide caching performances and availability to local clients. It is also possible to serialise (or chain) peers to provide caching performances and high availability to remote end-users. To chain a proxy with a peer, one must be configured as a next peer while the other is configured as a previous peer (to allow the other to query it). A next peer is queried when it receives a request from an end-user. When several peers are chained, each system can participate to secure and optimise the traffic. For instance one can be configured to cache the traffic while a second one performs traffic shaping and a third one filters the traffic.
+
+It is important to note that when at least on previous peer is defined, only end-users (clients) that are explicitly defined with the command \fBaccess web\fR are allows to connect to the local web proxy (see the command \fBaccess\fR). Also, note that, next peers are applicable only if the \fBrweb\fR mode is not activated (see the command \fBmode\fR). 
+
+The first [1] usage form allows you to add a \fBshare\fR, \fBha\fR or \fBprevious\fR peer to the system. To add a share peer, use the \fBshare add\fR keywords followed by the internal IP address of the remote share peer. The optional \fI<qos>\fR value allows you to customise the shaping of the traffic exchanged with the added peer. The \fI<qos>\fR is a percentage of the total bandwidth allocated to peers by the \fBqos\fR command. It should be an integer between 1 and 100. If no \fI<qos>\fR is given, the value of 100% is used by default. To add an HA or previous peer, use the \fBha\fR or \fBprevious\fR keywords instead of the \fBshare\fR keyword.
+
+A peer always uses its external IP address to query the internet or next peers. That's why previous peers should be added using their external IP addresses.
+
+The second [2] usage form allows you to add a next peer. To add a next peer, use the \fBnext\fR \fBadd\fR keywords followed by the internal IP address of the remote next peer. By default the system connect to the next peer using the proxy port (see the \fBport\fR command). If the next peer is listening on another port, the optional \fI<port-number>\fR argument can be used to specify that port.
+
+The third [3] usage form allows you to delete a peer or completely erase a list of peers.
+
+.SH SSL MEDIATION LIMITATION
+
+The current OS version does not support the SSL mediation between peers so HTTPS traffic use the HTTP CONNECT method to establish point-to-point tunnels to connect Web users to HTTPS servers across the system without passing by peers.
+
+.SH SEE ALSO
+.B access
+(1)
+.B apply
+(1)
+.B mode
+(1)
+.B port
+(1)
+.B qos
+(1)
+.B vrrp
+(1)

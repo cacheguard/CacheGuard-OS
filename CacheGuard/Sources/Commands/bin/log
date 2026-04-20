@@ -1,0 +1,629 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       Commands
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+source functions
+
+check-syslog-protocol()
+{
+    test -n "${1}" || return 1
+    case "${1}" in
+	tcp|udp|tls)
+	    return 0
+	    ;;
+	*)
+	    return 1
+	    ;;
+    esac
+}
+
+check-log-serial()
+{
+    test -n "${1}" || return 1
+    local serial=${1}
+    
+    local len=$(expr length "${serial}" 2> /dev/null)
+    test ${len} -le 5 || return 1
+    local match_len=$(expr match "${serial}" "[0-9]*" 2> /dev/null)
+    test ${len} -eq ${match_len} || return 1
+    test ${serial} -gt 0 || return 1
+    test ${serial} -le ${LOGROTATE_NB} || return 1
+    return 0
+}
+
+save-log()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 1
+    test -n "${3}" || return 1
+    test -n "${4}" || return 1
+    test -n "${5}" || return 1
+
+    local log_type=${1}
+    local serial=${2}
+    local protocol=${3}
+    local ip=${4}
+    local dst_file=${5}
+
+    local extension base_name src_file
+
+    case ${log_type} in
+	system)
+	    base_name=system.[0-9]*.log
+	    extension=tar.gz
+	    ;;
+	firewall)
+	    base_name=${FIREWALL_LOG}
+	    extension=gz
+	    ;;
+	web)
+	    base_name=${WEB_LOG}
+	    extension=gz
+	    ;;
+	rweb)
+	    base_name=${RWEB_LOG}
+	    extension=gz
+	    ;;
+	guard)
+	    base_name=${ACCESS_GUARD_LOG}
+	    extension=gz
+	    ;;
+	waf)
+	    base_name=${WAF_LOG}
+	    extension=gz
+	    ;;
+	vpnipsec)
+	    base_name=${VPN_IPSEC_LOG}
+	    extension=gz
+	    ;;
+	antivirus)
+	    base_name=${ANTI_VIRUS_LOG}
+	    extension=gz
+	    ;;
+	avserver)
+	    base_name=${ANTI_VIRUS_SERVER_LOG}
+	    extension=gz
+	    ;;
+	*)
+	    error 255
+	    ;;
+    esac
+
+    cd /var/log
+
+    src_file=$(ls ${base_name}.${serial}.${extension} 2> /dev/null)
+    src_file=$(echo ${src_file} | cut -d ' ' -f1 2> /dev/null)
+    
+    test -n "${src_file}" || return 26
+    check-file-ip ${ip} || return 27
+
+    save-files ${protocol} ${ip} "${src_file} ${dst_file}"
+
+    cd ${HOME}
+}
+
+display-logrotate-log()
+{
+    display-log ${LOG_ROTATE_LOG}
+}
+
+display-archived-logs()
+{
+    echo
+
+    local logs=$(ls -r /var/log/system.[0-9]*.log.[0-9]*.tar.gz 2> /dev/null)
+    if test -z "${logs}" ; then
+	echo-command-form "log serial:"
+	echo-value-null
+	echo
+	return 0
+    fi
+
+    local log date seconds serial
+    for log in ${logs}
+    do
+	log=${log/*system./}
+	seconds=${log/\.*}
+	log=${log/*\.log\./}
+	serial=${log/\.tar.gz*}
+	date=$(get-date-from-epoch-seconds ${seconds})
+	echo-command-form "log serial ${serial}:"
+	echo-value "${date}"
+    done
+    echo
+}
+
+show-log-state-web()
+{
+    echo-command-form "log type web"
+    local val1=$(external-form ${CURRENT_LOG_TYPE_WEB/:*})
+    local val2=$(external-form ${CURRENT_LOG_TYPE_WEB/*:})
+    echo-mark-cur
+    echo-value "${val1} ${val2}"
+
+    if test "${CURRENT_LOG_TYPE_WEB}" != "${LOG_TYPE_WEB}" ; then
+	echo-command-form "log type web"
+	echo-mark-new
+	val1=$(external-form ${LOG_TYPE_WEB/:*})
+	val2=$(external-form ${LOG_TYPE_WEB/*:})
+	echo-value "${val1} ${val2}"
+    fi
+}
+
+show-log-state-rweb()
+{
+    echo-command-form "log type rweb"
+    local val1=$(external-form ${CURRENT_LOG_TYPE_RWEB/:*})
+    local val2=$(external-form ${CURRENT_LOG_TYPE_RWEB/*:})
+    echo-mark-cur
+    echo-value "${val1} ${val2}"
+
+    if test "${CURRENT_LOG_TYPE_RWEB}" != "${LOG_TYPE_RWEB}" ; then
+	echo-command-form "log type rweb"
+	echo-mark-new
+	val1=$(external-form ${LOG_TYPE_RWEB/:*})
+	val2=$(external-form ${LOG_TYPE_RWEB/*:})
+	echo-value "${val1} ${val2}"
+    fi
+}
+
+show-log-state-guard()
+{
+    echo-command-form "log type guard"
+    local val1=$(external-form ${CURRENT_LOG_TYPE_GUARD/:*})
+    local val2=$(external-form ${CURRENT_LOG_TYPE_GUARD/*:})
+    echo-mark-cur
+    echo-value "${val1} ${val2}"
+
+    if test "${CURRENT_LOG_TYPE_GUARD}" != "${LOG_TYPE_GUARD}" ; then
+	echo-command-form "log type guard"
+	echo-mark-new
+	val1=$(external-form ${LOG_TYPE_GUARD/:*})
+	val2=$(external-form ${LOG_TYPE_GUARD/*:})
+	echo-value "${val1} ${val2}"
+    fi
+}
+
+show-log-state-antivirus()
+{
+    echo-command-form "log type antivirus"
+    local val1=$(external-form ${CURRENT_LOG_TYPE_ANTIVIRUS/:*})
+    local val2=$(external-form ${CURRENT_LOG_TYPE_ANTIVIRUS/*:})
+    echo-mark-cur
+    echo-value "${val1} ${val2}"
+
+    if test "${CURRENT_LOG_TYPE_ANTIVIRUS}" != "${LOG_TYPE_ANTIVIRUS}" ; then
+	echo-command-form "log type antivirus"
+	echo-mark-new
+	val1=$(external-form ${LOG_TYPE_ANTIVIRUS/:*})
+	val2=$(external-form ${LOG_TYPE_ANTIVIRUS/*:})
+	echo-value "${val1} ${val2}"
+    fi
+}
+
+show-log-state-avserver()
+{
+    echo-command-form "log type avserver"
+    local val1=$(external-form ${CURRENT_LOG_TYPE_ANTIVIRUS_SERVER/:*})
+    local val2=$(external-form ${CURRENT_LOG_TYPE_ANTIVIRUS_SERVER/*:})
+    echo-mark-cur
+    echo-value "${val1} ${val2}"
+
+    if test "${CURRENT_LOG_TYPE_ANTIVIRUS_SERVER}" != "${LOG_TYPE_ANTIVIRUS_SERVER}" ; then
+	echo-command-form "log type avserver"
+	echo-mark-new
+	val1=$(external-form ${LOG_TYPE_ANTIVIRUS_SERVER/:*})
+	val2=$(external-form ${LOG_TYPE_ANTIVIRUS_SERVER/*:})
+	echo-value "${val1} ${val2}"
+    fi
+}
+
+show-log-state-waf()
+{
+    echo-command-form "log type waf"
+    local val1=$(external-form ${CURRENT_LOG_TYPE_WAF/:*})
+    local val2=$(external-form ${CURRENT_LOG_TYPE_WAF/*:})
+    echo-mark-cur
+    echo-value "${val1} ${val2}"
+
+    if test "${CURRENT_LOG_TYPE_WAF}" != "${LOG_TYPE_WAF}" ; then
+	echo-command-form "log type waf"
+	echo-mark-new
+	val1=$(external-form ${LOG_TYPE_WAF/:*})
+	val2=$(external-form ${LOG_TYPE_WAF/*:})
+	echo-value "${val1} ${val2}"
+    fi
+}
+
+show-log-state-firewall()
+{
+    echo-command-form "log type firewall"
+    local val1=$(external-form ${CURRENT_LOG_TYPE_FIREWALL/:*})
+    local val2=$(external-form ${CURRENT_LOG_TYPE_FIREWALL/*:})
+    echo-mark-cur
+    echo-value "${val1} ${val2}"
+
+    if test "${CURRENT_LOG_TYPE_FIREWALL}" != "${LOG_TYPE_FIREWALL}" ; then
+	echo-command-form "log type firewall"
+	echo-mark-new
+	val1=$(external-form ${LOG_TYPE_FIREWALL/:*})
+	val2=$(external-form ${LOG_TYPE_FIREWALL/*:})
+	echo-value "${val1} ${val2}"
+
+    fi
+}
+
+show-log-state()
+{
+    echo-begin-show
+    case "${1}" in
+	web|rweb|guard|antivirus|avserver|waf|firewall)
+	    show-log-state-${1}
+	    ;;
+	"")
+	    show-log-state-web
+	    show-log-state-rweb
+	    show-log-state-guard
+	    show-log-state-antivirus
+	    show-log-state-avserver
+	    show-log-state-waf
+	    show-log-state-firewall
+	    ;;
+	*)
+	    return 255
+	    ;;
+    esac
+    echo-end-show
+}
+
+manage-log-type()
+{
+    log_type=${1}
+    log_state=${2}
+    syslog_state=${3}
+    
+    if test -z "${log_state}" ; then
+	show-log-state ${log_type}
+	return 0
+    fi
+
+    check-boolean ${log_state}	|| return 18
+
+    local bool2 bool1=$(internal-form ${log_state})
+
+    if test ${bool1} == False ; then
+	bool2=False
+    else
+	if test -z "${syslog_state}" ; then
+	    bool2=False
+	else
+	    check-boolean ${syslog_state} || return 18
+	    bool2=$(internal-form ${syslog_state})
+	fi
+    fi
+
+    case ${log_type} in
+	web)
+	    cli-is-in-template-context || test ${bool1} == False -o ${PERSISTENT_WEB_LOG} == True || return 167
+	    export LOG_TYPE_WEB=${bool1}:${bool2}
+	    ;;
+	rweb)
+	    cli-is-in-template-context || test ${bool1} == False -o ${PERSISTENT_RWEB_LOG} == True || return 167
+	    export LOG_TYPE_RWEB=${bool1}:${bool2}
+	    ;;
+	guard)
+	    export LOG_TYPE_GUARD=${bool1}:${bool2}
+	    ;;
+	antivirus)
+	    export LOG_TYPE_ANTIVIRUS=${bool1}:${bool2}
+	    ;;
+	avserver)
+	    export LOG_TYPE_ANTIVIRUS_SERVER=${bool1}:${bool2}
+	    ;;
+	waf)
+	    export LOG_TYPE_WAF=${bool1}:${bool2}
+	    ;;
+	firewall)
+	    export LOG_TYPE_FIREWALL=${bool1}:${bool2}
+	    ;;
+	*)
+	    ;;
+    esac
+    
+    SAVENV=1
+}
+
+show-syslog1()
+{
+    local servers=${2}
+
+    echo-command-form "log syslog"
+    if test "${1}" == "new" ; then
+	echo-mark-new
+    else
+	echo-mark-cur
+    fi
+
+    if test -z "${servers}" ; then
+	echo-value-null
+    else
+	local elt range i=0 n=0
+	local server protocol port
+
+	for elt in ${servers}
+	do
+	    range=$[${i} % 3]
+	    case ${range} in
+		0)
+		    protocol=${elt}
+		    ;;
+		1)
+		    server=${elt}
+		    ;;
+		2)
+		    port=${elt}
+		    test ${n} -eq 0 || echo-blank-command
+		    echo-value "${protocol} ${server} ${port}"
+		    ((n++))
+		    ;;
+		*)
+		    return 255
+		    ;;
+	    esac
+	    ((i++))
+	done
+    fi
+}
+
+show-syslog()
+{
+    echo-begin-show
+    show-syslog1 'current' "${CURRENT_SYSLOG_SERVER_LIST}"
+    if test "${CURRENT_SYSLOG_SERVER_LIST}" != "${SYSLOG_SERVER_LIST}" ; then
+	show-syslog1 'new' "${SYSLOG_SERVER_LIST}"
+    fi
+    echo-end-show
+}
+
+show-syslog-ca1()
+{
+    local syslog_ca=${2}
+
+    echo-command-form "log syslog ca"
+    if test "${1}" == "new" ; then
+	echo-mark-new
+    else
+	echo-mark-cur
+    fi
+
+    if test -z "${syslog_ca}" ; then
+	echo-value-null
+	return 0
+    fi
+
+    echo-value "${syslog_ca}"
+}
+
+show-syslog-ca()
+{
+    echo-begin-show
+    show-syslog-ca1 'current' "${CURRENT_SYSLOG_CA}"
+    test "${CURRENT_SYSLOG_CA}" == "${SYSLOG_CA}" || show-syslog-ca1 'new' "${SYSLOG_CA}"
+    echo-end-show
+}
+
+syslog-del()
+{
+    export SYSLOG_SERVER_LIST=$(remove-record-from-list 3 3 "${1}" "${SYSLOG_SERVER_LIST}")
+}
+
+syslog-add()
+{
+    export SYSLOG_SERVER_LIST=$(insert-record-in-slist 3 3 "${1}" "${SYSLOG_SERVER_LIST}")
+}
+
+manage-syslog()
+{
+    local action=${1}
+    case "${action}" in
+	add|del)
+	    if test "${action}" != "del" ; then
+		local len=$(record3-length-list "${SYSLOG_SERVER_LIST}")
+		test ${len} -lt ${MAX_SYSLOG_NB} || return 90
+	    fi
+
+	    test -n "${2}" || return 1
+	    test -n "${3}" || return 1
+	    local protocol=${2}
+	    local server=${3}
+	    local port=${4}
+
+	    if test -z "${port}" ; then
+		case ${protocol} in
+		    udp|tcp)
+			port=514
+			;;
+		    tls)
+			port=6514
+			;;
+		    *)
+			port=514
+			;;
+		esac
+	    else
+		port=$(remove-leading-zeros ${port})
+	    fi
+	    
+	    check-syslog-protocol ${protocol} || return 112
+	    check-ip-name ${server} || return 113
+	    check-service-port-nb ${port} || return 61
+	    
+	    case ${action} in
+		add)
+		    syslog-add "${protocol} ${server} ${port}"
+		    ;;
+		del)
+		    syslog-del "${protocol} ${server} ${port}"
+		    ;;
+		*)
+		    error 255
+		    ;;
+	    esac
+	    SAVENV=1
+	    ;;
+	raz)
+	    export SYSLOG_SERVER_LIST=''
+	    SAVENV=1
+	    ;;
+	'test')
+	    if test -n "${CURRENT_SYSLOG_SERVER_LIST}" ; then
+		check-lock || return 123
+		supervisor-action 'syslog-test'
+		test ${?} -eq 0 || return 104
+		return 0
+	    else
+		test -z "${SYSLOG_SERVER_LIST}" || return 134
+		return 133
+	    fi
+	    ;;
+	ca)
+	    if test -z "${ARGS[2]}" ; then
+		show-syslog-ca
+		return 0
+	    else
+		local act=${ARGS[2]}
+		case ${act} in
+		    'set')
+			test -n "${ARGS[3]}" || return 1
+			local ca_id=${ARGS[3]}
+			export SYSLOG_CA=${ca_id}
+			SAVENV=1
+			;;
+		    raz)
+			export SYSLOG_CA=''
+			SAVENV=1
+			;;
+		    *)
+			return 1
+			;;
+		esac
+	    fi
+	    ;;
+	*)
+	    return 1
+	    ;;
+    esac
+}
+
+run()
+{
+    if test -z "${ARGS[1]}" ; then
+	display-archived-logs
+	return ${?}
+    fi
+    
+    case ${ARGS[1]} in
+	rotate)
+	    contextual-command-is-allowed || return 207
+	    test -z "${TRANSACTION}" || return 106
+	    case "${ARGS[2]}" in
+		""|force)
+		    user-has-admin-rights || return 31
+		    check-lock || return 123
+		    test "${ARGS[2]}" == force || request-confirmation
+		    test -z "${ARGS[3]}" || test ${ARGS[3]} == wait || return 1
+		    supervisor-action 'logrotate' inform "${ARGS[3]}"
+		    test ${?} -eq 0 || return 104
+		    return 0
+		    ;;
+		report)
+		    display-logrotate-log
+		    return 0
+		    ;;
+		*)
+		    return 1
+		    ;;
+	    esac
+	    ;;
+	save)
+	    contextual-command-is-allowed || return 207
+	    test -z "${TRANSACTION}" || return 106
+
+	    test -n "${ARGS[2]}" || return 1
+	    test -n "${ARGS[3]}" || return 1
+	    test -n "${ARGS[4]}" || return 1
+	    test -n "${ARGS[5]}" || return 1
+	    test -n "${ARGS[6]}" || return 1
+
+	    local lt=${ARGS[2]}
+	    local ls=${ARGS[3]}
+	    local pt=${ARGS[4]}
+	    local ip=${ARGS[5]}
+	    local fn=${ARGS[6]}
+
+	    if ! check-log-type ${lt} ; then
+		INDIRECT_ERROR_CODE=534
+		return 254
+	    fi
+
+	    check-log-serial ${ls} || return 25
+
+	    test -n "${pt}" || return 1
+	    test -n "${ip}" || return 1
+	    test -n "${fn}" || return 1
+
+	    check-file-protocol ${pt} || return 63
+	    check-ip-name ${ip} || return 113
+	    check-file-ip ${ip} || return 27
+	    check-filename ${fn} || return 19
+
+	    user-has-admin-rights || return 31
+	    save-log ${lt} ${ls} ${pt} ${ip} ${fn}
+	    ;;
+	syslog)
+	    if test -z "${ARGS[2]}" ; then
+		show-syslog
+		return 0
+	    fi
+	    shift-args
+	    manage-syslog ${ALLARGS}
+	    ;;
+	'type')
+	    contextual-command-is-allowed || return 207
+	    case "${ARGS[2]}" in
+		""|web|rweb|guard|antivirus|avserver|waf|firewall)
+		    shift-args
+		    manage-log-type ${ALLARGS}
+		    ;;
+		*)
+		    return 1
+		    ;;
+	    esac
+	    ;;
+	*)
+	    return 1
+	    ;;
+    esac
+}
+
+main "${@}"

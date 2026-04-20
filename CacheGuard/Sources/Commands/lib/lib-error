@@ -1,0 +1,112 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       Commands
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+display-error()
+{
+    test -n "${1}" || return 1
+    local err=${1}
+    local txt=${2}
+
+    local com txt tag
+
+    txt="${txt}${Errors[${err}]}"
+
+    test -z "${TRANSACTION}" || com=" (command ${ARGS[0]})"
+
+    if test ${TERM} == ${WADMIN_TERM} ; then
+	tag="${ERROR_TAG}"
+    else
+	tag='***'
+    fi
+    test -n "${txt}" || txt="No error description has been defined for this error."
+    echo "${tag} Error ${err}${com} - ${txt}" >&2
+}
+
+error()
+{
+    local in_error_code=${1} error_code
+    test -n "${in_error_code}" || in_error_code=255
+
+    if test ${in_error_code} = 254 ; then
+	error_code=${INDIRECT_ERROR_CODE}
+    else
+	error_code=${in_error_code}
+    fi
+
+    display-error ${error_code}
+
+    if test -z "${TRANSACTION}" ; then
+	exit ${in_error_code}
+    else
+	LAST_ERROR=${error_code}
+    fi
+}
+
+display-warning()
+{
+    test -n "${1}" || return 1
+    warn_code=${1}
+    
+    local warn_text=${Warnings[${warn_code}]}
+
+    if test ${TERM} == ${WADMIN_TERM} ; then
+	tag="${WARNING_TAG}"
+    else
+	tag='+++'
+    fi
+
+    echo "${tag} Warning ${warn_code} - ${warn_text}" >&2
+}
+
+warning()
+{
+    if test -z "${1}" ; then local warn_code=255 ; else local warn_code=${1} ; fi
+    display-warning ${warn_code}
+}
+
+display-info()
+{
+    test -n "${1}" || return 1
+    info_code=${1}
+
+    test "${CLI_SILENT}" != yes || return 0
+
+    local info_text=${Informations[${info_code}]}
+
+    if test ${TERM} == ${WADMIN_TERM} ; then
+	tag="${INFO_TAG}"
+    else
+	tag='---'
+    fi
+
+    echo "${tag} Information ${info_code} - ${info_text}" >&2
+}
+
+info()
+{
+    local info_code=${1}
+    test -n "${info_code}" || info_code=255
+
+    display-info ${info_code}
+}

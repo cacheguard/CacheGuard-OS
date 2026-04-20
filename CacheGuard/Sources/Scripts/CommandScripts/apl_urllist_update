@@ -1,0 +1,436 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       Scripts
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+source /usr/local/lib/apl_functions
+
+source ${APPLIANCE_DIR}/lib/lib-check
+source ${APPLIANCE_DIR}/lib/lib-job
+source ${APPLIANCE_DIR}/lib/lib-file
+source ${APPLIANCE_DIR}/lib/lib-urllist
+
+source ${ABASE_DIR}/${ENV_RDIR}/${ENV_CURRENT_NAME}
+
+urllist-notification()
+{
+    test -n "${1}" || return 1
+    test -n "${1}" || return 2
+    local event=${1}
+    local value=${2}
+
+    local event_description
+
+    case ${event} in
+	URLListAutoLoadFailure)
+	    event_description="One or more URL list files downloads have failed during the auto load process."
+	    ;;
+	*)
+	    return 10
+	    ;;
+    esac
+
+    logger -p daemon.alert -t apl_urllist_update -- "${event_description}"
+    ${LOCAL_DIR}/bin/apl_rlogger "${event_description}"
+    test "${CURRENT_ADMIN_SNMP}" == True || return 0
+    ${LOCAL_DIR}/bin/apl_snmp_trap 20 "${event}" "${value}" "${event_description}" > /dev/null 2>&1
+}
+
+# All log functions in lib/apl_log are rewritten here for build-all-urllists()
+
+log-reset()
+{
+    echo -n > ${URLLIST_AUTO_LOG}
+    chmod 640 ${URLLIST_AUTO_LOG}
+    chown ${ADMIN_NAME}:${GROUP_NAME} ${URLLIST_AUTO_LOG}
+}
+
+log-msg()
+{
+    test -n "${1}" || return 1
+    local message=${1}
+
+    echo -ne "${message}" >> ${URLLIST_AUTO_LOG}
+}
+
+log()
+{
+    test -n "${1}" || return 1
+    local message=${1}
+    local tag=${2}
+    test -n "${tag}" || tag=0
+
+    local date=$(date +"%Y/%m/%d-%T")
+    log-msg "${tag} ${date} ${message}"
+}
+
+log-ret()
+{
+    test -n "${1}" || return 1
+    local err_code=${1}
+
+    local ok="[OK]"
+    local ko="[KO]"
+
+    if test ${err_code} -eq 0 ; then
+	log-msg "${ok}\n"
+    else
+	log-msg "${ko}\n"
+    fi
+}
+
+log-abort()
+{
+    echo >> ${URLLIST_AUTO_LOG}	
+}
+
+log-result()
+{
+    test -n "${1}" || return 255
+    local code=${1}
+
+    if test ${code} -eq 0 ; then
+	log-ret ${code}
+    else
+	log-msg " (${code})"
+	log-ret ${code}
+    fi
+}
+
+system-auto-load()
+{
+    local in_period=${1}
+
+    local ret total=0
+    local file files
+    local usleep len urllist
+    local bool load op period protocol ip fn
+
+    local seconds=$(date +"%s")
+    local days=$[${seconds} / 86400]
+
+    files=$(ls -1 ${URLLIST_DIR}/*.${URLLIST_AUTO}.current 2> /dev/null)
+    len=$(echo "${files}" | wc --words)
+    if test ${len} -gt 1 ; then	usleep=250000 ; else usleep=0 ; fi
+    
+    for file in ${files}
+    do
+	read bool load op period protocol ip fn < ${file}
+
+	test ${protocol} != push || continue
+
+	test -z "${in_period}" -o "${period}" == "${in_period}" || continue
+
+	urllist=$(file-basename ${file} .${URLLIST_AUTO}.current)
+
+	case ${op} in
+	    create)
+		log "Loading ${urllist} list"
+		urllist-load ${days} ${load} ${urllist} ${protocol} ${ip} ${fn} ${op} ${ILOADED} 1 1 0 > /dev/null 2>&1
+		ret=${?}
+		log-result ${ret}
+		test ${ret} -eq 0 || ((total++))
+		usleep ${usleep}
+		;;
+	    update)
+		log "Loading ${urllist} domains list"
+		urllist-auto-load ${load} ${urllist} ${protocol} ${ip} ${fn} ${op} ${ILOADED} domains > /dev/null 2>&1
+		ret=${?}
+		log-result ${ret}
+		test ${ret} -eq 0 || ((total++))
+
+		usleep 250000
+
+		log "Loading ${urllist} urls list"
+		urllist-auto-load ${load} ${urllist} ${protocol} ${ip} ${fn} ${op} ${ILOADED} urls > /dev/null 2>&1
+		ret=${?}
+		log-result ${ret}
+		test ${ret} -eq 0 || ((total++))
+		;;
+	    *)
+		;;
+	esac
+    done
+
+    test ${total} -eq 0 || urllist-notification URLListAutoLoadFailure ${total}
+}
+
+reload-proxy()
+{
+    test "${CURRENT_GUARD_MODE}" == True || return 0
+
+    local service=squid
+    local action=reload
+    local iteration=5
+
+    log "Refreshing the URL Guard"
+
+    while true
+    do
+	test ${iteration} -gt 0 || break
+	/etc/rc.d/init.d/${service} ${action} > /dev/null 2>&1
+	test ${?} -ne 0 || break
+	sleep 3
+	((iteration--))
+    done
+
+    test ${iteration} -gt 0
+    log-result ${?}
+}
+
+begin-urllist-auto-load()
+{
+    local period=${1}
+    local period_txt
+    test -z "${period}" || period_txt=" (${period^})"
+
+    export ROOT_DIR=${ADMIN_DIR}
+    export HOME=/root
+    export DOWNLOAD_ACCOUNT_DIR=${ABASE_DIR}
+    export FLAG_SSLMEDIATE_EXCEPTIONS=0
+
+    test -n "${CURRENT_FTP_PASSIVE_MODE}" ||  CURRENT_FTP_PASSIVE_MODE=False
+    test -n "${CURRENT_ANONYMOUS_FTP_EMAIL}" || CURRENT_ANONYMOUS_FTP_EMAIL=anonymous@example.com
+
+    test "${period}" == "weekly" -a -z "${NON_INTERACTIVE}" || log-reset
+    log "Begining the URL list update${period_txt}" ; log-result 0
+}
+
+end-urllist-auto-load()
+{
+    local period=${1}
+    local period_txt
+    test -z "${period}" || period_txt=" (${period^})"
+
+    echo -n > ${HOME}/.netrc
+    log "Ending the URL list update${period_txt}" ; log-result 0
+}
+
+clean-exit()
+{
+    trap "" USR1 INT QUIT TERM
+
+    local code=${1}
+    wait
+    clean-loaded-files # Temporary Files
+    clean-loaded-urllist system
+    manage-appliance-unlock
+    log-abort
+    log "Aborting the URL lists Update operation" ; log-result 0
+    exit ${code}
+}
+
+full-load-on-previous-pushed-error()
+{
+    local gateway_index_file=${ABASE_DIR}/${MANAGER_GATEWAY_INDEX}
+    test -s ${gateway_index_file} || return 0
+
+    local usleep=250000
+    local seconds=$(date +"%s")
+    local days=$[${seconds} / 86400]
+
+    local uuid domain id ip
+    local urllist_dir auto_files auto_file
+    local bool load op period protocol protocol ip fn
+    local name file pushed_dir
+    local full_urllist_list
+    local suffix ret
+
+    while read uuid domain id ip
+    do
+	urllist_dir=${ABASE_DIR}/${MANAGER_GATEWAY_RDIR}/${id}/${URLLIST_RDIR}
+	test -d ${urllist_dir} || continue
+
+	test -f ${URLLIST_VAR_DIR}/${id}.${MPUSHED_STATUS} || continue
+	ret=$(cat ${URLLIST_VAR_DIR}/${id}.${MPUSHED_STATUS})
+	test ${ret} -ne 0 || continue
+
+	auto_files=$(ls -1 ${urllist_dir}/*.${URLLIST_AUTO}.current 2>/dev/null)
+	test -n "${auto_files}" || continue
+
+	for auto_file in ${auto_files}
+	do
+	    read bool load op period protocol ip fn < ${auto_file}
+	    test "${bool}" == on || continue
+	    test "${protocol}" == push || continue
+	    test "${op}" == update || continue
+
+	    name=$(file-basename ${auto_file})
+	    name=${name/\.${URLLIST_AUTO}\.current}
+	    member "${full_urllist_list}" ${name} || full_urllist_list="${full_urllist_list} ${name}"
+	done
+    done < ${gateway_index_file}
+    full_urllist_list=${full_urllist_list:1}
+
+    for name in ${full_urllist_list}
+    do
+	test -f ${URLLIST_DIR}/${name}.${URLLIST_AUTO}.current || continue
+	file=$(get-urllist-filename create ${days} ${MPUSHED} ${name})
+
+	test ! -f ${URLLIST_VAR_DIR}/${file}.domains.gz -o ! -f ${URLLIST_VAR_DIR}/${file}.urls.gz || continue
+
+	log "Loading the complete '${name}' due to previous push error"
+
+	read bool load op period protocol ip fn < ${URLLIST_DIR}/${name}.${URLLIST_AUTO}.current
+	urllist-load ${days} ${load} ${name} ${protocol} ${ip} ${fn} create ${ILOADED} 1 1 0 > /dev/null 2>&1
+	ret=${?}
+	log-result ${ret}
+
+	if test ${ret} -eq 0 ; then
+	    for suffix in domains urls
+	    do
+		file=$(get-urllist-filename create ${days} ${ILOADED} ${name})
+		file=${file}.${suffix}.gz
+		manager-build-urllist ${TMP_DIR}/${file} ${ILOADED} ${URLLIST_CREATE} ${name} ${suffix} 0
+	    done
+	fi
+
+	usleep ${usleep}
+    done
+}
+
+manager-clean-mpushed-urllist()
+{
+    log "Purging pushed URL lists"
+    rm -f \
+       ${URLLIST_VAR_DIR}/${MPUSHED}.${URLLIST_CREATE}.* \
+       ${URLLIST_VAR_DIR}/${MPUSHED}.${URLLIST_UPDATE}.*
+    log-result ${?}
+}
+
+manager-push-urllists()
+{
+    local content_files=$(ls -1 ${URLLIST_VAR_DIR} 2>/dev/null)
+    test -n "${content_files}" || return 0
+
+    local gateway_index_file=${ABASE_DIR}/${MANAGER_GATEWAY_INDEX}
+    test -s ${gateway_index_file} || return 0
+
+    local uuid domain id ip
+    local urllist_dir auto_files auto_file
+    local bool load op period protocol rest
+    local name pushed_dir
+    local full ret
+
+    while read uuid domain id ip
+    do
+	urllist_dir=${ABASE_DIR}/${MANAGER_GATEWAY_RDIR}/${id}/${URLLIST_RDIR}
+	test -d ${urllist_dir} || continue
+
+	pushed_dir=${TMP_DIR}/${MANAGER_PUSHED}.${id}.urllists.${$}
+	rpushed_dir=${pushed_dir/${ADMIN_DIR}}
+
+	rm -rf ${pushed_dir}
+	mkdir -p ${pushed_dir}
+
+	auto_files=$(ls -1 ${urllist_dir}/*.${URLLIST_AUTO}.current 2>/dev/null)
+	test -n "${auto_files}" || continue
+
+	unset full
+
+	for auto_file in ${auto_files}
+	do
+	    read bool load op period protocol rest < ${auto_file}
+	    test "${protocol}" == push || continue
+
+	    name=$(file-basename ${auto_file})
+	    name=${name/\.${URLLIST_AUTO}\.current}
+
+	    if test ${op} == update ; then
+		if test -f ${URLLIST_VAR_DIR}/${id}.${MPUSHED_STATUS} ; then
+		    ret=$(cat ${URLLIST_VAR_DIR}/${id}.${MPUSHED_STATUS})
+		    test ${ret} -eq 0 || full=yes
+		fi
+	    fi  
+
+	    if test -n "${full}" ; then
+		content_files=$(ls -1 ${URLLIST_VAR_DIR}/${MPUSHED}.${URLLIST_CREATE}.${name}.* 2>/dev/null)
+	    else
+		content_files=$(ls -1 ${URLLIST_VAR_DIR}/${MPUSHED}.${URLLIST_UPDATE}.${name}.* 2>/dev/null)
+		test -n "${content_files}" || content_files=$(ls -1 ${URLLIST_VAR_DIR}/${MPUSHED}.${URLLIST_CREATE}.${name}.* 2>/dev/null)
+	    fi
+	    test -n "${content_files}" || continue
+
+	    cp -f ${content_files} ${pushed_dir}
+	done
+
+	content_files=$(ls -1 ${pushed_dir} 2>/dev/null)
+	test -n "${content_files}" || continue
+
+	log "Pushing URL lists to '${id}' Gateway"
+	chroot ${ADMIN_DIR} ssh -q4atn -l ${ADMIN_NAME} -i /home/${ADMIN_NAME}/.ssh/id_rsa ${ip} "system internal cleanurllistmpushed"
+	ret=${PIPESTATUS[0]}
+
+	if test ${ret} -eq 0 ; then
+	    chroot ${ADMIN_DIR} /bin/bash -c "cd ${rpushed_dir} ; scp -4BCpqOr -i /home/${ADMIN_NAME}/.ssh/id_rsa ${MPUSHED}.* ${ADMIN_NAME}@${ip}:/tmp" > /dev/null 2>&1
+	    ret=${PIPESTATUS[0]}    
+	fi
+
+	echo ${ret} > ${URLLIST_VAR_DIR}/${id}.${MPUSHED_STATUS}
+	log-result ${ret}
+
+	chown ${ADMIN_NAME}:${GROUP_NAME} ${URLLIST_VAR_DIR}/${id}.${MPUSHED_STATUS}
+	rm -rf ${pushed_dir}
+
+    done < ${gateway_index_file}
+}
+
+main()
+{
+    if test ${APL_ROLE} == manager ; then
+	test ${CURRENT_MANAGER_SYNC_ROLE} != slave || clean-exit 0
+    fi
+
+    trap "clean-exit 100" USR1 INT QUIT TERM
+
+    manage-appliance-lock
+
+    set-proxy2-parameters-cur
+    set-rweb-name-qos-list-cur
+
+    begin-urllist-auto-load "${@}"
+    clean-loaded-urllist system
+    system-auto-load "${@}"
+
+    case ${APL_ROLE} in
+	gateway)
+	    build-all-urllists system
+	    build-all-urllists manager
+	    update-sslmediation-exceptions cur auto "${@}"
+	    reload-proxy
+	    ;;
+	manager)
+	    build-all-urllists system
+	    full-load-on-previous-pushed-error
+	    manager-push-urllists
+	    manager-clean-mpushed-urllist
+	    ;;
+    esac
+
+    end-urllist-auto-load "${@}"
+
+    manage-appliance-unlock
+}
+
+# Main()
+
+main "${@}"

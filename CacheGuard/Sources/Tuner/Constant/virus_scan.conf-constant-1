@@ -1,0 +1,27 @@
+Service virus_scan virus_scan.so
+Module common clamd_mod.so
+Module logger sys_logger.so
+
+acl ICAPResponse type RESPMOD
+acl ICAPServer http_resp_header{Server} /^C-ICAP/
+
+LogFormat VirusLog "%>a %{X-Authenticated-User}>ih %>ho %{virus_scan:virus}Sa"
+sys_logger.Facility local2
+sys_logger.access_priority alert
+sys_logger.server_priority crit
+sys_logger.LogFormat VirusLog
+sys_logger.Prefix antivirus
+sys_logger.access ICAPServer ICAPResponse
+
+ServiceAlias avscan virus_scan
+
+virus_scan.DefaultEngine clamd
+virus_scan.ScanFileTypes ARCHIVE BINARY DATA EXECUTABLE MSOFFICE TEXT
+
+virus_scan.SendPercentData 10
+virus_scan.Allow204Responces on
+virus_scan.PassOnError off
+
+# virus_scan.VirScanFileTypes ARCHIVE EXECUTABLE
+# virus_scan.VirUpdateTime 5
+# virus_scan.VirSaveDir /usr/local/proxy/tmp/

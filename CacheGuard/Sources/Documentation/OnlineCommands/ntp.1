@@ -1,0 +1,28 @@
+Manage the NTP configuration
+.SH SYNOPSIS
+
+[1] \fBntp\fR [\fBraz\fR | (\fBadd\fR | \fBdel\fR) \fI<ntp-server>\fR | \fBupdate\fR]
+
+.SH DESCRIPTION
+The internal clock can be maintained in sync with internet standard time servers called NTP servers. This command allows you to manage NTP servers for the system. To leverage the synchronism precision more than one NTP server can be configured.
+
+To add an NTP server use the keyword
+.B add
+followed by the NTP server name or IP address.
+To remove one, use the keyword
+.B del
+instead.
+To erase all NTP servers, use the keyword
+.B raz.
+
+In some cases the current system time may differ radically from the network time. This may happen for instance with a suspended  virtual machine. In such a situation ntp takes a long time to synchronise the system time with the network time. To immediately update the system time, use the keyword \fBupdate\fR.
+
+Like in any other configuration command, a new NTP server configuration is applied after invoking the command \fBapply\fR. If NTP servers are unreachable during the apply process, the initialisation of the NTP service fails and an error is generated, but the system will automatically continue its attempts to restart the NTP service as soon as NTP servers become reachable.
+
+.SH SEE ALSO
+.B apply
+(1)
+.B clock
+(1)
+.B timezone
+(1)

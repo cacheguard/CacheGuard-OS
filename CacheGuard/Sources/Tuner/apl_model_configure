@@ -1,0 +1,3634 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       Tuner
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+# All computation are made in Kilo Byte!
+
+test -n "${GENERATED_DIR}" || GENERATED_DIR=ModelGenerated
+test -d "${GENERATED_DIR}" || exit 1
+
+source constant
+source TUNER.env
+
+# Errors Table
+Errors[1]="Insufficient memory to install this capacity configuration. Reduce the required capacity and try again."
+Errors[2]="At least one disk is required."
+Errors[3]="The number of end users must be greater than 0."
+Errors[4]="The number of Category List records must be greater than or equal to 0."
+Errors[5]="The disk(s) are not large enough to install this configuration. Reduce or disable some persistent data options and try again."
+Errors[6]="The disk(s) are not large enough to support persistent caching. Reduce or disable some persistent data options and try again."
+Errors[7]="Cannot manage more than ${MAX_DISK_NB} disks."
+Errors[8]="Cannot manage more than ${MAX_USERS_NB} users."
+Errors[9]="Cannot manage more than ${MAX_GURAD_RECORDS_NB} records for Category Lists."
+Errors[10]="Disk sizes must be greater than or equal to 1 MB."
+Errors[11]="The RAM size must be greater than 1 MB."
+Errors[12]="At least two NICs (Network Interface Cards) are required to install a Gateway."
+Errors[13]="Some NICs (Network Interface Cards) are not supported."
+Errors[14]="An invalid NIC (Network Interface Card) name has been used."
+Errors[15]="Disk identifiers must start from 1."
+Errors[16]="The number of websites must be greater than 0."
+Errors[17]="Cannot manage more than ${MAX_RWEB_NB} websites."
+Errors[18]="The specified memory type is invalid."
+Errors[19]="Cannot manage more than ${MAX_RUSERS_NB} simultaneous users in reverse mode."
+Errors[20]="The log retention period must be between ${MIN_LOGROTATE_NB} and ${MAX_LOGROTATE_NB}."
+Errors[21]="The maximum upload file size must be between $[${MIN_MAX_UPLOAD_FILE_SZ} / 1024] MB and $[${MAX_MAX_UPLOAD_FILE_SZ} / 1024] MB."
+Errors[22]="Allowed persistency modes are 'on' or 'off'."
+Errors[23]="Cannot create an ext4 filesystem larger than $[${EXT4_PARTITION_MAX_SZ}/1024/1024/1024] TB."
+Errors[24]="Cannot create a reiserfs filesystem larger than $[${REISERFS_PARTITION_MAX_SZ}/1024/1024/1024] TB."
+Errors[25]="The selected OS disk is not large enough to install ${COMMERCIAL_NAME}-OS. Please select another disk for the OS installation."
+Errors[26]="The number of managed gateways must be greater than 0."
+Errors[27]="Cannot manage more than ${MAX_MANAGER_GATEWAY_NB} gateways."
+Errors[28]="The number of supported templates must be greater than 0."
+Errors[29]="Cannot manage more than ${MAX_TEMPLATE_GATEWAY_NB} templates."
+Errors[101]="Invalid model reference."
+Errors[254]="Usage error."
+Errors[255]="An unknown error has occurred."
+
+# Warnings Table
+Warnings[1]="Insufficient memory to activate the cache mode."
+Warnings[2]="Insufficient memory to activate the SSL mediation mode."
+Warnings[3]="Insufficient memory to activate the built-in name server."
+Warnings[4]="Insufficient memory to activate the guard mode."
+Warnings[5]="Insufficient memory to activate the WAF mode."
+Warnings[6]="Insufficient memory to activate the DHCP mode."
+Warnings[7]="Insufficient memory to activate the antivirus mode."
+Warnings[8]="Insufficient memory to activate the rCache volume space."
+Warnings[9]="Insufficient memory to activate the OCSP mode."
+Warnings[10]="Insufficient memory to activate all services simultaneously."
+Warnings[11]="Cannot manage more than @VALUE@ KB of RAM."
+Warnings[12]="Cannot manage more than ${MAX_CPU_NB} CPUs."
+Warnings[13]="Disks may not be fully utilised for caching."
+Warnings[14]="Insufficient memory to activate the web, tweb, or rweb modes."
+Warnings[15]="Insufficient memory to activate the SNMP agent."
+
+usage()
+{
+    echo "Usage forms are:"
+    echo "apl_model_configure --model <role:id (integer)>"
+
+    echo "apl_model_configure <memory-type> <users> <guards> <simultaneous-reverse-users> <reverse-web-sites> <log-rotate-nb> <cpus> <memory> <disk-info> <networks> <rweb-cache-size> <max-upload-file-size> <with-persistent-cache> <with-persistent-web-log> <with-persistent-rweb-log>"
+    echo -e "\t<memory-type>: lowmem | highmem | 64mem"
+    echo -e "\t<cpu-nb>: [0-9]+"
+    echo -e "\t<memory-sz>: [0-9]+ (in MB)"
+    echo -e "\t<disk>: \"(ide|scsi|nvme|virt|raid0|raid1|raid5|raid6|raid10) <nb> <size (GB)> (ide|scsi|nvme|virt) <nb> <size (GB)>...\""
+    echo -e "\t<networks> : \"eth0 eth1...\""
+    echo -e "\t<users>: [0-9]+"
+    echo -e "\t<keyboard-name>"
+    echo -e "\tgateway:<users>,<guards>,<simultaneous-reverse-users>,<reverse-websites>,<log-rotate-nb>,<rweb-cache-size>,<max-upload-file-size>,<with-persistent-cache>,<with-persistent-web-log>,<with-persistent-rweb-log> | manager:<gateway-nb>,<template-nb> (where arguments are as follows)"
+    echo -e "\t<users>: [0-9]+"
+    echo -e "\t<guards>: [0-9]+"
+    echo -e "\t<simultaneous-reverse-users>: [0-9]+"
+    echo -e "\t<reverse-websites>: [0-9]+"
+    echo -e "\t<log-rotate-nb>: [0-9]+"
+    echo -e "\t<rweb-cache-size> : [0-9]+ in KB"
+    echo -e "\t<max-upload-file-size> : [0-9]+"
+    echo -e "\t<with-persistent-cache> : (on|off)"
+    echo -e "\t<with-persistent-web-log> : (on|off)"
+    echo -e "\t<with-persistent-rweb-log> : (on|off)"
+    echo -e "\t<gateway-nb> : [0-9]+"
+    error 254
+}
+
+display-error()
+{
+    if test -z "${1}" ; then local error_code=255 ; else local error_code=${1} ; fi
+    
+    if test -z "${error_code}" ; then exit 255 ; fi
+    if test ${error_code} -ge 0 -a ${error_code} -le 255 ; then
+	local error_text=${Errors[${error_code}]}
+    else
+	local error_text=""
+    fi
+    
+    echo "*** Error ${error_code}: ${error_text}" >&2
+}
+
+error()
+{
+    if test -z "$1" ; then local error_code=255 ; else local error_code=${1} ; fi
+    display-error ${error_code}
+    exit ${error_code}
+}
+
+display-warning()
+{
+    if test -z "${1}" ; then local warn_code=255 ; else local warn_code=${1} ; fi
+    local warn_value=${2}
+
+    local warn_text 
+
+    if test -z "${warn_code}" ; then exit 255 ; fi
+
+    if test ${warn_code} -ge 0 -a ${warn_code} -le 255 ; then
+	local warn_text=${Warnings[${warn_code}]}
+    fi
+    
+    echo -n "+++ Warning ${warn_code}: "
+    echo "${warn_text//@VALUE@/${warn_value}}"
+}
+
+warning()
+{
+    if test -z "${1}" ; then local warn_code=255 ; else local warn_code=$1 ; fi
+    display-warning ${warn_code} ${2}
+}
+
+check-nb()
+{
+    test -n "${1}" || return 1
+    local nb=${1}
+
+    local len=${#nb}
+    test ${len} -le 18 || return 11
+    [[ "${1}" =~ ^[[:digit:]]+$ ]] || return 13
+
+    return 0
+}
+
+check-memory-type()
+{
+    case ${MEMORY_TYPE} in
+	lowmem|highmem|64mem)
+	    return 0
+	    ;;
+	*)
+	    usage
+	    ;;
+    esac
+}
+
+tuner-check-users-nb()
+{
+    check-nb ${USERS_NB} || usage
+    check-nb ${RUSERS_NB} || usage
+
+    test ${USERS_NB} -gt 0 || error 3
+    test ${USERS_NB} -le ${MAX_USERS_NB} || error 8
+
+    test ${RUSERS_NB} -gt 0 || error 3
+    test ${RUSERS_NB} -le ${MAX_RUSERS_NB} || error 19
+}
+
+check-disk-type()
+{
+    test -n "${1}" || return 1
+    local type=${1}
+
+    case ${type} in
+	ide|scsi|nvme|virt|raid0|raid1|raid5|raid6|raid10)
+	    return 0
+	    ;;
+	*)
+	    return 1
+	    ;;
+    esac
+}
+
+check-disk-infos()
+{
+    test -n "${1}" || return 0
+    local disk_infos=${1}
+
+    local elt range i=0
+    local disk_type id size
+    local id1 id2 nb=0
+
+    for elt in ${disk_infos}
+    do
+	range=$[${i} % 3]
+	case ${range} in
+	    0)
+		disk_type=${elt}
+		check-disk-type ${disk_type} || usage
+		;;
+	    1)
+		id=${elt}
+		id1=${id/:*}
+		id2=${id/*:}
+
+		test ${id1} == x || check-nb ${id1} || usage
+		check-nb ${id2} || usage
+		test ${id2} -ge 1 || error 15
+		;;
+	    2)
+		size=${elt}
+		check-nb ${size} || usage
+		test ${size} -gt $((FIRST_PARTITION_BEGINING_SECTOR + EFI_SZ + LVM_MD_SZ)) || error 10
+		((nb++))
+		;;
+	    *)
+		error 255
+		;;
+	esac
+	((i++))
+    done
+
+    test ${nb} -le ${MAX_DISK_NB} || error 7
+    return 0
+}
+
+tuner-check-urllist-record-nb()
+{
+    check-nb ${URLLIST_RECORDS_NB} || usage
+    test ${URLLIST_RECORDS_NB} -ge 0 || error 4
+    test ${URLLIST_RECORDS_NB} -le ${MAX_GURAD_RECORDS_NB} || error 9
+}
+
+check-cpu-nb()
+{
+    test ${CPU_NB} -le ${MAX_CPU_NB} || warning 12
+}
+
+check-memory-sz()
+{
+    check-nb ${MEMORY_SZ} || usage
+    test ${MEMORY_SZ} -ge 1024 || error 11
+}
+
+check-networks()
+{
+    local net i=0
+
+    for net in ${NETWORKS}
+    do
+	test "${net:0:3}" == "eth" || error 13
+	check-nb "${net:3}" || error 14
+	((i++))
+    done
+
+    case ${APL_ROLE} in
+	gateway)
+	    test ${i} -ge 2 || error 12
+	    ;;
+	manager)
+	    ;;
+	*)
+	    ;;
+    esac
+}
+
+tuner-check-rweb-nb()
+{
+    check-nb ${RWEB_NB} || usage
+
+    test ${RWEB_NB} -gt 0 || error 16
+    test ${RWEB_NB} -le ${MAX_RWEB_NB} || error 17
+}
+
+tuner-check-logrotate-nb()
+{
+    check-nb ${LOGROTATE_NB} || usage
+
+    test ${LOGROTATE_NB} -ge ${MIN_LOGROTATE_NB} -a ${LOGROTATE_NB} -le ${MAX_LOGROTATE_NB} || error 20
+}
+
+tuner-check-uploaded-files-sz()
+{
+    check-nb ${MAX_UPLOAD_FILE_SZ} || usage
+    test ${MAX_UPLOAD_FILE_SZ} -ge ${MIN_MAX_UPLOAD_FILE_SZ} -a ${MAX_UPLOAD_FILE_SZ} -le ${MAX_MAX_UPLOAD_FILE_SZ} || error 21
+}
+
+tuner-check-persistency-states()
+{
+    local states="${@}"
+
+    local state i=0
+
+    for state in ${states}
+    do
+	case ${state} in
+	    on|off)
+		;;
+	    *)
+		error 22
+		;;
+	esac
+	((i++))
+    done
+
+    test ${i} == 3 || error 22
+}
+
+tuner-check-gateway-nb()
+{
+    check-nb ${MANAGER_GATEWAY_NB} || usage
+
+    test ${MANAGER_GATEWAY_NB} -gt 0 || error 26
+    test ${MANAGER_GATEWAY_NB} -le ${MAX_MANAGER_GATEWAY_NB} || error 27
+}
+
+tuner-check-template-nb()
+{
+    check-nb ${MANAGER_TEMPLATE_NB} || usage
+
+    test ${MANAGER_TEMPLATE_NB} -gt 0 || error 28
+    test ${MANAGER_TEMPLATE_NB} -le ${MAX_MANAGER_TEMPLATE_NB} || error 29
+}
+
+round-1024()
+{
+    test -n "${1}" || return 1
+    local value=${1}
+
+    value=$[${value} / 1024 * 1024]
+    test ${value} -gt 0 || value=1
+
+    echo ${value}
+    return 0
+}
+
+round-devide()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 1
+
+    local precision=1000000
+
+    local quotient=$[${1} / ${2}]
+    local remainder=$[${1} % ${2}]
+
+    test $[${remainder} * 2 * ${precision}] -lt $[${2} * ${precision}] || quotient=$[${quotient} + 1]
+
+    echo ${quotient}
+}
+
+# Take a decimal number and output it's octal
+octal()
+{
+    test -n "${1}" || return 1
+    local quotient=${1}
+
+    local remainder octal
+
+    while [ ${quotient} -ne 0 ]
+      do
+      remainder=$[$quotient % 8]
+      octal=${remainder}${octal}
+      quotient=$[${quotient} / 8]
+    done
+    echo ${octal}
+}
+
+apply-journal-size()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    test -n "${3}" || return 3
+    local fstype=${1}
+    local size=${2}
+    local sens=${3}
+
+    if test ${size} -le 0 ; then
+	echo 0
+	return 0
+    fi
+
+    local jsize
+
+    case ${fstype} in
+	ext4)
+	    jsize=${FS_EXT4_JOURNAL_SZ}
+	    ;;
+	reiserfs)
+	    jsize=${FS_REISERFS_JOURNAL_SZ}
+	    ;;
+	*)
+	    jsize=${FS_EXT4_JOURNAL_SZ}
+	    ;;
+    esac
+	    
+    case ${sens} in
+	-)
+	    local fs_size=$[${size} - ${jsize}]
+	    ;;
+	+)
+	    local fs_size=$[${size} + ${jsize}]
+	    ;;
+	*)
+	    ;;
+    esac
+
+    fs_size=$(round-1024 ${fs_size})
+    test ${fs_size} -ge 0 || fs_size=0
+    echo ${fs_size}
+}
+
+minus-journal-size()
+{
+    apply-journal-size ${1} ${2} -
+}
+
+plus-journal-size()
+{
+    local size=$(apply-journal-size ${1} ${2} +)
+    echo ${size}
+}
+
+lvm-adjust-size()
+{
+    test -n "${1}" || return 1
+    local size=${1}
+
+    ((size /= LVM_PE_SZ))
+    ((size *= LVM_PE_SZ))
+
+    echo ${size}
+}
+
+get-fixed-storage-sz()
+{
+    test -n "${1}" || return 1
+    local size=${1}
+
+    local margin=$[${size} * ${STORAGE_SZ_ERROR_PCT} / 100]
+    local fixed_size=$[${size} - ${margin}]
+    echo ${fixed_size}
+}
+
+get-cache-conf-sz()
+{
+    test -n "${1}" || return 1
+    local size=${1}
+
+    local margin=$[${size} * ${CACHE_FS_RATIO_PCT} / 100]
+    local conf_size=$[${size} - ${margin}]
+    echo ${conf_size}
+}
+
+disk-index()
+{
+    test -n "${1}" || return 1
+    local disk_name=${1}
+
+    local disk_index=${disk_name:2}
+
+    case ${disk_name:0:2} in
+	hd|sd|nv|vd)
+	    disk_index=$(printf "%d" \'${disk_index})
+	    disk_index=$[${disk_index} - 97]
+	    ;;
+	md)
+	    disk_index=$[${disk_index} - 1]
+	    ;;
+	*)
+	    ;;
+    esac
+
+    echo ${disk_index}
+    return 0
+}
+
+gen-urllist-info()
+{
+    test -n "${1}" || return 1
+    local urllist_record_nb="${1}"
+
+    URLLIST_RECORDS_NB=${urllist_record_nb}
+}
+
+gen-kernel-parameters()
+{
+    test -n "${1}" || return 1
+    local memory_type=${1}
+
+    case ${memory_type} in
+	64mem)
+	    KERNEL_PROCESS_SZ=${KERNEL_64_PROCESS_SZ}
+	    SYSTEM_NAME=${SYS_VERSION}-${SYS_64_NAME}
+	    ;;
+	highmem)
+	    KERNEL_PROCESS_SZ=${KERNEL_32_PROCESS_SZ}
+	    SYSTEM_NAME=${SYS_VERSION}-${SYS_HM_NAME}
+	    ;;
+	lowmem)
+	    KERNEL_PROCESS_SZ=${KERNEL_32_PROCESS_SZ}
+	    SYSTEM_NAME=${SYS_VERSION}-${SYS_NAME}
+	    ;;
+	*)
+	    KERNEL_PROCESS_SZ=0
+	    SYSTEM_NAME=unknown
+	    ;;
+    esac
+}
+
+gen-networks-info()
+{
+    test -n "${1}" || return 1
+    local nets="${1}"
+    local networks
+
+    local net i=0
+    for net in ${nets}
+    do
+	if test ${net:0:3} == eth ; then
+	    networks="${networks} ${net}"
+	    ((i++))
+	fi
+    done
+
+    NETWORKS="${networks:1}"
+    NETWORKS_NB=${i}
+}
+
+gen-sshd-conf-tuned()
+{
+    :
+}
+
+gen-named-conf-tuned()
+{
+    test ${APL_ROLE} == 'gateway' || return 0
+
+    local proc_size=$[${NAMED_PROCESS_SZ} / 1024]
+    local recursive_clients=$[8 + ${RWEB_NB} * 8 + ${USERS_NB}]
+
+    echo -e "\trecursive-clients\t${recursive_clients};"
+    echo -e "\tmax-cache-size\t\t${proc_size};"
+}
+
+gen-dhcpd-conf-tuned()
+{
+    test ${APL_ROLE} == 'gateway' || return 0
+
+    local max=$[${USERS_NB} * 2]
+
+    echo -e "class \"limited\" {"
+    echo -e "\tmatch if 1 = 1;"
+    echo -e "\tlease limit ${max};"
+    echo -e "}"
+    echo
+    echo "option interface-mtu 1500;"
+    echo "option max-dgram-reassembly 1500;"
+    echo "option appliance.editor \"${COMMERCIAL_NAME}\";"
+}
+
+gen-wadmind-conf-tuned()
+{
+    local simultaneous_admin_nb=$[${SIMULTANEOUS_USERS_PCT} * ${MAX_ADMINISTRATORS_NB} / 100]
+    local max=$[${simultaneous_admin_nb} * ${WADMIND_REQUESTS_PER_PAGE}]
+    test ${max} -le 200000 || max=200000
+
+    local min_spare=${simultaneous_admin_nb}
+    local max_spare=$[${min_spare} * 2]
+
+    echo "StartServers 1"
+    echo "MinSpareServers ${min_spare}"
+    echo "MaxSpareServers ${max_spare}"
+    echo "ServerLimit ${max}"
+    echo "MaxRequestWorkers ${max}"
+    echo "MaxMemFree ${HTTPD_MAIN_PROCESS_SZ}"
+    echo "MaxConnectionsPerChild 5000"
+}
+
+gen-httpd-noproxy-conf-tuned()
+{
+    test ${APL_ROLE} == 'gateway' || return 0
+
+    local max=${HTTPD_GUARD_SERVER_LIMIT}
+    test ${max} -le 200000 || max=200000
+
+    local max_spare=$[${max} / 2]
+    local min_spare=$[${max_spare} / 2]
+
+    echo "StartServers 1"
+    echo "MinSpareServers ${min_spare}"
+    echo "MaxSpareServers ${max_spare}"
+    echo "ServerLimit ${max}"
+    echo "MaxRequestWorkers ${max}"
+    echo "MaxMemFree ${HTTPD_MAIN_PROCESS_SZ}"
+    echo "MaxConnectionsPerChild 5000"
+}
+
+gen-httpd-proxy-conf-tuned()
+{
+    test ${APL_ROLE} == 'gateway' || return 0
+
+    local max=${HTTPD_RPROXY_SERVER_LIMIT}
+    test ${max} -le 200000 || max=200000
+
+    local max_spare=$[${max} / 2]
+    local min_spare=$[${max_spare} / 2]
+
+    echo "StartServers 1"
+    echo "MinSpareServers ${min_spare}"
+    echo "MaxSpareServers ${max_spare}"
+    echo "ServerLimit ${max}"
+    echo "MaxRequestWorkers ${max}"
+    echo "MaxMemFree ${HTTPD_MAIN_PROCESS_SZ}"
+    echo "MaxConnectionsPerChild 3000"
+
+    echo "ProxyMaxForwards 24"
+    echo "ProxyTimeout 300"
+    echo "ProxyVia Off"
+    echo "ProxyRequests Off"
+
+    echo "Header edit WWW-Authenticate ^[n|N][t|T][l|L][m|M]$ Dummy"
+}
+
+gen-httpd-proxy-conf-cache-tuned()
+{
+    test ${APL_ROLE} == 'gateway' || return 0
+
+    echo "CacheRoot ${WEB_RCACHE_DIR:${#WEB_SERVER_DIR}}"
+}
+
+gen-slapd-conf-tuned()
+{
+    test ${APL_ROLE} == 'gateway' || return 0
+
+    local requests=$[${AVERAGE_OBJECTS_PER_PAGE} * ${USERS_NB}]
+    local threads=${USERS_NB}
+
+    test ${requests} -le 2100000000 || requests=2100000000
+    test ${threads} -le 1000000 || threads=1000000
+
+    echo "conn_max_pending ${requests}"
+    echo "conn_max_pending_auth ${requests}"
+    echo "threads ${threads}"
+}
+
+gen-squid-conf-tuned()
+{
+    test ${APL_ROLE} == 'gateway' || return 0	
+
+    local records=${VISITED_SITE_ALL_USERS}
+    local ssl_startup=$[${SSL_CERTIFICATE_CHILDREN} / 2 + 1]
+    local ssl_idle=$[${ssl_startup} / 2 + 1]
+
+    local guard_startup guard_idle
+
+    ((guard_startup = GUARD_CHILDREN / 4))
+    test ${guard_startup} -ne 0 || guard_startup=1
+
+    ((guard_idle = GUARD_CHILDREN / 10))
+    test ${guard_idle} -ne 0 || guard_idle=1
+
+    echo "maximum_object_size_in_memory ${MAX_OBJECT_MEMORY_SZ} KB"
+    echo "ipcache_size ${records}"
+    echo "fqdncache_size ${records}"
+    echo "url_rewrite_children ${GUARD_CHILDREN} startup=${guard_startup} idle=${guard_idle}"
+    echo "auth_param basic children ${AUTH_CHILDREN}"
+    echo "auth_param negotiate children ${AUTH_CHILDREN}"
+    echo "sslcrtd_children ${SSL_CERTIFICATE_CHILDREN} startup=${ssl_startup} idle=${ssl_idle}"
+    echo "sslproxy_session_cache_size $[${SSL_SESSION_CACHE_SZ} / 1024] MB"
+}
+
+gen-c-icap-conf-tuned()
+{
+    test ${APL_ROLE} == 'gateway' || return 0
+
+    echo "StartServers ${ICAP_START_SERVERS}"
+    echo "MaxServers ${ICAP_SERVERS}"
+    echo "MinSpareThreads ${ICAP_THREADS_PER_CHILD}"
+    echo "MaxSpareThreads ${ICAP_THREADS_PER_CHILD}"
+    echo "ThreadsPerChild ${ICAP_THREADS_PER_CHILD}"
+    echo "MaxMemObject $[${AV_MAX_TMP_SZ} * 1024]"
+}
+
+gen-clamd-conf-tuned()
+{
+    test ${APL_ROLE} == 'gateway' || return 0
+
+    local recursion=16
+    local threads=$[2 * (${SIMULTANEOUS_USERS_NB} + ${SIMULTANEOUS_RUSERS_NB})]
+    local queue=$[2 * ${threads}]
+
+    echo "MaxRecursion ${recursion}"
+    echo "LogFileMaxSize ${LOG_CLAMD_PER_DAY_SZ}K"
+    echo "MaxConnectionQueueLength ${USERS_NB}"
+    echo "MaxThreads ${threads}"
+    echo "MaxQueue ${queue}"
+}
+
+gen-snmpd-conf-tuned()
+{
+    if test ${FS_SWAP_SZ} -ne 0 ; then
+	local swap_threshold=$[${FS_SWAP_SZ} / 2]
+	echo "swap ${swap_threshold}"
+    fi
+
+    echo "file ${WEB_LOG_DIR}/${WEB_SERVER_LOG} ${LOG_WEB_SERVER_PER_DAY_THR_SZ}"
+
+    test ${APL_ROLE} == 'gateway' || return 0
+
+    echo "file ${PROXY_LOG_DIR}/${PROXY_GUARD_LOG} ${LOG_GUARD_PER_DAY_THR_SZ}"
+    echo "file ${PROXY_LOG_DIR}/${PROXY_LOG} ${LOG_PROXY_PER_DAY_THR_SZ}"
+    echo "file ${WEB_LOG_DIR}/${FIREWALL_LOG} ${LOG_FIREWALL_PER_DAY_THR_SZ}"
+    echo "file ${WEB_LOG_DIR}/${ACCESS_GUARD_LOG} ${LOG_GUARDED_ACCESS_PER_DAY_THR_SZ}"
+    echo "file ${WEB_LOG_DIR}/${ANTI_VIRUS_LOG} ${LOG_AV_WEB_PER_DAY_THR_SZ}"
+    echo "file ${WEB_LOG_DIR}/${ANTI_VIRUS_SERVER_LOG} ${LOG_AV_SERVER_PER_DAY_THR_SZ}"
+    echo "file ${WEB_LOG_DIR}/${WAF_LOG} ${LOG_WAF_PER_DAY_THR_SZ}"
+    echo "file ${WEB_LOG_DIR}/${VPN_IPSEC_LOG} ${LOG_VPN_IPSEC_PER_DAY_THR_SZ}"
+    test ${PERSISTENT_WEB_LOG} == False || echo "file ${WEB_LOG_DIR}/${WEB_LOG} ${LOG_WEB_PER_DAY_THR_SZ}"
+    test ${PERSISTENT_RWEB_LOG} == False || echo "file ${WEB_LOG_DIR}/${RWEB_LOG} ${LOG_RWEB_PER_DAY_THR_SZ}"
+}
+
+gen-snmpd-conf-httpd-tuned()
+{
+    test ${APL_ROLE} == 'gateway' || return 0
+
+    echo "proc httpd ${HTTPD_RPROXY_SERVER_LIMIT} 2"
+}
+
+gen-snmpd-conf-c-icap-tuned()
+{
+    test ${APL_ROLE} == 'gateway' || return 0
+
+    echo "proc c-icap ${ICAP_SERVERS} ${ICAP_START_SERVERS}"
+}
+
+gen-snmpd-conf-squidGuard-tuned()
+{
+    test ${APL_ROLE} == 'gateway' || return 0
+
+    echo "proc squidGuard ${GUARD_CHILDREN} 2"
+}
+
+gen-logrotate-appliance-statistics()
+{
+    test -n "${1}" || return 1
+    local log=${1}
+
+    echo -e "\tprerotate"
+    echo -e "\t\t${LOCAL_DIR}/bin/apl_update_log_statistics ${log}"
+    echo -e "\tendscript"
+}
+
+gen-logrotate-daily-conf()
+{
+    echo "include /etc/logrotate-common.conf"
+    test ${APL_ROLE} != gateway || echo "include /etc/logrotate-daily.d/gateway"
+    echo "include /etc/logrotate-daily.d/system"
+}
+
+gen-logrotate-hourly-conf()
+{
+    echo "include /etc/logrotate-common.conf"
+    test ${APL_ROLE} != gateway || echo "include /etc/logrotate-hourly.d/gateway"
+    echo "include /etc/logrotate-hourly.d/system"
+}
+
+gen-logrotate-appliance-daily()
+{
+    echo "${WEB_LOG_DIR}/${WEB_SERVER_LOG} {"
+    echo -e "\tcopytruncate"
+    echo -e "\trotate ${LOGROTATE_NB}"
+    echo "}"
+
+    echo "${WEB_LOG_DIR}/${VPN_IPSEC_LOG} {"
+    echo -e "\tcompress"
+    echo -e "\tcopytruncate"
+    echo -e "\trotate ${LOGROTATE_NB}"
+    echo "}"
+
+    echo "${WEB_LOG_DIR}/${FIREWALL_LOG} {"
+    gen-logrotate-appliance-statistics ${WEB_LOG_DIR}/${FIREWALL_LOG}
+    echo -e "\tcompress"
+    echo -e "\tcopytruncate"
+    echo -e "\trotate ${LOGROTATE_NB}"
+    echo "}"
+
+    echo "${PROXY_LOG_DIR}/${PROXY_GUARD_LOG} {"
+    echo -e "\tcopytruncate"
+    echo -e "\trotate ${LOGROTATE_NB}"
+    echo "}"
+
+    echo "${PROXY_LOG_DIR}/${PROXY_LOG} {"
+    echo -e "\tcopytruncate"
+    echo -e "\trotate ${LOGROTATE_NB}"
+    echo "}"
+
+    echo "${WEB_LOG_DIR}/${ACCESS_GUARD_LOG} {"
+    gen-logrotate-appliance-statistics ${WEB_LOG_DIR}/${ACCESS_GUARD_LOG}
+    echo -e "\tcompress"
+    echo -e "\tcopytruncate"
+    echo -e "\trotate ${LOGROTATE_NB}"
+    echo "}"
+
+    echo "${WEB_LOG_DIR}/${ANTI_VIRUS_LOG} {"
+    gen-logrotate-appliance-statistics ${WEB_LOG_DIR}/${ANTI_VIRUS_LOG}
+    echo -e "\tcompress"
+    echo -e "\tcopytruncate"
+    echo -e "\trotate ${LOGROTATE_NB}"
+    echo -e "\tpostrotate"
+    echo -e "\t\t/etc/rc.d/init.d/c-icap reload > /dev/null 2>&1 || true"
+    echo -e "\tendscript"
+    echo "}"
+
+    echo "${WEB_LOG_DIR}/${ANTI_VIRUS_SERVER_LOG} {"
+    gen-logrotate-appliance-statistics ${WEB_LOG_DIR}/${ANTI_VIRUS_SERVER_LOG}
+    echo -e "\tcompress"
+    echo -e "\tcopytruncate"
+    echo -e "\trotate ${LOGROTATE_NB}"
+    echo "}"
+
+    echo "${WEB_LOG_DIR}/${WAF_LOG} {"
+    gen-logrotate-appliance-statistics ${WEB_LOG_DIR}/${WAF_LOG}
+    echo -e "\tcompress"
+    echo -e "\tcopytruncate"
+    echo -e "\trotate ${LOGROTATE_NB}"
+    echo "}"
+
+    if test ${PERSISTENT_RWEB_LOG} == True ; then
+	echo "${WEB_LOG_DIR}/${RWEB_LOG} {"
+	gen-logrotate-appliance-statistics ${WEB_LOG_DIR}/${RWEB_LOG}
+	echo -e "\tcompress"
+	echo -e "\tcopytruncate"
+	echo -e "\trotate ${LOGROTATE_NB}"
+	echo "}"
+    fi
+
+    if test ${PERSISTENT_WEB_LOG} == True ; then
+	echo "${WEB_LOG_DIR}/${WEB_LOG} {"
+	gen-logrotate-appliance-statistics ${WEB_LOG_DIR}/${WEB_LOG}
+	echo -e "\tcompress"
+	echo -e "\tcopytruncate"
+	echo -e "\trotate ${LOGROTATE_NB}"
+	echo -e "\tpostrotate"
+	echo -e "\t\t${LOCAL_DIR}/bin/apl_proxy_logrotate"
+	echo -e "\tendscript"
+	echo "}"
+    fi
+}
+
+gen-logrotate-appliance-hourly()
+{
+    echo "${WEB_LOG_DIR}/${WEB_SERVER_LOG} {"
+    echo -e "\tsize=${LOG_WEB_SERVER_PER_DAY_THR_SZ}k"
+    echo -e "\tcopytruncate"
+    echo -e "\trotate ${LOGROTATE_NB}"
+    echo "}"
+
+    echo "${WEB_LOG_DIR}/${VPN_IPSEC_LOG} {"
+    echo -e "\tsize=${LOG_VPN_IPSEC_PER_DAY_THR_SZ}k"
+    echo -e "\tcopytruncate"
+    echo -e "\trotate ${LOGROTATE_NB}"
+    echo "}"
+
+    echo "${WEB_LOG_DIR}/${FIREWALL_LOG} {"
+    gen-logrotate-appliance-statistics ${WEB_LOG_DIR}/${FIREWALL_LOG}
+    echo -e "\tcompress"
+    echo -e "\tsize=${LOG_FIREWALL_PER_DAY_THR_SZ}k"
+    echo -e "\tcopytruncate"
+    echo -e "\trotate ${LOGROTATE_NB}"
+    echo "}"
+
+    echo "${PROXY_LOG_DIR}/${PROXY_GUARD_LOG} {"
+    echo -e "\tsize=${LOG_GUARD_PER_DAY_THR_SZ}k"
+    echo -e "\tcopytruncate"
+    echo -e "\trotate ${LOGROTATE_NB}"
+    echo "}"
+
+    echo "${PROXY_LOG_DIR}/${PROXY_LOG} {"
+    echo -e "\tsize=${LOG_PROXY_PER_DAY_THR_SZ}k"
+    echo -e "\tcopytruncate"
+    echo -e "\trotate ${LOGROTATE_NB}"
+    echo "}"
+
+    echo "${WEB_LOG_DIR}/${ACCESS_GUARD_LOG} {"
+    gen-logrotate-appliance-statistics ${WEB_LOG_DIR}/${ACCESS_GUARD_LOG}
+    echo -e "\tcompress"
+    echo -e "\tsize=${LOG_GUARDED_ACCESS_PER_DAY_THR_SZ}k"
+    echo -e "\tcopytruncate"
+    echo -e "\trotate ${LOGROTATE_NB}"
+    echo "}"
+
+    echo "${WEB_LOG_DIR}/${ANTI_VIRUS_LOG} {"
+    gen-logrotate-appliance-statistics ${WEB_LOG_DIR}/${ANTI_VIRUS_LOG}
+    echo -e "\tcompress"
+    echo -e "\tsize=${LOG_AV_WEB_PER_DAY_THR_SZ}k"
+    echo -e "\tcopytruncate"
+    echo -e "\trotate ${LOGROTATE_NB}"
+    echo -e "\tpostrotate"
+    echo -e "\t\t/etc/rc.d/init.d/c-icap reload > /dev/null 2>&1 || true"
+    echo -e "\tendscript"
+    echo "}"
+
+    echo "${WEB_LOG_DIR}/${ANTI_VIRUS_SERVER_LOG} {"
+    gen-logrotate-appliance-statistics ${WEB_LOG_DIR}/${ANTI_VIRUS_SERVER_LOG}
+    echo -e "\tcompress"
+    echo -e "\tsize=${LOG_AV_SERVER_PER_DAY_THR_SZ}k"
+    echo -e "\tcopytruncate"
+    echo -e "\trotate ${LOGROTATE_NB}"
+    echo "}"
+
+    echo "${WEB_LOG_DIR}/${WAF_LOG} {"
+    gen-logrotate-appliance-statistics ${WEB_LOG_DIR}/${WAF_LOG}
+    echo -e "\tcompress"
+    echo -e "\tsize=${LOG_WAF_PER_DAY_THR_SZ}k"
+    echo -e "\tcopytruncate"
+    echo -e "\trotate ${LOGROTATE_NB}"
+    echo "}"
+
+    if test ${PERSISTENT_RWEB_LOG} == True ; then
+	echo "${WEB_LOG_DIR}/${RWEB_LOG} {"
+	gen-logrotate-appliance-statistics ${WEB_LOG_DIR}/${RWEB_LOG}
+	echo -e "\tcompress"
+	echo -e "\tsize=${LOG_RWEB_PER_DAY_THR_SZ}k"
+	echo -e "\tcopytruncate"
+	echo -e "\trotate ${LOGROTATE_NB}"
+	echo "}"
+    fi
+
+    if test ${PERSISTENT_WEB_LOG} == True ; then
+	echo "${WEB_LOG_DIR}/${WEB_LOG} {"
+	gen-logrotate-appliance-statistics ${WEB_LOG_DIR}/${WEB_LOG}
+	echo -e "\tcompress"
+	echo -e "\tsize=${LOG_WEB_PER_DAY_THR_SZ}k"
+	echo -e "\tcopytruncate"
+	echo -e "\trotate ${LOGROTATE_NB}"
+	echo -e "\tpostrotate"
+	echo -e "\t\t${LOCAL_DIR}/bin/apl_proxy_logrotate"
+	echo -e "\tendscript"
+	echo "}"
+    fi
+}
+
+gen-logrotate-system-daily()
+{
+    echo "/var/log/*.log ${WAUTH_LOG} {"
+    echo -e "\tcopytruncate"
+    echo -e "\trotate ${LOGROTATE_NB}"
+
+    echo -e "\tlastaction"
+    echo -e "\t\tkill -HUP \$(cat /var/run/rsyslogd.pid 2> /dev/null) 2> /dev/null || true"
+    echo -e "\t\t${LOCAL_DIR}/bin/apl_group_logs"
+    echo -e "\tendscript"
+    echo "}"
+}
+
+gen-logrotate-system-hourly()
+{
+    if test ${APL_ROLE} == 'gateway' ; then
+
+	echo "/var/log/freshclam.log {"
+	echo -e "\tsize=${LOG_FRESHCLAM_PER_DAY_THR_SZ}k"
+	echo -e "\tcopytruncate"
+	echo -e "\trotate ${LOGROTATE_NB}"
+	echo "}"
+
+	echo "/var/log/clamd.log {"
+	echo -e "\tsize=${LOG_CLAMD_PER_DAY_THR_SZ}k"
+	echo -e "\tcopytruncate"
+	echo -e "\trotate ${LOGROTATE_NB}"
+	echo "}"
+
+	echo "/var/log/icap.log {"
+	echo -e "\tsize=${LOG_ICAP_PER_DAY_THR_SZ}k"
+	echo -e "\tcopytruncate"
+	echo -e "\trotate ${LOGROTATE_NB}"
+	echo "}"
+    fi
+
+    echo "${WAUTH_LOG} {"
+    echo -e "\tsize=${LOG_WAUTH_PER_DAY_THR_SZ}k"
+    echo -e "\tcopytruncate"
+    echo -e "\trotate ${LOGROTATE_NB}"
+    echo "}"
+
+    echo "/var/log/auth.log {"
+    echo -e "\tsize=${LOG_AUTH_PER_DAY_THR_SZ}k"
+    echo -e "\tcopytruncate"
+    echo -e "\trotate ${LOGROTATE_NB}"
+    echo "}"
+
+    echo "/var/log/av-extended.log {"
+    echo -e "\tsize=${LOG_AV_EXTENDED_PER_DAY_THR_SZ}k"
+    echo -e "\tcopytruncate"
+    echo -e "\tmissingok"
+    echo -e "\trotate ${LOGROTATE_NB}"
+    echo "}"
+
+    echo "/var/log/daemon.log {"
+    echo -e "\tsize=${LOG_DAEMON_PER_DAY_THR_SZ}k"
+    echo -e "\tcopytruncate"
+    echo -e "\trotate ${LOGROTATE_NB}"
+    echo "}"
+    
+    echo "/var/log/kern.log {"
+    echo -e "\tsize=${LOG_KERN_PER_DAY_THR_SZ}k"
+    echo -e "\tcopytruncate"
+    echo -e "\trotate ${LOGROTATE_NB}"
+    echo "}"
+    
+    echo "/var/log/smartd.log {"
+    echo -e "\tsize=${LOG_SMARTD_PER_DAY_THR_SZ}k"
+    echo -e "\tcopytruncate"
+    echo -e "\trotate ${LOGROTATE_NB}"
+    echo "}"
+        
+    echo "/var/log/snmpd.log {"
+    echo -e "\tsize=${LOG_SNMPD_PER_DAY_THR_SZ}k"
+    echo -e "\tcopytruncate"
+    echo -e "\trotate ${LOGROTATE_NB}"
+    echo "}"
+
+    echo "/var/log/sys.log {"
+    echo -e "\tsize=${LOG_SYS_PER_DAY_THR_SZ}k"
+    echo -e "\tcopytruncate"
+    echo -e "\trotate ${LOGROTATE_NB}"
+    echo "}"
+
+    echo "/var/log/user.log {"
+    echo -e "\tsize=${LOG_USER_PER_DAY_THR_SZ}k"
+    echo -e "\tcopytruncate"
+    echo -e "\trotate ${LOGROTATE_NB}"
+    echo -e "\tlastaction"
+    echo -e "\t\tkill -HUP \$(cat /var/run/rsyslogd.pid 2> /dev/null) 2> /dev/null || true"
+    echo -e "\t\t${LOCAL_DIR}/bin/apl_group_logs"
+    echo -e "\tendscript"
+    echo "}"
+}
+
+gen-model-conf()
+{
+    local min_os_memory_size=$[${MIN_OS_MEMORY_SIZE} / 1024]
+    local cache_io_memory_sz=$[${CACHE_IO_MEMORY_SZ} / 1024]
+    local squid_initial_process_sz=$[${SQUID_INITIAL_PROCESS_SZ} / 1024]
+    local squid_ssl_mediate_memory_sz=$[${SQUID_SSL_MEDIATE_MEMORY_SZ} / 1024]
+    local ssl_mimic_certificate_cache_sz=$[${SSL_MIMIC_CERTIFICATE_CACHE_SZ} / 1024]
+    local ssl_mimic_certificate_cache_memory_sz=$[${SSL_MIMIC_CERTIFICATE_CACHE_MEMORY_SZ} / 1024]
+    local guard_memory_sz=$[${TOTAL_GUARD_PROCESS_SZ} / 1024]
+    local httpd_guard_memory_sz=$[${HTTPD_GUARD_MEMORY_SZ} / 1024]
+    local proxy_memory_sz=$[${PROXY_MEMORY_SZ} / 1024]
+    local httpd_proxy_memory_sz=$[${HTTPD_PROXY_MEMORY_SZ} / 1024]
+    local cache_clean_memory_sz=$[${CACHE_CLEAN_PROCESS_SZ} / 1024]
+    local dhcpd_memory_sz=$[${DHCPD_MEMORY_SZ} / 1024]
+    local clamav_memory_sz=$[${CLAMAV_MEMORY_SZ} / 1024]
+    local named_memory_sz=$[${NAMED_PROCESS_SZ} / 1024]
+    local proxy_cache_sz=$[${PROXY_CACHE_SZ} / 1024]
+    local web_cache_sz=$[${RWEB_CACHE_SZ} / 1024]
+    local snmpd_memory_sz=$[${SNMPD_PROCESS_SZ} / 1024]
+    local ocspd_memory_sz=$[${OCSPD_PROCESS_SZ} / 1024]
+
+    cat <<EOF
+# ###########################
+# NEVER EVER EDIT THIS FILE #
+# ###########################
+
+EOF
+    echo "CPU_NB=${CPU_NB}"
+    echo "CPU_ARCHITECTURE=${CPU_ARCHITECTURE}"
+    echo "NETWORK_DEVICES=\"${NETWORKS}\""
+    echo "DISK_INFOS=\"${DISK_INFOS}\""
+    echo
+    echo "MANAGER_GATEWAY_NB=${MANAGER_GATEWAY_NB}"
+    echo "MANAGER_TEMPLATE_NB=${MANAGER_TEMPLATE_NB}"
+    echo
+    echo "USERS_NB=${USERS_NB}"
+    echo "RUSERS_NB=${RUSERS_NB}"
+    echo "URLLIST_RECORDS_NB=${URLLIST_RECORDS_NB}"
+    echo "LOGROTATE_NB=${LOGROTATE_NB}"
+    echo "RWEB_NB=${RWEB_NB}"
+    echo "AUTH_CHILDREN=${AUTH_CHILDREN}"
+    echo "SIMULTANEOUS_USERS_NB=${SIMULTANEOUS_USERS_NB}"
+    echo "SIMULTANEOUS_RUSERS_NB=${SIMULTANEOUS_RUSERS_NB}"
+    echo "OCSPD_NB=${OCSPD_NB}"
+    echo
+    echo "PERSISTENT_CACHE=${PERSISTENT_CACHE}"
+    echo "PERSISTENT_WEB_LOG=${PERSISTENT_WEB_LOG}"
+    echo "PERSISTENT_RWEB_LOG=${PERSISTENT_RWEB_LOG}"
+    echo
+    echo "MIN_OS_MEMORY_SIZE=${min_os_memory_size}"
+    echo "SSL_MIMIC_CERTIFICATE_CACHE_SZ=${ssl_mimic_certificate_cache_sz}"
+    echo "SSL_MIMIC_CERTIFICATE_CACHE_MEMORY_SZ=${ssl_mimic_certificate_cache_memory_sz}"
+    echo "CACHE_INDEX_OBJECT_MEMORY_SZ=${CACHE_INDEX_OBJECT_MEMORY_SZ}"
+    echo "DEFAULT_STORE_AVERAGE_OBJECT_SZ=${DEFAULT_STORE_AVERAGE_OBJECT_SZ}"
+    echo "MAX_OBJECT_MEMORY_SZ=${MAX_OBJECT_MEMORY_SZ}"
+    echo "CACHE_IO_MEMORY_SZ=${cache_io_memory_sz}"
+    echo "SQUID_INITIAL_PROCESS_SZ=${squid_initial_process_sz}"
+    echo "SQUID_SSL_MEDIATE_MEMORY_SZ=${squid_ssl_mediate_memory_sz}"
+    echo "GUARD_MEMORY_SZ=${guard_memory_sz}"
+    echo "HTTPD_GUARD_MEMORY_SZ=${httpd_guard_memory_sz}"
+    echo "PROXY_MEMORY_SZ=${proxy_memory_sz}"
+    echo "HTTPD_PROXY_MEMORY_SZ=${httpd_proxy_memory_sz}"
+    echo "CACHE_CLEAN_MEMORY_SZ=${cache_clean_memory_sz}"
+    echo "DHCPD_MEMORY_SZ=${dhcpd_memory_sz}"
+    echo "CLAMAV_MEMORY_SZ=${clamav_memory_sz}"
+    echo "NAMED_MEMORY_SZ=${named_memory_sz}"
+    echo "SNMPD_MEMORY_SZ=${snmpd_memory_sz}"
+    echo "OCSPD_MEMORY_SZ=${ocspd_memory_sz}"
+    echo "MAX_MEMORY_SZ=${MAX_MEMORY_SZ}"
+    echo "MAX_DOWNLOAD_SZ=${MAX_DOWNLOAD_SZ}"
+    echo
+    echo "AV_EXTENDED_DB_SZ=${AV_EXTENDED_DB_SZ}"
+    echo "AV_WHITELIST_SIG_SZ=${AV_WHITELIST_SIG_SZ}"
+    echo "PROXY_CACHE_SZ=${proxy_cache_sz}"
+    echo "PROXY_CACHE_UNIT_SZ=${PROXY_CACHE_UNIT_SZ}"
+    echo "RWEB_CACHE_SZ=${web_cache_sz}"
+    echo "MAX_UPLOAD_FILE_SZ=${MAX_UPLOAD_FILE_SZ}"
+    echo "BACKUP_SZ=${BACKUP_SZ}"
+    echo "MAX_KEYTAB_FILE_SZ=${MAX_KEYTAB_FILE_SZ}"
+}
+
+gen-appliance-role()
+{
+        cat <<EOF
+#############################
+# NEVER EVER EDIT THIS FILE #
+#############################
+
+EOF
+    echo "APL_ROLE=${APL_ROLE}"
+
+    test ${APL_ROLE} == manager || return 0
+
+    echo "MANAGER_TOTAL_USERS_NB=${MANAGER_TOTAL_USERS_NB}"
+    echo "MANAGER_TOTAL_RWEB_NB=${MANAGER_TOTAL_RWEB_NB}"
+}
+
+gen-at-allow()
+{
+    echo "${ADMIN_NAME}"
+}
+
+gen-charon.conf-tuned()
+{
+    test ${APL_ROLE} == 'gateway' || return 0
+
+    local hash_table_sz=$[${USERS_NB} / 10]
+
+    test ${hash_table_sz} -gt 0 || hash_table_sz=1
+    sed \
+	-e "s/ikesa_table_size =.*/ikesa_table_size = ${hash_table_sz}/" \
+	-e "s/init_limit_half_open =.*/init_limit_half_open = ${USERS_NB}/" \
+	-e "s/ikesa_limit =.*/ikesa_limit = ${USERS_NB}/" \
+	-e "s/max_threads =.*/max_threads = ${SIMULTANEOUS_USERS_NB}/" \
+	\
+	${DEVELOPMENT_CONF_DIR}ipsec.charon.conf
+}
+
+gen-httpd-sysconfig-htcacheclean-tuned()
+{
+    test ${APL_ROLE} == 'gateway' || return 0
+
+    local web_cache_sz=$[${RWEB_CACHE_SZ} / 1024]
+    local web_cache_dir=${WEB_RCACHE_DIR:${#WEB_SERVER_DIR}}
+
+    echo "CACHE_RDIR=${web_cache_dir:1}"
+    echo "CACHE_SZ=${web_cache_sz}"
+    echo "CACHE_INTERVAL=5"
+}
+
+gen-sysconfig-squid-tuned()
+{
+    test ${APL_ROLE} == 'gateway' || return 0
+
+    local ssl_mimic_certificate_cache_sz=${SSL_MIMIC_CERTIFICATE_CACHE_SZ}
+    ((ssl_mimic_certificate_cache_sz /= 1024))
+    
+    cat << EOF
+export SQUID_OPTS=''
+export SQUID_ACTION_RETRY=15
+export KRB5_CONFIG=/etc/krb5.conf
+export KRB5RCACHETYPE=none
+export KRB5_KTNAME=${KERBEROS_KEYTAB_FILE_PROXY1}
+export KRB5RCACHEDIR=${KERBEROS_CACHE_DIR}
+export SSL_MIMIC_CERTIFICATE_CACHE_SZ=${ssl_mimic_certificate_cache_sz}
+EOF
+}
+
+# Take a disk number and output the disk name (1 -> a, 2 -> b...)
+disk-name()
+{
+    test -n "${1}" || return 1
+    local dk_nb=${1}
+    
+    # Must be between 1 (a) and 26 (z)
+    test ${dk_nb} -ge 1 -a ${dk_nb} -le ${MAX_DISK_NB} || return 1
+
+    dk_nb=$[${dk_nb}+96]
+    octal=$(octal ${dk_nb})
+	
+    echo -e "\0${octal}"
+    return 0
+}
+
+gen-disk-id-sz()
+{
+    test -n "${1}" || return 1
+    local in_disk_infos="${1}"
+
+    local disk_type disk_ref disk_sz margin
+    local ctrl_num disk_num
+    local disk_id_sz
+    local elt range disk_id i=0
+
+    local disk_total_sz=0
+
+    for elt in ${in_disk_infos}
+    do
+	range=$[${i} % 3]
+	case ${range} in
+	    0)
+		disk_type=${elt}
+		;;
+	    1)
+		disk_ref=${elt}
+		;;
+	    2)
+		disk_sz=${elt}
+
+		disk_num=${disk_ref/*:}
+
+		case ${disk_type} in
+		    ide)
+			disk_id=$(disk-name ${disk_num})
+			disk_id="hd${disk_id}"
+			;;
+		    scsi)
+			disk_id=$(disk-name ${disk_num})
+			disk_id="sd${disk_id}"
+			;;
+		    nvme)
+			ctrl_num=${disk_ref/:*}
+			disk_id="nvme${ctrl_num}n${disk_num}"
+			;;
+		    virt)
+			disk_id=$(disk-name ${disk_num})
+			disk_id="vd${disk_id}"
+			;;
+		    raid0|raid1|raid5|raid6|raid10)
+			disk_id=$(disk-name ${disk_num})
+			disk_id="md${disk_num}"
+			;;
+		    *)
+			error 255
+			;;
+		esac
+
+		((disk_sz -= FIRST_PARTITION_BEGINING_SECTOR + EFI_SZ + LVM_MD_SZ))
+		disk_sz=$(get-fixed-storage-sz ${disk_sz})
+
+		disk_total_sz=$[${disk_sz} + ${disk_total_sz}]
+		disk_id_sz="${disk_id_sz} ${disk_id} ${disk_sz}"
+		
+		if test ${i} -eq 2 ; then
+		    DISK_SYSTEM_ID=${disk_id}
+		    DISK_SYSTEM_SZ=${disk_sz}
+		    DISK_SYSTEM_TYPE=${disk_type}
+		fi
+		;;
+	    *)
+		error 255
+		;;
+	esac
+	((i++))
+    done
+
+    disk_id_sz="${disk_id_sz:1}"
+
+    DISK_ID_SZ="${disk_id_sz}"
+    DISK_NB=$[${i} / 3]
+    DISK_TOTAL_SZ=${disk_total_sz}
+
+    test ${DISK_NB} -ge 1 || error 2
+    test ${DISK_NB} -le ${MAX_DISK_NB} || error 7
+}
+
+tune-tmp-fs()
+{
+    local fs_tmp_sz=$[${FS_TMP_SZ} + ${AWS_DISK_SZ}]
+
+    fs_tmp_sz=$(plus-journal-size ext4 ${fs_tmp_sz})
+    fs_tmp_sz=$(lvm-adjust-size ${fs_tmp_sz})
+    FS_TMP_SZ=${fs_tmp_sz}
+}
+
+tune-waf-rules-sz()
+{
+    local base_waf_rule_sz=$[(${MAX_REGEXP_LEN} * 2 + 128) * ${MAX_WAF_RULES_NB}]
+    base_waf_rule_sz=$[${base_waf_rule_sz} * ${RWEB_NB}]
+    base_waf_rule_sz=$[${base_waf_rule_sz} * (${MAX_ADMINISTRATORS_NB} + 2)]
+    base_waf_rule_sz=$[${base_waf_rule_sz} / 1024]
+
+    case ${APL_ROLE} in
+	gateway)
+	    local proxy_waf_rule_sz=$[(${MAX_REGEXP_LEN} * 2 + 128) * ${MAX_WAF_RULES_NB}]
+	    proxy_waf_rule_sz=$[${proxy_waf_rule_sz} * ${RWEB_NB}]
+	    proxy_waf_rule_sz=$[${proxy_waf_rule_sz} / 1024]
+	    ;;
+	manager)
+	    local proxy_waf_rule_sz=0
+	    base_waf_rule_sz=$[${base_waf_rule_sz} * (${MANAGER_TEMPLATE_NB} + ${MANAGER_GATEWAY_NB})]
+	    ;;
+	*)
+	    ;;
+    esac
+
+    PROXY_WAF_RULE_SZ=${proxy_waf_rule_sz}
+    BASE_WAF_RULE_SZ=${base_waf_rule_sz}
+}
+
+gen-implicit-parameters()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    test -n "${3}" || return 3
+    test -n "${4}" || return 4
+    local memory_type=${1}
+    local urllist_record_nb=${2}
+    local networks=${3}
+    local disk_infos=${4}
+
+    tune-waf-rules-sz
+    tune-tmp-fs
+    gen-urllist-info ${urllist_record_nb}
+    gen-kernel-parameters ${memory_type}
+    gen-networks-info "${networks}"
+    gen-disk-id-sz "${disk_infos}"
+}
+
+tune-visited-site()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    local users=${1}
+    local rweb=${1}
+
+    case ${APL_ROLE} in
+	gateway)
+	    local visited_site_all_users=$[${VISITED_COMMON_SITE} + ${rweb} + (${VISITED_SPECIFIC_SITE_USER} * ${users})]    
+	    VISITED_SITE_ALL_USERS=${visited_site_all_users}
+	    ;;
+	manager)
+	    VISITED_SITE_ALL_USERS=0
+	    ;;
+	*)
+	    ;;
+    esac
+}
+
+tune-simultaneous()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    local users=${1}
+    local rusers=${2}
+
+    case ${APL_ROLE} in
+	gateway)
+	    local simultaneous_users_nb
+
+	    test ${users} -ge 1 || ((users++))
+	    test ${rusers} -ge 1 || ((rusers++))
+
+	    if test ${users} -lt 5 ; then
+		SIMULTANEOUS_USERS_PCT=100
+	    elif test ${users} -lt 20 ; then
+		SIMULTANEOUS_USERS_PCT=80
+	    elif test ${users} -lt 50 ; then
+		SIMULTANEOUS_USERS_PCT=60
+	    elif test ${users} -lt 100 ; then
+		SIMULTANEOUS_USERS_PCT=30
+	    else
+		:
+	    fi
+
+	    simultaneous_users_nb=$[${SIMULTANEOUS_USERS_PCT} * ${users} / 100]
+
+	    SIMULTANEOUS_USERS_NB=${simultaneous_users_nb}
+	    SIMULTANEOUS_RUSERS_NB=${rusers}
+	    ;;
+	manager)
+	    SIMULTANEOUS_USERS_NB=1
+	    SIMULTANEOUS_RUSERS_NB=1
+	    ;;
+	*)
+	    ;;
+    esac
+}
+
+tune-user-objects()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    local users=${1}
+    local rusers=${2}
+
+    case ${APL_ROLE} in
+	gateway)
+	    # We make the assumption that simultaneous users browse a new page every 15 seconds during 10 hours
+	    local objects_day=$[${AVERAGE_OBJECTS_PER_PAGE} * ${SIMULTANEOUS_USERS_NB} * 3600 *  12 / 15]
+	    local robjects_day=$[${AVERAGE_OBJECTS_PER_PAGE} * ${SIMULTANEOUS_RUSERS_NB} * 3600 * 12 / 15]
+
+	    OBJECTS_DAY=${objects_day}
+	    ROBJECTS_DAY=${robjects_day}
+	    ;;
+	manager)
+	    OBJECTS_DAY=0
+	    ROBJECTS_DAY=0
+	    ;;
+	*)
+	    ;;
+    esac
+}
+
+tune-cpu-nb()
+{
+    test -n "${1}" || return 1
+    local cpus=${1}
+
+    if test ${cpus} -lt ${MAX_CPU_NB} ; then
+	CPU_NB=${cpus}
+    else
+	CPU_NB=${MAX_CPU_NB}
+    fi
+}
+
+tune-users()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    test -n "${3}" || return 3
+    local users=${1}
+    local rusers=${2}
+    local rweb=${3}
+
+    tune-visited-site ${users} ${rweb}
+    tune-simultaneous ${users} ${rusers}
+    tune-user-objects ${users} ${rusers}
+
+    USERS_NB=${users}
+    RUSERS_NB=${rusers}
+}
+
+tune-rweb()
+{
+    test -n "${1}" || return 1
+    local rwebs=${1}
+
+    RWEB_NB=${rwebs}
+}
+
+tune-urllist-records()
+{
+    test -n "${1}" || return 1
+    local records=${1}
+
+    URLLIST_RECORDS_NB=${records}
+}
+
+tune-persistency-states()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    test -n "${3}" || return 3
+    local persistent_cache=${1}
+    local persistent_web_log=${2}
+    local persistent_rweb_log=${3}
+
+    case ${APL_ROLE} in
+	gateway)
+	    if test ${persistent_cache} == on ; then
+		PERSISTENT_CACHE=True
+	    else
+		PERSISTENT_CACHE=False
+	    fi
+
+	    if test ${persistent_web_log} == on ; then
+		PERSISTENT_WEB_LOG=True
+	    else
+		PERSISTENT_WEB_LOG=False
+	    fi
+
+	    if test ${persistent_rweb_log} == on ; then
+		PERSISTENT_RWEB_LOG=True
+	    else
+		PERSISTENT_RWEB_LOG=False
+	    fi
+	    ;;
+	manager)
+	    PERSISTENT_CACHE=False
+	    PERSISTENT_WEB_LOG=False
+	    PERSISTENT_RWEB_LOG=False
+	    ;;
+	*)
+	    ;;
+    esac
+}
+
+tune-named()
+{
+    case ${APL_ROLE} in
+	gateway)
+	    local named_process_sz=$[${DNS_MEMORY_PER_DN_SZ} * ${VISITED_SITE_ALL_USERS} ]
+	    test ${named_process_sz} -ge 2048 || named_process_sz=2048
+	    NAMED_PROCESS_SZ=${named_process_sz}
+	    ;;
+	manager)
+	    NAMED_PROCESS_SZ=0
+	    ;;
+	*)
+	    ;;
+    esac 
+}
+
+tune-httpd-guard()
+{
+    case ${APL_ROLE} in
+	gateway)
+	    local in_error_req_pct=$[${ILLEGAL_REQUEST_PCT} + ${VIRUS_REQUEST_PCT} + ${GUARD_BLOCKED_PCT} + ${WAF_BLOCKED_PCT}]
+	    local server_limit=$[${SIMULTANEOUS_USERS_NB} * ${AVERAGE_OBJECTS_PER_PAGE} * ${in_error_req_pct} / 100]
+	    test ${server_limit} -ne 0 || server_limit=1
+
+	    HTTPD_GUARD_SERVER_LIMIT=${server_limit}
+	    ;;
+	manager)
+	    HTTPD_GUARD_SERVER_LIMIT=0
+	    ;;
+	*)
+	    ;;
+    esac
+}
+
+tune-httpd-rproxy()
+{
+    case ${APL_ROLE} in
+	gateway)
+	    local direct_rusers=$[${SIMULTANEOUS_RUSERS_NB} * ${DIRECT_RUSERS_PCT} / 100]
+	    local via_proxy_rusers=$[${SIMULTANEOUS_RUSERS_NB} - ${direct_rusers}]
+
+	    local direct_connections=$[${direct_rusers} * ${FIREFOX_CONNECTIONS_PER_RWEB}]
+	    local via_proxy_connections=$[${via_proxy_rusers} * ${FIREFOX_VIA_PROXY_CONNECTIONS_PER_RWEB}]
+	    local server_limit=$[${direct_connections} + ${via_proxy_connections}]
+
+	    HTTPD_RPROXY_SERVER_LIMIT=${server_limit}
+	    ;;
+	manager)
+	    HTTPD_RPROXY_SERVER_LIMIT=0
+	    ;;
+	*)
+	    ;;
+    esac
+}
+
+tune-guarded-access-log-sz()
+{
+    case ${APL_ROLE} in
+	gateway)
+	    local size_day=$[${LOG_GUARDED_ACCESS_LINE_SZ} * ${OBJECTS_DAY} / 1024 * ${GUARD_BLOCKED_PCT} / 100]
+	    local copressed_day=$[${size_day} / ${COMPRESS_LOG_RATIO}]
+	    local compressed=$[${copressed_day} * ${LOGROTATE_NB}]
+	    local size=$[${size_day} + ${copressed_day} + ${compressed}]
+
+	    LOG_GUARDED_ACCESS_SZ=${size}
+	    LOG_GUARDED_ACCESS_PER_DAY_SZ=${size_day}
+	    LOG_GUARDED_ACCESS_PER_DAY_THR_SZ=$[${size_day} * 2]
+	    ;;
+	manager)
+	    LOG_GUARDED_ACCESS_SZ=0
+	    LOG_GUARDED_ACCESS_PER_DAY_SZ=0
+	    LOG_GUARDED_ACCESS_PER_DAY_THR_SZ=0
+	    ;;
+	*)
+	    ;;
+    esac
+}
+
+tune-av-web-log-sz()
+{
+    case ${APL_ROLE} in
+	gateway)
+	    local size_day=$[8 + ${LOG_AV_LINE_SZ} * ${OBJECTS_DAY} / 1024 * ${VIRUS_REQUEST_PCT} / 100]
+	    local copressed_day=$[${size_day} / ${COMPRESS_LOG_RATIO}]
+	    local compressed=$[${copressed_day} * ${LOGROTATE_NB}]
+	    local size=$[${size_day} + ${copressed_day} + ${compressed}]
+
+	    LOG_AV_WEB_SZ=${size}
+	    LOG_AV_WEB_PER_DAY_SZ=${size_day}
+	    LOG_AV_WEB_PER_DAY_THR_SZ=$[${size_day} * 3]
+	    ;;
+	manager)
+	    LOG_AV_WEB_SZ=0
+	    LOG_AV_WEB_PER_DAY_SZ=0
+	    LOG_AV_WEB_PER_DAY_THR_SZ=0
+	    ;;
+	*)
+	    ;;
+    esac
+}
+
+tune-av-server-log-sz()
+{
+    case ${APL_ROLE} in
+	gateway)
+	    local size_day=$[${LOG_CLAMD_LINE_SZ} * ${USERS_NB} * ${MAX_MAIL_PER_USER_PER_DAY} / 1024 * ${VIRUS_REQUEST_PCT} / 100]
+	    local copressed_day=$[${size_day} / ${COMPRESS_LOG_RATIO}]
+	    local compressed=$[${copressed_day} * ${LOGROTATE_NB}]
+	    local size=$[${size_day} + ${size_day} + ${copressed_day} + ${compressed}]
+
+	    LOG_AV_SERVER_SZ=${size}
+	    LOG_AV_SERVER_PER_DAY_SZ=${size_day}
+	    LOG_AV_SERVER_PER_DAY_THR_SZ=$[${size_day} * 2]
+	    ;;
+	manager)
+	    LOG_AV_SERVER_SZ=0
+	    LOG_AV_SERVER_PER_DAY_SZ=0
+	    LOG_AV_SERVER_PER_DAY_THR_SZ=0
+	    ;;
+	*)
+	    ;;
+    esac
+}
+
+tune-waf-log-sz()
+{
+    case ${APL_ROLE} in
+	gateway)
+	    local size_day=$[${LOG_WAF_LINE_SZ} * ${ROBJECTS_DAY} / 1024 * ${WAF_BLOCKED_PCT} / 100]
+	    local copressed_day=$[${size_day} / ${COMPRESS_LOG_RATIO}]
+	    local compressed=$[${copressed_day} * ${LOGROTATE_NB}]
+	    local size=$[${size_day} + ${copressed_day} + ${compressed}]
+
+	    LOG_WAF_SZ=${size}
+	    LOG_WAF_PER_DAY_SZ=${size_day}
+	    LOG_WAF_PER_DAY_THR_SZ=$[${size_day} * 2]
+	    ;;
+	manager)
+	    LOG_WAF_SZ=0
+	    LOG_WAF_PER_DAY_SZ=0
+	    LOG_WAF_PER_DAY_THR_SZ=0
+	    ;;
+	*)
+	    ;;
+    esac
+}
+
+tune-firewall-log-sz()
+{
+    case ${APL_ROLE} in
+	gateway)
+	    local size_day=$[${LOG_FIREWALL_LINE_SZ} * ${LOG_FIREWALL_LINE_PER_DAY} / 1024]
+	    local copressed_day=$[${size_day} / ${COMPRESS_LOG_RATIO}]
+	    local compressed=$[${copressed_day} * ${LOGROTATE_NB}]
+	    local size=$[${size_day} + ${copressed_day} + ${compressed}]
+
+	    LOG_FIREWALL_SZ=${size}
+	    LOG_FIREWALL_PER_DAY_SZ=${size_day}
+	    LOG_FIREWALL_PER_DAY_THR_SZ=$[${size_day} * 2]
+	    ;;
+	manager)
+	    LOG_FIREWALL_SZ=0
+	    LOG_FIREWALL_PER_DAY_SZ=0
+	    LOG_FIREWALL_PER_DAY_THR_SZ=0
+	    ;;
+	*)
+	    ;;
+    esac
+}
+
+tune-access-log-sz()
+{
+    case ${APL_ROLE} in
+	gateway)
+	    if test ${PERSISTENT_WEB_LOG} == True ; then
+		local size_day=$[${LOG_WEB_LINE_SZ} * ${OBJECTS_DAY} / 1024]
+		local copressed_day=$[${size_day} / ${COMPRESS_LOG_RATIO}]
+		local compressed=$[${copressed_day} * ${LOGROTATE_NB}]
+		local size=$[${size_day} + ${copressed_day} + ${compressed}]
+
+		LOG_WEB_SZ=${size}
+		LOG_WEB_PER_DAY_SZ=${size_day}
+		LOG_WEB_PER_DAY_THR_SZ=$[${size_day} * 2]
+	    else
+		LOG_WEB_SZ=0
+		LOG_WEB_PER_DAY_SZ=0
+		LOG_WEB_PER_DAY_THR_SZ=0
+	    fi
+	    ;;
+	manager)
+	    LOG_WEB_SZ=0
+	    LOG_WEB_PER_DAY_SZ=0
+	    LOG_WEB_PER_DAY_THR_SZ=0
+	    ;;
+	*)
+	    ;;
+    esac
+}
+
+tune-raccess-log-sz()
+{
+    case ${APL_ROLE} in
+	gateway)
+	    if test ${PERSISTENT_RWEB_LOG} == True ; then
+		local size_day=$[${LOG_RWEB_LINE_SZ} * ${ROBJECTS_DAY} / 1024]
+		local copressed_day=$[${size_day} / ${COMPRESS_LOG_RATIO}]
+		local compressed=$[${copressed_day} * ${LOGROTATE_NB}]
+		local size=$[${size_day} + ${copressed_day} + ${compressed}]
+
+		LOG_RWEB_SZ=${size}
+		LOG_RWEB_PER_DAY_SZ=${size_day}
+		LOG_RWEB_PER_DAY_THR_SZ=$[${size_day} * 2]
+	    else
+		LOG_RWEB_SZ=0
+		LOG_RWEB_PER_DAY_SZ=0
+		LOG_RWEB_PER_DAY_THR_SZ=0
+	    fi
+	    ;;
+	manager)
+	    LOG_RWEB_SZ=0
+	    LOG_RWEB_PER_DAY_SZ=0
+	    LOG_RWEB_PER_DAY_THR_SZ=0
+	    ;;
+	*)
+	    ;;
+    esac
+}
+
+tune-web-log-sz()
+{
+    local size_day=$[${LOG_WEB_SERVER_LINE_SZ} * ${LOG_WEB_SERVER_LINE_PER_DAY} / 1024]
+    local copressed_day=$[${size_day} / ${COMPRESS_LOG_RATIO}]
+    local compressed=$[${copressed_day} * ${LOGROTATE_NB}]
+    local size=$[${size_day} + ${copressed_day} + ${compressed}]
+
+    LOG_WEB_SERVER_SZ=${size}
+    LOG_WEB_SERVER_PER_DAY_SZ=${size_day}
+    LOG_WEB_SERVER_PER_DAY_THR_SZ=$[${size_day} * 3]
+}
+
+tune-waf-debug-log-sz()
+{
+    case ${APL_ROLE} in
+	gateway)
+	    local debug_req=64
+
+	    local size_day=$[${LOG_WAF_DEBUG_LINE_SZ} * ${debug_req} / 1024]
+	    local copressed_day=$[${size_day} / ${COMPRESS_LOG_RATIO}]
+	    local compressed=$[${copressed_day} * ${LOGROTATE_NB}]
+	    local size=$[${size_day} + ${copressed_day} + ${compressed}]
+
+	    LOG_WAF_DEBUG_SZ=${size}
+	    LOG_WAF_DEBUG_PER_DAY_SZ=${size_day}
+	    LOG_WAF_DEBUG_PER_DAY_THR_SZ=$[${size_day} * 3]
+	    ;;
+	manager)
+	    LOG_WAF_DEBUG_SZ=0
+	    LOG_WAF_DEBUG_PER_DAY_SZ=0
+	    LOG_WAF_DEBUG_PER_DAY_THR_SZ=0
+	    ;;
+	*)
+	    ;;
+    esac
+}
+
+tune-cache-log-sz()
+{
+    case ${APL_ROLE} in
+	gateway)
+	    local size_day=$[${LOG_PROXY_LINE_SZ} * ${LOG_PROXY_LINE_PER_DAY} / 1024]
+	    local copressed_day=$[${size_day} / ${COMPRESS_LOG_RATIO}]
+	    local compressed=$[${copressed_day} * ${LOGROTATE_NB}]
+	    local size=$[${size_day} + ${copressed_day} + ${compressed}]
+
+	    LOG_PROXY_SZ=${size}
+	    LOG_PROXY_PER_DAY_SZ=${size_day}
+	    LOG_PROXY_PER_DAY_THR_SZ=$[${size_day} * 3]
+	    ;;
+	manager)
+	    LOG_PROXY_SZ=0
+	    LOG_PROXY_PER_DAY_SZ=0
+	    LOG_PROXY_PER_DAY_THR_SZ=0
+	    ;;
+	*)
+	    ;;
+    esac
+}
+
+tune-guard-log-sz()
+{
+    case ${APL_ROLE} in
+	gateway)
+	    local size_day=$[5 * ${MAX_URLLIST_NB} * ${GUARD_CHILDREN} * ${LOG_GUARD_LINE_SZ} / 1024]
+	    local copressed_day=$[${size_day} / ${COMPRESS_LOG_RATIO}]
+	    local compressed=$[${copressed_day} * ${LOGROTATE_NB}]
+	    local size=$[${size_day} + ${copressed_day} + ${compressed}]
+
+	    LOG_GUARD_SZ=${size}
+	    LOG_GUARD_PER_DAY_SZ=${size_day}
+	    LOG_GUARD_PER_DAY_THR_SZ=$[${size_day} * 3]
+	    ;;
+	manager)
+	    LOG_GUARD_SZ=0
+	    LOG_GUARD_PER_DAY_SZ=0
+	    LOG_GUARD_PER_DAY_THR_SZ=0
+	    ;;
+	*)
+	    ;;
+    esac
+}
+
+tune-clamd-log-sz()
+{
+    case ${APL_ROLE} in
+	gateway)
+	    local size_day=$[${LOG_CLAMD_LINE_SZ} * ${LOG_CLAMD_LINE_PER_DAY} / 1024]
+	    local copressed_day=$[${size_day} / ${COMPRESS_LOG_RATIO}]
+	    local compressed=$[${copressed_day} * ${LOGROTATE_NB}]
+	    local size=$[${size_day} + ${size_day} + ${copressed_day} + ${compressed}]
+
+	    LOG_CLAMD_SZ=${size}
+	    LOG_CLAMD_PER_DAY_SZ=${size_day}
+	    LOG_CLAMD_PER_DAY_THR_SZ=$[${size_day} * 3]
+	    ;;
+	manager)
+	    LOG_CLAMD_SZ=0
+	    LOG_CLAMD_PER_DAY_SZ=0
+	    LOG_CLAMD_PER_DAY_THR_SZ=0
+	    ;;
+	*)
+	    ;;
+    esac
+}
+
+tune-freshclam-log-sz()
+{
+    case ${APL_ROLE} in
+	gateway)
+	    local size_day=$[${LOG_FRESHCLAM_LINE_SZ} * ${LOG_FRESHCLAM_LINE_PER_DAY} / 1024]
+	    local copressed_day=$[${size_day} / ${COMPRESS_LOG_RATIO}]
+	    local compressed=$[${copressed_day} * ${LOGROTATE_NB}]
+	    local size=$[${size_day} + ${size_day} + ${copressed_day} + ${compressed}]
+
+	    LOG_FRESHCLAM_SZ=${size}
+	    LOG_FRESHCLAM_PER_DAY_SZ=${size_day}
+	    LOG_FRESHCLAM_PER_DAY_THR_SZ=$[${size_day} * 3]
+	    ;;
+	manager)
+	    LOG_FRESHCLAM_SZ=0
+	    LOG_FRESHCLAM_PER_DAY_SZ=0
+	    LOG_FRESHCLAM_PER_DAY_THR_SZ=0
+	    ;;
+	*)
+	    ;;
+    esac
+}
+
+tune-clamav-extended-log-sz()
+{
+    case ${APL_ROLE} in
+	gateway)
+	    local size_day=$[${LOG_AV_EXTENDED_LINE_SZ} * ${LOG_AV_EXTENDED_LINE_PER_DAY} / 1024]
+	    local copressed_day=$[${size_day} / ${COMPRESS_LOG_RATIO}]
+	    local compressed=$[${copressed_day} * ${LOGROTATE_NB}]
+	    local size=$[${size_day} + ${size_day} + ${copressed_day} + ${compressed}]
+
+	    LOG_AV_EXTENDED_SZ=${size}
+	    LOG_AV_EXTENDED_PER_DAY_SZ=${size_day}
+	    LOG_AV_EXTENDED_PER_DAY_THR_SZ=$[${size_day} * 3]
+	    ;;
+	manager)
+	    LOG_AV_EXTENDED_SZ=0
+	    LOG_AV_EXTENDED_PER_DAY_SZ=0
+	    LOG_AV_EXTENDED_PER_DAY_THR_SZ=0
+	    ;;
+	*)
+	    ;;
+    esac
+}
+
+tune-icap-log-sz()
+{
+    case ${APL_ROLE} in
+	gateway)
+	    local size_day=$[${LOG_ICAP_LINE_SZ} * ${LOG_ICAP_LINE_PER_DAY} / 1024]
+	    local copressed_day=$[${size_day} / ${COMPRESS_LOG_RATIO}]
+	    local compressed=$[${copressed_day} * ${LOGROTATE_NB}]
+	    local size=$[${size_day} + ${size_day} + ${copressed_day} + ${compressed}]
+
+	    LOG_ICAP_SZ=${size}
+	    LOG_ICAP_PER_DAY_SZ=${size_day}
+	    LOG_ICAP_PER_DAY_THR_SZ=$[${size_day} * 3]
+	    ;;
+	manager)
+	    LOG_ICAP_SZ=0
+	    LOG_ICAP_PER_DAY_SZ=0
+	    LOG_ICAP_PER_DAY_THR_SZ=0
+	    ;;
+	*)
+	    ;;
+    esac
+}
+
+tune-auth-log-sz()
+{
+    local size_day=$[${LOG_AUTH_LINE_SZ} * ${LOG_AUTH_LINE_PER_DAY} / 1024]
+    local copressed_day=$[${size_day} / ${COMPRESS_LOG_RATIO}]
+    local compressed=$[${copressed_day} * ${LOGROTATE_NB}]
+    local size=$[${size_day} + ${size_day} + ${copressed_day} + ${compressed}]
+
+    LOG_AUTH_SZ=${size}
+    LOG_AUTH_PER_DAY_SZ=${size_day}
+    LOG_AUTH_PER_DAY_THR_SZ=$[${size_day} * 3]
+}
+
+tune-ipsec-log-sz()
+{
+    case ${APL_ROLE} in
+	gateway)
+	    local access_size_day=$[(${LOG_IPSEC_PER_START_STOP_SZ} * 4 +
+				     ${LOG_VPN_IPSEC_LINE_SZ} * ${USERS_NB} * 24) / 1024]
+
+	    local site_size_day=$[8 * ${MAX_VPN_NB} * ${LOG_IPSEC_PER_START_STOP_SZ} / 1024]
+
+	    local size_day=$((access_size_day > site_size_day ? access_size_day : site_size_day))
+	    local copressed_day=$[${size_day} / ${COMPRESS_LOG_RATIO}]
+	    local compressed=$[${copressed_day} * ${LOGROTATE_NB}]
+	    local size=$[${size_day} + ${copressed_day} + ${compressed}]
+
+	    LOG_VPN_IPSEC_SZ=${size}
+	    LOG_VPN_IPSEC_PER_DAY_SZ=${size_day}
+	    LOG_VPN_IPSEC_PER_DAY_THR_SZ=$[${size_day} * 3]
+	    ;;
+	manager)
+	    LOG_VPN_IPSEC_SZ=0
+	    LOG_VPN_IPSEC_PER_DAY_SZ=0
+	    LOG_VPN_IPSEC_PER_DAY_THR_SZ=0
+	    ;;
+	*)
+	    ;;
+    esac
+}
+
+tune-wauth-log-sz()
+{
+    local size_day=$[${LOG_WAUTH_LINE_SZ} * ${LOG_WAUTH_LINE_PER_DAY} / 1024]
+    local copressed_day=$[${size_day} / ${COMPRESS_LOG_RATIO}]
+    local compressed=$[${copressed_day} * ${LOGROTATE_NB}]
+    local size=$[${size_day} + ${size_day} + ${copressed_day} + ${compressed}]
+
+    LOG_WAUTH_SZ=${size}
+    LOG_WAUTH_PER_DAY_SZ=${size_day}
+    LOG_WAUTH_PER_DAY_THR_SZ=$[${size_day} * 3]
+}
+
+tune-daemon-log-sz()
+{
+    case ${APL_ROLE} in
+	gateway)
+	    # DHCP daemon
+	    local size_day1=$[(\
+			       ${LOG_DHCPD_START_SZ} * ${DHCPD_START_PER_DAY} + \
+			       ${LOG_DHCPD_PER_USER_SZ} * ${LOG_DHCPD_PER_USER_PER_DAY} * ${USERS_NB} \
+			     ) / 1024]
+
+	    ;;
+	manager)
+	    local size_day1=0
+	    ;;
+	*)
+	    ;;
+    esac
+
+    # Other daemons
+    local size_day2=$[${LOG_DAEMON_LINE_SZ} * ${LOG_DAEMON_LINE_PER_DAY} / 1024]
+    
+    local size_day=$[${size_day1} + ${size_day2}]
+
+    local copressed_day=$[${size_day} / ${COMPRESS_LOG_RATIO}]
+    local compressed=$[${copressed_day} * ${LOGROTATE_NB}]
+    local size=$[${size_day} + ${size_day} + ${copressed_day} + ${compressed}]
+
+    LOG_DAEMON_SZ=${size}
+    LOG_DAEMON_PER_DAY_SZ=${size_day}
+    LOG_DAEMON_PER_DAY_THR_SZ=$[${size_day} * 3]
+}
+
+tune-kern-log-sz()
+{
+    local size_day=$[${LOG_KERN_LINE_SZ} * ${LOG_KERN_LINE_PER_DAY} / 1024]
+    local copressed_day=$[${size_day} / ${COMPRESS_LOG_RATIO}]
+    local compressed=$[${copressed_day} * ${LOGROTATE_NB}]
+    local size=$[${size_day} + ${size_day} + ${copressed_day} + ${compressed}]
+
+    LOG_KERN_SZ=${size}
+    LOG_KERN_PER_DAY_SZ=${size_day}
+    LOG_KERN_PER_DAY_THR_SZ=$[${size_day} * 3]
+}
+
+tune-sys-log-sz()
+{
+    local size_day=$[${LOG_SYS_LINE_SZ} * ${LOG_SYS_LINE_PER_DAY} / 1024]
+    local copressed_day=$[${size_day} / ${COMPRESS_LOG_RATIO}]
+    local compressed=$[${copressed_day} * ${LOGROTATE_NB}]
+    local size=$[${size_day} + ${size_day} + ${copressed_day} + ${compressed}]
+
+    LOG_SYS_SZ=${size}
+    LOG_SYS_PER_DAY_SZ=${size_day}
+    LOG_SYS_PER_DAY_THR_SZ=$[${size_day} * 3]
+}
+
+tune-smartd-log-sz()
+{
+    local size_day=$[${LOG_SMARTD_LINE_SZ} * ${LOG_SMARTD_LINE_PER_DAY} / 1024]
+    local copressed_day=$[${size_day} / ${COMPRESS_LOG_RATIO}]
+    local compressed=$[${copressed_day} * ${LOGROTATE_NB}]
+    local size=$[${size_day} + ${size_day} + ${copressed_day} + ${compressed}]
+
+    LOG_SMARTD_SZ=${size}
+    LOG_SMARTD_PER_DAY_SZ=${size_day}
+    LOG_SMARTD_PER_DAY_THR_SZ=$[${size_day} * 3]
+}
+
+tune-user-log-sz()
+{
+    local size_day=$[${LOG_USER_LINE_SZ} * ${LOG_USER_LINE_PER_DAY} / 1024]
+    local copressed_day=$[${size_day} / ${COMPRESS_LOG_RATIO}]
+    local compressed=$[${copressed_day} * ${LOGROTATE_NB}]
+    local size=$[${size_day} + ${size_day} + ${copressed_day} + ${compressed}]
+
+    LOG_USER_SZ=${size}
+    LOG_USER_PER_DAY_SZ=${size_day}
+    LOG_USER_PER_DAY_THR_SZ=$[${size_day} * 3]
+}
+
+tune-snmpd-log-sz()
+{
+    local size_day=$[${LOG_SNMPD_LINE_SZ} * ${LOG_SNMPD_LINE_PER_DAY} / 1024]
+    local copressed_day=$[${size_day} / ${COMPRESS_LOG_RATIO}]
+    local compressed=$[${copressed_day} * ${LOGROTATE_NB}]
+    local size=$[${size_day} + ${size_day} + ${copressed_day} + ${compressed}]
+
+    LOG_SNMPD_SZ=${size}
+    LOG_SNMPD_PER_DAY_SZ=${size_day}
+    LOG_SNMPD_PER_DAY_THR_SZ=$[${size_day} * 3]
+}
+
+tune-ocspd()
+{
+    case ${APL_ROLE} in
+	gateway)
+	    local request_sz=8
+	    local requests=$[${SIMULTANEOUS_USERS_NB} + ${SIMULTANEOUS_RUSERS_NB}]
+	    local ocspd_child_nb=$[${requests} / ${REQUESTS_PER_OCSPD} + 1]
+	    local ocspd_child_process_sz=$[${OCSPD_INITIAL_PROCESS_SZ} + (${REQUESTS_PER_OCSPD} * ${request_sz})]
+	    local ocspd_process_sz=$[${OCSPD_INITIAL_PROCESS_SZ} + (${ocspd_child_nb} * ${ocspd_child_process_sz})]
+
+	    OCSPD_NB=$[${ocspd_child_nb}]
+	    OCSPD_PROCESS_SZ=${ocspd_process_sz}
+	    ;;
+	manager)
+	    OCSPD_PROCESS_SZ=0
+	    OCSPD_NB=0
+	    ;;
+	*)
+	    ;;
+    esac
+}
+
+tune-cache-cleaner()
+{
+    case ${APL_ROLE} in
+	gateway)
+	    ;;
+	manager)
+	    CACHE_CLEAN_PROCESS_SZ=0
+	    ;;
+	*)
+	    ;;
+    esac 
+}
+
+tune-av-sz()
+{
+    case ${APL_ROLE} in
+	gateway)
+	    ;;
+	manager)
+	    FRESHCLAM_PROCESS_SZ=0
+	    MAX_OBJECT_MEMORY_SZ=0
+	    DEFAULT_STORE_AVERAGE_OBJECT_SZ=0
+	    ;;
+	*)
+	    ;;
+    esac 
+}
+
+tune-log-sz()
+{
+    tune-firewall-log-sz
+    tune-access-log-sz
+    tune-raccess-log-sz
+    tune-cache-log-sz
+    tune-web-log-sz
+    tune-waf-debug-log-sz
+    tune-waf-log-sz
+    tune-guard-log-sz
+    tune-guarded-access-log-sz
+    tune-av-web-log-sz
+    tune-av-server-log-sz
+    tune-clamd-log-sz
+    tune-freshclam-log-sz
+    tune-clamav-extended-log-sz
+    tune-icap-log-sz
+
+    tune-auth-log-sz
+    tune-ipsec-log-sz
+    tune-wauth-log-sz
+    tune-daemon-log-sz
+    tune-kern-log-sz
+    tune-sys-log-sz
+    tune-user-log-sz
+    tune-smartd-log-sz
+    tune-snmpd-log-sz
+
+    local margin
+
+    local admin_log_sz=$[\
+	${LOG_FIREWALL_SZ} + \
+	${LOG_WEB_SERVER_SZ} + \
+	${LOG_WAF_DEBUG_SZ} + \
+	${LOG_PROXY_SZ} + \
+	${LOG_GUARD_SZ} + \
+	${LOG_GUARDED_ACCESS_SZ} + \
+	${LOG_AV_WEB_SZ} + \
+	${LOG_AV_SERVER_SZ} + \
+	${LOG_WAF_SZ} + \
+	${LOG_VPN_IPSEC_SZ} + \
+	${LOG_WEB_SZ} + \
+	${LOG_RWEB_SZ} + \
+	${LOG_ICAP_SZ} + \
+	${LOG_CLAMD_SZ} + \
+	${LOG_FRESHCLAM_SZ} + \
+	${LOG_AV_EXTENDED_SZ} + \
+	${LOG_AUTH_SZ} + \
+	${LOG_WAUTH_SZ} + \
+	${LOG_DAEMON_SZ} + \
+	${LOG_KERN_SZ} + \
+	${LOG_SYS_SZ} + \
+	${LOG_SMARTD_SZ} + \
+	${LOG_SNMPD_SZ} + \
+	${LOG_USER_SZ} \
+    ]
+
+    margin=$[${admin_log_sz} * ${ADMIN_LOG_SZ_ERROR_PCT} / 100]
+    admin_log_sz=$[${admin_log_sz} + ${margin}]
+
+    local system_log_per_day_sz=$[
+	${LOG_AUTH_PER_DAY_SZ} +
+	${LOG_WAUTH_PER_DAY_SZ} +
+	${LOG_DAEMON_PER_DAY_SZ} +
+	${LOG_KERN_PER_DAY_SZ} +
+	${LOG_SYS_PER_DAY_SZ} +
+	${LOG_SMARTD_PER_DAY_SZ} +
+	${LOG_SNMPD_PER_DAY_SZ} +
+	${LOG_USER_PER_DAY_SZ}]
+
+    margin=$[${system_log_per_day_sz} * ${SYSTEM_LOG_SZ_PER_DAY_ERROR_PCT} / 100]
+    system_log_per_day_sz=$[${system_log_per_day_sz} + ${margin}]
+
+    local gateway_log_per_day_sz=$[
+	${LOG_VPN_IPSEC_PER_DAY_SZ} +
+	${LOG_FIREWALL_PER_DAY_SZ} +
+	${LOG_WEB_PER_DAY_SZ} +
+	${LOG_RWEB_PER_DAY_SZ} +
+	${LOG_WAF_PER_DAY_SZ} +
+	${LOG_PROXY_PER_DAY_SZ} +
+	${LOG_AV_WEB_PER_DAY_SZ} +
+	${LOG_AV_SERVER_PER_DAY_SZ} +
+	${LOG_GUARD_PER_DAY_SZ}]
+
+    margin=$[${gateway_log_per_day_sz} * ${PROXY_LOG_SZ_PER_DAY_ERROR_PCT} / 100]
+    gateway_log_per_day_sz=$[${gateway_log_per_day_sz} + ${margin}]
+
+    ADMIN_LOG_SZ=${admin_log_sz}
+    SYSTEM_LOG_PER_DAY_SZ=${system_log_per_day_sz}
+    GATEWAY_LOG_PER_DAY_SZ=${gateway_log_per_day_sz}
+}
+
+tune-dhcp-leases-sz()
+{
+    case ${APL_ROLE} in
+	gateway)
+	    local max=$[${USERS_NB} * 2]
+
+	    local dhcp_leases_sz=$[( (${DHCP_LEASE_PEER_SZ} * ${DHCPD_START_PER_DAY}) + \
+				     ((${DHCP_LEASE_HEADER_SZ} + ${DHCP_LEASE_SZ}) * ${max} * 24) \
+				   ) * 2 / 1024]
+
+	    local margin=$[${dhcp_leases_sz} * ${LOG_SZ_ERROR_PCT} / 100]
+	    dhcp_leases_sz=$[${dhcp_leases_sz} + ${margin}]
+
+	    DHCP_LEASES_SZ=${dhcp_leases_sz}
+	    ;;
+	manager)
+	    DHCP_LEASES_SZ=0
+	    ;;
+	*)
+	    ;;
+    esac
+}
+
+tune-guard-av()
+{
+    case ${APL_ROLE} in
+	gateway)
+	    local guard_children=${SIMULTANEOUS_USERS_NB}
+	    local icap_start_servers=$[${SIMULTANEOUS_USERS_NB} + ${SIMULTANEOUS_RUSERS_NB}]
+	    local icap_servers=$[${icap_start_servers} * (100 / ${SIMULTANEOUS_USERS_PCT})]
+	    test ${guard_children} -ge 2 || guard_children=2
+	    test ${icap_servers} -ge 2 || icap_servers=2
+	    test ${icap_start_servers} -ge 2 || icap_start_servers=2
+
+	    local guard_process_size=$[${guard_children} * ${GUARD_PROCESS_SZ}]
+	    local av_scan_process_size=$[(${icap_start_servers} + 1) * ${AV_SCAN_PROCESS_SZ}]
+
+	    ICAP_THREADS_PER_CHILD=${AVERAGE_OBJECTS_PER_PAGE}
+	    GUARD_CHILDREN=${guard_children}
+	    ICAP_SERVERS=${icap_servers}
+	    ICAP_START_SERVERS=${icap_start_servers}
+	    TOTAL_GUARD_PROCESS_SZ=${guard_process_size}
+	    TOTAL_AV_SCAN_PROCESS_SZ=${av_scan_process_size}
+	    ;;
+	manager)
+	    ICAP_THREADS_PER_CHILD=0
+	    GUARD_CHILDREN=0
+	    ICAP_SERVERS=0
+	    ICAP_START_SERVERS=0
+	    TOTAL_GUARD_PROCESS_SZ=0
+	    TOTAL_AV_SCAN_PROCESS_SZ=0
+	    ;;
+	*)
+	    ;;
+    esac
+}
+
+tune-ssl-children()
+{
+    case ${APL_ROLE} in
+	gateway)
+	    local ssl_children=$[${SIMULTANEOUS_USERS_NB} * ${FIRST_VISIT_PCT} / 100]
+	    test ${ssl_children} -ge 5 || ssl_children=5
+
+	    SSL_CERTIFICATE_CHILDREN=${ssl_children}
+	    ;;
+	manager)
+	    SSL_CERTIFICATE_CHILDREN=0
+	    ;;
+	*)
+	    ;;
+    esac
+}
+
+tune-auth-helper()
+{
+    case ${APL_ROLE} in
+	gateway)
+	    local users=$[${SIMULTANEOUS_USERS_PCT} * (${SIMULTANEOUS_USERS_NB} + ${SIMULTANEOUS_RUSERS_NB}) / 100]
+	    local children=$[${SIMULTANEOUS_AUTH_USERS_PCT} * ${users} / 100]
+	    ((children++))
+	    AUTH_CHILDREN=${children}
+	    ;;
+	manager)
+	    AUTH_CHILDREN=0
+	    ;;
+	*)
+	    ;;
+    esac
+}
+
+gen-cache-info()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    local fs_rweb_cache_sz=${1}
+    local system_fs_sz=${2}
+
+    FS_PROXY_CACHE_SZ=0
+    PROXY_CACHE_SZ=0
+    PROXY_CACHE_UNIT_SZ=0
+    PROXY_CACHE_NB=0
+
+    test ${PERSISTENT_CACHE} == True || return 0
+
+    test ${fs_rweb_cache_sz} -ge $[${FS_REISERFS_JOURNAL_SZ} * 2] || \
+	fs_rweb_cache_sz=$[${FS_REISERFS_JOURNAL_SZ} * 2]
+
+    local fs_cache_sz=$[${DISK_TOTAL_SZ} - ${system_fs_sz}]
+    local fs_proxy_cache_sz=$[${fs_cache_sz} - ${fs_rweb_cache_sz}]
+    fs_proxy_cache_sz=$(lvm-adjust-size ${fs_proxy_cache_sz})
+
+    test ${fs_proxy_cache_sz} -gt $[${FS_REISERFS_JOURNAL_SZ} * 2] || return 13
+
+    local proxy_cache_sz=$(minus-journal-size reiserfs ${fs_proxy_cache_sz})
+    proxy_cache_sz=$(get-cache-conf-sz ${proxy_cache_sz})
+
+    local cache_nb=$[(${SIMULTANEOUS_USERS_NB} + ${SIMULTANEOUS_RUSERS_NB}) / ${USERS_PER_DISKD}]
+    test ${cache_nb} -ge 3 || cache_nb=3
+    local proxy_cache_unit_sz=$[${proxy_cache_sz} / ${cache_nb}]
+
+    test ${proxy_cache_unit_sz} -ge 1024 || return 15
+
+    FS_PROXY_CACHE_SZ=${fs_proxy_cache_sz}
+    PROXY_CACHE_SZ=${proxy_cache_sz}
+    PROXY_CACHE_NB=${cache_nb}
+    PROXY_CACHE_UNIT_SZ=${proxy_cache_unit_sz}
+}
+
+tune-memory()
+{
+    test -n "${1}" || return 1
+    local memory_sz=${1}
+
+    if test ${memory_sz} -gt ${MAX_MEMORY_SZ} ; then
+	memory_sz=${MAX_MEMORY_SZ}
+	warning 11 ${MAX_MEMORY_SZ}
+    fi
+
+    MEMORY_SZ=${memory_sz}
+}
+
+tune-memory-storage()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    test -n "${3}" || return 3
+    test -n "${4}" || return 4
+    test -n "${5}" || return 5
+    test -n "${6}" || return 6
+    test -n "${7}" || return 7
+    test -n "${8}" || return 8
+    local users_nb=${1}
+    local memory_sz=${2}
+    local records=${3}
+    local rweb_cache_sz=${4}
+    local max_upload_file_sz=${5}
+    local rweb_nb=${6}
+    local gateway_nb=${7}
+    local template_nb=${8}
+
+    local env_file_sz=$[${ENV_FILE_SZ} * 3]
+    local tmp_ssh_key_sz=$[${SSH_KEY_SZ} * ${MAX_SSH_KEY_NB}]
+    local ssh_key_sz=$[${SSH_KEY_SZ} * ${MAX_SSH_KEY_NB} * 2]
+
+    local tls_ca_sz=$[${TLS_CERTIFICATE_SZ} * ${MAX_CA_NB}]
+
+    local av_whitelist_sig_sz=$[${AV_DB_SZ} * ${VIRUS_WHITELIST_PCT} / 100]
+    local av_extended_pushed_db_sz=$[${AV_EXTENDED_DB_SZ} / ${COMPRESS_AV_EXTENDED_RATIO}]
+
+    local urllist_record_sz=$[(${URLLIST_DOMAIN_RECORD_SZ} + ${URLLIST_URL_RECORD_SZ}) / 2]
+    local urllists_size=$[${urllist_record_sz} * ${records} / 1024]
+    local urllists_gz_size=$[${urllists_size} / 6]
+    local urllists_db_size=$[(${urllists_size} * 2) + (${urllists_size} / 5)]
+
+    local urllist_working_sz=$(((MAX_URLLIST_GZ_SZ * 6 * 3)))
+
+    case ${APL_ROLE} in
+	gateway)
+	    local tls_server_sz=$[${TLS_SERVER_SZ} * ${rweb_nb} * ${TLS_NB_FACTOR}]
+	    local tls_client_sz=$[${TLS_CLIENT_SZ} * ${USERS_NB} * ${TLS_NB_FACTOR}]
+	    local av_extended_db_sz=$[(${AV_EXTENDED_DB_SZ} * 2) + (${AV_EXTENDED_DB_SZ} / ${COMPRESS_AV_EXTENDED_RATIO})]
+	    local av_db_sz=$[${CLAMAV_DB_SZ} + ${av_extended_db_sz} + ${av_whitelist_sig_sz}]
+	    local validity_months=$[365 / ${KERBEROS_PASSWORD_VALIDITY_DAYS} * 2]
+	    local max_keytab_file_sz=$[(${validity_months} * (${rweb_nb} + 1) * ${KEYTAB_FILE_PER_SERVICE_SZ} / 1024) + 1]
+
+	    local squid_network_all_io_sz=$[${BURST_FACTOR} * (${SIMULTANEOUS_USERS_NB} + ${SIMULTANEOUS_RUSERS_NB}) * ${SQUID_NETWORK_IO_SZ}]
+	    local squid_dns_sz=$[${VISITED_SITE_ALL_USERS} * ${SQUID_IP_CACHE_SZ} * 2 / 1024]
+	    local squid_request_reply_sz=$[${VISITED_SITE_ALL_USERS} * ${SQUID_REQUEST_REPLY_SZ}]
+	    local proxy_memory_sz=$[${SQUID_INITIAL_PROCESS_SZ} + ${squid_network_all_io_sz} + ${squid_dns_sz} + ${squid_request_reply_sz}]
+	    local admin_var_urllists_size=0
+
+	    tmp_ssh_key_sz=$[${tmp_ssh_key_sz} / 1024]
+	    ssh_key_sz=$[${ssh_key_sz} / 1024]
+	    ;;
+	manager)
+	    local manager_factor=$[${template_nb} + ${gateway_nb}]
+	    local tls_server_sz=$[${TLS_SERVER_SZ} * ${MANAGER_TOTAL_RWEB_NB} * ${TLS_NB_FACTOR} * ${manager_factor}]
+	    local tls_client_sz=$[${TLS_CLIENT_SZ} * ${MANAGER_TOTAL_USERS_NB} * ${TLS_NB_FACTOR} * ${gateway_nb}]
+	    local av_extended_db_sz=$[${AV_EXTENDED_DB_SZ} * 2 / ${COMPRESS_AV_EXTENDED_RATIO}]
+	    local av_db_sz=${av_extended_db_sz}
+	    local max_keytab_file_sz=0
+	    local proxy_memory_sz=0
+	    local admin_var_urllists_size=${urllists_gz_size}
+
+	    env_file_sz=$[${env_file_sz} + (${manager_factor} * ${ENV_FILE_SZ} * 3)]
+	    tmp_ssh_key_sz=$[(${manager_factor} + 1) * ${tmp_ssh_key_sz} / 1024]
+	    ssh_key_sz=$[(${manager_factor} + 1) * ${ssh_key_sz} / 1024]
+	    tls_ca_sz=$[${tls_ca_sz} * ${manager_factor}]
+	    ;;
+	*)
+	    ;;
+    esac
+
+    # AV scan for large files occupation in /var/tmp
+    local av_tmp_sz=$[(${USERS_NB} + (${BURST_FACTOR} * ${RUSERS_NB})) * ${DEFAULT_STORE_AVERAGE_OBJECT_SZ}]
+
+    local var_sz=$[${SYSTEM_LOG_PER_DAY_SZ} + ${LOG_FRESHCLAM_PER_DAY_SZ} + ${LOG_CLAMD_PER_DAY_SZ} + ${LOG_AV_EXTENDED_PER_DAY_SZ} + ${SNMPD_PERSISTENT_DATA_SZ} + ${AWS_DISK_SZ} + ${av_db_sz} + ${av_tmp_sz}]
+    local fs_var_sz=$(plus-journal-size ext4 ${var_sz})
+    fs_var_sz=$(lvm-adjust-size ${fs_var_sz})
+
+    local fs_gateway_log_per_day_sz=$(plus-journal-size ext4 ${GATEWAY_LOG_PER_DAY_SZ})
+    fs_gateway_log_per_day_sz=$(lvm-adjust-size ${fs_gateway_log_per_day_sz})
+
+    local ssl_mimic_certificate_cache_sz=$[${VISITED_SITE_ALL_USERS} * ${TLS_CERTIFICATE_PAIR_SZ} * 31]
+    local ssl_mimic_certificate_cache_memory_sz=$[${ssl_mimic_certificate_cache_sz} * ${SSL_MIMIC_CERTIFICATE_CACHE_MEMORY_PCT} / 100]
+
+    local flat_sslmediate_exception_size=$[${URLLIST_DOMAIN_RECORD_SZ} * ${records} / 1024]
+    local squid_sslmediate_exception_size=$[(${URLLIST_DOMAIN_RECORD_SZ} + 1) * ${records} / 1024]
+    local db_sslmediate_exception_size=$[${flat_sslmediate_exception_size} * 3]
+    local total_sslmediate_exception_size=$[${db_sslmediate_exception_size} + ${flat_sslmediate_exception_size} + ${squid_sslmediate_exception_size}]
+    
+    local backup_sz=$[ \
+		       ${BASE_SZ} + ${PROXY_WAF_RULE_SZ} + ${BASE_WAF_RULE_SZ} + ${env_file_sz} + ${ssh_key_sz} + \
+		       ${tls_client_sz} + ((${tls_ca_sz} + ${tls_server_sz}) * 2) + \
+		       ${av_db_sz} + ${urllists_db_size} + ${total_sslmediate_exception_size}]
+
+    local gz_backup_sz=$[${backup_sz} * 2 / 3]
+    backup_sz=$[(${backup_sz} * 2) + ${gz_backup_sz}]
+
+    local stderr_file_sz=$[${STDERR_FILE_PER_ADMINISTRATOR_SZ} * ${MAX_ADMINISTRATORS_NB}]
+    local os_patch_sz=$[${OS_DISK_SZ}/4]
+    local os_patch_gz_sz=$[${os_patch_sz}/5]
+    ((os_patch_sz += os_patch_gz_sz))
+
+    local base_sz=$[${BASE_SZ} + ${BASE_WAF_RULE_SZ} + ${env_file_sz} + ${ssh_key_sz} + ${tls_ca_sz} + ${tls_server_sz} + ${tls_client_sz}]
+    local fs_base_sz=$(plus-journal-size ext4 ${base_sz})
+    fs_base_sz=$(lvm-adjust-size ${fs_base_sz})
+
+    local admin_tmp_sz=$[${stderr_file_sz} + ${urllists_gz_size} + ${backup_sz} + ${os_patch_sz} + ${tmp_ssh_key_sz} + ${tls_ca_sz} + ${tls_server_sz} + ${tls_client_sz} + ${av_whitelist_sig_sz} + ${av_extended_pushed_db_sz}]
+    local fs_admin_tmp_sz=$(plus-journal-size ext4 ${admin_tmp_sz})
+    fs_admin_tmp_sz=$(lvm-adjust-size ${fs_admin_tmp_sz})
+
+    local admin_var_sz=$[${ADMIN_LOG_SZ} + ${ADMIN_VAR_ETC_SZ} + ${DHCP_LEASES_SZ} + ${av_whitelist_sig_sz} + ${admin_var_urllists_size}]
+    local fs_admin_var_sz=$(plus-journal-size ext4 ${admin_var_sz})
+    fs_admin_var_sz=$(lvm-adjust-size ${fs_admin_var_sz})
+
+    local httpd_noproxy_memory_sz=$[${HTTPD_MAIN_PROCESS_SZ} + (${BURST_FACTOR} * ${HTTPD_CHILD_NOPROXY_PROCESS_SZ})]
+    local httpd_guard_memory_sz=$[${HTTPD_GUARD_SERVER_LIMIT} * ${HTTPD_CHILD_NOPROXY_PROCESS_SZ}]
+    local upload_size=$[${SIMULTANEOUS_RUSERS_NB} * ${max_upload_file_sz}]
+
+    local fs_swap_sz=$[${users_nb} * ${FS_SYS_SWAP_USER_SZ} + ${memory_sz}]
+    fs_swap_sz=$(lvm-adjust-size ${fs_swap_sz})
+
+    local min_os_memory_size=$[${KERNEL_PROCESS_SZ} + (${HTTPD_MAIN_PROCESS_SZ} * 2) + ${httpd_noproxy_memory_sz} + ${SSHD_PROCESS_SZ} + (${WADMIND_PROCESS_SZ} * 2)]
+
+    local free_memory_sz=$[${MEMORY_SZ} - ${min_os_memory_size}]
+    test ${free_memory_sz} -gt 0 || error 1
+
+    local rweb_cache_upload_sz=${upload_size}
+
+    if test ${PERSISTENT_CACHE} == True ; then
+	rweb_cache_upload_sz=$[${rweb_cache_upload_sz} + ${rweb_cache_sz}]
+	local max_objects_in_cache=$[${free_memory_sz} / ${CACHE_INDEX_OBJECT_MEMORY_SZ}]
+	local swap_state_sz=$[${SWAP_STAT_RECORD_SZ} * ${max_objects_in_cache} / 1024]
+    else
+	CACHE_INDEX_OBJECT_MEMORY_SZ=0
+	local swap_state_sz=0
+    fi
+
+    local fs_rweb_cache_upload_sz=$(plus-journal-size reiserfs ${rweb_cache_upload_sz})
+    fs_rweb_cache_upload_sz=$(lvm-adjust-size ${fs_rweb_cache_upload_sz})
+
+    test ${fs_rweb_cache_upload_sz} -le ${REISERFS_PARTITION_MAX_SZ} || error 24
+
+    case ${APL_ROLE} in
+	gateway)
+	    local fs_proxy_db_sz=$[(${max_keytab_file_sz} * 2) + \
+				    ${ssl_mimic_certificate_cache_sz} + \
+				    ${urllists_db_size} + ${urllist_working_sz} + \
+				    ${total_sslmediate_exception_size} + \
+				    ${swap_state_sz} + \
+				    ${tls_ca_sz} + ${tls_server_sz}]
+
+	    fs_proxy_db_sz=$(plus-journal-size ext4 ${fs_proxy_db_sz})
+	    fs_proxy_db_sz=$(lvm-adjust-size ${fs_proxy_db_sz})
+
+	    local fs_web_db_sz=$[${PROXY_WAF_RULE_SZ} + \
+				 (${max_keytab_file_sz} * 2) + \
+				 ${tls_ca_sz} + ${tls_server_sz}]
+	    ;;
+	manager)
+	    local fs_proxy_db_sz=0
+	    local fs_web_db_sz=0
+	    ;;
+	*)
+	    ;;
+    esac
+
+    local fs_root_sz=$[${OS_DISK_SZ} + ${AWS_DISK_SZ} + ${fs_web_db_sz}]
+    fs_root_sz=$(plus-journal-size ext4 ${fs_root_sz})
+    fs_root_sz=$(lvm-adjust-size ${fs_root_sz})
+
+    local system_fs_sz=$[${fs_root_sz} + \
+	${fs_swap_sz} + \
+	${fs_gateway_log_per_day_sz} + \
+	${FS_TMP_SZ} + \
+	${fs_base_sz} + \
+	${fs_admin_tmp_sz} + \
+	${fs_admin_var_sz} + \
+	${fs_proxy_db_sz} + \
+	${fs_var_sz}]
+
+    test ${DISK_SYSTEM_SZ} -gt ${fs_root_sz} || error 25
+    test ${DISK_TOTAL_SZ} -gt ${system_fs_sz} || error 5
+
+    gen-cache-info ${fs_rweb_cache_upload_sz} ${system_fs_sz} || error 6
+
+    if test ${PERSISTENT_CACHE} == True ; then
+
+	local objects_per_diskd=$[${PROXY_CACHE_SZ}/${PROXY_CACHE_NB}/${DEFAULT_STORE_AVERAGE_OBJECT_SZ}]
+	test ${objects_per_diskd} -le ${MAX_OBJECTS_PER_CACHE_DIR} || warning 13
+
+	local min_cache_index_sz=$[${CACHE_INDEX_OBJECT_MEMORY_SZ} * ${MIN_OBJECTS_IN_CACHE} / 1024]
+	local margin=$[${min_cache_index_sz} * ${STORE_ERROR_PCT} / 100]
+	min_cache_index_sz=$[${min_cache_index_sz} + ${margin}]
+
+	local cache_disk_io_memory_sz=$[(${BURST_FACTOR} * (${SIMULTANEOUS_USERS_NB} + ${SIMULTANEOUS_RUSERS_NB}) * ${DEFAULT_STORE_AVERAGE_OBJECT_SZ}) + (${PROXY_CACHE_NB} * ${SQUID_DISKD_PROCESS_SZ})]
+	local cache_io_memory_sz=$[${min_cache_index_sz} + ${cache_disk_io_memory_sz}]
+    else
+	local cache_disk_io_memory_sz=0
+	local cache_io_memory_sz=0
+    fi
+
+    local squid_ssl_mediate_memory_sz=$[(${SSL_CERTIFICATE_CHILDREN} * ${SSL_CERTIFICATE_PROCESS_SZ}) + (${SSL_SESSION_CACHE_SZ} * ${SIMULTANEOUS_RUSERS_NB}) + ${ssl_mimic_certificate_cache_memory_sz}]
+    local httpd_proxy_memory_sz=$[${HTTPD_MAIN_PROCESS_SZ} + (${BURST_FACTOR} * ${HTTPD_CHILD_PROXY_PROCESS_SZ} * ${SIMULTANEOUS_RUSERS_NB})]
+    local lease_memory_sz=$[${USERS_NB} * ${DHCP_LEASE_SZ} * 2 / 1024]
+    local dhcpd_memory_sz=$[${DHCPD_PROCESS_SZ} + ${lease_memory_sz}]
+    local clamav_memory_sz=$[((${SIMULTANEOUS_USERS_NB} + ${SIMULTANEOUS_RUSERS_NB}) * ${VIRUS_SIGNATURE_SZ} / 1024) + ${TOTAL_AV_SCAN_PROCESS_SZ} + ${CLAMAV_PROCESS_SZ} + ${FRESHCLAM_PROCESS_SZ}]
+
+    test $[(${free_memory_sz} - ${cache_io_memory_sz}) / 1024] -gt 0 || warning 1
+    test $[(${free_memory_sz} - ${squid_ssl_mediate_memory_sz}) / 1024] -gt 0 || warning 2
+    test $[(${free_memory_sz} - ${NAMED_PROCESS_SZ}) / 1024] -gt 0 || warning 3
+    test $[(${free_memory_sz} - ${TOTAL_GUARD_PROCESS_SZ} - ${httpd_guard_memory_sz}) / 1024] -gt 0 || warning 4
+    test $[(${free_memory_sz} - ${httpd_proxy_memory_sz}) / 1024] -gt 0 || warning 5
+    test $[(${free_memory_sz} - ${dhcpd_memory_sz}) / 1024] -gt 0 || warning 6
+    test $[(${free_memory_sz} - ${clamav_memory_sz}) / 1024] -gt 0 || warning 7
+    test $[(${free_memory_sz} - ${httpd_proxy_memory_sz} - ${CACHE_CLEAN_PROCESS_SZ}) / 1024] -gt 0 || warning 8
+    test $[(${free_memory_sz} - ${OCSPD_PROCESS_SZ}) / 1024] -gt 0 || warning 9
+    test $[(${free_memory_sz} - ${proxy_memory_sz}) / 1024] -gt 0 || warning 14
+    test $[(${free_memory_sz} - ${SNMPD_PROCESS_SZ}) / 1024] -gt 0 || warning 15
+
+    local max_httpd_memory_sz=${httpd_proxy_memory_sz}
+    test ${httpd_guard_memory_sz} -lt ${httpd_proxy_memory_sz} || max_httpd_memory_sz=${httpd_guard_memory_sz}
+
+    test $[(${free_memory_sz} - \
+			      ${cache_io_memory_sz} - \
+			      ${squid_ssl_mediate_memory_sz} - \
+			      ${NAMED_PROCESS_SZ} - \
+			      ${TOTAL_GUARD_PROCESS_SZ} - \
+			      ${dhcpd_memory_sz} - \
+			      ${clamav_memory_sz} - \
+			      ${OCSPD_PROCESS_SZ} - \
+			      ${SNMPD_PROCESS_SZ} - \
+			      ${max_httpd_memory_sz} - \
+			      ${CACHE_CLEAN_PROCESS_SZ} - \
+			      ${proxy_memory_sz}) / 1024] -gt 0 || warning 10
+
+    FS_ROOT_SZ=${fs_root_sz}
+    BACKUP_SZ=${backup_sz}
+    FS_ADMIN_VAR_SZ=${fs_admin_var_sz}
+    FS_VAR_SZ=${fs_var_sz}
+    FS_GATEWAY_LOG_PER_DAY_SZ=${fs_gateway_log_per_day_sz}
+    FS_PROXY_DB_SZ=${fs_proxy_db_sz}
+    FS_SWAP_SZ=${fs_swap_sz}
+    FS_ADMIN_TMP_SZ=${fs_admin_tmp_sz}
+    FS_BASE_SZ=${fs_base_sz}
+    FS_RWEB_CACHE_SZ=${fs_rweb_cache_upload_sz}
+    MIN_OS_MEMORY_SIZE=${min_os_memory_size}
+    CACHE_IO_MEMORY_SZ=${cache_io_memory_sz}
+    SQUID_SSL_MEDIATE_MEMORY_SZ=${squid_ssl_mediate_memory_sz}
+    SSL_MIMIC_CERTIFICATE_CACHE_SZ=${ssl_mimic_certificate_cache_sz}
+    SSL_MIMIC_CERTIFICATE_CACHE_MEMORY_SZ=${ssl_mimic_certificate_cache_memory_sz}
+    HTTPD_PROXY_MEMORY_SZ=${httpd_proxy_memory_sz}
+    PROXY_MEMORY_SZ=${proxy_memory_sz}
+    DHCPD_MEMORY_SZ=${dhcpd_memory_sz}
+    CLAMAV_MEMORY_SZ=${clamav_memory_sz}
+    HTTPD_GUARD_MEMORY_SZ=${httpd_guard_memory_sz}
+    MAX_KEYTAB_FILE_SZ=${max_keytab_file_sz}
+    AV_WHITELIST_SIG_SZ=${av_whitelist_sig_sz}
+}
+
+gen-cache-conf-tuned()
+{
+    test ${PERSISTENT_CACHE} == True || return 0
+
+    local i
+    local q1=$[((${SIMULTANEOUS_USERS_NB} + ${SIMULTANEOUS_RUSERS_NB}) * ${AVERAGE_OBJECTS_PER_PAGE}) / ${PROXY_CACHE_NB}]
+    local q2=$[((${USERS_NB} + (${SIMULTANEOUS_RUSERS_NB} * 100 / ${SIMULTANEOUS_USERS_PCT})) * ${AVERAGE_OBJECTS_PER_PAGE}) / ${PROXY_CACHE_NB}]
+    local aufs_args="${L1_CACHE} ${L2_CACHE} Q1=${q1} Q2=${q2}"
+    local squid_cache_dir=${PROXY_CACHE_DIR:${#PROXY_DIR}}
+
+    for ((i=0 ; i<PROXY_CACHE_NB ; i++))
+    do
+	echo "cache_dir diskd ${squid_cache_dir}/d${i} $[${PROXY_CACHE_UNIT_SZ} / 1024] ${aufs_args}"
+    done > ${GENERATED_DIR}/squid.conf-cache-tuned
+}
+
+check-ext4-fs-sz()
+{
+    local fs_sz
+    
+    for fs_sz in \
+	${FS_ROOT_SZ} \
+	${FS_GATEWAY_LOG_PER_DAY_SZ} \
+	${FS_TMP_SZ} \
+	${FS_BASE_SZ} \
+	${FS_ADMIN_TMP_SZ} \
+	${FS_ADMIN_VAR_SZ} \
+	${FS_PROXY_DB_SZ} \
+	${FS_VAR_SZ}
+    do
+	test ${fs_sz} -le ${EXT4_PARTITION_MAX_SZ} || return 1
+    done
+
+    return 0
+}
+
+is-efi-system()
+{
+    test -d /sys/firmware/efi/efivars
+}
+
+gen-fs-tab()
+{
+    echo "# Begin /etc/fstab"
+    echo
+    echo "# FileSystem Mount-Point FS-Type Options Dump Fsck-Order"
+    echo
+
+    local disk_id=${DISK_SYSTEM_ID}
+    local efi pp root_dev 
+
+    is-efi-system
+    efi=${?}
+
+    case ${disk_id:0:2} in
+	sd|hd|nv|vd)
+	    test ${disk_id:0:2} != nv || pp=p
+	    root_dev=/dev/${disk_id}${pp}${ROOT_PARTITION_NB}
+	    ;;
+	md)
+	    pp=p
+	    root_dev=/dev/${disk_id}${pp}${RAID_ROOT_PARTITION_NB}
+	    ;;
+	*)
+	    ;;
+    esac
+
+    echo "${root_dev} / ext4 rw,suid,dev,exec,auto,nouser,async 1 1"
+
+    if test "${disk_id:0:2}" != md -a ${efi} -eq 0 ; then
+	local efi_dev=/dev/${disk_id}${pp}${EFI_PARTITION_NB}
+	echo "${efi_dev} /boot/efi vfat rw,nosuid,noexec,nodev,umask=0077 0 1"
+    fi
+
+    echo
+    echo "proc /proc proc rw,nosuid,noexec,nodev 0 0"
+    echo "sysfs /sys sysfs rw,nosuid,noexec,nodev 0 0"
+    echo "devpts /dev/pts devpts rw,nosuid,noexec,gid=5,mode=620 0 0"
+    echo "tmpfs /run tmpfs rw,nosuid,noexec 0 0"
+    echo "devtmpfs /dev devtmpfs rw,nosuid,noexec,mode=0755 0 0"
+
+    test ${efi} -ne 0 || echo "efivarfs /sys/firmware/efi/efivars efivarfs rw,nosuid,noexec,nodev 0 0"
+    echo
+    echo "proc ${ADMIN_DIR}/proc proc nosuid,noexec,nodev 0 0"
+
+    case ${APL_ROLE} in
+	gateway)
+	    echo "proxy ${PROXY_DIR}/dev/shm tmpfs rw,nosuid,noexec,nodev 0 0"
+	    echo
+	    echo "/dev/${LVM_VG_NAME}/Swap swap swap defaults 0 0"
+	    echo "/dev/${LVM_VG_NAME}/Logs ${WEB_LOG_DIR} ext4 ${FSTAB_OPTS} 1 2"
+	    echo "/dev/${LVM_VG_NAME}/Temp /tmp ext4 ${FSTAB_OPTS} 1 2"
+	    echo "/dev/${LVM_VG_NAME}/AdminHome ${BASE_DIR} ext4 rw,suid,exec,nodev,auto,nouser,async,data=journal 1 2"
+	    echo "/dev/${LVM_VG_NAME}/AdminTemp ${TMP_DIR} ext4 ${FSTAB_OPTS} 1 2"
+	    echo "/dev/${LVM_VG_NAME}/AdminVar ${VAR_DIR} ext4 ${FSTAB_OPTS} 1 2"
+	    echo "/dev/${LVM_VG_NAME}/ProxyDB ${PROXY_DB_DIR} ext4 ${FSTAB_OPTS} 1 2"
+	    echo "/dev/${LVM_VG_NAME}/Var /var ext4 ${FSTAB_OPTS} 1 2"
+	    echo "/dev/${LVM_VG_NAME}/WebCache ${WEB_CACHE_DIR} reiserfs rw,nosuid,noexec,nodev,auto,nouser,async,noatime 1 2"
+
+	    test ${PERSISTENT_CACHE} == False || \
+		echo "/dev/${LVM_VG_NAME}/ProxyCache ${PROXY_CACHE_DIR} reiserfs rw,nosuid,noexec,nodev,auto,nouser,async,noatime 1 2"
+	    ;;
+	manager)
+	    echo
+	    echo "/dev/${LVM_VG_NAME}/Swap swap swap defaults 0 0"
+	    echo "/dev/${LVM_VG_NAME}/Temp /tmp ext4 ${FSTAB_OPTS} 1 2"
+	    echo "/dev/${LVM_VG_NAME}/AdminHome ${BASE_DIR} ext4 data=journal,rw,suid,nodev,exec,auto,nouser,async 1 2"
+	    echo "/dev/${LVM_VG_NAME}/AdminTemp ${TMP_DIR} ext4 ${FSTAB_OPTS} 1 2"
+	    echo "/dev/${LVM_VG_NAME}/AdminVar ${VAR_DIR} ext4 ${FSTAB_OPTS} 1 2"
+	    echo "/dev/${LVM_VG_NAME}/Var /var ext4 ${FSTAB_OPTS} 1 2"
+	    ;;
+	*)
+	    ;;
+    esac
+
+    echo
+    echo "/dev/pts ${ADMIN_DIR}/dev/pts devpts rw,nosuid,noexec,gid=5,mode=620 0 0"
+    echo
+    echo "# End /etc/fstab"
+}
+
+gen-fs-info()
+{
+    # Order is important: Root first and then stripping need priority
+
+    echo "Root / ext4 ${FS_ROOT_SZ}"
+    echo "Logs ${WEB_LOG_DIR} ext4 ${FS_GATEWAY_LOG_PER_DAY_SZ}"
+    echo "Var /var ext4 ${FS_VAR_SZ}"
+
+    case ${APL_ROLE} in
+	gateway)
+	    echo "WebCache ${WEB_CACHE_DIR} reiserfs ${FS_RWEB_CACHE_SZ}"
+
+	    test ${PERSISTENT_CACHE} == False || \
+		echo "ProxyCache ${PROXY_CACHE_DIR} reiserfs ${FS_PROXY_CACHE_SZ}"
+
+	    echo "ProxyDB ${PROXY_DB_DIR} ext4 ${FS_PROXY_DB_SZ}"
+	    ;;
+	manager)
+	    ;;
+	*)
+	    ;;
+    esac
+
+    echo "AdminVar ${VAR_DIR} ext4 ${FS_ADMIN_VAR_SZ}"
+    echo "Swap swap swap ${FS_SWAP_SZ}"
+    echo "AdminHome ${BASE_DIR} ext4 ${FS_BASE_SZ}"
+    echo "AdminTemp ${TMP_DIR} ext4 ${FS_ADMIN_TMP_SZ}"
+    echo "Temp /tmp ext4 ${FS_TMP_SZ}"
+}
+
+get-cmdline-attribute()
+{
+    test -n "${1}" || return 1
+    local attribute=${1}
+
+    local assertion var val
+    local command_line=$(cat /proc/cmdline 2> /dev/null)
+
+    for assertion in ${command_line}
+    do
+	var=${assertion/=*}
+	val=${assertion/*=}
+
+	test "${var}" != ${attribute} || break
+    done
+
+    test "${var}" == "${val}" -o "${var}" != ${attribute} || echo ${val}
+}
+
+get-console()
+{
+    if test -n "${CLOUD_CONSOLE}" ; then
+	echo ${CLOUD_CONSOLE}
+	return 0
+    fi
+
+    get-cmdline-attribute console
+}
+
+get-console-assert()
+{
+    local console=$(get-console)
+    test -z "${console}" || echo console=${console}
+}
+
+get-terminal()
+{
+    local console_assert="${1}"
+
+    if test -z "${console_assert}" ; then
+	echo "console"
+	return 0
+    fi
+
+    local terminal=${console_assert:8:4}
+
+    if test "${terminal}" == ttyS ; then
+	echo "serial console"
+    else
+	echo "console"
+    fi
+}
+
+gen-grub-default()
+{
+    local console=$(get-console)
+    local terminal=$(get-terminal ${console})
+    local color
+
+    case ${APL_ROLE} in
+	gateway)
+	    color=red
+	    ;;
+	manager)
+	    color=green
+	    ;;
+	*)
+	    color=red
+	    ;;
+    esac
+
+    echo "insmod all_video"
+    echo "insmod ext2"
+
+    echo "set color_normal=white/black"
+    echo "set color_highlight=black/white"
+    echo "set menu_color=white/black"
+    echo "set menu_color_highlight=white/${color}"
+
+    echo "serial --unit=0 --speed=${SERIAL_SPEED} --word=8 --parity=no --stop=1"
+    echo "terminal_input ${terminal}"
+    echo "terminal_output ${terminal}"
+    echo "terminfo --ascii vt100"
+}
+
+gen-grub-menuentry()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    test -n "${3}" || return 3
+    local title=${1}
+    local system_name=${2}
+    local mode=${3}
+    local keyboard=${4}
+
+    local single root_partition_nb
+    local console=$(get-console-assert)
+
+    test ${mode} != 'single' || single=' single'
+    test -z "${keyboard}" || keyboard=" keyboard=${keyboard}"
+
+    echo "menuentry \"${title}\" {"
+
+    if test ${DISK_SYSTEM_TYPE:0:4} == raid ; then
+	case ${DISK_SYSTEM_TYPE} in
+	    raid0)
+		;;
+	    raid1)
+		;;
+	    raid5)
+		echo "insmod raid5rec"
+		;;
+	    raid6)
+		echo "insmod raid6rec"
+		;;
+	    raid10)
+		;;
+	    *)
+		;;
+	esac
+
+	if test ! -f ${APL}${HARD_DIR}/.install.os-version ; then
+	    root_partition_nb=${RAID_ROOT_PARTITION_NB}
+	else
+	    local initial_os_version=$(cat ${APL}${HARD_DIR}/.install.os-version 2> /dev/null)
+
+	    case ${initial_os_version} in
+		2.0.1|2.0.2)
+		    root_partition_nb=2
+		    ;;
+		*)
+		    root_partition_nb=${RAID_ROOT_PARTITION_NB}
+		    ;;
+	    esac
+	fi
+
+	echo "insmod mdraid1x"
+	echo "set root=(md/${TECHNICAL_NAME},${PARTITION_LABEL_TYPE}${root_partition_nb})"
+    else
+
+	#################################################################################################
+	# Some BIOS are unable to boot on disks other than the first one (even if others are bootable). #
+        # That's why the OS disk should be move to the first place at the BIOS level.                   #
+	# Therefore GRUB should be configured to boot on the first disk.                                #
+	#################################################################################################
+
+	local os_disk_ref=${DISK_INFOS#* }
+	os_disk_ref=${os_disk_ref/ *}
+	local os_disk_num=${os_disk_ref/*:}
+
+	if test ${DISK_SYSTEM_TYPE} == nvme ; then
+
+	    #########################################################################
+	    # We suppose that the OS disk is attached to the first NVMe controller. #
+	    #########################################################################
+
+	    ((os_disk_num--))
+	else
+	    ((os_disk_num--))
+	fi
+
+	if test ! -f ${APL}${HARD_DIR}/.install.os-version ; then
+	    root_partition_nb=${ROOT_PARTITION_NB}
+	else
+	    local initial_os_version=$(cat ${APL}${HARD_DIR}/.install.os-version 2> /dev/null)
+
+	    case ${initial_os_version} in
+		2.0.1|2.0.2)
+		    root_partition_nb=2
+		    ;;
+		*)
+		    root_partition_nb=${ROOT_PARTITION_NB}
+		    ;;
+	    esac
+	fi
+
+	echo "set root=(hd${os_disk_num},${PARTITION_LABEL_TYPE}${root_partition_nb})"
+    fi
+
+    echo "linux /boot/kernel-${system_name} ${console} ramdisk_size=${RAMDISK_SZ} ${KERNEL_OPTIONS}${single}${keyboard}"
+    echo "initrd /boot/initrd-${system_name}.img"
+    echo "cat /boot/grub/banner"
+    echo "}"
+}
+
+gen-grub-prod-conf()
+{
+    test -n "${1}" || return 1
+    local system_name=${1}
+    local keyboard=${2}
+
+    local timeout=3
+
+    echo "# Begin /boot/grub/grub.cfg"
+    echo
+    echo "set default=0"
+    echo "set fallback=1"
+    echo "set timeout=${timeout}"
+
+    gen-grub-default
+
+    echo
+    gen-grub-menuentry "${COMMERCIAL_NAME}" ${system_name} multi ${keyboard}
+    echo
+    gen-grub-menuentry "Maintenance" ${system_name} single ${keyboard}
+    echo
+    echo "# End /boot/grub/grub.cfg"
+}
+
+get-other-kernel-release()
+{
+    test -n "${1}" || return 1
+    local the_release=${1}
+
+    cd ${APL}//boot
+
+    local releases=$(ls -1 kernel-* 2> /dev/null)
+    local release other_release
+
+    for release in ${releases}
+    do
+	release=${release/kernel-}
+	test ${release} != ${the_release} || continue
+	other_release=${release}
+	break
+    done
+
+    echo ${other_release}
+}
+
+gen-grub-conf()
+{
+    local release
+
+    if test -z "${RETUNE}" ; then
+	release=${SYSTEM_NAME}
+    else
+	local active_kernel=$(uname -r 2> /dev/null)
+	release=$(get-other-kernel-release ${active_kernel})
+	test -n "${release}" || release=${SYSTEM_NAME}
+    fi
+
+    gen-grub-prod-conf ${release} ${BOOT_KEYBOARD}
+}
+
+select-model()
+{
+    test -n "${1}" || return 1
+    local model=${1}
+
+    local apl_role=${model/:*}
+    local apl_model=${model/*:}
+
+    local mega=1024
+    local giga=$[${mega} * 1024]
+
+    USERS_NB=1
+    RUSERS_NB=1
+    RWEB_NB=1
+    RWEB_CACHE_SZ=1
+    URLLIST_RECORDS_NB=1
+    LOGROTATE_NB=1
+    PERSISTENT_CACHE=off
+    PERSISTENT_WEB_LOG=off
+    PERSISTENT_RWEB_LOG=off
+    PER_RWEB_CACHE_SZ=1
+    MAX_UPLOAD_FILE_SZ=1
+    MANAGER_GATEWAY_NB=1
+    MANAGER_TEMPLATE_NB=1
+    MANAGER_TOTAL_USERS_NB=1
+    MANAGER_TOTAL_RWEB_NB=1
+
+    case ${apl_role} in
+	gateway)
+	    PER_RWEB_CACHE_SZ=50
+	    case ${apl_model} in
+		support)
+		    USERS_NB=100
+		    RUSERS_NB=100
+		    RWEB_NB=50
+		    URLLIST_RECORDS_NB=5000000
+		    LOGROTATE_NB=31
+		    PERSISTENT_CACHE=on
+		    PERSISTENT_WEB_LOG=on
+		    PERSISTENT_RWEB_LOG=on
+		    MAX_UPLOAD_FILE_SZ=$[100 * ${mega}]
+		    CPU_NB=${CPU_NB-8}
+		    MEMORY_SZ=${MEMORY_SZ-$[8 * ${giga}]}
+		    DISK_INFOS="${DISK_INFOS-scsi x:1 $[200 * ${giga}]}"
+		    NETWORKS="${NETWORKS-eth0 eth1}"
+		    ;;
+		'test')
+		    USERS_NB=10
+		    RUSERS_NB=5
+		    RWEB_NB=$[${RUSERS_NB} * 2]
+		    URLLIST_RECORDS_NB=5000000
+		    LOGROTATE_NB=31
+		    PERSISTENT_CACHE=on
+		    PERSISTENT_WEB_LOG=on
+		    PERSISTENT_RWEB_LOG=on
+		    PER_RWEB_CACHE_SZ=$[30 * ${mega}]
+		    MAX_UPLOAD_FILE_SZ=$[100 * ${mega}]
+		    CPU_NB=${CPU_NB-4}
+		    MEMORY_SZ=${MEMORY_SZ-$[4 * ${giga}]}
+		    DISK_INFOS="${DISK_INFOS-scsi x:1 $[32 * ${giga}]}"
+		    NETWORKS="${NETWORKS-eth0 eth1}"
+		    ;;
+		vpnsubscr-20-payg)
+		    USERS_NB=10
+		    RUSERS_NB=2
+		    RWEB_NB=1
+		    URLLIST_RECORDS_NB=0
+		    LOGROTATE_NB=7
+		    PERSISTENT_CACHE=on
+		    PERSISTENT_WEB_LOG=off
+		    PERSISTENT_RWEB_LOG=off
+		    PER_RWEB_CACHE_SZ=$[5 * ${mega}]
+		    MAX_UPLOAD_FILE_SZ=$[1 * ${mega}]
+		    CPU_NB=${CPU_NB-2}
+		    MEMORY_SZ=${MEMORY_SZ-$[1 * ${giga}]}
+		    DISK_INFOS="${DISK_INFOS-scsi x:1 $[20 * ${giga}]}"
+		    NETWORKS="${NETWORKS-eth0 eth1}"
+		    ;;
+		10)
+		    USERS_NB=10
+		    RUSERS_NB=5
+		    RWEB_NB=$[${RUSERS_NB} * 2]
+		    URLLIST_RECORDS_NB=5000000
+		    LOGROTATE_NB=31
+		    PERSISTENT_CACHE=on
+		    PERSISTENT_WEB_LOG=on
+		    PERSISTENT_RWEB_LOG=on
+		    PER_RWEB_CACHE_SZ=$[30 * ${mega}]
+		    MAX_UPLOAD_FILE_SZ=$[100 * ${mega}]
+		    CPU_NB=${CPU_NB-4}
+		    MEMORY_SZ=${MEMORY_SZ-$[4 * ${giga}]}
+		    DISK_INFOS="${DISK_INFOS-scsi x:1 $[60 * ${giga}]}"
+		    NETWORKS="${NETWORKS-eth0 eth1}"
+		    ;;
+		50)
+		    USERS_NB=40
+		    RUSERS_NB=20
+		    RWEB_NB=10
+		    URLLIST_RECORDS_NB=5000000
+		    LOGROTATE_NB=31
+		    PERSISTENT_CACHE=on
+		    PERSISTENT_WEB_LOG=on
+		    PERSISTENT_RWEB_LOG=on
+		    MAX_UPLOAD_FILE_SZ=$[100 * ${mega}]
+		    CPU_NB=${CPU_NB-4}
+		    MEMORY_SZ=${MEMORY_SZ-$[8 * ${giga}]}
+		    DISK_INFOS="${DISK_INFOS-scsi x:1 $[100 * ${giga}]}"
+		    NETWORKS="${NETWORKS-eth0 eth1 eth2 eth3 eth4 eth5}"
+		    ;;
+		100)
+		    USERS_NB=100
+		    RUSERS_NB=$[${USERS_NB} / 5]
+		    RWEB_NB=$[${RUSERS_NB} * 2]
+		    URLLIST_RECORDS_NB=5000000
+		    LOGROTATE_NB=31
+		    PERSISTENT_CACHE=on
+		    PERSISTENT_WEB_LOG=on
+		    PERSISTENT_RWEB_LOG=on
+		    MAX_UPLOAD_FILE_SZ=$[100 * ${mega}]
+		    CPU_NB=${CPU_NB-4}
+		    MEMORY_SZ=${MEMORY_SZ-$[8 * ${giga}]}
+		    DISK_INFOS="${DISK_INFOS-scsi x:1 $[250 * ${giga}]}"
+		    NETWORKS="${NETWORKS-eth0 eth1 eth2}"
+		    ;;
+		250)
+		    USERS_NB=250
+		    RUSERS_NB=$[${USERS_NB} / 5]
+		    RWEB_NB=$[${RUSERS_NB} * 2]
+		    URLLIST_RECORDS_NB=5000000
+		    LOGROTATE_NB=31
+		    PERSISTENT_CACHE=on
+		    PERSISTENT_WEB_LOG=on
+		    PERSISTENT_RWEB_LOG=on
+		    MAX_UPLOAD_FILE_SZ=$[200 * ${mega}]
+		    CPU_NB=${CPU_NB-6}
+		    MEMORY_SZ=${MEMORY_SZ-$[16 * ${giga}]}
+		    DISK_INFOS="${DISK_INFOS-scsi x:1 $[500 * ${giga}]}"
+		    NETWORKS="${NETWORKS-eth0 eth1 eth2}"
+		    ;;
+		500)
+		    USERS_NB=500
+		    RUSERS_NB=$[${USERS_NB} / 5]
+		    RWEB_NB=$[${RUSERS_NB} * 2]
+		    URLLIST_RECORDS_NB=5000000
+		    LOGROTATE_NB=31
+		    PERSISTENT_CACHE=on
+		    PERSISTENT_WEB_LOG=on
+		    PERSISTENT_RWEB_LOG=on
+		    MAX_UPLOAD_FILE_SZ=$[200 * ${mega}]
+		    CPU_NB=${CPU_NB-6}
+		    MEMORY_SZ=${MEMORY_SZ-$[24 * ${giga}]}
+		    DISK_INFOS="${DISK_INFOS-scsi x:1 $[1000 * ${giga}]}"
+		    NETWORKS="${NETWORKS-eth0 eth1 eth2}"
+		    ;;
+		1250)
+		    USERS_NB=1250
+		    RUSERS_NB=100
+		    RWEB_NB=$[${RUSERS_NB} * 2]
+		    URLLIST_RECORDS_NB=5000000
+		    LOGROTATE_NB=31
+		    PERSISTENT_CACHE=on
+		    PERSISTENT_WEB_LOG=on
+		    PERSISTENT_RWEB_LOG=on
+		    MAX_UPLOAD_FILE_SZ=$[500 * ${mega}]
+		    CPU_NB=${CPU_NB-16}
+		    MEMORY_SZ=${MEMORY_SZ-$[64 * ${giga}]}
+		    DISK_INFOS="${DISK_INFOS-raid5 x:1 $[2000 * ${giga}]}"
+		    NETWORKS="${NETWORKS-eth0 eth1 eth2 eth3 eth4 eth5}"
+		    ;;
+		mini)
+		    USERS_NB=3
+		    RUSERS_NB=1
+		    RWEB_NB=1
+		    URLLIST_RECORDS_NB=1000000
+		    LOGROTATE_NB=1
+		    PERSISTENT_CACHE=off
+		    PERSISTENT_WEB_LOG=off
+		    PERSISTENT_RWEB_LOG=off
+		    PER_RWEB_CACHE_SZ=$[1 * ${mega}]
+		    MAX_UPLOAD_FILE_SZ=$[1 * ${mega}]
+		    CPU_NB=${CPU_NB-1}
+		    MEMORY_SZ=${MEMORY_SZ-$[256 * ${mega}]}
+		    DISK_INFOS="${DISK_INFOS-scsi x:1 $[16 * ${giga}]}"
+		    NETWORKS="${NETWORKS-eth0 eth1}"
+		    ;;
+		TEST)
+		    local disk_info disk_sz=2048 disk_nb=1
+		    ((disk_sz *= disk_nb))
+
+		    USERS_NB=200
+		    RUSERS_NB=1000
+		    RWEB_NB=250
+		    URLLIST_RECORDS_NB=5000000
+		    LOGROTATE_NB=31
+		    PERSISTENT_CACHE=on
+		    PERSISTENT_WEB_LOG=on
+		    PERSISTENT_RWEB_LOG=on
+		    PER_RWEB_CACHE_SZ=$[64 * ${mega}]
+		    MAX_UPLOAD_FILE_SZ=$[30 * ${mega}]
+		    CPU_NB=${CPU_NB-24}
+		    MEMORY_SZ=${MEMORY_SZ-$[48 * ${giga}]}
+		    DISK_INFOS="${DISK_INFOS-raid1 x:1 $[${disk_sz} * ${giga}]}"
+		    NETWORKS="eth0 eth1"
+		    ;;
+		*)
+		    error 101
+		    ;;
+	    esac
+
+	    RWEB_CACHE_SZ=$[${RWEB_NB} * ${PER_RWEB_CACHE_SZ}]
+	    ;;
+
+	manager)
+	    case ${apl_model} in
+
+		support)
+		    MANAGER_GATEWAY_NB=30
+		    MANAGER_TEMPLATE_NB=8
+		    MANAGER_TOTAL_USERS_NB=1000
+		    MANAGER_TOTAL_RWEB_NB=20
+		    URLLIST_RECORDS_NB=5000000
+		    CPU_NB=${CPU_NB-2}
+		    MEMORY_SZ=${MEMORY_SZ-$[3 * ${giga}]}
+		    DISK_INFOS="${DISK_INFOS-scsi x:1 $[64 * ${giga}]}"
+		    NETWORKS="${NETWORKS-eth0 eth1}"
+		    ;;
+		2|'test')
+		    MANAGER_GATEWAY_NB=2
+		    MANAGER_TEMPLATE_NB=10
+		    MANAGER_TOTAL_USERS_NB=200
+		    MANAGER_TOTAL_RWEB_NB=20
+		    URLLIST_RECORDS_NB=5000000
+		    CPU_NB=${CPU_NB-2}
+		    MEMORY_SZ=${MEMORY_SZ-$[1 * ${giga}]}
+		    DISK_INFOS="${DISK_INFOS-scsi x:1 $[12 * ${giga}]}"
+		    NETWORKS="${NETWORKS-eth0}"
+		    ;;
+		20)
+		    MANAGER_GATEWAY_NB=20
+		    MANAGER_TEMPLATE_NB=20
+		    MANAGER_TOTAL_USERS_NB=$((MANAGER_GATEWAY_NB * 100))
+		    MANAGER_TOTAL_RWEB_NB=$((MANAGER_TOTAL_USERS_NB / 5 * 2))
+		    URLLIST_RECORDS_NB=5000000
+		    CPU_NB=${CPU_NB-2}
+		    MEMORY_SZ=${MEMORY_SZ-$[1 * ${giga}]}
+		    DISK_INFOS="${DISK_INFOS-scsi x:1 $[30 * ${giga}]}"
+		    NETWORKS="${NETWORKS-eth0}"
+		    ;;
+		50)
+		    MANAGER_GATEWAY_NB=50
+		    MANAGER_TEMPLATE_NB=20
+		    MANAGER_TOTAL_USERS_NB=$((MANAGER_GATEWAY_NB * 100))
+		    MANAGER_TOTAL_RWEB_NB=$((MANAGER_TOTAL_USERS_NB / 5 * 2))
+		    URLLIST_RECORDS_NB=5000000
+		    CPU_NB=${CPU_NB-2}
+		    MEMORY_SZ=${MEMORY_SZ-$[1 * ${giga}]}
+		    DISK_INFOS="${DISK_INFOS-scsi x:1 $[100 * ${giga}]}"
+		    NETWORKS="${NETWORKS-eth0 eth1}"
+		    ;;
+		100)
+		    MANAGER_GATEWAY_NB=100
+		    MANAGER_TEMPLATE_NB=20
+		    MANAGER_TOTAL_USERS_NB=$((MANAGER_GATEWAY_NB * 100))
+		    MANAGER_TOTAL_RWEB_NB=$((MANAGER_TOTAL_USERS_NB / 5 * 2))
+		    URLLIST_RECORDS_NB=5000000
+		    CPU_NB=${CPU_NB-2}
+		    MEMORY_SZ=${MEMORY_SZ-$[2 * ${giga}]}
+		    DISK_INFOS="${DISK_INFOS-scsi x:1 $[300 * ${giga}]}"
+		    NETWORKS="${NETWORKS-eth0 eth1}"
+		    ;;
+		200)
+		    MANAGER_GATEWAY_NB=250
+		    MANAGER_TEMPLATE_NB=20
+		    MANAGER_TOTAL_USERS_NB=20000
+		    MANAGER_TOTAL_RWEB_NB=$((MANAGER_TOTAL_USERS_NB / 5 * 2))
+		    URLLIST_RECORDS_NB=5000000
+		    CPU_NB=${CPU_NB-2}
+		    MEMORY_SZ=${MEMORY_SZ-$[2 * ${giga}]}
+		    DISK_INFOS="${DISK_INFOS-scsi x:1 $[1500 * ${giga}]}"
+		    NETWORKS="${NETWORKS-eth0 eth1}"
+		    ;;
+		500)
+		    MANAGER_GATEWAY_NB=500
+		    MANAGER_TEMPLATE_NB=30
+		    MANAGER_TOTAL_USERS_NB=50000
+		    MANAGER_TOTAL_RWEB_NB=$((MANAGER_TOTAL_USERS_NB / 5 * 2))
+		    URLLIST_RECORDS_NB=5000000
+		    CPU_NB=${CPU_NB-2}
+		    MEMORY_SZ=${MEMORY_SZ-$[3 * ${giga}]}
+		    DISK_INFOS="${DISK_INFOS-scsi x:1 $[8000 * ${giga}]}"
+		    NETWORKS="${NETWORKS-eth0 eth1}"
+		    ;;
+		1000)
+		    MANAGER_GATEWAY_NB=1000
+		    MANAGER_TEMPLATE_NB=50
+		    MANAGER_TOTAL_USERS_NB=100000
+		    MANAGER_TOTAL_RWEB_NB=$((MANAGER_TOTAL_USERS_NB / 5 * 2))
+		    URLLIST_RECORDS_NB=5000000
+		    CPU_NB=${CPU_NB-2}
+		    MEMORY_SZ=${MEMORY_SZ-$[4 * ${giga}]}
+		    DISK_INFOS="${DISK_INFOS-scsi x:1 $[30000 * ${giga}]}"
+		    NETWORKS="${NETWORKS-eth0 eth1}"
+		    ;;
+		mini)
+		    MANAGER_GATEWAY_NB=2
+		    MANAGER_TEMPLATE_NB=2
+		    MANAGER_TOTAL_USERS_NB=6
+		    MANAGER_TOTAL_RWEB_NB=1
+		    URLLIST_RECORDS_NB=1000000
+		    CPU_NB=${CPU_NB-2}
+		    MEMORY_SZ=${MEMORY_SZ-$[1 * ${giga}]}
+		    DISK_INFOS="${DISK_INFOS-scsi x:1 $[8 * ${giga}]}"
+		    NETWORKS="${NETWORKS-eth0}"
+		    ;;
+		TEST)
+		    MANAGER_GATEWAY_NB=2000
+		    MANAGER_TEMPLATE_NB=200
+		    MANAGER_TOTAL_USERS_NB=100000
+		    MANAGER_TOTAL_RWEB_NB=500
+		    URLLIST_RECORDS_NB=10000000
+		    CPU_NB=${CPU_NB-2}
+		    MEMORY_SZ=${MEMORY_SZ-$[8 * ${giga}]}
+		    DISK_INFOS="${DISK_INFOS-scsi x:1 $[512 * ${giga}]}"
+		    NETWORKS="${NETWORKS-eth0 eth1}"
+		    ;;
+		*)
+		    error 101
+		    ;;
+	    esac
+	    ;;
+	*)
+	    ;;
+    esac
+
+    APL_ROLE=${apl_role}
+
+    if test ${CPU_ARCHITECTURE} == x86_64 ; then
+	MEMORY_TYPE=64mem
+    elif test ${MEMORY_SZ} -le $[3 * ${giga}] ; then
+	MEMORY_TYPE=lowmem
+    else
+	MEMORY_TYPE=highmem
+    fi
+}
+
+check-parameters-conf()
+{
+    check-memory-type ${MEMORY_TYPE}
+    check-cpu-nb ${CPU_NB}
+    check-memory-sz ${MEMORY_SZ}
+    check-disk-infos "${DISK_INFOS}"
+    check-networks "${NETWORKS}"
+
+    case ${APL_ROLE} in
+	gateway)
+	    tuner-check-users-nb ${USERS_NB} ${RUSERS_NB}
+	    tuner-check-urllist-record-nb ${URLLIST_RECORDS_NB}
+	    tuner-check-rweb-nb ${RWEB_NB}
+	    tuner-check-logrotate-nb ${LOGROTATE_NB}
+	    tuner-check-uploaded-files-sz ${MAX_UPLOAD_FILE_SZ}
+	    tuner-check-persistency-states ${PERSISTENT_CACHE} ${PERSISTENT_WEB_LOG} ${PERSISTENT_RWEB_LOG}
+	    ;;
+	manager)
+	    tuner-check-gateway-nb ${MANAGER_GATEWAY_NB}
+	    tuner-check-template-nb ${MANAGER_TEMPLATE_NB}
+	    ;;
+	*)
+	    ;;
+    esac
+}
+
+tune-hardware-conf()
+{
+    tune-cpu-nb ${CPU_NB}
+    tune-memory ${MEMORY_SZ}
+    tune-persistency-states ${PERSISTENT_CACHE} ${PERSISTENT_WEB_LOG} ${PERSISTENT_RWEB_LOG}
+}
+
+tune-gateway-parameters-conf()
+{
+    tune-users ${USERS_NB} ${RUSERS_NB} ${RWEB_NB}
+    tune-rweb ${RWEB_NB}
+    tune-urllist-records ${URLLIST_RECORDS_NB}
+}
+
+tune-software-conf()
+{
+    tune-named
+    tune-httpd-guard
+    tune-httpd-rproxy
+    tune-guard-av
+    tune-dhcp-leases-sz
+    tune-ssl-children
+    tune-auth-helper
+    tune-ocspd
+    tune-cache-cleaner
+    tune-av-sz
+    tune-log-sz
+}
+
+gen-all-configurations()
+{
+    gen-sshd-conf-tuned > ${GENERATED_DIR}/sshd_config-tuned
+    gen-named-conf-tuned  > ${GENERATED_DIR}/named.conf-tuned
+    gen-dhcpd-conf-tuned > ${GENERATED_DIR}/dhcpd.conf-tuned
+    gen-wadmind-conf-tuned > ${GENERATED_DIR}/${WADMIND_NAME}.conf-tuned
+    gen-httpd-noproxy-conf-tuned > ${GENERATED_DIR}/httpd-noproxy.conf-tuned
+    gen-httpd-proxy-conf-tuned > ${GENERATED_DIR}/httpd-proxy.conf-tuned
+    gen-httpd-proxy-conf-cache-tuned > ${GENERATED_DIR}/httpd-proxy.conf-cache-tuned
+    gen-slapd-conf-tuned > ${GENERATED_DIR}/slapd.conf-tuned
+    gen-squid-conf-tuned > ${GENERATED_DIR}/squid.conf-tuned
+    gen-c-icap-conf-tuned > ${GENERATED_DIR}/c-icap.conf-tuned
+    gen-clamd-conf-tuned > ${GENERATED_DIR}/clamd.conf-tuned
+    gen-snmpd-conf-tuned > ${GENERATED_DIR}/snmpd.conf-tuned
+    gen-snmpd-conf-httpd-tuned > ${GENERATED_DIR}/snmpd.conf-httpd-tuned
+    gen-snmpd-conf-c-icap-tuned > ${GENERATED_DIR}/snmpd.conf-c-icap-tuned
+    gen-snmpd-conf-squidGuard-tuned > ${GENERATED_DIR}/snmpd.conf-squidGuard-tuned
+    gen-logrotate-daily-conf > ${GENERATED_DIR}/logrotate-daily.conf
+    gen-logrotate-hourly-conf > ${GENERATED_DIR}/logrotate-hourly.conf
+    gen-model-conf > ${GENERATED_DIR}/model.conf
+    gen-appliance-role > ${GENERATED_DIR}/role
+    gen-at-allow > ${GENERATED_DIR}/at.allow
+    gen-charon.conf-tuned > ${GENERATED_DIR}/ipsec.charon.conf-tuned
+    gen-httpd-sysconfig-htcacheclean-tuned > ${GENERATED_DIR}/sysconfig.htcacheclean-tuned
+    gen-sysconfig-squid-tuned > ${GENERATED_DIR}/sysconfig.squid-tuned
+
+    gen-logrotate-system-daily > ${GENERATED_DIR}/logrotate-daily.system
+    gen-logrotate-system-hourly > ${GENERATED_DIR}/logrotate-hourly.system
+
+    test ${APL_ROLE} == 'gateway' || return 0
+
+    gen-logrotate-appliance-daily > ${GENERATED_DIR}/logrotate-daily.gateway
+    gen-logrotate-appliance-hourly > ${GENERATED_DIR}/logrotate-hourly.gateway
+}
+
+set-cpu-architecture()
+{
+    export CPU_ARCHITECTURE=$(uname -m 2> /dev/null)
+
+    if test ${CPU_ARCHITECTURE} == "x86_64" ; then
+	MAX_MEMORY_SZ=$[256 * 1024 * 1024]
+    else
+	MAX_MEMORY_SZ=$[64 * 1024 * 1024]
+    fi
+}
+
+set-cpu-architecture-parameters()
+{
+    case ${APL_ROLE} in
+	gateway)
+	    if test ${CPU_ARCHITECTURE} == "x86_64" ; then
+		DHCPD_PROCESS_SZ=${DHCPD_64_PROCESS_SZ}
+		CACHE_INDEX_OBJECT_MEMORY_SZ=${CACHE_INDEX_OBJECT_64_MEMORY_SZ}
+		SQUID_INITIAL_PROCESS_SZ=${SQUID_INITIAL_64_PROCESS_SZ}
+		GUARD_PROCESS_SZ=${GUARD_64_PROCESS_SZ}
+		HTTPD_MAIN_PROCESS_SZ=${HTTPD_MAIN_64_PROCESS_SZ}
+		HTTPD_CHILD_NOPROXY_PROCESS_SZ=${HTTPD_CHILD_NOPROXY_64_PROCESS_SZ}
+		HTTPD_CHILD_PROXY_PROCESS_SZ=${HTTPD_CHILD_PROXY_64_PROCESS_SZ}
+		CLAMAV_PROCESS_SZ=${CLAMAV_64_PROCESS_SZ}
+	    else
+		DHCPD_PROCESS_SZ=${DHCPD_32_PROCESS_SZ}
+		CACHE_INDEX_OBJECT_MEMORY_SZ=${CACHE_INDEX_OBJECT_32_MEMORY_SZ}
+		SQUID_INITIAL_PROCESS_SZ=${SQUID_INITIAL_32_PROCESS_SZ}
+		GUARD_PROCESS_SZ=${GUARD_32_PROCESS_SZ}
+		HTTPD_MAIN_PROCESS_SZ=${HTTPD_MAIN_32_PROCESS_SZ}
+		HTTPD_CHILD_NOPROXY_PROCESS_SZ=${HTTPD_CHILD_NOPROXY_32_PROCESS_SZ}
+		HTTPD_CHILD_PROXY_PROCESS_SZ=${HTTPD_CHILD_PROXY_32_PROCESS_SZ}
+		CLAMAV_PROCESS_SZ=${CLAMAV_32_PROCESS_SZ}
+	    fi
+	    ;;
+	manager)
+	    DHCPD_PROCESS_SZ=0
+	    CACHE_INDEX_OBJECT_MEMORY_SZ=0
+	    SQUID_INITIAL_PROCESS_SZ=0
+	    GUARD_PROCESS_SZ=0
+	    HTTPD_MAIN_PROCESS_SZ=0
+	    HTTPD_CHILD_NOPROXY_PROCESS_SZ=0
+	    HTTPD_CHILD_PROXY_PROCESS_SZ=0
+	    CLAMAV_PROCESS_SZ=0
+	    ;;
+	*)
+	    ;;
+    esac
+
+    if test ${CPU_ARCHITECTURE} == "x86_64" ; then
+	WADMIND_PROCESS_SZ=${WADMIND_64_PROCESS_SZ}
+    else
+	WADMIND_PROCESS_SZ=${WADMIND_32_PROCESS_SZ}
+    fi
+}
+
+set-gateway-capacities-env()
+{
+    MANAGER_GATEWAY_NB=0
+    MANAGER_TEMPLATE_NB=0
+    MANAGER_TOTAL_USERS_NB=0
+    MANAGER_TOTAL_RWEB_NB=0
+
+    USERS_NB=${1}
+    URLLIST_RECORDS_NB=${2}
+    RUSERS_NB=${3}
+    RWEB_NB=${4}
+    LOGROTATE_NB=${5}
+    RWEB_CACHE_SZ=${6}
+    MAX_UPLOAD_FILE_SZ=${7}
+    PERSISTENT_CACHE=${8}
+    PERSISTENT_WEB_LOG=${9}
+    PERSISTENT_RWEB_LOG=${10}
+}
+
+set-manager-capacities-env()
+{
+    USERS_NB=0
+    RUSERS_NB=0
+    RWEB_NB=0
+    LOGROTATE_NB=${MANAGER_LOGROTATE_NB}
+    RWEB_CACHE_SZ=0
+    MAX_UPLOAD_FILE_SZ=0
+    PERSISTENT_CACHE=off
+    PERSISTENT_WEB_LOG=off
+    PERSISTENT_RWEB_LOG=off
+
+    MANAGER_GATEWAY_NB=${1}
+    MANAGER_TEMPLATE_NB=${2}
+    MANAGER_TOTAL_USERS_NB=${3}
+    MANAGER_TOTAL_RWEB_NB=${4}
+    URLLIST_RECORDS_NB=${5}
+}
+
+main()
+{
+    local model=${1}
+
+    set-cpu-architecture
+
+    case "${model}" in
+	--model)
+	    test -n "${2}" || return 1
+	    model=${2}
+	    select-model ${model}
+	    ;;
+	"")
+	    select-model gateway:5
+	    ;;
+	*)
+	    BOOT_KEYBOARD=${6}
+
+	    test -n "${1}"  || return 11
+	    test -n "${2}"  || return 12
+	    test -n "${3}"  || return 13
+	    test -n "${4}"  || return 14
+	    test -n "${5}"  || return 15
+	    test -n "${7}"  || return 17
+
+	    MEMORY_TYPE=${1}
+	    CPU_NB=${2}
+	    MEMORY_SZ=${3}
+	    DISK_INFOS=${4}
+	    NETWORKS=${5}
+	    MODEL=${7}
+
+	    local apl_role=${MODEL/:*}
+	    local apl_capacities=${MODEL/*:}
+
+	    apl_capacities=${apl_capacities//,/ }
+
+	    case ${apl_role} in
+		gateway)
+		    set-gateway-capacities-env ${apl_capacities}
+		    ;;
+		manager)
+		    set-manager-capacities-env ${apl_capacities}
+		    ;;
+		*)
+		    ;;
+	    esac
+
+	    APL_ROLE=${apl_role}
+    esac
+
+    set-cpu-architecture-parameters
+
+    check-parameters-conf
+    tune-hardware-conf
+    tune-gateway-parameters-conf
+
+    gen-implicit-parameters \
+	${MEMORY_TYPE} \
+	${URLLIST_RECORDS_NB} \
+	"${NETWORKS}" \
+	"${DISK_INFOS}"
+
+    tune-software-conf
+
+    tune-memory-storage \
+	$[${SIMULTANEOUS_USERS_NB} + ${SIMULTANEOUS_RUSERS_NB}] \
+	${MEMORY_SZ} \
+	${URLLIST_RECORDS_NB} \
+	${RWEB_CACHE_SZ} \
+	${MAX_UPLOAD_FILE_SZ} \
+	${RWEB_NB} \
+	${MANAGER_GATEWAY_NB} \
+	${MANAGER_TEMPLATE_NB}
+
+    check-ext4-fs-sz || error 23
+
+    gen-fs-info > ${GENERATED_DIR}/fs-info
+    gen-fs-tab > ${GENERATED_DIR}/etc.fstab
+    gen-cache-conf-tuned > ${GENERATED_DIR}/squid.conf-cache-tuned
+
+    gen-all-configurations
+    gen-grub-conf > ${GENERATED_DIR}/grub.cfg
+}
+
+# Main()
+
+main "${@}"

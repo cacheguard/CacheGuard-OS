@@ -1,0 +1,1131 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       Commands
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+source functions
+
+# Overloading a function defined in lib-check file
+
+check-ldap-protocol()
+{
+    test -n "${1}" || return 1
+
+    case ${1} in
+	ldap|ldaps|sldap)
+	    return 0
+	    ;;
+	*)
+	    return 1
+	    ;;
+    esac
+}
+
+show-auth-mode-ldap()
+{
+    echo-command-form "authenticate mode ldap"
+    local val=$(external-form ${CURRENT_AUTHENTICATE_LDAP})
+    echo-mark-cur
+    echo-value "${val}" ${AUTH_COL}
+
+    if test "${CURRENT_AUTHENTICATE_LDAP}" != "${AUTHENTICATE_LDAP}" ; then
+	echo-command-form "authenticate mode ldap"
+	echo-mark-new
+	val=$(external-form ${AUTHENTICATE_LDAP})
+	echo-value "${val}" ${AUTH_COL}
+    fi
+}
+
+show-ldaps-ca1()
+{
+    local ldaps_ca=${2}
+
+    echo-command-form "authenticate ldaps ca"
+    if test "${1}" == "new" ; then
+	echo-mark-new
+    else
+	echo-mark-cur
+    fi
+
+    if test -z "${ldaps_ca}" ; then
+	echo-value-null
+	return 0
+    fi
+
+    echo-value "${ldaps_ca}"
+}
+
+show-ldaps-ca()
+{
+    echo-begin-show
+    show-ldaps-ca1 'current' "${CURRENT_LDAPS_CA}"
+    test "${CURRENT_LDAPS_CA}" == "${LDAPS_CA}" || show-ldaps-ca1 'new' "${LDAPS_CA}"
+    echo-end-show
+}
+
+show-auth-mode-kerberos()
+{
+    echo-command-form "authenticate mode kerberos"
+    local val=$(external-form ${CURRENT_AUTHENTICATE_KERBEROS})
+    echo-mark-cur
+    echo-value "${val}" ${AUTH_COL}
+
+    if test "${CURRENT_AUTHENTICATE_KERBEROS}" != "${AUTHENTICATE_KERBEROS}" ; then
+	echo-command-form "authenticate mode kerberos"
+	echo-mark-new
+	val=$(external-form ${AUTHENTICATE_KERBEROS})
+	echo-value "${val}" ${AUTH_COL}
+    fi
+}
+
+show-auth-mode1()
+{
+    show-auth-mode-ldap
+    show-auth-mode-kerberos
+}
+
+show-auth-mode()
+{
+    echo-begin-show
+    case "${1}" in
+	ldap|kerberos)
+	    show-auth-mode-${1}
+	    ;;
+	"")
+	    show-auth-mode1
+	    ;;
+	*)
+	    return 255
+	    ;;
+    esac
+    echo-end-show
+}
+
+show-ldap-req2()
+{
+    local ldap_dn=${1}
+    local ldap_login=${2}
+    local ldap_passwd=${3}
+    local ldap_filter=${4}
+    local ldap_gdn=${5}
+
+    echo-value "userBaseDN: ${ldap_dn}" ${AUTH_COL}
+
+    echo-blank-command ; echo-value "loginAttribute: ${ldap_login}" ${AUTH_COL}
+    echo-blank-command ; echo-value "passwordAttribute: ${ldap_passwd}" ${AUTH_COL}
+    echo-blank-command ; echo-value "ldapFilter: ${ldap_filter}" ${AUTH_COL}
+
+    if test -n "${ldap_gdn}" ; then
+	echo-blank-command
+	echo-value "groupBaseDN: ${ldap_gdn}" ${AUTH_COL}
+    fi
+}
+
+show-ldap-req1()
+{
+    echo-begin-show
+    echo-command-form "authenticate ldap request"
+    echo-mark-cur
+
+    show-ldap-req2 \
+	"${CURRENT_LDAP_BASE_DN}" \
+	"${CURRENT_LDAP_LOGIN}" \
+	"${CURRENT_LDAP_PASSWORD}" \
+	"${CURRENT_LDAP_FILTER}" \
+	"${CURRENT_LDAP_GROUP_DN}"
+
+    if test \
+	"${CURRENT_LDAP_BASE_DN}" != "${LDAP_BASE_DN}" -o \
+	"${CURRENT_LDAP_LOGIN}" != "${LDAP_LOGIN}" -o \
+	"${CURRENT_LDAP_PASSWORD}" != "${LDAP_PASSWORD}" -o \
+	"${CURRENT_LDAP_FILTER}" != "${LDAP_FILTER}" -o \
+	"${CURRENT_LDAP_GROUP_DN}" != "${LDAP_GROUP_DN}"
+    then
+	echo
+	echo-command-form "authenticate ldap request"
+	echo-mark-new
+	show-ldap-req2 \
+	    "${LDAP_BASE_DN}" \
+	    "${LDAP_LOGIN}" \
+	    "${LDAP_PASSWORD}" \
+	    "${LDAP_FILTER}" \
+	    "${LDAP_GROUP_DN}"
+    fi
+    echo-end-show
+}
+
+show-ldap-req()
+{
+    echo-begin-show
+    show-ldap-req1
+    echo-end-show
+}
+
+show-ldap-servers2()
+{
+    test -n "${1}" || return 1
+    local type=${1}
+    local servers=${2}
+
+    echo-command-form "authenticate ldap server"
+    if test "${type}" == "new" ; then
+	echo-mark-new
+    else
+	echo-mark-cur
+    fi
+
+    if test -z "${servers}" ; then
+	echo-value-null ${AUTH_COL}
+	return 0
+    fi
+
+    local i=0 n=0 elt range 
+    local protocol name ip port
+
+    for elt in ${servers}
+    do
+	range=$[${i} % 4]
+	case ${range} in
+	    0)
+		protocol=${elt}
+		;;
+	    1)
+		name=${elt}
+		;;
+	    2)
+		ip=${elt}
+		;;
+	    3)
+		port=${elt}
+		test ${n} -eq 0 || echo-blank-command
+		echo-value "${protocol} ${name} ${ip} ${port}" ${AUTH_COL}
+		((n++))
+		;;
+	    *)
+		return 1
+		;;
+	esac
+	((i++))
+    done
+}
+
+show-ldap-servers1()
+{
+    show-ldap-servers2 'current' "${CURRENT_LDAP_SERVER_LIST}"
+    test "${CURRENT_LDAP_SERVER_LIST}" == "${LDAP_SERVER_LIST}" || show-ldap-servers2 'new' "${LDAP_SERVER_LIST}"
+}
+
+show-ldap-servers()
+{
+    echo-begin-show
+    show-ldap-servers1
+    echo-end-show
+}
+
+show-ldap-bind-dn1()
+{
+    echo-command-form "authenticate ldap binddn"
+
+    echo-mark-cur
+
+    if test ${CURRENT_LDAP_BIND_MODE} == True ; then
+	echo-value "${CURRENT_LDAP_BIND_DN} on ..." ${AUTH_COL}
+    else
+	echo-value "${CURRENT_LDAP_BIND_DN} off" ${AUTH_COL}
+    fi
+    
+    if test "${CURRENT_LDAP_BIND_MODE}" != "${LDAP_BIND_MODE}" -o \
+	    "${CURRENT_LDAP_BIND_DN}" != "${LDAP_BIND_DN}" -o \
+	    "${CURRENT_LDAP_BIND_PASSWORD}" != "${LDAP_BIND_PASSWORD}"; then
+
+	echo-command-form "authenticate ldap binddn"
+
+	echo-mark-new
+
+	if test ${LDAP_BIND_MODE} == True ; then
+	    echo-value "${LDAP_BIND_DN} on ..." ${AUTH_COL}
+	else
+	    echo-value "${LDAP_BIND_DN} off" ${AUTH_COL}
+	fi
+    fi
+}
+
+show-ldap-bind-dn()
+{
+    echo-begin-show
+    show-ldap-bind-dn1
+    echo-end-show
+}
+
+show-ldap()
+{
+    echo-begin-show
+    show-ldap-servers1
+    show-ldap-req1
+    show-ldap-bind-dn1
+    echo-end-show
+}
+
+ldap-remove()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 1
+    test -n "${3}" || return 1
+    test -n "${4}" || return 1
+    local in_protocol=${1}
+    local in_name=${2}
+    local in_ip=${3}
+    local in_port=${4}
+
+    local record="${in_protocol} ${in_name} ${in_ip} ${in_port}"
+
+    local out_list
+    local protocol name ip port
+    local elt i=0 range
+
+    for elt in ${LDAP_SERVER_LIST}
+    do
+	range=$[${i} % 4]
+      case ${range} in
+	  0)
+	      protocol=${elt}
+	      ;;
+	  1)
+	      name=${elt}
+	      ;;
+	  2)
+	      ip=${elt}
+	      ;;
+	  3)
+	      port=${elt}
+	      test "${protocol} ${name} ${ip} ${port}" == "${record}" || out_list="${out_list} ${protocol} ${name} ${ip} ${port}"
+	      ;;
+	  *)
+	      return 1
+	      ;;
+      esac
+      ((i++))
+    done
+    echo "${out_list:1}"
+}
+
+show-auth-target-web()
+{
+    echo-command-form "authenticate web"
+    local val=$(external-form ${CURRENT_AUTHENTICATE_WEB})
+    echo-mark-cur
+    echo-value "${val}" ${AUTH_COL}
+
+    if test "${CURRENT_AUTHENTICATE_WEB}" != "${AUTHENTICATE_WEB}" ; then
+	echo-command-form "authenticate web"
+	echo-mark-new
+	val=$(external-form ${AUTHENTICATE_WEB})
+	echo-value "${val}" ${AUTH_COL}
+    fi
+}
+
+show-auth-target-rweb()
+{
+    echo-command-form "authenticate rweb"
+    local val=$(external-form ${CURRENT_AUTHENTICATE_RWEB})
+    echo-mark-cur
+    echo-value "${val}" ${AUTH_COL}
+
+    if test "${CURRENT_AUTHENTICATE_RWEB}" != "${AUTHENTICATE_RWEB}" ; then
+	echo-command-form "authenticate rweb"
+	echo-mark-new
+	val=$(external-form ${AUTHENTICATE_RWEB})
+	echo-value "${val}" ${AUTH_COL}
+    fi
+}
+
+show-auth-target()
+{
+    echo-begin-show
+    case "${1}" in
+	web|rweb)
+	    show-auth-target-${1}
+	    ;;
+	"")
+	    show-auth-target-web
+	    show-auth-target-rweb
+	    ;;
+	*)
+	    return 255
+	    ;;
+    esac
+    echo-end-show
+}
+
+show-auth()
+{
+    echo-begin-show
+
+    show-auth-target-web
+    show-auth-target-rweb
+    show-auth-mode1
+
+    echo-end-show
+}
+
+wait4-ldap-test-file()
+{
+    wait4-file ${ADMIN_TMP_DIR}/${AUTH_LDAP_TEST}.${$} f 105 200000
+}
+
+show-ad-rdn()
+{
+    echo-command-form "authenticate ad rdn"
+    echo-mark-cur
+    echo-value "${CURRENT_AD_WEBGATEWAY_RDN}" ${AUTH_COL}
+    
+    test "${CURRENT_AD_WEBGATEWAY_RDN}" != "${AD_WEBGATEWAY_RDN}" || return 0
+
+    echo-command-form "authenticate ad rdn"
+    echo-mark-new
+    echo-value "${AD_WEBGATEWAY_RDN}" ${AUTH_COL}
+}
+
+show-ad()
+{
+    echo-begin-show
+    case "${1}" in
+	rdn)
+	    show-ad-${1}
+	    ;;
+	"")
+	    show-ad-rdn
+	    ;;
+	*)
+	    return 255
+	    ;;
+    esac
+    echo-end-show
+}
+
+show-kerberos-encrypt()
+{
+    echo-command-form "authenticate kerberos encrypt"
+    echo-mark-cur
+    echo-value "${CURRENT_KERBEROS_ENCRYPT_TYPE}" ${AUTH_COL}
+    
+    test "${CURRENT_KERBEROS_ENCRYPT_TYPE}" != "${KERBEROS_ENCRYPT_TYPE}" || return 0
+
+    echo-command-form "authenticate kerberos encrypt "
+    echo-mark-new
+    echo-value "${KERBEROS_ENCRYPT_TYPE}" ${AUTH_COL}
+}
+
+show-kerberos-web()
+{
+    echo-command-form "authenticate kerberos web"
+    echo-mark-cur
+    echo-value "${CURRENT_KERBEROS_SERVICE_NAME}" ${AUTH_COL}
+    
+    test "${CURRENT_KERBEROS_SERVICE_NAME}" != "${KERBEROS_SERVICE_NAME}" || return 0
+
+    echo-command-form "authenticate kerberos web"
+    echo-mark-new
+    echo-value "${KERBEROS_SERVICE_NAME}" ${AUTH_COL}
+}
+
+show-kerberos-hapassword()
+{
+    echo-command-form "authenticate kerberos hapassword"
+    echo-mark-cur
+    echo-value "..." ${AUTH_COL}
+    
+    test "${CURRENT_KERBEROS_HA_SHARED_PASSWORD}" != "${KERBEROS_HA_SHARED_PASSWORD}" || return 0
+
+    echo-command-form "authenticate kerberos hapassword"
+    echo-mark-new
+    echo-value "..." ${AUTH_COL}
+}
+
+check-kerberos-server-nb()
+{
+    local len=$(length-list "${KERBEROS_SERVER_LIST}")
+    test ${len} -lt ${MAX_KERBEROS_SERVER_NB}
+}
+
+show-kerberos-server1()
+{
+    local servers=${2}
+
+    echo-command-form "authenticate kerberos server"
+        if test "${1}" == "new" ; then
+	echo-mark-new
+    else
+	echo-mark-cur
+    fi
+
+    if test -z "${servers}" ; then
+	echo-value-null ${AUTH_COL}
+    else
+	local ip i=0
+	for ip in ${servers}
+	do
+	    test ${i} -eq 0 || echo-blank-command
+	    echo-value "${ip}" ${AUTH_COL}
+	    ((i++))
+	done
+    fi
+}
+
+show-kerberos-server()
+{
+    show-kerberos-server1 'cur' "${CURRENT_KERBEROS_SERVER_LIST}"
+    test "${CURRENT_KERBEROS_SERVER_LIST}" == "${KERBEROS_SERVER_LIST}" || show-kerberos-server1 'new' "${KERBEROS_SERVER_LIST}"
+}
+
+show-kerberos-rweb1()
+{
+    local list=${2}
+
+    echo-command-form "authenticate kerberos rweb"
+    if test "${1}" == "new" ; then
+	echo-mark-new
+    else
+	echo-mark-cur
+    fi
+
+
+    if test -z "${list}" ; then
+	echo-value-null ${AUTH_COL}
+    else
+	local i=0 n=0 elt range
+	local canonical_name site_name
+	for elt in ${list}
+	do
+	    range=$[${i} % 2]
+	    case ${range} in
+		0)
+		    site_name=${elt}
+		    ;;
+		1)
+		    canonical_name=${elt}
+		    test ${n} -eq 0 || echo-blank-command
+		    echo-value "${site_name} ${canonical_name}" ${AUTH_COL}
+		    ((n++))
+		    ;;
+		*)
+		    return 1
+		    ;;
+	    esac
+	    ((i++))
+	done
+    fi
+}
+
+show-kerberos-rweb()
+{
+    show-kerberos-rweb1 'cur' "${CURRENT_KERBEROS_RWEB_LIST}"
+    test "${CURRENT_KERBEROS_RWEB_LIST}" == "${KERBEROS_RWEB_LIST}" || show-kerberos-rweb1 'new' "${KERBEROS_RWEB_LIST}"
+}
+
+show-kerberos()
+{
+    echo-begin-show
+    case "${1}" in
+	encrypt|hapassword|web|rweb|server)
+	    show-kerberos-${1}
+	    ;;
+	"")
+	    show-kerberos-encrypt
+	    show-kerberos-hapassword
+	    show-kerberos-server
+	    show-kerberos-web
+	    show-kerberos-rweb
+	    ;;
+	*)
+	    return 255
+	    ;;
+    esac
+    echo-end-show
+}
+
+check-kerberos-encrypt()
+{
+    test -n "${1}" || return 1
+
+    case ${1} in
+	aes|des)
+	    return 0
+	    ;;
+	*)
+	    return 1
+	    ;;
+    esac
+}
+
+display-kerberos-log()
+{
+    display-log ${KERBEROS_CREATE_LOG}
+}
+
+run()
+{
+    contextual-command-is-allowed || return 207
+
+    if test -z "${ARGS[1]}" ; then
+	show-auth
+	return 0
+    fi
+
+    local switch=${ARGS[1]}
+    
+    case ${switch} in
+	web|rweb)
+	    if test -z "${ARGS[2]}" ; then
+		show-auth-target ${switch}
+	    else
+		local val=${ARGS[2]}
+		check-boolean ${val} || return 18
+		local bool=$(internal-form ${val})
+
+		case ${switch} in
+		    web)
+			export AUTHENTICATE_WEB=${bool}
+			;;
+		    rweb)
+			export AUTHENTICATE_RWEB=${bool}
+			;;
+		    *)
+			return 255
+			;;
+		esac
+		SAVENV=1
+	    fi
+	    ;;
+	mode)
+	    if test -z "${ARGS[2]}" ; then
+		show-auth-mode
+		return 0
+	    fi
+	    local mode=${ARGS[2]}
+	    case ${mode} in
+		ldap|kerberos)
+		    if test -z "${ARGS[3]}" ; then
+			show-auth-mode ${mode}
+			return 0
+		    fi
+		    ;;
+		*)
+		    return 9
+		    ;;
+	    esac
+
+	    val=${ARGS[3]}
+	    check-boolean ${val} || return 18
+
+	    case ${mode} in
+		ldap)
+		    local bool=$(internal-form ${val})
+		    export AUTHENTICATE_LDAP=${bool}
+		    ;;
+
+		kerberos)
+		    local bool=$(internal-form ${val})
+		    export AUTHENTICATE_KERBEROS=${bool}
+		    ;;
+		*)
+		    return 255
+		    ;;
+	    esac
+	    SAVENV=1
+	    ;;
+	ldap)
+	    if test -z "${ARGS[2]}" ; then
+		show-ldap
+		return 0
+	    fi
+
+	    local operation=${ARGS[2]}
+	    case ${operation} in
+		server)
+		    if test -z "${ARGS[3]}" ; then
+			show-ldap-servers
+			return 0
+		    fi
+		    local action=${ARGS[3]}
+		    check-action ${action} || return 122
+		    case "${action}" in
+			add|del)
+			    if test "${action}" == "add" ; then
+				local len=$(record4-length-list "${LDAP_SERVER_LIST}")
+				test ${len} -lt ${MAX_LDAP_SERVER_NB} || return 90
+			    fi
+			    test -n "${ARGS[4]}" || return 1
+			    local protocol=${ARGS[4]}
+			    check-ldap-protocol ${protocol} || return 92
+			    test -n "${ARGS[5]}" || return 1
+			    local name=${ARGS[5]}
+			    check-sitename ${name} || return 78
+
+			    if check-expr-ip ${name} ; then
+				INDIRECT_ERROR_CODE=520
+				return 254
+			    fi
+
+			    test -n "${ARGS[6]}" || return 1
+			    local ip=${ARGS[6]}
+			    check-ip ${ip} || return 12
+
+			    if test -z "${ARGS[7]}" ; then
+				case ${protocol} in
+				    ldap)
+					port=389
+					;;
+				    ldaps)
+					port=636
+					;;
+				    sldap)
+					port=389
+					;;
+				    *)
+					;;
+				esac
+			    else
+				local port=${ARGS[7]}
+				port=$(remove-leading-zeros ${port})
+				check-service-port-nb ${port} || return 61
+			    fi
+			    
+			    export LDAP_SERVER_LIST=$(ldap-remove ${protocol} ${name} ${ip} ${port})
+			    test "${action}" != add || LDAP_SERVER_LIST="${LDAP_SERVER_LIST} ${protocol} ${name} ${ip} ${port}"
+			    ;;
+			raz)
+			    export LDAP_SERVER_LIST=''
+			    ;;
+			*)
+			    error 255
+			    ;;
+		    esac
+		    SAVENV=1
+		    ;;
+		request)
+		    if test \
+			-z "${ARGS[3]}" -a \
+			-z "${ARGS[4]}" -a \
+			-z "${ARGS[5]}" -a \
+			-z "${ARGS[6]}" -a \
+			-z "${ARGS[7]}" -a \
+			-z "${ARGS[8]}"
+		    then
+			show-ldap-req
+			return 0
+		    fi
+		    test -n "${ARGS[3]}" || return 1
+		    local dn=${ARGS[3]}
+		    dn=$(remove-quotes "${dn}")
+		    check-ldap-dn "${dn}" || return 7
+		    test -n "${ARGS[4]}" || return 1
+		    local login=${ARGS[4]}
+		    login=$(remove-quotes "${login}")
+		    check-ldap-attr "${login}" || return 3
+
+		    local passwd=${ARGS[5]}
+		    local filter=${ARGS[6]}
+
+		    passwd=$(remove-quotes "${passwd}")
+		    filter=$(remove-quotes "${filter}")
+
+		    test -z "${passwd}" || check-ldap-attr "${passwd}" || return 4
+		    test -z "${filter}" || check-ldap-filter "${filter}" || return 5
+
+		    local group_dn
+		    local group_name
+		    if test -n "${ARGS[7]}" ; then
+			group_dn=${ARGS[7]}
+			group_dn=$(remove-quotes "${group_dn}")
+			check-ldap-dn "${group_dn}" || return 7
+		    fi
+		    export LDAP_BASE_DN="${dn}"
+		    export LDAP_LOGIN="${login}"
+		    export LDAP_PASSWORD="${passwd}"
+		    export LDAP_FILTER="${filter}"
+		    export LDAP_GROUP_DN="${group_dn}"
+		    SAVENV=1
+		    ;;
+
+		binddn)
+		    if test -z "${ARGS[3]}" ; then
+			show-ldap-bind-dn
+			return 0
+		    fi
+
+		    local bind_dn=${ARGS[3]}
+		    bind_dn=$(remove-quotes "${bind_dn}")
+		    check-ldap-dn "${bind_dn}" || return 7
+
+		    local action=${ARGS[4]}
+		    case ${action} in
+			""|off)
+			    export LDAP_BIND_MODE=False
+			    export LDAP_BIND_DN=${bind_dn}
+			    unset LDAP_BIND_PASSWORD
+			    SAVENV=1
+			    ;;
+			'on'|'on:encrypted')
+			    local passwd=${ARGS[5]}
+			    case ${action} in
+				'on')
+				    if test -z "${passwd}" ; then
+					test ${TERM} != ${WADMIN_TERM} || return 0
+					test "${__BATCH_MODE}" != yes || error 111
+					test -z "${TRANSACTION}" || return 106
+
+					echo -n "Please enter the Bind DN password: "
+					stty -echo
+					read passwd
+					stty echo
+					echo
+				    fi
+				    test ${#passwd} -le ${MAX_LEN} || return 159
+				    ;;
+				'on:encrypted')
+				    test -n "${passwd}" || return 0
+				    passwd=$(decrypt-password "encrypted:${passwd}" "${LDAP_PASSWD}")
+				    ;;
+				*)
+				    return 1
+				    ;;
+			    esac
+
+			    export LDAP_BIND_MODE=True
+			    export LDAP_BIND_DN=${bind_dn}
+
+			    if test ${TERM} == ${WADMIN_TERM} ; then
+				test -z "${passwd}" || export LDAP_BIND_PASSWORD="${passwd}"
+			    else
+				export LDAP_BIND_PASSWORD="${passwd}"
+			    fi
+			    SAVENV=1
+			    ;;
+			*)
+			    return 1
+			    ;;
+		    esac
+		    ;;
+		'test')
+		    if test \
+			"${CURRENT_AUTHENTICATE_MODE}" == True -a \
+			${CURRENT_AUTHENTICATE_LDAP} == True -a \
+			-n "${CURRENT_LDAP_SERVER_LIST}" ; then
+
+			check-lock || return 123
+
+			local test_login="${ARGS[3]}"
+			local test_password="${ARGS[4]}"
+
+			if test -z "${test_login}" ; then
+
+ 			    test ${TERM} != ${WADMIN_TERM} || return 0
+			    test "${__BATCH_MODE}" != yes || error 111
+
+			    echo -n "Enter the login: "
+			    read test_login
+			fi
+			
+			if test -z "${test_password}" ; then
+
+			    test ${TERM} != ${WADMIN_TERM} || return 0
+			    test "${__BATCH_MODE}" != yes || error 111
+
+			    echo -n "Enter the password: "
+			    stty -echo
+			    read test_password
+			    stty echo
+			    echo
+			fi
+			
+			local test_group
+
+			if test -n "${CURRENT_LDAP_GROUP_DN}" ; then
+			    test_group=${CURRENT_LDAP_GROUP_DN// }
+			    test_group=${test_group/,*}
+			    test_group=${test_group/*=}
+			fi
+
+			supervisor-push-args "${test_login}" "${test_password}" "${test_group}"
+			supervisor-action "authenticate-ldap-test"
+			test ${?} -eq 0 || return 104
+			wait4-ldap-test-file || return 176
+			cat ${ADMIN_TMP_DIR}/${AUTH_LDAP_TEST}.${$}
+			rm -f ${ADMIN_TMP_DIR}/${AUTH_LDAP_TEST}.${$}
+			return 0
+		    else
+			test "${AUTHENTICATE_MODE}" == False -o -z "${LDAP_SERVER_LIST}" -o "${AUTHENTICATE_LDAP}" == False || return 134
+			test "${AUTHENTICATE_LDAP}" == True -a "${AUTHENTICATE_MODE}" == True || return 174
+			test -n "${LDAP_SERVER_LIST}" || return 175
+			return 255
+		    fi
+		    ;;
+		*)
+		    return 1
+		    ;;
+	    esac
+	    ;;
+	ldaps)
+	    if test -z "${ARGS[2]}" ; then
+		show-ldaps-ca
+		return 0
+	    fi
+	    case ${ARGS[2]} in
+		ca)
+		    if test -z "${ARGS[3]}" ; then
+			show-ldaps-ca
+			return 0
+		    else
+			local act=${ARGS[3]}
+			case ${act} in
+			    'set')
+				test -n "${ARGS[4]}" || return 1
+				local ca_id=${ARGS[4]}
+				export LDAPS_CA=${ca_id}
+				SAVENV=1
+				;;
+			    raz)
+				export LDAPS_CA=''
+				SAVENV=1
+				;;
+			    *)
+				return 1
+				;;
+			esac
+		    fi
+		;;
+		*)
+		    return 1
+		    ;;
+	    esac
+	    ;;
+	ad)
+	    if test -z "${ARGS[2]}" ; then
+		show-ad
+		return 0
+	    fi
+	    local attribute=${ARGS[2]}
+	    case ${attribute} in
+		rdn)
+		    if test -z "${ARGS[3]}" ; then
+			show-ad rdn
+			return 0
+		    fi
+		    local rdn=${ARGS[3]}
+		    rdn=$(remove-quotes "${rdn}")
+		    check-ldap-dn "${rdn}" || return 7
+		    export AD_WEBGATEWAY_RDN=${rdn}
+		    SAVENV=1
+		    ;;
+		*)
+		    return 1
+		    ;;
+	    esac
+	    ;;
+	kerberos)
+	    if test -z "${ARGS[2]}" ; then
+		show-kerberos
+		return 0
+	    fi
+
+	    local attribute=${ARGS[2]}
+	    case ${attribute} in
+		encrypt)
+		    if test -z "${ARGS[3]}" ; then
+			show-kerberos encrypt
+			return 0
+		    fi
+		    local encrypt=${ARGS[3]}
+		    check-kerberos-encrypt ${encrypt} || return 187
+		    export KERBEROS_ENCRYPT_TYPE=${encrypt}
+		    SAVENV=1
+		    ;;
+		hapassword)
+		    if test -n "${ARGS[3]}" ; then
+			local password="${ARGS[3]}"
+			check-password "${password}" || return 86
+		    else
+			test ${TERM} != ${WADMIN_TERM} || return 0
+			test "${__BATCH_MODE}" != yes || error 111
+			test -z "${TRANSACTION}" || return 106
+
+			echo -n "Please type the password: "
+			stty -echo
+			read password
+			stty echo
+			echo
+
+			test -z "${password}" || check-password "${password}" || return 86
+
+			local retype_password
+			echo -n "Please retype the password: "
+			stty -echo
+			read retype_password
+			stty echo
+			echo
+
+			test "${retype_password}" == "${password}" || return 146
+		    fi
+		    export KERBEROS_HA_SHARED_PASSWORD="${password}"
+		    SAVENV=1
+		    ;;
+		hapassword:encrypted)
+		    test -n "${ARGS[3]}" || return 0
+		    local password=$(decrypt-password "encrypted:${ARGS[3]}" "${KERBEROS_SHARED_PASSWD}")
+		    test -z "${password}" || check-password "${password}" || return 86
+		    export KERBEROS_HA_SHARED_PASSWORD="${password}"
+		    SAVENV=1
+		    ;;
+		hapassword:show)
+		    show-kerberos hapassword
+		    return 0
+		    ;;
+		web)
+		    if test -z "${ARGS[3]}" ; then
+			show-kerberos web
+			return 0
+		    fi
+		    local canonical_name=${ARGS[3]}
+		    check-computer-name ${canonical_name} || return 188
+		    export KERBEROS_SERVICE_NAME=${canonical_name}
+		    SAVENV=1
+		    ;;
+		rweb)
+		    if test -z "${ARGS[3]}" ; then show-kerberos rweb ; return 0 ; fi
+		    local act=${ARGS[3]}
+    
+		    case ${act} in
+			raz)
+			    export KERBEROS_RWEB_LIST=""
+			    SAVENV=1
+			    ;;
+			add|del)
+			    test -n "${ARGS[4]}" || return 1
+			    local site_name=${ARGS[4]}
+			    check-sitename ${site_name} || return 78
+			    site-name-exist ${site_name} || return 72
+			    export KERBEROS_RWEB_LIST=$(remove-record-from-list 2 1 "${site_name}" "${KERBEROS_RWEB_LIST}")
+			    if test ${act} == add ; then
+				local canonical_name=${ARGS[5]}
+				check-computer-name ${canonical_name} || return 188
+				KERBEROS_RWEB_LIST=$(insert-record-in-slist 2 1 "${site_name} ${canonical_name}" "${KERBEROS_RWEB_LIST}")
+			    fi
+			    SAVENV=1
+			    ;;
+			*)
+			    return 1
+			    ;;
+		    esac
+		    ;;
+		server)
+                    if test -z "${ARGS[3]}" ; then show-kerberos server; return 0 ; fi
+                    local act=${ARGS[3]}
+
+                    case ${act} in
+                        raz)
+                            export KERBEROS_SERVER_LIST=""
+                            SAVENV=1
+                            ;;
+                        add|del)
+                            test -n "${ARGS[4]}" || return 1
+                            local ip=${ARGS[4]}
+                            check-ip-name ${ip} || return 113
+
+                            if test ${act} == add ; then
+                                check-kerberos-server-nb || return 90
+                                test ${ip} != "127.0.0.1" || return 38
+				export KERBEROS_SERVER_LIST=$(remove "${KERBEROS_SERVER_LIST}" "${ip}")
+				if test -z "${KERBEROS_SERVER_LIST}" ; then
+				    KERBEROS_SERVER_LIST="${ip}"
+				else
+				    KERBEROS_SERVER_LIST="${KERBEROS_SERVER_LIST} ${ip}"
+				fi
+			    else
+				export KERBEROS_SERVER_LIST=$(remove "${KERBEROS_SERVER_LIST}" "${ip}")
+                            fi
+                            SAVENV=1
+                            ;;
+                        *)
+                            return 1
+                            ;;
+                    esac
+                    ;;
+		create)
+		    test ${APL_ROLE} == 'gateway' || return 232
+
+		    local admin_user=${ARGS[3]}
+		    local password wait4
+
+		    test -n "${admin_user}" || return 1
+		    test ${#admin_user} -le ${MAX_LEN} || return 159
+		    check-allowed-argument ${admin_user} || return 1
+		    user-has-admin-rights || return 31
+		    check-lock || return 123
+
+		    if test ${TERM} == ${WADMIN_TERM} ; then
+			password=${ARGS[4]}
+			wait4=${ARGS[5]}
+		    else
+			if test -n "${ARGS[4]}" ; then
+			    password=${ARGS[4]}
+			    wait4=${ARGS[5]}
+			else
+			    test "${__BATCH_MODE}" != yes || error 111
+			    test -z "${TRANSACTION}" || return 106
+			    echo -n "Please type the password: "
+			    stty -echo
+			    read password
+			    stty echo
+			    echo
+			fi
+		    fi
+
+		    test -n "${password}" || return 51
+
+		    if ! check-external-password-length "${password}" ; then
+			INDIRECT_ERROR_CODE=531
+			return 254
+		    fi
+
+		    supervisor-push-args "${admin_user}" "${password}"
+		    test -z "${wait4}" || test ${wait4} == wait || return 1
+		    supervisor-action "kerberos-create" inform ${wait4}
+		    ;;
+		report)
+		    display-kerberos-log || return ${?}
+		    return 0
+		    ;;
+		*)
+		    return 1
+		    ;;
+	    esac
+
+	    ;;
+	*)
+	    return 1
+	    ;;
+    esac
+}
+
+AUTH_COL=39
+main "${@}"

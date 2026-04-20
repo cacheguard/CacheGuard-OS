@@ -1,0 +1,92 @@
+Manage general features and functions
+.SH SYNOPSIS
+
+[1] \fBmode\fR [\fBrouter\fR | \fBdns\fR | \fBdhcp\fR | \fBsnat\fR | (\fBtweb\fR | \fBtransparent\fR) | \fBtnat\fR | \fBvlan\fR | \fBftppassive\fR | \fBha\fR | \fBqos\fR) [(\fBon\fR | \fBoff\fR)]
+
+[2] \fBmode\fR [((\fBforward\fR | \fBweb\fR) | (\fBrweb\fR | \fBreverse\fR) | \fBanonymous\fR | \fBguard\fR | \fBwaf\fR | \fBantivirus\fR | \fBsslmediate\fR | \fBfirewall\fR | \fBauthenticate\fR | \fBocsp\fR | \fBvpnipsec\fR | \fBcache\fR | \fBcompress\fR | \fBlog\fR) [(\fBon\fR | \fBoff\fR)]]
+
+.SH DESCRIPTION
+
+This command is used to set or get general appliance modes. There are two mode categories: network related modes and feature related modes. Network related modes are listed in the first [1] usage form and feature modes in the second [2] usage form. To activate a mode just use the mode specifier keyword followed by the keyword \fBon\fR. To deactivate a mode use the keyword \fBoff\fR instead. You can find below the description of each mode.
+
+In a common implementation, the appliance is used as a gateway router to access the internet (or external insecure zones). In such a network topology all traffic is routed via the appliance. You can use the \fBrouter\fR keyword to set the router mode.
+
+The appliance may act as a caching-only DNS (Domain Name Server). The \fBdns\fR keyword is used to turn on/off the access to the embedded DNS. Only clients located behind the internal and auxiliary interfaces can access the DNS.
+
+The appliance may act as a DHCP server for connected devices to the internal network interface. The \fBdhcp\fR keyword is used to turn on/off the embedded DHCP server. Refer to the \fBdhcp\fR command to configure the DHCP server.
+
+The \fBsnat\fR mode is used to activate or deactivate the appliance's Source NAT (Network Address Translation) mode for traffic exchanged via the external network interface. When the \fBsnat\fR mode is activated, the source IP address of all (including Web traffic) outgoing traffic from the external network interface are translated to the external IP address of the appliance (see the command \fBip\fR to set the external IP address). When the \fBsnat\fR mode is deactivated, traffic other than Web traffic outgoing from the external network interface use their real IP addresses. To deactivate the source NATing of Web traffic see the \fBtnat\fR mode below.
+
+To isolate different types of traffic passing through the internal network interface you can activate the VLAN mode. The \fBvlan\fR keyword refers to the VLAN mode. When using VLANs, the real internal network interface can no longer be used. You can set VLANs using the \fBvlan\fR command.
+
+When the appliance tries to connect to external FTP servers, it may use the passive or active FTP mode. The \fBftppassive\fR mode is used to activate or deactivate the passive FTP mode. The \fBftppassive\fR keyword refers to the passive FTP mode.
+
+The High Availability mode provides continuity of service in case of a failures on an appliance. The HA mode requires two or more combined appliances to make a virtual appliance based on redundant appliances. To activate or deactivate the HA mode use the \fBha\fR keyword. When the HA mode is activated, feature services listen on VRRP IPs (and not on real IPs). Refer to the \fBvrrp\fR command to configure VRRP IPs.
+
+The Quality of Service mode allows you to share the available bandwidth between different types of traffic based on policies you configure. The \fBqos\fR keyword refers to the QoS mode. When the QoS mode is activated you can use the \fBqos\fR command to configure the QoS.
+
+The appliance embeds a Web proxy that allows you to securely browse the Web. To activate or deactivate the embedded Web proxy, use the \fBweb\fR (or \fBforward\fR) keyword. The Web proxy is only available to clients located in the internal area (behind the internal network interface). In this mode, clients are protected against threats coming from the external zone (in front of the external network interface). The Web proxy can be used in explicit or transparent mode. In explicit mode, clients should configure their browsers to use the appliance as a proxy by specifying its internal network interface and web port (see the \fBip\fR and \fBport\fR commands for furhter information).
+
+In transparent mode, the proxy transparently intercepts Web traffic even if clients do not explicitly select to use it. To activate or deactivate the transparent mode use the \fBtweb\fR (or \fBtransparent\fR) keyword. Please note that the transparent mode does not operate when the \fBauthenticate\fR mode is activated. The \fBtnat\fR mode is used to activate or deactivate the appliance's Source NAT (Network Address Translation) mode for Web traffic (only when the embedded proxy is activated). When the \fBtnat\fR is activated, the source IP address of Web traffic outgoing traffic from the external network interface are translated to the external IP address of the appliance (see the command \fBip\fR to set the external IP address). When the \fBtnat\fR is deactivated, Web traffic outgoing from the external network interface use their real IP addresses. To configure the source NATing of traffic other than Web traffic, see the \fBsnat\fR mode above.
+
+You can implement the appliance in front of your Web server/applications to protect them agains direct accesses. In this case, Web clients are located in the external zone (in front of the external network interface) while Web servers/applications are located in the internal zone (behind the internal network interface). This is the reverse of a the forwarding mode, thus the designation reverse web or simply \fBrweb\fR mode. In \fBrweb\fR mode, the appliance acts as a reverse proxy to which you can associate content filtering with the \fBwaf\fR mode (see below).
+
+The \fBanonymous\fR mode hides some HTTP headers to make requests and responses anonymous. Hidden headers are: "From", "Referer", "Server" and "Link".
+
+The \fBguard\fR mode is used to allow or deny access to defined websites for Web users. The \fBguard\fR mode is based on black or white lists of domain names, URL or regular expressions (commonly named URL). See the command \fBguard\fR to manage the guard policies. The guarding feature is only available when the appliance is configured in forwarding proxy mode (\fBweb\fR mode) and allows you to control access to requested URLs. To control the content of Web requests (GET and POST methods) in reverse mode (\fBrweb\fR mode) activate the \fBwaf\fR mode (see below).
+
+The \fBwaf\fR keyword is used to turn on/off the Web Application Firewall used in reverse mode (\fBrweb\fR mode) to protect Web servers. When this mode is activated, the system inspects all inside requests and filters unwanted and/or malicious requests. See the command \fBwaf\fR to manage the filtering policy.
+
+The \fBantivirus\fR keyword is used to turn on/off the antivirus mode. In this mode, the system inspects all Web traffic in forwarding mode (\fBweb\fR mode) and blocks malware objects (viruses , trojans, worms). You can also combine this mode with the \fBwaf\fR and \fBrweb\fR modes to block all attempts to upload malware onto your protected web servers. See the command \fBantivirus\fR to manage the malware filtering policies. Note that activating the antivirus clears the persistent cache.
+
+You can use the \fBsslmediate\fR keyword to activate or deactivate the SSL mediation. The SSL mediation feature allows you to decrypt HTTPS traffic at the gateway point in order to cache, inspect its contents and possibly block unwanted contents. When the SSL mediation mode is turned off the HTTP CONNECT method is used to establish point-to-point tunnels to connect Web users to HTTPS servers across the system. Without the SSL mediation the system fully respects Web users privacy without decrypting the content of HTTPS traffic. The downside of having the SSL mediation off is that as the HTTPS traffic is encrypted unwanted contents like viruses can reach Web users without giving the opportunity to the system to block it. Also because of the HTTPS protocol encrypted objects can't be cached by the system.
+
+When the SSL mediation mode is turned on the system decrypts HTTPS traffic, inspects its content and re-encrypts it before forwarding to the final client. In the process of re-encrypting the traffic the system uses a dynamically generated SSL certificate signed by its own CA (Certificate Authority) certificate. In this case clients should trust that CA certificate by importing it into their Web browsers. The CA certificate of the system is available at : \fIhttp://<internal-ip-address>\fR (or \fIhttp://<web-ip-address>\fR if the \fBvlan\fR mode is activated). \fBCAUTION\fR: please note that as HTTPS aims to give users privacy and security, its decrypting in the middle (before reaching the final client) may violate ethical norms and should be used with caution.
+
+By default, the appliance acts as a \fIstate full\fR firewall allowing only those connections coming from the internal area (incoming from the internal network interface) and going to the external area (outgoing from the external network interface). In certain cases, you may want to deactivate the firewall mode but please note that the deactivation of the firewall mode exposes your infrastructure to networks attacks. To turn on/off the Firewall mode use the \fBfirewall\fR keyword.
+
+Web accesses may be controlled by an external authentication system. The keyword \fBauthenticate\fR allows you to turn on/off this feature. When the authentication is activated, only authenticated Web users are allowed to access the Web. Note that the \fBauthenticate\fR mode does not operate in \fBtransparent\fR mode. See the command \fBauthenticate\fR for further information.
+
+The \fBocsp\fR keyword is used to turn on/off the embedded OCSP server. OCSP stands for Online Certificate Status Protocol. It's a protocol used for obtaining the revocation status of an X.509 digital certificate. When this mode is activated, the system acts as an HTTP OCSP responder for certificates signed by the system's certificate CA. The OCSP server listens on the external IP address and the OCSP port configured with the command \fBport\fR. Further configurations can be set using the  \fBtls\fR command.
+
+The \fBvpnipsec\fR keyword is used to turn on/off the IPsec VPN server. VPN stands for Virtual Private Network and IPsec for Internet Protocol Security. An IPsec VPN allows you to authenticate and encrypt the packets of data between 2 networks over an IP network to provide secure encrypted communications. You can build a persistent IPsec VPN between 2 sites and/or allow remote workers to access your internal infrastructures via a IPsec VPN server. See the \fBvpnipsec\fR command for further information.
+
+The \fBcache\fR keyword is used to turn on/off the caching mode. The caching mode saves browsed Web objects in an internal cache memory, allowing their use in future requests instead of looking for them on internet. This method allows you to save bandwidth and in some cases improves performance.
+
+To save the internal bandwidth consumption the compress mode can be activated. This is especially interesting when clients and the appliance are connected using a low bandwidth WAN. Compression may reduce the size of an textual files (HTML, CSS, JavaScript... by 80%). Note this mode requires large CPU resources.  Use the keyword \fBcompress\fR to set the compression mode.
+
+The appliance may log all allowed Web accesses (in forwarding or reverse mode) as well as denied accesses to unauthorized contents (virus, blacklisted URLS...). The \fBlog\fR keyword allows you to turn on/off this feature. You can refer to the \fBlog\fR command to configure the logging.
+
+.SH SEE ALSO
+.B access
+(1)
+.B antivirus
+(1)
+.B apply
+(1)
+.B authenticate
+(1)
+.B dhcp
+(1)
+.B ip
+(1)
+.B guard
+(1)
+.B log
+(1)
+.B peer
+(1)
+.B port
+(1)
+.B sslmediate
+(1)
+.B tls
+(1)
+.B transparent
+(1)
+.B vlan
+(1)
+.B vpnipsec
+(1)
+.B vrrp
+(1)

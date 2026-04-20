@@ -1,0 +1,173 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       Scripts
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+CACHEGUARD_DIR=/etc/sysconfig/cacheguard
+source ${CACHEGUARD_DIR}/constant
+source ${APPLIANCE_DIR}/etc/role
+source ${LOCAL_DIR}/lib/apl_functions
+source ${APPLIANCE_DIR}/lib/lib-cache
+source ${ABASE_DIR}/${ENV_RDIR}/${ENV_CURRENT_NAME}
+
+clean-exit()
+{
+    trap "" USR1 INT QUIT TERM
+
+    local code=${1}
+    wait
+    manage-appliance-unlock
+    exit ${code}
+}
+
+update-squid-conf()
+{
+    test -n "${1}" || return 1
+    local store_average_object_sz=${1}
+
+    local squid_cache_memory_sz adapted_sz
+    local total_in_memory_cached_object_sz cache_buffer_sz cpu_architecture
+    local proxy_proxy2_ratio_pct
+    local tag program dir sz rest
+
+    test -f ${RUN_DIR}/${TOTAL_IN_MEMORY_CACHED_OBJECT_SZ_FILENAME} || return 111
+    total_in_memory_cached_object_sz=$(cat ${RUN_DIR}/${TOTAL_IN_MEMORY_CACHED_OBJECT_SZ_FILENAME} 2> /dev/null)
+    check-digit ${total_in_memory_cached_object_sz} || return 113
+    set-memory-cache-parameters ${CURRENT_CACHE_MODE} ${total_in_memory_cached_object_sz} ${store_average_object_sz} || return 115
+    test ${FREE_MEMORY_SZ} -ge 0 || return 117
+
+    ((squid_cache_memory_sz = CACHE_IO_MEMORY_SZ + SQUID_INITIAL_PROCESS_SZ + total_in_memory_cached_object_sz))
+
+    set-proxy2-parameters-cur
+
+    proxy_proxy2_ratio_pct=$(get-proxy-proxy2-ratio-pct ${CURRENT_PROXY2_MODE})
+    cache_buffer_sz=$(get-proxy1-cache-buffer-sz ${FREE_MEMORY_SZ} ${proxy_proxy2_ratio_pct})
+    cpu_architecture=$(uname -m 2> /dev/null)
+    
+    local backup_squid_conf_file=${CONF_DIR}/${CACHE_RECONFIGURE_BACKUP_FILENAME}
+    local new_squid_conf_file=/tmp/squid-new.${$}.conf
+    local origin_cache_dir_file=${CONF_DIR}/squid.conf-cache-dir
+
+    test -f ${origin_cache_dir_file} || return 211
+    cp -f ${CONF_DIR}/squid.conf ${backup_squid_conf_file} || return 213
+
+    while read tag rest
+    do
+	case ${tag} in
+	    quick_abort_min)
+		;;
+	    quick_abort_max)
+		;;
+	    store_avg_object_size)
+		;;
+	    memory_pools_limit)
+		;;
+	    cache_mem)
+		;;
+	    cache_dir)
+		;;
+	    *)
+		echo ${tag} ${rest}
+		;;
+	esac
+    done < ${CONF_DIR}/squid.conf > ${new_squid_conf_file}
+
+    echo "quick_abort_min ${store_average_object_sz} KB" >> ${new_squid_conf_file}
+    echo "quick_abort_max ${store_average_object_sz} KB" >> ${new_squid_conf_file}
+    echo "store_avg_object_size ${store_average_object_sz} KB" >> ${new_squid_conf_file}
+    echo "memory_pools_limit ${squid_cache_memory_sz} MB" >> ${new_squid_conf_file}
+
+    gen-squid-cache-buffer ${cache_buffer_sz} ${cpu_architecture} >> ${new_squid_conf_file}
+
+    while read tag program dir sz rest
+    do
+	((adapted_sz = (HDD_CACHE_USABLE_PCT * sz) / 100))
+	echo ${tag} ${program} ${dir} ${adapted_sz} ${rest}
+    done < ${origin_cache_dir_file} >> ${new_squid_conf_file}
+
+    cp -f ${new_squid_conf_file} ${CONF_DIR}/squid.conf &&
+	cp -f ${new_squid_conf_file} ${PROXY_DIR}/etc/squid.conf &&
+	/etc/rc.d/init.d/squid reload > /dev/null 2>&1
+
+    if test ${?} -ne 0 ; then
+	cp -f ${backup_squid_conf_file} ${CONF_DIR}/squid.conf
+	cp -f ${backup_squid_conf_file} ${PROXY_DIR}/etc/squid.conf
+	/etc/rc.d/init.d/squid reload > /dev/null 2>&1
+    fi
+
+    rm -f ${backup_squid_conf_file} ${new_squid_conf_file}
+}
+
+update-caching-configuration()
+{
+    local old_mean_object_sz
+    local new_mean_object_sz
+    local diff_sz_pct
+
+    old_mean_object_sz=$(get-cache-reference-mean-object-sz)
+    new_mean_object_sz=$(get-cache-real-mean-object-sz)
+    test ${?} -eq 0 || return 1
+    test ${new_mean_object_sz} -gt 0 || return 0
+
+    test ${old_mean_object_sz} -ne ${new_mean_object_sz} || return 0
+
+    if test ${old_mean_object_sz} -gt ${new_mean_object_sz} ; then
+	((diff_sz_pct = (old_mean_object_sz - new_mean_object_sz) * 100 / old_mean_object_sz))
+    else
+	((diff_sz_pct = (new_mean_object_sz - old_mean_object_sz) * 100 / new_mean_object_sz))
+    fi
+
+    test ${diff_sz_pct} -ge 2 || return 0
+    echo -n ${new_mean_object_sz} > ${RUN_DIR}/${MEAN_OBJECT_SZ_FILENAME}
+
+    update-squid-conf ${new_mean_object_sz}
+}
+
+update-caching-configuration-alert()
+{
+    test -n "${1}" || return 1
+    local code=${1}
+
+    message="The cache reconfiguration has been terminated abnormally with the error code ${code}"
+    logger -p daemon.alert -t apl_cache_reconfigure -- "${message}"
+    ${LOCAL_DIR}/bin/apl_rlogger "${message}"
+    test "${CURRENT_ADMIN_SNMP}" == False || ${LOCAL_DIR}/bin/apl_snmp_trap 24 "CacheReconfigure" ${code} "${message}"
+
+}
+
+main()
+{
+    test ${PERSISTENT_CACHE} == True -a ${CURRENT_CACHE_MODE} == True || return 0
+    trap "clean-exit 100" USR1 INT QUIT TERM
+
+    local ret
+
+    manage-appliance-lock
+    update-caching-configuration
+    ret=${?}
+    test ${ret} -eq 0 || update-caching-configuration-alert ${ret}
+    clean-exit ${ret}
+}
+
+# Main()
+
+main "${@}"

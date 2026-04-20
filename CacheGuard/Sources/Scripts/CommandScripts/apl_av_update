@@ -1,0 +1,148 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       Scripts
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+source /usr/local/lib/apl_functions
+source ${ABASE_DIR}/${ENV_RDIR}/${ENV_CURRENT_NAME}
+
+reset-av-update-log()
+{
+    echo -n > ${AV_UPDATE_LOG}
+    chmod 640 ${AV_UPDATE_LOG}
+    chown ${ADMIN_NAME}:${GROUP_NAME} ${AV_UPDATE_LOG}
+}
+
+av-update-log()
+{
+    test -n "${1}" || return 1
+    local message=${1}
+
+    local date=$(date +"%Y/%m/%d-%T")
+    echo -n "0 ${date} ${message}" >> ${AV_UPDATE_LOG}
+}
+
+av-update-log-abort()
+{
+    echo >> ${AV_UPDATE_LOG}
+}
+
+av-update-log-ret()
+{
+    test -n "${1}" || return 1
+    local err_code=${1}
+
+    if test ${err_code} -eq 0 ; then
+	echo "[OK]" >> ${AV_UPDATE_LOG}
+    else
+	echo " (${err_code})[KO]" >> ${AV_UPDATE_LOG}
+    fi
+}
+
+apl-av-update()
+{
+    local pid ret1 ret2
+
+    reset-av-update-log
+
+    av-update-log "Beginig the Antivirus signatures DB explicit updating"
+    av-update-log-ret ${?}
+
+    if test ${APL_ROLE} == 'gateway' ; then
+	av-update-log "Stopping the Health Check service"
+	/etc/rc.d/init.d/health stop > /dev/null 2>&1
+	av-update-log-ret ${?}
+
+	av-update-log "Starting the main signatures DB updating in background"
+	/etc/rc.d/init.d/freshclam update > /dev/null 2>&1 & pid=${!}
+	av-update-log-ret ${?}
+    fi
+
+    if test "${CURRENT_AV_EXTENDED_MODE}" == True ; then
+	REPORT_LOG=${AV_UPDATE_LOG} apl_av_extended_update cur update index
+	ret2=${?}
+	test ${ret2} -eq 0 || ((ret2 += 120))
+    else
+	ret2=0
+    fi
+
+    if test -n "${pid}" ; then
+	wait ${pid} 2> /dev/null
+	ret1=${?}
+	test ${ret1} -ne 127 || ret1=0
+    else
+	ret1=0
+    fi
+
+    av-update-log "Terminating signatures DB updates"
+    av-update-log-ret ${ret1}
+
+    if test "${CURRENT_AV_EXTENDED_MODE}" == True ; then
+	av-update-log "Terminating extended signatures DB updates"
+	av-update-log-ret ${ret2}
+    fi
+
+    if test ${APL_ROLE} == 'gateway' ; then
+	getpids clamd > /dev/null
+	local clamd_state=${?}
+
+	if test ${clamd_state} -eq 0 ; then
+	    av-update-log "Reloading the Antivirus signatures..."
+	    /etc/rc.d/init.d/clamd reload > /dev/null 2>&1
+	    av-update-log-ret ${?}
+	fi
+
+	av-update-log "Starting the Health Check service"
+	/etc/rc.d/init.d/health start > /dev/null 2>&1
+	av-update-log-ret ${?}
+    fi
+
+    av-update-log "Ending the Antivirus explicit update"
+    av-update-log-ret ${?}
+}
+
+clean-exit()
+{
+    trap "" USR1 INT QUIT TERM
+
+    local code=${1}
+    wait 2> /dev/null
+    manage-appliance-unlock
+    av-update-log-abort
+    av-update-log "Aborting the Antivirus Update operation"
+    av-update-log-ret ${?}
+
+    exit ${code}
+}
+
+main()
+{
+    trap "clean-exit 100" USR1 INT QUIT TERM
+    manage-appliance-lock
+    set-av-extended-parameters cur
+    apl-av-update
+    manage-appliance-unlock
+}
+
+# Main()
+
+main "${@}"

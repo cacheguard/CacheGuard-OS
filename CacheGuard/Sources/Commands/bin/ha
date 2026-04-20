@@ -1,0 +1,69 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       Commands
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+source functions
+
+show-ha()
+{
+    local state=$(get-ha-state)
+
+    echo-begin-show
+    echo-command-form "ha"
+    echo-value "${state}"
+    echo-end-show
+}
+
+run()
+{
+    contextual-command-is-allowed || return 207
+    test -z "${TRANSACTION}" || return 106
+    test "${CURRENT_HA_MODE}" == True || return 164
+
+    if test -z "${ARGS[1]}" ; then
+	show-ha
+	return ${?}
+    fi
+
+    local action=${ARGS[1]}
+    local confirm=${ARGS[2]}
+
+    case ${action} in
+	failover)
+	    ;;
+	active)
+	    ;;
+	*)
+	    return 165
+	    ;;
+    esac
+
+    test -z "${confirm}" -o "${confirm}" == "force" || return 1
+    user-has-admin-rights || return 31
+    check-lock || return 123
+    test "${confirm}" == force || request-confirmation
+    supervisor-action "ha-${action}"
+    test ${?} -eq 0 || return 104
+}
+
+main "${@}"

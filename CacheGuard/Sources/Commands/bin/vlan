@@ -1,0 +1,187 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       Commands
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+source functions
+
+check-access-vlan()
+{
+    test -n "${1}" || return 1
+
+    case "${1}" in
+	web|rweb|file|peer|admin|mon|antivirus)
+	    return 0
+	    ;;
+	*)
+	    return 1
+	    ;;
+    esac
+}
+
+show-vlans()
+{
+    local vlan_ids="web rweb antivirus peer file admin mon"
+    local vlan_id cur_tag new_tag
+
+    for vlan_id in ${vlan_ids}
+    do
+	cur_tag=$(get-vlan-tag ${vlan_id} cur)
+	new_tag=$(get-vlan-tag ${vlan_id} new)
+
+	echo-command-form "vlan"
+	echo-mark-cur
+	echo-value "${vlan_id} ${cur_tag}"
+
+	if test ${cur_tag} != ${new_tag} ; then
+	    echo-command-form "vlan"
+	    echo-mark-new
+	    echo-value "${vlan_id} ${new_tag}"
+	fi
+    done
+}
+
+show-vlan-type()
+{
+    test -n "${1}" || return 1
+    local at=${1}
+
+    local cur_vid=$(get-vlan-tag ${at} cur)
+    local vid=$(get-vlan-tag ${at} new)
+
+    echo-command-form "vlan"
+    echo-mark-cur
+
+    echo-value "${at} ${cur_vid}"
+
+    if test "${cur_vid}" != "${vid}" ; then
+	echo-command-form "vlan"
+	echo-mark-new
+	echo-value "${at} ${vid}"
+    fi
+}
+
+show-vlan()
+{
+    echo-begin-show
+
+    if test -z "${1}" ;then
+	show-vlans
+    else
+	show-vlan-type ${1}
+    fi
+
+    echo-end-show
+}
+
+set-vlan()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 1
+    local in_at=${1}
+    local in_vid=${2}
+
+    local elt range i=0
+    local vlan_exist=0 deleted_vlan=-1
+    local ats_col ats_txt vid at
+    local new_vlans=""
+    local new_ip_vlans
+    
+    for elt in ${VLAN_FLOW_LIST}
+    do
+	range=$[${i} % 2]
+	case ${range} in
+	    0)
+		vid=${elt}
+		;;
+	    1)
+		ats_col=${elt}
+		ats_txt=$(colon2space ${ats_col})
+		if test "${vid}" == "${in_vid}" ; then
+		    vlan_exist=1
+		    ats_col=""
+
+		    for at in ${ats_txt}
+		    do
+			if test "${at}" != "${in_at}" ; then
+			    if test -z "${ats_col}" ; then ats_col="${at}"
+			    else ats_col="${ats_col}:${at}" ; fi
+			fi
+		    done
+
+		    if test -z "${ats_col}" ; then
+			ats_col="${in_at}"
+		    else
+			ats_col="${ats_col}:${in_at}"
+		    fi
+
+		    new_vlans="${new_vlans} ${vid} ${ats_col}"
+		else
+		    ats_txt=$(remove "${ats_txt}" "${in_at}")
+		    if test -n "${ats_txt}" ; then
+			ats_col=$(space2colon "${ats_txt}")
+			new_vlans="${new_vlans} ${vid} ${ats_col}"
+		    else
+			deleted_vlan=${vid}
+		    fi
+		fi
+		;;
+	    *)
+		error 255
+		;;
+	esac
+	((i++))
+    done
+
+    if test ${vlan_exist} -eq 0 ; then
+	new_vlans="${new_vlans} ${in_vid} ${in_at}"
+	new_ip_vlans="${IP_VLAN_LIST} ${in_vid} 0.0.0.0 0.0.0.0"
+    else
+	new_ip_vlans="${IP_VLAN_LIST}"
+    fi
+
+    if test ${deleted_vlan} -ne -1 ; then
+	new_ip_vlans=$(remove-ip_vlan_list_vlan "${new_ip_vlans}" ${deleted_vlan})
+    fi
+    
+    export VLAN_FLOW_LIST="${new_vlans}"
+    export IP_VLAN_LIST="${new_ip_vlans}"
+}
+
+run()
+{
+    contextual-command-is-allowed || return 207
+
+    if test -z "${ARGS[1]}" ; then show-vlan ; return 0 ; fi
+    local as=${ARGS[1]}
+    check-access-vlan ${as} || return 45
+    
+    if test -z "${ARGS[2]}" ; then show-vlan ${as} ; return 0 ; fi
+    local vl=${ARGS[2]}
+    check-vlan ${vl} || return 41
+    
+    set-vlan ${as} ${vl}
+    
+    SAVENV=1
+}
+
+main "${@}"

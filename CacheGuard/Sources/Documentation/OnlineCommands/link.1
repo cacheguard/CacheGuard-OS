@@ -1,0 +1,34 @@
+Manage L2 network interfaces
+.SH SYNOPSIS
+
+[1] \fBlink\fR [\fBmac\fR]
+
+[2] \fBlink bond\fR [(\fBinternal\fR | \fBexternal\fR | \fBauxiliary\fR) [\fBraz\fR | (\fBadd\fR | \fBdel\fR) \fI<eth-id>\fR]]
+
+.SH DESCRIPTION
+The first [1] usage form is used to display some practical information (manufacturer, model...) related to physical NIC (Network Interface Cards). Use this command to identify physical NIC. The optional keyword "mac" allows you to display MAC address instead.
+
+The second [2] usage form is used to get or set physical NIC bonding configurations. CacheGuard uses three logical network interfaces: the \fBinternal\fR interface, the \fBexternal\fR interface and a third interface called \fBauxiliary\fR. Internal users and Web servers should access the internet through the internal interface while CacheGuard uses its external interface to access the internet. You can use the auxiliary interface for your specific needs (For instance to implement a DMZ or a Back Office zone).
+
+Each logical network interface is associated to at least one physical interface. By default the
+.B external
+interface is associated to the
+.I eth0
+(ethernet interface "0") and the
+.B internal
+interface is associated to
+.I eth1
+(ethernet interface "1") . In order to increase the network availability it is possible to associate more than one physical interface to the same logical interface. To do this, CacheGuard uses NIC aggregation in "Active/Backup" mode.
+
+The
+.B bond
+keyword allows you to add or delete physical NIC to logical NIC. When associating a list of physical NIC to a logical NIC, the first physical NIC is always used as the master (or active) NIC. All others are slave (or backup) interfaces. The argument <eth-id> is the physical NIC id.
+
+For instance to add the ethernet NIC named \fIeth3\fR to the internal interface use the following command: \fBlink bond internal add\fR \fIeth3\fR.
+
+.SH USB ETHERNET ADAPTERS
+CacheGuard supports USB Ethernet adapters. To install your USB Ethernet adapter, just plug it in a USB port on your machine and wait for its detection and installation. If your USB Ethernet adapter is recognised by the system, you will be able to see it in the list of NIC on your machine using the present command. If more than one USB Ethernet adapters have to be installed, they should be installed one by one in order to let the system assign them a distinct a constant and unique Ethernet ID. To uninstall a USB Ethernet adapter, just unplug it from your machine and reboot your system.
+
+.SH SEE ALSO
+.B apply
+(1)

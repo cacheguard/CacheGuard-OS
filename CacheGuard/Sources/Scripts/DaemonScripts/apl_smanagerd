@@ -1,0 +1,171 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       Scripts
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+CACHEGUARD_DIR=/etc/sysconfig/cacheguard
+source ${CACHEGUARD_DIR}/constant
+source ${APPLIANCE_DIR}/etc/role
+source ${ABASE_DIR}/${ENV_RDIR}/${ENV_CURRENT_NAME}
+source ${LOCAL_DIR}/lib/apl_common
+
+get-excluded()
+{
+    test -n "${1}" || return 1
+    local name=${1}
+
+    local excluded
+
+    case ${name} in
+	logs)
+	    local base=$(file-basename ${MANAGER_REMOTE_EXEC_OPERATION_LOG})
+	    excluded="${base}*"
+	    ;;
+	*)
+	    ;;
+    esac
+
+    echo ${excluded}
+}
+
+check-remote-manager-os-version()
+{
+    test -n "${1}" || return 1
+    local ip=${1}
+
+    local tmp_remote_os_file=/tmp/${PEER_MANAGER_NAME}.os-version.${$}
+    local hard_dir=${HARD_DIR/${ADMIN_DIR}}
+
+    scp -4BCpqO -i ${ABASE_DIR}/.ssh/id_rsa ${ADMIN_NAME}@${ip}:${hard_dir}/os-version ${tmp_remote_os_file} > /dev/null 2>&1
+    ret=${?}
+
+    if test ${ret} -ne 0 ; then
+	rm -f ${tmp_remote_os_file}
+	return 215
+    fi
+    
+    local local_os_version=$(cat ${HARD_DIR}/os-version 2> /dev/null)
+    local remote_os_version=$(cat ${tmp_remote_os_file} 2> /dev/null)
+
+    rm -f ${tmp_remote_os_file}
+
+    test "${local_os_version}" == "${remote_os_version}" || return 228
+}
+
+log-sync()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    local name=${1}
+    local code=${2}
+
+    local date=$(date +"%s" 2> /dev/null)
+    echo ${code} ${date} > ${MANAGER_SYNC_FILE}.${name}
+}
+
+start-loop()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    test -n "${3}" || return 3
+    test -n "${4}" || return 4
+    local peer_ip=${1}
+    local user=${2}
+    local name=${3}
+    local src_dir=${4}
+    local dst_dir=${5}
+
+    test -n "${dst_dir}" || dst_dir=${src_dir/${ADMIN_DIR}}
+    local excluded=$(get-excluded ${name})
+
+    local ret
+
+    while true
+    do
+	check-remote-manager-os-version ${peer_ip}
+	ret=${?}
+
+	test ${ret} -ne 0 || break
+	log-sync ${name} ${ret}
+	sleep 30
+    done
+
+    rsync --quiet --archive --delete --compress --exclude "${excluded}" --rsh "ssh -i ${ABASE_DIR}/.ssh/id_rsa" ${src_dir}/ ${user}@${peer_ip}:${dst_dir}
+    ret=${?}
+    log-sync ${name} ${ret}
+
+    while inotifywait --quiet --recursive --event modify,create,delete ${src_dir}
+    do
+	check-remote-manager-os-version ${peer_ip}
+	ret=${?}
+
+	if test ${ret} -ne 0 ; then
+	    log-sync ${name} ${ret}
+	    continue
+	fi
+
+	rsync --quiet --archive --delete --compress --exclude "${excluded}" --rsh "ssh -i ${ABASE_DIR}/.ssh/id_rsa" ${src_dir}/ ${user}@${peer_ip}:${dst_dir}
+	ret=${?}
+	log-sync ${name} ${ret}
+    done
+}
+
+start-loops()
+{
+    test -n "${1}" || return 1
+    local peer_ip=${1}
+    local services=${2}
+    test -n "${services}" || services="repository logs urllists avstatus avsignatures"
+
+    local service pids
+
+    for service in ${services}
+    do
+	usleep 200000
+	case ${service} in
+	    repository)
+		start-loop ${peer_ip} ${ADMIN_NAME} ${service} ${ABASE_DIR}/${MANAGER_REPOSITORY_RDIR} > /dev/null 2>&1 & pids="${pids} ${!}"
+		;;
+	    logs)
+		start-loop ${peer_ip} ${ADMIN_NAME} ${service} ${MANAGER_LOG_DIR} > /dev/null 2>&1 & pids="${pids} ${!}"
+		;;
+	    urllists)
+		start-loop ${peer_ip} ${ADMIN_NAME} ${service} ${URLLIST_VAR_DIR} > /dev/null 2>&1 & pids="${pids} ${!}"
+		;;
+	    avstatus)
+		start-loop ${peer_ip} ${ADMIN_NAME} ${service} ${AV_VAR_DIR} > /dev/null 2>&1 & pids="${pids} ${!}"
+		;;
+	    avsignatures)
+		start-loop ${peer_ip} ${MANAGER_NAME} ${service} ${AV_EXTENDED_CACHE_DIR} ${AV_EXTENDED_CACHE_DIR} > /dev/null 2>&1 & pids="${pids} ${!}"
+		;;
+	    *)
+		;;
+	esac
+    done
+    pids=${pids:1}
+
+    echo ${pids}
+}
+
+# Main()
+
+start-loops "${@}"

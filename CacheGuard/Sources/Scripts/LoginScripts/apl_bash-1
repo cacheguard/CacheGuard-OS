@@ -1,0 +1,109 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       Scripts
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+OPTS="
+    --norc
+    --login
+    --restricted
+    +O cdable_vars
+    +O cdspell
+    +O checkhash
+    -O checkwinsize
+    -O cmdhist
+    +O dotglob
+    -O execfail
+    +O expand_aliases
+    +O extglob
+    -O histappend
+    +O histreedit
+    -O histverify
+    +O lithist
+    +O hostcomplete
+    -O huponexit
+    -O interactive_comments
+    -O login_shell
+    +O mailwarn
+    -O no_empty_cmd_completion
+    +O nocaseglob
+    +O nullglob
+    -O progcomp
+    -O promptvars
+    -O restricted_shell
+    +O shift_verbose
+    +O sourcepath
+    +O xpg_echo
+"
+
+get-kerberos-message()
+{
+    if test -f ${ROOT_DIR}/tmp/${KERBEROS_CREATE_FILENAME} ; then
+	local msg7=$(cat ${ROOT_DIR}${APPLIANCE_DIR}/etc/.file7)
+	msg7=$(echo -en "${msg7}")
+	echo "${msg7}"
+	return 1
+    else
+	return 0
+    fi
+}
+
+print-usage-message()
+{
+    test -t 0 || return 0
+
+    local message_usage
+
+    usage_message=$(get-usage-message "${@}")
+    kerberos_message=$(get-kerberos-message "${@}")
+
+    if test -n "${usage_message}" -o -n "${kerberos_message}" ; then
+	echo
+	test -z "${usage_message}" || echo "${usage_message}"
+	test -z "${kerberos_message}" || echo "${kerberos_message}"
+	echo
+    fi
+}
+
+apl_bash-main()
+{
+    if test "${1}" == "-c" -o "${1}" == "--command" ; then
+	shift
+	test -n "${@}" || exit 1
+	local com=${@/ *}
+
+	case ${com} in
+	    scp)
+		exec ${@}
+		;;
+	    rsync)
+		test ${APL_ROLE} != manager || exec ${@}
+		;;
+	    *)
+		__BATCH_MODE=yes exec bash ${OPTS} -c "${@//\$/\\\$}"
+		;;
+	esac
+    else
+	ilogin-usage-message
+	exec bash ${OPTS} -i
+    fi
+}

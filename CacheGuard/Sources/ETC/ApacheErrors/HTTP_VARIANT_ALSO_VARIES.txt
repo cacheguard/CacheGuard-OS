@@ -1,0 +1,4 @@
+506
+Variant also varies
+A variant for the requested entity is itself a negotiable resource
+Access not possible

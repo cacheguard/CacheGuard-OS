@@ -1,0 +1,116 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       InitScript
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+source /lib/lsb/init-functions
+
+CACHEGUARD_DIR=/etc/sysconfig/cacheguard
+source ${CACHEGUARD_DIR}/constant
+source ${APPLIANCE_DIR}/etc/role
+
+[ ! -f /etc/sysconfig/rlogger ] || source /etc/sysconfig/rlogger
+
+RETVAL=0
+SERV="Relaying Logger"
+PROG="rlogger"
+
+start-rlogger()
+{
+    local i=0 pids
+    local log_file_in log_file_out log_remote
+    declare -t log_file_in log_file_out log_remote
+
+    if test ${GUARD_LOG} == 'yes' ; then
+	log_file_in[${i}]=${PROXY_LOG_DIR}/${ACCESS_GUARD_LOG}
+	log_file_out[${i}]=${WEB_LOG_DIR}/${ACCESS_GUARD_LOG}
+	log_remote[${i}]=${GUARD_RLOG}
+	((i++))
+    fi
+    
+    local n=${i}
+
+    for ((i=0 ; i<n ; i++))
+    do
+	/usr/local/bin/apl_rloggerd ${log_file_in[${i}]} ${log_file_out[${i}]} ${log_remote[${i}]} &
+	pids="${pids} ${!}"
+    done
+    pids="${pids:1}"
+
+    test -n "${pids}" || return 0
+    echo ${pids} > /var/run/${PROG}.pid
+    touch /var/lock/${PROG}
+}
+
+stop-rlogger()
+{
+    test -f /var/run/${PROG}.pid || return 111
+
+    local pids=$(cat /var/run/${PROG}.pid 2> /dev/null) pid
+    local ret=0
+
+    for pid in ${pids}
+    do
+	kill -KILL -- ${pid} > /dev/null
+	((ret += ${?}))
+	break
+    done
+
+    rm -f /var/run/${PROG}.pid
+    rm -f /var/lock/${PROG}
+
+    return ${ret}
+}
+
+case "${1}" in
+    start)
+	log_info_msg "Starting ${SERV}..."
+	start-rlogger
+	RETVAL=${?}
+	[ ${RETVAL} -eq 0 ]
+	evaluate_retval
+	exit ${RETVAL}
+	;;
+
+    stop)
+	log_info_msg "Stopping ${SERV}... "
+	stop-rlogger
+	RETVAL=${?}
+	[ ${RETVAL} -eq 0 ]
+	evaluate_retval
+	exit ${RETVAL}
+	;;
+    
+    restart)
+	${0} stop
+	${0} start
+	;;
+    
+    status)
+	statusproc ${PROG}
+	;;
+    
+    *)
+	echo "Usage: ${0} {start|stop|restart|status}"
+	exit 1
+	;;
+esac

@@ -1,0 +1,58 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       Configurator
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+set-ntp-parameters()
+{
+    if test -n "${NTP_SERVER_LIST}" ; then
+	export NTP_MODE=True
+    else
+	export NTP_MODE=False
+    fi
+
+    if test -n "${CURRENT_NTP_SERVER_LIST}" ; then
+	export CURRENT_NTP_MODE=True
+    else
+	export CURRENT_NTP_MODE=False
+    fi
+}
+
+gen-ntp-conf()
+{
+    cat ntp.conf-constant
+
+    local srv
+
+    for srv in ${NTP_SERVER_LIST}
+    do
+	echo "server ${srv}"
+    done
+}
+
+gen-sysconfig-ntpd()
+{
+    cat sysconfig.ntpd-constant
+    echo "NTP_SERVER_LIST=\"${NTP_SERVER_LIST}\""
+}
+
+LIB_APL_NTP=Yes

@@ -1,0 +1,52 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       Commands
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+source functions
+
+run()
+{
+    test -z "${TRANSACTION}" || return 106
+
+    push-args "${@}"
+    init-global-variables
+
+    if test -n "${ARGS[1]}" ; then
+	case "${ARGS[1]}" in
+	    force|report)
+		;;
+	    *)
+		return 1
+		;;
+	esac
+    fi
+
+    user-has-admin-rights || return 31
+    check-lock || return 123
+    test "${ARGS[1]}" == force || request-confirmation
+    test "${ARGS[1]}" != report || return 0
+    supervisor-action "halt"
+    test ${?} -eq 0 || return 104
+}
+
+main __noenv "${@}"

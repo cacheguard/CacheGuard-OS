@@ -1,0 +1,48 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       Scripts
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+CACHEGUARD_DIR=/etc/sysconfig/cacheguard
+source ${CACHEGUARD_DIR}/constant
+source ${APPLIANCE_DIR}/etc/role
+
+av-scan()
+{
+    test -n "${1}" || return 1
+    local file=${1}
+
+    ${LOCAL_DIR}/bin/clamdscan --quiet --stream --config-file=${LOCAL_DIR}/etc/clamd.conf --no-summary ${file} > /dev/null 2>&1
+    local ret=${?}
+
+    if test -n "${VERBOSE}" ; then
+	if test ${ret} -eq 0 ; then
+	    echo "1: No Malware Found"
+	else
+	    echo "0: Malware Found"
+	fi
+    fi
+
+    return ${ret}
+}
+
+av-scan "${@}"

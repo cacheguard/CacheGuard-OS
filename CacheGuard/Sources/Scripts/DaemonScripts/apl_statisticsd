@@ -1,0 +1,65 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       Scripts
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+CACHEGUARD_DIR=/etc/sysconfig/cacheguard
+source ${CACHEGUARD_DIR}/constant
+source ${APPLIANCE_DIR}/etc/role
+
+reset-network-statistics()
+{
+    local nic nics
+
+    test -f ${RUN_DIR}/${NETWORK_INTERFACES_FILENAME} || return 11
+    nics=$(cat ${RUN_DIR}/${NETWORK_INTERFACES_FILENAME} 2> /dev/null)
+    
+    for nic in ${nics}
+    do
+	echo -n > ${RUN_DIR}/${NETWORK_STATISTICS_FILENAME}.${nic}
+    done
+}
+
+reset-cpu-statistics()
+{
+    head --lines=1 /proc/stat > ${RUN_DIR}/${CPU_STATISTICS_FILENAME}
+}
+
+start-loop()
+{
+    while true
+    do
+	sleep ${STATISTICS_INTERVAL}
+	apl_statistics
+    done
+}
+
+main()
+{
+    reset-network-statistics
+    reset-cpu-statistics
+    start-loop "${@}"
+}
+
+# Main()
+
+main

@@ -1,0 +1,40 @@
+#!/bin/bash
+
+############################################################################
+#
+# MODULE:       Install
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+print_usage()
+{
+    echo "Usage form example: raidfail sda"
+    exit 11
+}
+
+raid_fail()
+{
+    test -n "${1}" || print_usage
+    local hd=${1}
+
+    test ${hd:0:5} == "/dev/" || hd="/dev/${hd}"
+    mdadm /dev/md@RAID_MD_NB@ --fail ${hd}@RAID_PARTITION_NB@
+}
+
+raid_fail "${@}"

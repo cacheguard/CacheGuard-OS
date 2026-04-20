@@ -1,0 +1,255 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       Scripts
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+CACHEGUARD_DIR=/etc/sysconfig/cacheguard
+source ${CACHEGUARD_DIR}/constant
+source ${APPLIANCE_DIR}/etc/role
+source ${ABASE_DIR}/${ENV_RDIR}/${ENV_CURRENT_NAME}
+
+test "${CURRENT_ADMIN_SNMP}" == True || exit 0
+
+source /usr/local/lib/apl_functions
+
+send-snmp-trap()
+{
+    test -n "${1}" || return 111
+    test -n "${2}" || return 112
+    test -n "${3}" || return 113
+    local notification=${1}
+    local event=${2}
+
+    check-digit ${notification} || return 3
+
+    local specific_trap_v1_code=${notification}
+    local generic_trap_v1_code=6
+
+    local description oid_assertions trap_oid
+    local  v3_security_options password_option
+
+    local global_options="-r 2 -t 4"
+
+    local i=0 elt range
+    local version server port user hash_function enc_algorithm password privacy
+
+    case ${notification} in
+	10)
+	    # Test
+	    local description="This is a test SNMP trap sent from ${CURRENT_SHOSTNAME}.${CURRENT_DOMAIN_NAME}."
+	    trap_oid="CACHEGUARD-MIB::cgTestNotification"
+	    oid_assertions="cgTestEvent s ${event}"
+	    oid_assertions="${oid_assertions} cgTestEventDescription s"
+	    ;;
+	11)
+	    # Health Checking Status
+	    local service=${3}
+	    local description=${4}
+	    trap_oid="CACHEGUARD-MIB::cgHealthCheckNotification"
+	    oid_assertions="cgHealthCheckEvent u ${event} cgHealthCheckServiceName s ${service}"
+	    test -z "${description}" || oid_assertions=" ${oid_assertions} cgHealthCheckEventDescription s"
+	    ;;
+	12)
+	    # SMART Status
+	    local device=${3}
+	    local description=${4}
+	    trap_oid="CACHEGUARD-MIB::cgSMARTNotification"
+	    oid_assertions="cgSMARTEvent s ${event} cgSMARTDevice s ${device}"
+	    test -z "${description}" || oid_assertions=" ${oid_assertions} cgSMARTEventDescription s"
+	    ;;
+	13)
+	    # RAID Status
+	    local device=${3}
+	    local description=${4}
+	    trap_oid="CACHEGUARD-MIB::cgRAIDNotification"
+	    oid_assertions="cgRAIDEvent s ${event} cgRAIDDevice s ${device}"
+	    test -z "${device}" || oid_assertions=" ${oid_assertions} cgRAIDEventDescription s"
+	    ;;
+	14)
+	    # VRRP transition
+	    local device=${3}
+	    local description=${4}
+	    trap_oid="CACHEGUARD-MIB::cgVRRPNotification"
+	    oid_assertions="cgVRRPEvent s ${event} cgVRRPDevice s ${device}"
+	    test -z "${device}" || oid_assertions=" ${oid_assertions} cgVRRPEventDescription s"
+	    ;;
+	15)
+	    # NIC (Network Interface Card) changes
+	    local device=${3}
+	    local description=${4}
+	    trap_oid="CACHEGUARD-MIB::cgNICNotification"
+	    oid_assertions="cgNICEvent s ${event} cgNICDevice s ${device}"
+	    test -z "${device}" || oid_assertions=" ${oid_assertions} cgNICEventDescription s"
+	    ;;
+	16)
+	    # Gateway unavailability
+	    local ip=${3}
+	    local description=${4}
+	    trap_oid="CACHEGUARD-MIB::cgGatewayNotification"
+	    oid_assertions="cgGatewayEvent s ${event} cgGatewayIP s ${ip}"
+	    test -z "${ip}" || oid_assertions=" ${oid_assertions} cgGatewayEventDescription s"
+	    ;;
+	20)
+	    # URL lists auto load
+	    local nb=${3}
+	    local description=${4}
+	    trap_oid="CACHEGUARD-MIB::cgURLListNotification"
+	    oid_assertions="cgURLListEvent s ${event} cgURLListAutoLoadFailures i ${nb}"
+	    test -z "${nb}" || oid_assertions=" ${oid_assertions} cgURLListEventDescription s"
+	    ;;
+	21)
+	    # Antivirus outdated DB signature
+	    local value=${3}
+	    local description=${4}
+	    trap_oid="CACHEGUARD-MIB::cgAntiVirusNotification"
+	    oid_assertions="cgAntiVirusEvent s ${event} cgAntiVirusFreshnessDate s ${value}"
+	    test -z "${value}" || oid_assertions=" ${oid_assertions} cgAntiVirusEventDescription s"
+	    ;;
+	22)
+	    # Antivirus extended signature DB update
+	    local code=${3}
+	    local description=${4}
+	    trap_oid="CACHEGUARD-MIB::cgAntiVirusExtendedNotification"
+	    oid_assertions="cgAntiVirusEvent s ${event} cgAntiVirusUpdateErrorCode i ${code}"
+	    test -z "${code}" || oid_assertions=" ${oid_assertions} cgAntiVirusEventDescription s"
+	    ;;
+	23)
+	    # Kerberos KeyTab file update
+	    local code=${3}
+	    local description=${4}
+	    trap_oid="CACHEGUARD-MIB::cgKerberosKeyTabUpdateNotification"
+	    oid_assertions="cgKerberosEvent s ${event} cgKerberosKeyTabUpdateErrorCode i ${code}"
+	    test -z "${code}" || oid_assertions=" ${oid_assertions} cgKerberosEventDescription s"
+	    ;;
+	24)
+	    # Cache Reconfiguration
+	    local code=${3}
+	    local description=${4}
+	    trap_oid="CACHEGUARD-MIB::cgCacheReconfigureNotification"
+	    oid_assertions="cgCacheEvent s ${event} cgCacheEventStatusCode i ${code}"
+	    test -z "${code}" || oid_assertions=" ${oid_assertions} cgCacheEventDescription s"
+	    ;;
+	25)
+	    # Failed Login Attempt
+	    local interface=${3}
+	    local remote_ip=${4}
+	    local description=${5}
+	    trap_oid="CACHEGUARD-MIB::cgLoginNotification"
+	    oid_assertions="cgLoginEvent s ${event} cgLoginInterface s ${interface} cgLoginRemoteIP s ${remote_ip}"
+	    test -z "${interface}" -a -z "${remote_ip}" || oid_assertions=" ${oid_assertions} cgLoginEventDescription s"
+	    ;;
+	*)
+	    return 114
+	    ;;
+    esac
+
+    for elt in ${CURRENT_SNMP_TRAP_SERVER_LIST}
+    do
+	range=$[${i} % 8]
+	case ${range} in
+	    0)
+		version=${elt}
+		;;
+	    1)
+		server=${elt}
+		;;
+	    2)
+		port=${elt}
+		;;
+	    3)
+		user=${elt}
+		;;
+	    4)
+		hash_function=${elt}
+		;;
+	    5)
+		enc_algorithm=${elt}
+		;;
+	    6)
+		password=${elt}
+		;;
+	    7)
+		privacy=${elt}
+
+		if test -n "${password}" ; then
+		    password_option="-c ${password}"
+		else
+		    unset password_option
+		fi
+
+		case ${version} in
+		    v1)
+			snmptrap ${global_options} -v 1 ${password_option} tcp:${server}:${port} ${trap_oid} "" ${generic_trap_v1_code} ${specific_trap_v1_code} "" ${oid_assertions} "${description}" 2> /dev/null
+			;;
+		    v2c)
+			snmptrap ${global_options} -v 2c ${password_option} tcp:${server}:${port} "" ${trap_oid} ${oid_assertions} "${description}" 2> /dev/null
+			;;
+		    v3)
+			local engine_file=${RUN_DIR}/${SNMP_ENGINE_ID}
+			test -s ${engine_file} || return 4
+			local engine_id=$(cat ${engine_file})
+                        engine_id=${engine_id// /}
+
+			case ${hash_function} in
+			    sha256)
+				hash_function='SHA-256'
+				;;
+			    sha384)
+				hash_function='SHA-384'
+				;;
+			    sha512)
+				hash_function='SHA-512'
+				;;
+			    *)
+				hash_function='SHA-256'
+				;;
+			esac
+
+			enc_algorithm=${enc_algorithm^^}
+
+			if test -n "${password}" ; then
+			    if test -n "${privacy}" ; then
+				v3_security_options="-l authPriv -a ${hash_function} -A ${password} -x ${enc_algorithm} -X ${privacy}"
+			    else
+				v3_security_options="-l authNoPriv -a ${hash_function} -A ${password}"
+			    fi
+			else
+			    v3_security_options="-l noAuthNoPriv"
+			fi
+			# Sending Inform Notification with -Ci option (for Traps the user should be the local SNMP_USER)
+			snmptrap ${global_options} -v 3 -Ci -u "${user}" ${v3_security_options} tcp:${server}:${port} "" ${trap_oid} ${oid_assertions} "${description}" 2> /dev/null &
+			;;
+		    *)
+			;;
+		esac
+		;;
+	    *)
+		return 255
+		;;
+	esac
+	((i++))
+    done
+}
+
+# Main()
+
+send-snmp-trap "${@}"

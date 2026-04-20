@@ -1,0 +1,72 @@
+<a name='main' class='doc-title'></a>
+<h1>The Network</h1>
+
+A freshly installed CacheGuard-OS has no IP configurations at all and before being able to connect to it as an administrator (<strong>admin</strong> user), you must set an IP address for at least one of its network interfaces. The only way to set an IP address for the first time on a CacheGuard appliance is to use the CacheGuard appliance console port. At the first login (as the <strong>admin</strong> user) via the console port, a command named <strong>setup</strong> is automatically executed and allows you to set CacheGuard's <strong>internal</strong> and <strong>external</strong> IP addresses. As an alternative method, you can use the <a href="/doc/command/ip.html">ip</a> command.
+
+<a name='if' class='doc-title'></a><h2>Network Interfaces</h2>
+With a CacheGuard appliance, the network is divided into at least two zones: the <i>internal zone</i> and the <i>external zone</i>. The <i>external zone</i> is considered an untrusted zone (the Internet), while protected users and servers should be placed in the <i>internal zone</i> (considered trusted). A third optional zone called <i>auxiliary</i> can be created and used as per your convenience (for instance, as a DMZ or as a Back Office zone). The <i>internal zone</i> can optionally be divided into sub-zones using tagged <a href="#vlan">VLANs</a>.
+<p>
+CacheGuard appliance connects each zone via a distinct <u>logical</u> network interface. Hence, a CacheGuard appliance can support up to three logical network interfaces: the <strong>external</strong>, the <strong>internal</strong>, and the <strong>auxiliary</strong> logical network interfaces. In this network topology, internal users and servers are routed via the <strong>internal</strong> interface, while the CacheGuard appliance uses its <strong>external</strong> interface to connect to the Internet.
+<p>
+A logical network interface should be associated with at least one physical network interface. The <a href="/doc/command/link.html">link</a> command allows you to associate a logical network interface with a physical (<i>eth0</i>, <i>eth1</i>...) network interface. A link configuration in which more than one physical network interface is associated with a logical network interface is called <i>link bonding</i>. The <i>link bonding</i> is an active/backup link configuration that allows service continuity in the event of a link failure. You can refer to the <a href="#bond">Link Bonding</a> section for further information on <i>link bonding</i>.
+
+<center><img width='600' src="/doc/image/configuration.png" class="schema" /></center>
+
+<a name='ip' class='doc-title'></a><h2>Appliance IP Addresses</h2>
+To support the IP protocol, a logical network interface must be associated with a main IP address. The <a href="/doc/command/ip.html">ip</a> command allows you to set main IP addresses. Additional IP addresses can be implicitly associated with a logical network interface by other commands. For instance, the <a href="/doc/command/vrrp.html">vrrp</a> command allows you to create floating IP addresses in HA mode, while the <a href="/doc/command/rweb.html">rweb</a> command may create IP aliases associated with a main IP address. The example below sets the <strong>external</strong> IP address to <i>192.168.1.1 255.255.255.0</i> and the <strong>internal</strong> IP address to <i>10.20.0.254 255.255.0.0</i>:
+<ul>
+  <li><i>ip external 192.168.1.1 255.255.255.0</i></li>
+  <li><i>ip internal 10.20.0.254 255.255.0.0</i></li>
+  <li><i>apply</i></li>
+</ul>
+
+<a name='vlan' class='doc-title'></a><h2>Using 802.1q VLANs</h2>
+
+CacheGuard appliance supports 802.1q VLAN (Virtual LAN) tagging on its internal network interface to secure and isolate predefined functional traffic (<strong>admin</strong>, <strong>web</strong>, <strong>rweb</strong>...). When using tagged VLANs, a pseudo network interface is implicitly created for each defined VLAN. To use VLANs, you have to activate the VLAN mode by using the <a href="/doc/command/mode.html">mode vlan on</a> command and then configure VLANs with the help of the <a href="/doc/command/vlan.html">vlan</a> and <a href="/doc/command/ip.html">ip</a> commands. Note that in VLAN mode, the native IP address associated with the <strong>internal</strong> network interface is no longer active, and you should configure a separate IP address for each pseudo network interface. For instance, the following commands define tagged VLANs 10, 20, and 30 respectively associated with the <strong>web</strong>, <strong>rweb</strong>, and <strong>admin</strong> functional traffic, and set a distinct IP address for each created VLAN (all other functional traffic will remain in the default VLAN 0).
+<ul>
+  <li><i>vlan web 10</i></li>
+  <li><i>vlan rweb 20</i></li>
+  <li><i>vlan admin 30</i></li>
+  <li><i>ip internal.0 10.0.0.254 255.255.255.0</i></li>
+  <li><i>ip internal.10 10.0.10.254 255.255.255.0</i></li>
+  <li><i>ip internal.20 10.0.20.254 255.255.255.0</i></li>
+  <li><i>ip internal.30 10.0.30.254 255.255.255.0</i></li>
+  <li><i>mode vlan on</i></li>
+  <li><i>apply</i></li>
+</ul>
+
+<a name='route' class='doc-title'></a><h2>Network Routes</h2>
+To route (or forward) IP traffic, you must create routing tables. CacheGuard-OS supports static routes only. However, you have the possibility to create multi-gateway routes to balance the IP routing between multiple gateways. In a multi-gateway configuration, gateway failures can be detected and the routing configuration dynamically modified to avoid routing traffic via failed gateways. Please note that gateways in a route specification should be directly connected to a CacheGuard network interface and have an IP address in the same network as the connected network interface IP address. For example, the following commands allow you to create two default gateways via the <i>192.168.1.254</i> and <i>192.168.1.253</i> gateways and a static route to the <i>172.22.22.0 255.255.255.0</i> network via the <i>10.20.0.1</i> gateway.
+<ul>
+  <li><i>ip route add default 192.168.1.254</i></li>
+  <li><i>ip route add default 192.168.1.253</i></li>
+  <li><i>ip route add 172.22.22.0 255.255.255.0 10.20.0.1</i></li>
+  <li><i>apply</i></li>
+</ul>
+
+<a name='dns' class='doc-title'></a><h2>Domain Name Servers</h2>
+
+To connect to external name-based services (for instance, websites), CacheGuard appliance needs a DNS (Domain Name Server) to translate domain names to IP addresses. CacheGuard appliance embeds a caching-only DNS (Domain Name Server) that you can activate by adding the <i>localhost</i> (or the <i>127.0.0.1</i> loopback IP address) to the list of DNS servers. You also have the possibility to add external DNS to the system using the <a href="/doc/command/dns.html">dns</a> command. If you activate the internal DNS server, you will have the possibility to allow external clients to use it as a service. Please note that you can restrict DNS access to trusted networks only by using the <a href="/doc/command/access.html">access</a> command. The example below activates the internal DNS and allows IP clients to use it as a service.
+<ul>
+  <li><i>dns add 127.0.0.1</i></li>
+  <li><i>mode dns on</i></li>
+  <li><i>apply</i></li>
+</ul>
+
+<a name='dhcp' class='doc-title'></a><h2>DHCP Server</h2>
+CacheGuard appliance integrates an easy-to-handle DHCP server that you can activate to deliver dynamic IP addresses to connected devices. The <a href="/doc/command/dhcp.html">dhcp</a> command allows you to define dynamic IP address ranges and/or fixed IP addresses for particular devices identified by their MAC addresses on an Ethernet network. Please note that dynamic IP addresses can only be delivered to devices connected to the <strong>internal</strong> network interface (or the <strong>web</strong> interface in VLAN mode). The example below activates the DHCP server, configures it to deliver dynamic IP addresses between <i>10.20.0.11</i> and <i>10.20.0.15</i>, and fixes the IP address <i>10.20.0.10</i> and hostname <i>john</i> for a device having the MAC address 00:01:00:02:00:03.
+<ul>
+  <li><i>mode dhcp on</i></li>
+  <li><i>dhcp range add 10.20.0.11 10.20.0.15</i></li>
+  <li><i>dhcp fixed add john 00:01:00:02:00:03 10.20.0.10</i></li>
+  <li><i>apply</i></li>
+</ul>
+
+<a name='ha' class='doc-title'></a><h2>High Availability</h2>
+CacheGuard appliance uses several technologies to ensure the <i>High Availability</i> of the services that it offers. The HA in a CacheGuard appliance is based on redundancy and resiliency concepts. If you plan to implement CacheGuard solutions to secure and/or optimise critical services in your organisation, it is highly recommended to implement the HA offered in CacheGuard-OS.
+
+<a name='bond' class='doc-title'></a><h3>The VRRP Protocol</h3>
+
+By associating several CacheGuard appliances in HA mode, you can ensure service continuity and HA (High Availability) in the event of a software or hardware failure on one of them. To associate two (or more) CacheGuard appliances in HA mode, you must activate the HA mode on them using the <a href="/doc/command/mode.html">mode ha on</a> command. In HA mode, operational appliances automatically start handling network traffic that was initially destined for a failed appliance. The HA mode is based on the VRRP (Virtual Router Redundancy Protocol) and can be configured using the <a href="/doc/command/vrrp.html">vrrp</a> command.
+<p>
+When using VRRP, two (or more) CacheGuard appliances share the same virtual IP (VRRP IP) address (in addition to their real IP addresses) on their same network interface. External services or clients should then address appliances configured in HA mode by using their VRRP IP addresses (and not their real IP addresses). A VRRP IP address can be <strong>master</strong> (active) or <strong>backup</strong> on a network interface. The master VRRP IP is active on a network interface until a failure occurs on that interface. Following that failure, the backup VRRP IP becomes active (on the backup appliance). Each CacheGuard appliance embeds a service called <u>health checker</u> that continuously verifies the health of the services running on it. In case of a repeated failure on a service, the <u>health checker</u> deactivates its network interfaces, allowing other associated appliances in HA mode to take over the failed appliance.

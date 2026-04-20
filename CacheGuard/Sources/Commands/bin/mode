@@ -1,0 +1,599 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       Commands
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+source functions
+
+check-mode-mode()
+{
+    test -n "${1}" || return 1
+    
+    case ${1} in
+	dhcp|dns|ha|ftppassive|qos|router|snat|transparent|tweb|tnat|vlan)
+	    return 0
+	    ;;
+	anonymous|antivirus|authenticate|firewall|forward|web|compress|ocsp|rweb|reverse|sslmediate|log|guard|vpnipsec|waf|cache)
+	    return 0
+	    ;;
+	*)
+	    return 1
+	    ;;
+    esac
+}
+
+show-mode-cache()
+{
+    echo-command-form "mode cache"
+    local val=$(external-form ${CURRENT_CACHE_MODE})
+    echo-mark-cur
+    echo-value "${val}"
+
+    if test "${CURRENT_CACHE_MODE}" != "${CACHE_MODE}" ; then
+	echo-command-form "mode cache"
+	val=$(external-form ${CACHE_MODE})
+	echo-mark-new
+	echo-value "${val}"
+    fi
+}
+
+show-mode-qos()
+{
+    echo-command-form "mode qos"
+    local val=$(external-form ${CURRENT_QOS_MODE})
+    echo-mark-cur
+    echo-value "${val}"
+
+    if test "${CURRENT_QOS_MODE}" != "${QOS_MODE}" ; then
+	echo-command-form "mode qos"
+	val=$(external-form ${QOS_MODE})
+	echo-mark-new
+	echo-value "${val}"
+    fi
+}
+
+show-mode-router()
+{
+    echo-command-form "mode router"
+    local val=$(external-form ${CURRENT_ROUTER_MODE})
+    echo-mark-cur
+    echo-value "${val}"
+
+    if test "${CURRENT_ROUTER_MODE}" != "${ROUTER_MODE}" ; then
+	echo-command-form "mode router"
+	val=$(external-form ${ROUTER_MODE})
+	echo-mark-new
+	echo-value "${val}"
+    fi
+}
+
+show-mode-snat()
+{
+    echo-command-form "mode snat"
+    local val=$(external-form ${CURRENT_SNAT_MODE})
+    echo-mark-cur
+    echo-value "${val}"
+
+    if test "${CURRENT_SNAT_MODE}" != "${SNAT_MODE}" ; then
+	echo-command-form "mode snat"
+	val=$(external-form ${SNAT_MODE})
+	echo-mark-new
+	echo-value "${val}"
+    fi
+}
+
+show-mode-tnat()
+{
+    echo-command-form "mode tnat"
+    local val=$(external-form ${CURRENT_TNAT_MODE})
+    echo-mark-cur
+    echo-value "${val}"
+
+    if test "${CURRENT_TNAT_MODE}" != "${TNAT_MODE}" ; then
+	echo-command-form "mode tnat"
+	val=$(external-form ${TNAT_MODE})
+	echo-mark-new
+	echo-value "${val}"
+    fi
+}
+
+show-mode-tweb()
+{
+    echo-command-form "mode tweb"
+    local val=$(external-form ${CURRENT_TRANSPARENT_MODE})
+    echo-mark-cur
+    echo-value "${val}"
+
+    if test "${CURRENT_TRANSPARENT_MODE}" != "${TRANSPARENT_MODE}" ; then
+	echo-command-form "mode tweb"
+	val=$(external-form ${TRANSPARENT_MODE})
+	echo-mark-new
+	echo-value "${val}"
+    fi
+}
+
+show-mode-sslmediate()
+{
+    echo-command-form "mode sslmediate"
+    local val=$(external-form ${CURRENT_SSLMEDIATE_MODE})
+    echo-mark-cur
+    echo-value "${val}"
+
+    if test "${CURRENT_SSLMEDIATE_MODE}" != "${SSLMEDIATE_MODE}" ; then
+	echo-command-form "mode sslmediate"
+	val=$(external-form ${SSLMEDIATE_MODE})
+	echo-mark-new
+	echo-value "${val}"
+    fi
+}
+
+show-mode-transparent()
+{
+    show-mode-tweb
+}
+
+show-mode-firewall()
+{
+    echo-command-form "mode firewall"
+    local val=$(external-form ${CURRENT_FIREWALL_MODE})
+    echo-mark-cur
+    echo-value "${val}"
+
+    if test "${CURRENT_FIREWALL_MODE}" != "${FIREWALL_MODE}" ; then
+	echo-command-form "mode firewall"
+	val=$(external-form ${FIREWALL_MODE})
+	echo-mark-new
+	echo-value "${val}"
+    fi
+}
+
+show-mode-guard()
+{
+    echo-command-form "mode guard"
+    local val=$(external-form ${CURRENT_GUARD_MODE})
+    echo-mark-cur
+    echo-value "${val}"
+
+    if test "${CURRENT_GUARD_MODE}" != "${GUARD_MODE}" ; then
+	echo-command-form "mode guard"
+	val=$(external-form ${GUARD_MODE})
+	echo-mark-new
+	echo-value "${val}"
+    fi
+}
+
+show-mode-compress()
+{
+    echo-command-form "mode compress"
+    local val=$(external-form ${CURRENT_COMPRESS_MODE})
+    echo-mark-cur
+    echo-value "${val}"
+
+    if test "${CURRENT_COMPRESS_MODE}" != "${COMPRESS_MODE}" ; then
+	echo-command-form "mode compress"
+	val=$(external-form ${COMPRESS_MODE})
+	echo-mark-new
+	echo-value "${val}"
+    fi
+}
+
+show-mode-waf()
+{
+    echo-command-form "mode waf"
+    local val=$(external-form ${CURRENT_WAF_MODE})
+    echo-mark-cur
+    echo-value "${val}"
+
+    if test "${CURRENT_WAF_MODE}" != "${WAF_MODE}"; then
+	echo-command-form "mode waf"
+	val=$(external-form ${WAF_MODE})
+	echo-mark-new
+	echo-value "${val}"
+    fi
+}
+
+show-mode-dhcp()
+{
+    echo-command-form "mode dhcp"
+    local val=$(external-form ${CURRENT_DHCP_MODE})
+    echo-mark-cur
+    echo-value "${val}"
+
+    if test "${CURRENT_DHCP_MODE}" != "${DHCP_MODE}" ; then
+	echo-command-form "mode dhcp"
+	val=$(external-form ${DHCP_MODE})
+	echo-mark-new
+	echo-value "${val}"
+    fi
+}
+
+show-mode-dns()
+{
+    echo-command-form "mode dns"
+    local val=$(external-form ${CURRENT_DNS_MODE})
+    echo-mark-cur
+    echo-value "${val}"
+
+    if test "${CURRENT_DNS_MODE}" != "${DNS_MODE}" ; then
+	echo-command-form "mode dns"
+	val=$(external-form ${DNS_MODE})
+	echo-mark-new
+	echo-value "${val}"
+    fi
+}
+
+show-mode-ftppassive()
+{
+    echo-command-form "mode ftppassive"
+    local val=$(external-form ${CURRENT_FTP_PASSIVE_MODE})
+    echo-mark-cur
+    echo-value "${val}"
+
+    if test "${CURRENT_FTP_PASSIVE_MODE}" != "${FTP_PASSIVE_MODE}" ; then
+	echo-command-form "mode ftppassive"
+	val=$(external-form ${FTP_PASSIVE_MODE})
+	echo-mark-new
+	echo-value "${val}"
+    fi
+}
+
+show-mode-log()
+{
+    echo-command-form "mode log"
+    local val=$(external-form ${CURRENT_LOG_MODE})
+    echo-mark-cur
+    echo-value "${val}"
+
+    if test "${CURRENT_LOG_MODE}" != "${LOG_MODE}" ; then
+	echo-command-form "mode log"
+	val=$(external-form ${LOG_MODE})
+	echo-mark-new
+	echo-value "${val}"
+    fi
+}
+
+show-mode-vlan()
+{
+    echo-command-form "mode vlan"
+    local val=$(external-form ${CURRENT_VLAN_MODE})
+    echo-mark-cur
+    echo-value "${val}"
+
+    if test "${CURRENT_VLAN_MODE}" != "${VLAN_MODE}" ; then
+	echo-command-form "mode vlan"
+	val=$(external-form ${VLAN_MODE})
+	echo-mark-new
+	echo-value "${val}"
+    fi
+}
+
+show-mode-ha()
+{
+    echo-command-form "mode ha"
+    local val=$(external-form ${CURRENT_HA_MODE})
+    echo-mark-cur
+    echo-value "${val}"
+
+    if test "${CURRENT_HA_MODE}" != "${HA_MODE}" ; then
+	echo-command-form "mode ha"
+	val=$(external-form ${HA_MODE})
+	echo-mark-new
+	echo-value "${val}"
+    fi
+}
+
+show-mode-web()
+{
+    echo-command-form "mode web"
+    local val=$(external-form ${CURRENT_WEB_MODE})
+    echo-mark-cur
+    echo-value "${val}"
+
+    if test "${CURRENT_WEB_MODE}" != "${WEB_MODE}" ; then
+	echo-command-form "mode web"
+	echo-mark-new
+	val=$(external-form ${WEB_MODE})
+	echo-value "${val}"
+    fi
+}
+
+show-mode-forward()
+{
+    show-mode-web
+}
+
+show-mode-rweb()
+{
+    echo-command-form "mode rweb"
+    local val=$(external-form ${CURRENT_RWEB_MODE})
+    echo-mark-cur
+    echo-value "${val}"
+
+    if test "${CURRENT_RWEB_MODE}" != "${RWEB_MODE}" ; then
+	echo-command-form "mode rweb"
+	val=$(external-form ${RWEB_MODE})
+	echo-mark-new
+	echo-value "${val}"
+    fi
+}
+
+show-mode-reverse()
+{
+    show-mode-rweb
+}
+
+show-mode-anonymous()
+{
+    echo-command-form "mode anonymous"
+    local val=$(external-form ${CURRENT_ANONYMOUS_MODE})
+    echo-mark-cur
+    echo-value "${val}"
+
+    if test "${CURRENT_ANONYMOUS_MODE}" != "${ANONYMOUS_MODE}" ; then
+	echo-command-form "mode anonymous"
+	val=$(external-form ${ANONYMOUS_MODE})
+	echo-mark-new
+	echo-value "${val}"
+    fi
+}
+
+show-mode-authenticate()
+{
+    echo-command-form "mode authenticate"
+    local val=$(external-form ${CURRENT_AUTHENTICATE_MODE})
+    echo-mark-cur
+    echo-value "${val}"
+
+    if test "${CURRENT_AUTHENTICATE_MODE}" != "${AUTHENTICATE_MODE}" ; then
+	echo-command-form "mode authenticate"
+	val=$(external-form ${AUTHENTICATE_MODE})
+	echo-mark-new
+	echo-value "${val}"
+    fi
+}
+
+show-mode-antivirus()
+{
+    echo-command-form "mode antivirus"
+    local val=$(external-form ${CURRENT_AV_MODE})
+    echo-mark-cur
+    echo-value "${val}"
+
+    if test "${CURRENT_AV_MODE}" != "${AV_MODE}" ; then
+	echo-command-form "mode antivirus"
+	val=$(external-form ${AV_MODE})
+	echo-mark-new
+	echo-value "${val}"
+    fi
+}
+
+show-mode-ocsp()
+{
+    echo-command-form "mode ocsp"
+    local val=$(external-form ${CURRENT_OCSP_MODE})
+    echo-mark-cur
+    echo-value "${val}"
+
+    if test "${CURRENT_OCSP_MODE}" != "${OCSP_MODE}" ; then
+	echo-command-form "mode ocsp"
+	val=$(external-form ${OCSP_MODE})
+	echo-mark-new
+	echo-value "${val}"
+    fi
+}
+
+show-mode-vpnipsec()
+{
+    echo-command-form "mode vpnipsec"
+    local val=$(external-form ${CURRENT_VPN_IPSEC_MODE})
+    echo-mark-cur
+    echo-value "${val}"
+
+    if test "${CURRENT_VPN_IPSEC_MODE}" != "${VPN_IPSEC_MODE}" ; then
+	echo-command-form "mode vpnipsec"
+	val=$(external-form ${VPN_IPSEC_MODE})
+	echo-mark-new
+	echo-value "${val}"
+    fi
+}
+
+show-mode()
+{
+    echo-begin-show
+    case "${1}" in
+	dhcp|dns|ha|ftppassive|qos|router|snat|transparent|tweb|tnat|vlan)
+	    show-mode-${1}
+	    ;;
+	anonymous|antivirus|authenticate|firewall|forward|web|compress|ocsp|rweb|reverse|sslmediate|log|guard|vpnipsec|waf|cache)
+	    show-mode-${1}
+	    ;;
+	"")
+	    local role=$(get-contextual-role)
+
+	    case ${role} in
+		gateway)
+		    show-mode-dhcp
+		    show-mode-dns
+		    show-mode-ha
+		    show-mode-ftppassive
+		    show-mode-qos
+		    show-mode-router
+		    show-mode-snat
+		    show-mode-tnat
+		    show-mode-tweb
+		    show-mode-vlan
+
+		    show-mode-anonymous
+		    show-mode-antivirus
+		    show-mode-authenticate
+		    show-mode-firewall
+		    show-mode-web
+		    show-mode-compress
+		    show-mode-ocsp
+		    show-mode-rweb
+		    show-mode-sslmediate
+		    show-mode-log
+		    show-mode-guard
+		    show-mode-vpnipsec
+		    show-mode-waf
+		    show-mode-cache
+		    ;;
+		manager)
+		    show-mode-ftppassive
+		    ;;
+		*)
+		    return 255
+		    ;;
+	    esac
+	    ;;
+	*)
+	    return 255
+	    ;;
+    esac
+    echo-end-show
+}
+
+run()
+{
+    if test -z "${ARGS[1]}" ; then show-mode ; return 0 ; fi
+
+    if test -z "${ARGS[2]}" ; then
+	case ${ARGS[1]} in
+	    ftppassive)
+		show-mode ${ARGS[1]}
+		return 0
+		;;
+	    router|snat|tweb|transparent|tnat|dns|dhcp|firewall|vlan|qos|ha)
+		contextual-command-is-allowed || return 207
+		show-mode ${ARGS[1]}
+		return 0
+		;;
+	    web|rweb|forward|reverse|sslmediate|anonymous|guard|antivirus|ocsp|vpnipsec|waf|cache|compress|log|authenticate)
+		contextual-command-is-allowed || return 207
+		show-mode ${ARGS[1]}
+		return 0
+		;;
+	    *)
+		return 1
+		;;
+	esac
+    fi
+
+    local mod=${ARGS[1]}
+    local val=${ARGS[2]}
+
+    check-mode-mode ${mod} || return 1
+
+    case "${mod}" in
+	ftppassive)
+	    ;;
+	*)
+	    contextual-command-is-allowed || return 207
+	    ;;
+    esac
+
+    check-boolean ${val} || return 18
+
+    local bool=$(internal-form ${val})
+
+    case "${mod}" in
+	web|forward)
+	    export WEB_MODE=${bool}
+	    ;;
+	rweb|reverse)
+	    export RWEB_MODE=${bool}
+	    ;;
+	transparent|tweb)
+	    export TRANSPARENT_MODE=${bool}
+	    ;;
+	sslmediate)
+	    export SSLMEDIATE_MODE=${bool}
+	    ;;
+	router)
+	    export ROUTER_MODE=${bool}
+	    ;;
+	snat)
+	    export SNAT_MODE=${bool}
+	    ;;
+	tnat)
+	    export TNAT_MODE=${bool}
+	    ;;
+	firewall)
+	    export FIREWALL_MODE=${bool}
+	    ;;
+	guard)
+	    export GUARD_MODE=${bool}
+	    ;;
+	compress)
+	    export COMPRESS_MODE=${bool}
+	    ;;
+	waf)
+	    export WAF_MODE=${bool}
+	    ;;
+	dhcp)
+	    export DHCP_MODE=${bool}
+	    ;;
+	dns)
+	    export DNS_MODE=${bool}
+	    ;;
+	cache)
+	    cli-is-in-template-context || test ${bool} == False -o ${PERSISTENT_CACHE} == True || return 167
+	    export CACHE_MODE=${bool}
+	    ;;
+	ftppassive)
+	    export FTP_PASSIVE_MODE=${bool}
+	    ;;
+	log)
+	    export LOG_MODE=${bool}
+	    ;;
+	vlan)
+	    export VLAN_MODE=${bool}
+	    ;;
+	ha)
+	    export HA_MODE=${bool}
+	    ;;
+	qos)
+	    export QOS_MODE=${bool}
+	    ;;
+	anonymous)
+	    export ANONYMOUS_MODE=${bool}
+	    ;;
+	authenticate)
+	    export AUTHENTICATE_MODE=${bool}
+	    ;;
+	antivirus)
+	    export AV_MODE=${bool}
+	    ;;
+	ocsp)
+	    export OCSP_MODE=${bool}
+	    ;;
+	vpnipsec)
+	    export VPN_IPSEC_MODE=${bool}
+	    ;;
+	*)
+	    error 255
+	    ;;
+    esac
+    SAVENV=1
+}
+
+main "${@}"

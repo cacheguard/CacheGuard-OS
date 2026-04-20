@@ -1,0 +1,131 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       VPN Subscription
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+CACHEGUARD_DIR=/etc/sysconfig/cacheguard
+source ${CACHEGUARD_DIR}/constant
+source ${HARD_DIR}/cloud.conf
+source ${LOCAL_DIR}/lib/apl_ea_vpnsubscr.env
+source ${LOCAL_DIR}/lib/apl_common
+source ${LOCAL_DIR}/lib/apl_ea_vpnsubscr_functions
+
+get-random-timezone()
+{
+    source ${APPLIANCE_DIR}/lib/lib-timezone
+
+    load-timezones
+
+    local index=$[${RANDOM} % ${TIMEZONES_NB}]
+    local timezone=${TIMEZONES[${index}]}
+
+    echo ${timezone}
+}
+
+get-random-domainname()
+{
+    local domains n i=0
+    declare -a domainnames
+
+    domainnames[${i}]='security.matters' ; ((i++))
+    domainnames[${i}]='privacy.matters' ; ((i++))
+    domainnames[${i}]='freedom.matters' ; ((i++))
+    domainnames[${i}]='heaven.network' ; ((i++))
+    domainnames[${i}]='secure.network' ; ((i++))
+    domainnames[${i}]='private.network' ; ((i++))
+    domainnames[${i}]='private.zone' ; ((i++))
+    domainnames[${i}]='secure.zone' ; ((i++))
+    domainnames[${i}]='free.zone' ; ((i++))
+    domainnames[${i}]='private.area' ; ((i++))
+    domainnames[${i}]='secure.area' ; ((i++))
+    domainnames[${i}]='free.area' ; ((i++))
+    domainnames[${i}]='private.garden' ; ((i++))
+    domainnames[${i}]='secure.garden' ; ((i++))
+    domainnames[${i}]='free.garden' ; ((i++))
+
+    n=${i}
+
+    local index=$[${RANDOM} % ${n}]
+    local domainname=${domainnames[${index}]}
+
+    echo ${domainname}
+}
+
+main()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    local service_name=${1}
+    local email_address=${2}
+    local first_name=${3}
+    local last_name=${4}
+
+    local domain_name=$(get-random-domainname)
+    local timezone=$(get-random-timezone)
+
+    local error_file=/tmp/vpnsubscr-cloud-init-error.${$}
+
+    local service=$(get-setup-service 2> ${error_file})
+    local error=$(get-error-text ${error_file})
+
+    if test -n "${error}" ; then
+	vpnsubscr-log-error 11 "can't get the setup service state."
+	return 11
+    fi
+
+    if test -z "${service}" ; then
+	vpnsubscr-log-error 13 "can't get the setup service state."
+	return 13
+    fi
+
+    test ${service} == ${VPNSUBSCR_SETUP_STATE_INEXISTANT} || return 0
+
+    sqlite3 ${EMBEDDED_VPNSUBSCR_DB_FILE} << EOFSQL 2> ${error_file}
+UPDATE setup SET service_name = '${service_name}', previous_service_name = '${service_name}', domain_name = '${domain_name}', timezone = '${timezone}', service = ${VPNSUBSCR_SETUP_STATE_INITIALISED} WHERE id = 0;
+UPDATE email SET first_name = '$first_name', last_name = '$last_name', email_address = '$email_address' WHERE id = 0;
+EOFSQL
+
+    error=$(get-error-text ${error_file})
+
+    if test -n "${error}" ; then
+	vpnsubscr-log-error 15 "can't initialise the application in a cloud environment."
+	return 15
+    fi
+
+    local name=$(get-administrator-name "${first_name}" "${last_name}")
+
+    su - ${ADMIN_NAME} -c \
+       "
+email admin ${email_address} '${name}'
+" \
+       2> ${error_file} > /dev/null
+    error=$(get-error-text ${error_file})
+
+    if test -n "${error}" ; then
+	vpnsubscr-log-error 21 "can't modify the administrator email address. The low level error is: ${error}"
+	return 21
+    fi
+}
+
+# Main()
+
+main "${@}"

@@ -1,0 +1,106 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       Commands
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+show-file-password1()
+{
+    echo-command-form "password file"
+    if test "${1}" == "new" ; then
+	echo-mark-new
+    else
+	echo-mark-cur
+    fi
+
+    local passwords=${2}
+    if test -z "${passwords}" ; then
+	echo-value-null
+	return 0
+    fi
+
+    local i=0 n=0 elt rang
+    local protocol name login
+
+    for elt in ${passwords}
+    do
+	rang=$[${i} % 4]
+	case ${rang} in
+	    0)
+		protocol=${elt}
+		;;
+	    1)
+		name=${elt}
+		;;
+	    2)
+		login=${elt}
+		;;
+	    3)
+		test ${n} -eq 0 || echo-blank-command
+		echo-value "${protocol} ${name} ${login} ..."
+		((n++))
+		;;
+	    *)
+		return 1
+		;;
+	esac
+	((i++))
+    done
+}
+
+show-file-password()
+{
+    echo-begin-show
+    show-file-password1 'current' "${CURRENT_FILE_SERVER_PASSWORD_LIST}"
+    if test "${CURRENT_FILE_SERVER_PASSWORD_LIST}" != "${FILE_SERVER_PASSWORD_LIST}" ; then
+	show-file-password1 'new' "${FILE_SERVER_PASSWORD_LIST}"
+    fi
+    echo-end-show
+}
+
+raz-file-password()
+{
+    export FILE_SERVER_PASSWORD_LIST=''
+}
+
+del-file-password()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    local in_protocol=${1}
+    local in_ip=${2}
+
+    FILE_SERVER_PASSWORD_LIST=$(remove-record-from-list 4 2 "${in_protocol} ${in_ip}" "${FILE_SERVER_PASSWORD_LIST}")
+}
+
+add-file-password()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    test -n "${3}" || return 3
+    test -n "${4}" || return 4
+    local in_protocol=${1}
+    local in_ip=${2}
+    local in_login=${3}
+    local in_password=${4}
+
+    FILE_SERVER_PASSWORD_LIST=$(insert-record-in-slist 4 2 "${in_protocol} ${in_ip} ${in_login} ${in_password}" "${FILE_SERVER_PASSWORD_LIST}")
+}

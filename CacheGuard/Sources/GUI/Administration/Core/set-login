@@ -1,0 +1,187 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       GUI
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+gui-login-ko()
+{
+    test -n "${1}" || return 1
+    local user=${1}
+
+    gen-gui-error 9
+    gui-reset-login-process
+    log-login False "${user}"
+    usleep 3000000
+}
+
+gui-login-ok()
+{
+    test -n "${1}" || return 1
+    local user=${1}
+
+    log-login True "${user}"
+    set-auth-token "${user}"
+}
+
+gui-reset-login-process()
+{
+    unset-post-data
+    REQUEST_METHOD=GET
+}
+
+log-login()
+{
+    test -n "${1}" || return 1
+    local state=${1}
+    local user=${2}
+
+    test -n "${WAUTH_LOG}" || return 0
+
+    local date=$(date +"%Y/%m/%d-%T" 2> /dev/null)
+
+    case ${state} in
+	True)
+	    echo "${date}: Successful login for '${user}' from ${REMOTE_ADDR}" >> ${WAUTH_LOG}
+	    ;;
+	False)
+	    echo "${date}: Failed login for '${user}' from ${REMOTE_ADDR}" >> ${WAUTH_LOG}
+	    execute-noauth-command "system internal alert login failed web ${REMOTE_ADDR}"
+	    ;;
+	*)
+	    ;;
+    esac
+}
+
+2fa-is-not-reused()
+{
+    test -n "${1}" || return 1
+    local user=${1}
+
+    local dates=$(REMOTE_USER="${user}" execute-command-with-output "admin internal 2fa-get-disallow-reused")
+    local step_now=$(($(date +%s) / TWO_FACTOR_AUTHENTICATION_STEP_SIZE))
+
+    for date in ${dates}
+    do
+	test ${date} -lt ${step_now} || return 21
+    done
+
+    return 0
+}
+
+set-login()
+{
+    local login_step=${VALUES[0]}
+    local user=${VALUES[1]}
+    local password=${VALUES[2]}
+    user=${user// }
+
+    local home=/${HOME_NAME}/${user}
+
+    case ${login_step} in
+	basic)
+	    check-user-password "${user}" "${password}"
+	    if test ${?} -ne 0 ; then
+		gui-login-ko "${user}"
+	    else
+		if is-admin-2fa-mode ${user} ; then
+		    VALUES[0]=2fa
+		else
+		    set-auth-token "${user}"
+		    gui-reset-login-process
+		fi
+	    fi
+	    ;;
+	2fa)
+	    local error
+	    password=${password// }
+
+	    if check-digit "${password}" ; then
+		local len=${#password}
+		case ${len} in
+		    6|8)
+			;;
+		    *)
+			error=yes
+			;;
+		esac
+	    else
+		error=yes
+	    fi
+
+	    if test -n "${error}" ; then
+		gui-login-ko "${user}"
+		return 0
+	    fi
+
+	    local secrets=$(REMOTE_USER="${user}" execute-command-with-output "admin internal 2fa-get-secrets")
+
+	    if test ${len} -eq 8 ; then
+		local ecodes=${secrets#* }
+		if member "${ecodes}" "${password}" ; then
+		    REMOTE_USER="${user}" execute-command "admin internal 2fa-consume-ecode ${password}"
+		    gui-login-ok "${user}"
+		else
+		    gui-login-ko "${user}"
+		fi
+
+		return 0
+	    fi
+
+	    if is-admin-2fa-mode ${user} ; then
+		local secret=${secrets/ *}
+		if test -z "${secret}" ; then
+		    gui-login-ko "${user}"
+		else
+		    local status
+
+		    oathtool \
+			--base32 \
+			--totp=SHA1 \
+			--digits=6 \
+			--time-step-size=${TWO_FACTOR_AUTHENTICATION_STEP_SIZE} \
+			"${secret}" "${password}" > /dev/null 2>&1
+
+		    if test ${?} -ne 0 ; then
+			gui-login-ko "${user}"
+			status=ko
+		    else
+			if 2fa-is-not-reused ${user} ; then
+			    gui-login-ok "${user}"
+			    status=ok
+			else
+			    gui-login-ko "${user}"
+			    status=ko
+			fi
+		    fi
+
+		    REMOTE_USER="${user}" execute-command "admin internal 2fa-update-timestamp ${status}"
+		fi
+	    else
+		gui-login-ko "${user}"
+	    fi
+	    ;;
+	*)
+	    ;;
+    esac
+}
+
+set-login

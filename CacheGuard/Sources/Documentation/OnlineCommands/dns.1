@@ -1,0 +1,17 @@
+Display, add or delete DNS (Domain Name Service) servers
+.SH SYNOPSIS
+
+[1] \fBdns\fR [\fBraz\fR | (\fBadd\fR | \fBdel\fR) \fI<ip>\fR]
+
+[2] \fBdns\fR [\fBresolve\fR [(\fBon\fR | \fBoff\fR)]]
+
+.SH DESCRIPTION
+The first [1] usage form allows you to add (or delete) DNS servers. DNS servers allow the resolution of a domain name to an IP address. A DNS server is given by its IP address. The system has its own internal built in DNS server. To use the internal DNS server give the keyword \fBlocalhost\fR or the IP address \fI127.0.0.1\fR (the recommended configuration).
+
+To add an DNS server use the keyword \fBadd\fR. To remove one, use the keyword \fBdel\fR. To erase all DNS servers, use the keyword \fBraz\fR.
+
+The second [2] usage form allows you to arm the resolution of all names used in the configuration to IP addresses. When the resolution is armed all firewall and QoS rules are recompiled during the apply operation. To arm the resolution use the keyword \fBon\fR. To deactivate the resolution use the keyword \fBoff\fR.
+
+.SH SEE ALSO
+.B apply
+(1)

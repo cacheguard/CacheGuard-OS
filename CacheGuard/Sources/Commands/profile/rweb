@@ -1,0 +1,634 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       Commands
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+__complete-rweb()
+{
+    test -n "${COMP_CWORD-1}" || return 1
+
+    case ${COMP_CWORD} in
+	1)
+	    case ${COMP_WORDS[1]} in
+		b|ba|bal|bala|balan|balanc|balance|balancer)
+		    COMPREPLY=(balancer)
+		    ;;
+		h|ho|hos|host)
+		    COMPREPLY=(host)
+		    ;;
+		r|rh|rht|rhtt|rhttp)
+		    COMPREPLY=(rhttp)
+		    ;;
+		s)
+		    COMPREPLY=('' site standby)
+		    ;;
+		si|sit|site)
+		    COMPREPLY=(site)
+		    ;;
+		st|sta|stan|stand|standb|standby)
+		    COMPREPLY=(standby)
+		    ;;
+		v|vi|via)
+		    COMPREPLY=(via)
+		    ;;		    
+		'')
+		    COMPREPLY=('' '<RET>' balancer rhttp site host standby via)
+		    ;;
+		*)
+		    COMPREPLY=()
+		    ;;
+	    esac
+	    ;;
+	2)
+	    case ${COMP_WORDS[1]} in
+		balancer|rhttp)
+		    COMPREPLY=('' '<RET>' '<site-name>')
+		    ;;
+		site)
+		    case ${COMP_WORDS[2]} in
+			a|ad|add)
+			    COMPREPLY=(add)
+			    ;;
+			d|de|del)
+			    COMPREPLY=(del)
+			    ;;
+			r|ra|raz)
+			    COMPREPLY=(raz)
+			    ;;
+			'')
+			    COMPREPLY=('' '<RET>' add del raz)
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		standby)
+		    COMPREPLY=('' '<RET>' '<site-name>')
+		    ;;
+		host)
+		    COMPREPLY=('' '<RET>' '<site-name>')
+		    ;;
+		via)
+		    COMPREPLY=('' '<RET>' '<site-name>')
+		    ;;
+		*)
+		    COMPREPLY=()
+		    ;;
+	    esac
+	    ;;
+	3)
+	    case ${COMP_WORDS[1]} in
+		balancer)
+		    case ${COMP_WORDS[3]} in
+			r|ro|rob|robi|robin)
+			    COMPREPLY=(robin)
+			    ;;
+			t|tr|tra|traf|traff|traffi|traffic)
+			    COMPREPLY=(traffic)
+			    ;;
+			p|pe|pen|pend|pendi|pendin|pending)
+			    COMPREPLY=(pending)
+			    ;;
+			*)
+			    COMPREPLY=('' '<RET>' robin traffic pending)
+			    ;;
+		    esac
+		    ;;
+		rhttp)
+		    case ${COMP_WORDS[3]} in
+			o)
+			    COMPREPLY=('' on off)
+			    ;;
+			of|off)
+			    COMPREPLY=(off)
+			    ;;
+			on)
+			    COMPREPLY=(on)
+			    ;;
+			'')
+			    COMPREPLY=('' '<RET>' on off)
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		site)
+		    case ${COMP_WORDS[2]} in
+			add|del)
+			    COMPREPLY=('' '<site-name>')
+			    ;;
+			raz)
+			    COMPREPLY=()
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		host)
+		    case ${COMP_WORDS[3]} in
+			a|ad|add)
+			    COMPREPLY=(add)
+			    ;;
+			d|de|del)
+			    COMPREPLY=(del)
+			    ;;
+			r|ra|raz)
+			    COMPREPLY=(raz)
+			    ;;
+			'')
+			    COMPREPLY=('' '<RET>' add del raz)
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		standby)
+		    case ${COMP_WORDS[3]} in
+			o)
+			    COMPREPLY=('' on off)
+			    ;;
+			of|off)
+			    COMPREPLY=(off)
+			    ;;
+			on)
+			    COMPREPLY=(on)
+			    ;;
+			'')
+			    COMPREPLY=('' '<RET>' on off)
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		via)
+		    COMPREPLY=('' '<exposed-ip>')
+		    ;;
+		*)
+		    COMPREPLY=()
+		    ;;
+	    esac
+	    ;;
+	4)
+	    case ${COMP_WORDS[1]} in
+		balancer)
+		    case ${COMP_WORDS[3]} in
+			robin|traffic|pending)
+			    case ${COMP_WORDS[4]} in
+				s|st|sti|stic|stick|sticky)
+				    COMPREPLY=(sticky)
+				    ;;
+				n|no|nos|nost|nosti|nostic|nostick|nosticky|nosticky)
+				    COMPREPLY=(nosticky)
+				    ;;
+				'')
+				    COMPREPLY=('' '<RET>' sticky nosticky)
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+
+		    ;;
+		site)
+		    case ${COMP_WORDS[2]} in
+			add|del)
+			    case ${COMP_WORDS[4]} in
+				h|ht|htt|http)
+				    COMPREPLY=(http)
+				    ;;
+				https)
+				    COMPREPLY=(https)
+				    ;;
+				'')
+				    COMPREPLY=('' '<RET>' http https)
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		host)
+		    case ${COMP_WORDS[3]} in
+			add|del)
+			    case ${COMP_WORDS[4]} in
+				e|ex|ext|exte|exter|extern|externa|external)
+				    COMPREPLY=(external)
+				    ;;
+				r|rw|rwe|rweb)
+				    COMPREPLY=(rweb)
+				    ;;
+				v|vp|vpn|vpni|vpnip|vpnips|vpnipse|vpnipsec)
+				    COMPREPLY=(vpnipsec)
+				    ;;
+				'')
+				    COMPREPLY=('' external rweb vpnipsec)
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			raz)
+			    COMPREPLY=()
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		standby)
+		    case ${COMP_WORDS[3]} in
+			on)
+			    COMPREPLY=('' '<RET>' '<url>')
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		via)
+		    case ${COMP_WORDS[4]} in
+			a|ad|add)
+			    COMPREPLY=(add)
+			    ;;
+			d|de|del)
+			    COMPREPLY=(del)
+			    ;;
+			r|ra|raz)
+			    COMPREPLY=(raz)
+			    ;;
+			'')
+			    COMPREPLY=('' '<RET>' add del raz)
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		*)
+		    COMPREPLY=()
+		    ;;
+	    esac
+	    ;;
+	5)
+	    case ${COMP_WORDS[1]} in
+		balancer)
+		    case ${COMP_WORDS[3]} in
+			robin|traffic|pending)
+			    case ${COMP_WORDS[4]} in
+				sticky)
+				    case ${COMP_WORDS[5]} in
+				    	i|"in"|ins|inse|inser|insert)
+					    COMPREPLY=(insert)
+					    ;;
+					u|us|use)
+					    COMPREPLY=(use)
+					    ;;
+					'')
+					    COMPREPLY=('' '<RET>' insert use)
+					    ;;
+					*)
+					    ;;
+				    esac
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		site)
+		    case ${COMP_WORDS[2]} in
+			add)
+			    case ${COMP_WORDS[4]} in
+				http)
+				    COMPREPLY=('' '<RET>' '<exposed-ip>')
+				    ;;
+				https)
+				    COMPREPLY=('' '<tls-id>[:<ca-id>]')
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		host)
+		    case ${COMP_WORDS[3]} in
+			add|del)
+			    case ${COMP_WORDS[4]} in
+				rweb|vpnipsec|external)
+				    case ${COMP_WORDS[5]} in
+					h|ht|htt|http)
+					    COMPREPLY=(http)
+					    ;;
+					https)
+					    COMPREPLY=(https)
+					    ;;
+					'')
+					    COMPREPLY=('' http https)
+					    ;;
+					*)
+					    COMPREPLY=()
+					    ;;
+				    esac
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		via)
+		    case ${COMP_WORDS[4]} in
+			add|del)
+			    COMPREPLY=('' '<gateway-ip>')
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+
+		*)
+		    COMPREPLY=()
+		    ;;
+	    esac
+	    ;;
+	6)
+	    case ${COMP_WORDS[1]} in
+		site)
+		    case ${COMP_WORDS[2]} in
+			add)
+			    case ${COMP_WORDS[4]} in
+				http)
+				    COMPREPLY=('' '<RET>' '<qos>')
+				    ;;
+				https)
+				    COMPREPLY=('' '<RET>' '<ip>')
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		host)
+		    case ${COMP_WORDS[3]} in
+			add|del)
+			    case ${COMP_WORDS[4]} in
+				rweb|vpnipsec|external)
+				    case ${COMP_WORDS[5]} in
+					http|https)
+					    COMPREPLY=('' '<backend-server-ip>')
+					    ;;
+					*)
+					    COMPREPLY=()
+					    ;;
+				    esac
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		balancer)
+		    case ${COMP_WORDS[3]} in
+			robin|traffic|pending)
+			    case ${COMP_WORDS[4]} in
+				sticky)
+				    case ${COMP_WORDS[5]} in
+				    	insert|use)
+					    COMPREPLY=('' '<RET>' '<cookie-name>')
+					    ;;
+					*)
+					    ;;
+				    esac
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		via)
+		    case ${COMP_WORDS[4]} in
+			add)
+			    case ${COMP_WORDS[6]} in
+				m|ma|mas|mast|maste|master)
+				    COMPREPLY=(master)
+				    ;;
+				b|ba|bac|back|backu|backup)
+				    COMPREPLY=(backup)
+				    ;;
+				'')
+				    COMPREPLY=('' 'master' 'backup')
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		*)
+		    COMPREPLY=()
+		    ;;
+	    esac
+	    ;;
+	7)
+	    case ${COMP_WORDS[1]} in
+		site)
+		    case ${COMP_WORDS[2]} in
+			add)
+			    case ${COMP_WORDS[4]} in
+				https)
+				    COMPREPLY=('' '<RET>' '<qos>')
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		host)
+		    case ${COMP_WORDS[3]} in
+			add|del)
+			    case ${COMP_WORDS[4]} in
+				rweb|vpnipsec|external)
+				    case ${COMP_WORDS[5]} in
+					http|https)
+					    COMPREPLY=('' '<RET>' '<port>')
+					    ;;
+					*)
+					    COMPREPLY=()
+					    ;;
+				    esac
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		via)
+		    case ${COMP_WORDS[4]} in
+			add)
+			    case ${COMP_WORDS[6]} in
+				master|backup)
+				    COMPREPLY=('' '<RET>' '<priority>')
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		*)
+		    COMPREPLY=()
+		    ;;
+	    esac
+	    ;;
+	8)
+	    case ${COMP_WORDS[1]} in
+		host)
+		    case ${COMP_WORDS[3]} in
+			add|del)
+			    case ${COMP_WORDS[4]} in
+				rweb|vpnipsec|external)
+				    case ${COMP_WORDS[5]} in
+					http|https)
+					    COMPREPLY=('' '<RET>' '<balance-weight>')
+					    ;;
+					*)
+					    COMPREPLY=()
+					    ;;
+				    esac
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+
+		    ;;
+		*)
+		    COMPREPLY=()
+		    ;;
+	    esac
+	    ;;
+	9)
+	    case ${COMP_WORDS[1]} in
+		host)
+		    case ${COMP_WORDS[3]} in
+			add|del)
+			    case ${COMP_WORDS[4]} in
+				rweb|vpnipsec|external)
+				    case ${COMP_WORDS[5]} in
+					http|https)
+					    COMPREPLY=('' '<RET>' '<qos>')
+					    ;;
+					*)
+					    COMPREPLY=()
+					    ;;
+				    esac
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+
+		    ;;
+		*)
+		    COMPREPLY=()
+		    ;;
+	    esac
+	    ;;
+	*)
+	    COMPREPLY=()
+	    ;;
+    esac
+}

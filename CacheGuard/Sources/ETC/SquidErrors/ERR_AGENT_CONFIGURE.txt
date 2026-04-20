@@ -1,0 +1,3 @@
+Web Browser Configuration
+Your Web Browser configuration needs to be corrected to use this network
+Set the right IP and Port to use this Web Gateway

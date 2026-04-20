@@ -1,0 +1,295 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       Commands
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+source functions
+
+transaction-exec-command()
+{
+    local log=${1}
+    local apl_command=${ARGS[0]}
+
+    if test "${log}" == log ; then
+	local tag i
+
+	if test ${TERM} == ${WADMIN_TERM} ; then
+	    tag="${COMMAND_TAG} "
+	    ARGS[0]="<a href='/doc/command/${apl_command}.html' target='_blank'>${apl_command}</a>"
+	fi
+
+	case ${apl_command} in
+	    admin)
+		case ${ARGS[1]} in
+		    snmp)
+			case ${ARGS[2]} in
+			    "trap")
+				case ${ARGS[3]} in
+				    add)
+					case ${ARGS[4]} in
+					    v1|v2c)
+						echo "${tag}${ARGS[0]} ${ARGS[1]} ${ARGS[2]} ${ARGS[3]} ${ARGS[4]} ${ARGS[5]} ${ARGS[6]} ..." >&2
+						;;
+					    v3)
+						echo "${tag}${ARGS[0]} ${ARGS[1]} ${ARGS[2]} ${ARGS[3]} ${ARGS[4]} ${ARGS[5]} ${ARGS[6]} ${ARGS[7]} ${ARGS[8]} ${ARGS[9]} ..." >&2
+						;;
+					    *)
+						;;
+					esac
+					;;
+				    *)
+					echo "${tag}${ARGS[@]}" >&2
+					;;
+				esac
+				;;
+			    *)
+				echo "${tag}${ARGS[@]}" >&2
+				;;
+			esac
+			;;
+		    *)
+			echo "${tag}${ARGS[@]}" >&2
+			;;
+		esac
+		;;
+	    authenticate)
+		case ${ARGS[1]} in
+		    ldap)
+			case ${ARGS[2]} in
+			    request)
+				echo -n "${tag}${ARGS[0]} ${ARGS[1]} ${ARGS[2]}" >&2
+				for ((i=3 ; i<ARGS_NB ; i++))
+				do
+				    echo -n " '${ARGS[${i}]}'" >&2
+				done
+				echo >&2
+				;;
+			    binddn)
+				echo "${tag}${ARGS[0]} ${ARGS[1]} ${ARGS[2]} '${ARGS[3]}' ${ARGS[4]} ..." >&2
+				;;
+			    *)
+				echo "${tag}${ARGS[@]}" >&2
+				;;
+			esac
+			;;
+		    kerberos)
+			case ${ARGS[2]} in
+			    hapassword)
+				echo "${tag}${ARGS[0]} ${ARGS[1]} ${ARGS[2]} ..." >&2
+				;;
+			    *)
+				echo "${tag}${ARGS[@]}" >&2
+				;;
+			esac
+			;;
+
+		    *)
+			echo "${tag}${ARGS[@]}" >&2
+			;;
+		esac
+		;;
+	    guard)
+		case ${ARGS[1]} in
+		    filter)
+			case ${ARGS[2]} in
+			    ldap)
+				echo -n "${tag}${ARGS[0]} ${ARGS[1]} ${ARGS[2]} ${ARGS[3]} ${ARGS[4]}" >&2
+				for ((i=5 ; i<ARGS_NB ; i++))
+				do
+				    echo -n " '${ARGS[${i}]}'" >&2
+				done
+				echo >&2
+				;;
+			    *)
+				echo "${tag}${ARGS[@]}" >&2
+				;;
+			esac
+			;;
+		    *)
+			echo "${tag}${ARGS[@]}" >&2
+			;;
+		esac
+		;;
+	    password)
+		case ${ARGS[1]} in
+		    console)
+			echo "${tag}${ARGS[0]} ${ARGS[1]}" >&2
+			;;
+		    ldap|wadmin|login|kerberos)
+			echo "${tag}${ARGS[0]} ${ARGS[1]} ..." >&2
+			;;
+		    email)
+			echo "${tag}${ARGS[0]} ${ARGS[1]} ${ARGS[2]} ${ARGS[3]} ${ARGS[4]} ..." >&2
+			;;
+		    file)
+			case ${ARGS[2]} in
+			    add)
+				echo "${tag}${ARGS[0]} ${ARGS[1]} ${ARGS[2]} ${ARGS[3]} ${ARGS[4]} ${ARGS[5]} ..." >&2
+				;;
+			    *)
+				echo "${tag}${ARGS[@]}" >&2
+				;;
+			esac
+			;;
+		    *)
+			echo "${tag}${ARGS[@]}" >&2
+			;;
+		esac
+		;;
+	    email)
+		case ${ARGS[1]} in
+		    account)
+			echo "${tag}${ARGS[0]} ${ARGS[1]} ${ARGS[2]} ${ARGS[3]} ${ARGS[4]} ..." >&2
+			;;
+		    *)
+			echo "${tag}${ARGS[@]}" >&2
+			;;
+		esac
+		;;
+	    dynamicdns)
+		case ${ARGS[1]} in
+		    on)
+			case ${ARGS[2]} in
+			    changeip|myonlineportal|noip)
+				echo "${tag}${ARGS[0]} ${ARGS[1]} ${ARGS[2]} ${ARGS[3]} ${ARGS[4]} ..." >&2
+				;;
+			    *)
+				echo "${tag}${ARGS[0]} ${ARGS[1]} ${ARGS[2]} ${ARGS[3]} ..." >&2
+				;;
+			esac
+			;;
+		    *)
+			echo "${tag}${ARGS[@]}" >&2
+			;;
+		esac
+		;;
+	    waf)
+		case ${ARGS[1]} in
+		    reputation)
+			case ${ARGS[2]} in
+			    rbl)
+				case ${ARGS[3]} in
+				    set)
+					echo "${tag}${ARGS[0]} ${ARGS[1]} ${ARGS[2]} ${ARGS[3]} ..." >&2
+					;;
+				    *)
+					;;
+				esac
+				;;
+			    *)
+				echo "${tag}${ARGS[@]}" >&2
+				;;
+			esac
+			;;
+		    *)
+			echo "${tag}${ARGS[@]}" >&2
+			;;
+		esac
+		;;
+	    *)
+		echo "${tag}${ARGS[@]}" >&2
+		;;
+	esac
+    fi
+
+    source ${ROOT_DIR}${APPLIANCE_DIR}/bin/${apl_command}
+}
+
+run()
+{
+    test -z "${TRANSACTION}" || return 106
+    ! is-in-manager-exec-context || return 234
+
+    local apl_command line
+    unset ARGS
+    export ARGS
+
+    init-env-variables ${MANAGER_CONTEXT_ENV}
+    local transaction_file=${TMP_DIR}/${TRANSACTION_FILE}.${USER}
+    local action=${1}
+
+    case "${action}" in
+	open)
+	    test ! -f ${transaction_file} || return 107
+	    while read apl_command line
+	    do
+		test -n "${apl_command}" || continue
+		test "${apl_command:0:1}" != "#" || continue
+		test "${apl_command}" != "." || break
+
+		if test "${apl_command}" == "transaction" ; then
+		    test "${line}" !=  "close" || break
+		    continue
+		fi
+		echo ${apl_command} ${line}
+	    done > ${transaction_file}
+	    ;;
+	close)
+	    rm -f ${transaction_file}
+	    ;;
+	show)
+	    test -f ${transaction_file} || return 0
+	    echo
+	    cat ${transaction_file}
+	    echo
+	    ;;
+	commit)
+	    local log=${2}
+	    test -f ${transaction_file} || return 0
+
+	    initialise ${MANAGER_CONTEXT_ENV}
+	    export TRANSACTION=yes
+
+	    while read line
+	    do
+		unset ARGS
+		export ARGS
+
+		eval "set -- ${line}"
+		apl_command=${0}
+		push-args-1 "${@}"
+
+		test -n "${apl_command}" || continue
+		test "${apl_command:0:1}" != "#" || continue
+		test "${apl_command}" != "." || break
+
+		if test "${apl_command}" == "transaction" ; then
+		    test "${line}" !=  "close" || break
+		    continue
+		fi
+
+		test -x ${apl_command} || continue
+                transaction-exec-command ${log}
+
+	    done < ${transaction_file}
+
+	    unset TRANSACTION
+	    rm -f ${transaction_file}
+	    commit-env
+	    ;;
+	*)
+	    return 1
+	    ;;
+    esac
+}
+
+main __noenv "${@}"

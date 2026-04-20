@@ -1,0 +1,189 @@
+export TIMOUT=900
+export OPTERR=1
+export INPUTRC=/etc/inputrc
+export COMP_WORDBREAKS=' '
+
+export HISTFILE=~/.bash_history
+export HISTCONTROL=ignoredups
+export HISTFILESIZE=1024
+export LINES COLUMNS
+export MORE=''
+export TMOUT=7200
+
+declare -r POSIXLY_CORRECT
+declare -r TIMEFORMAT
+declare -r HOSTTYPE
+declare -r MACHTYPE
+declare -r OSTYPE
+declare -r HISTCONTROL
+declare -r HISTIGNORE
+declare -r LANG
+declare -r LC_ALL
+declare -r MAIL
+declare -r MAILCHECK
+declare -r MAILPATH
+declare -r HOME
+declare -r BASH
+declare -r BASH_VERSION
+declare -r GROUPS
+declare -r HOSTNAME
+declare -r HISTFILE
+declare -r HISTFILESIZE
+declare -r HISTSIZE
+declare -r IFS
+declare -r INPUTRC
+declare -r MAIL
+declare -r MAILCHECK
+declare -r MAILPATH
+declare -r OPTERR
+declare -r PS1
+declare -r PS2
+declare -r PS3
+declare -r PS4
+declare -r TMOUT
+declare -r TMPDIR
+
+declare -r auto_resume
+declare -r histchars
+
+trap '' STOP
+trap 'end cancel' INT
+
+umask 0022
+
+set +o allexport
+set +o braceexpand
+set -o emacs
+set +o errexit
+set -o errtrace
+set -o hashall
+set -o histexpand
+set -o ignoreeof
+set -o monitor
+set +o noclobber
+set +o noexec
+set +o noglob
+set -o notify
+set +o onecmd
+set +o physical
+set +o posix
+set -o privileged
+set +o verbose
+set +o vi
+set +o xtrace
+
+shopt -q  login_shell
+shopt -q  restricted_shell
+shopt -qs checkhash
+shopt -qs checkwinsize
+shopt -qs cmdhist
+shopt -qs execfail
+shopt -qs histappend
+shopt -qs histverify
+shopt -qs huponexit
+shopt -qs interactive_comments
+shopt -qs no_empty_cmd_completion
+shopt -qs progcomp
+shopt -qs promptvars
+shopt -qu cdable_vars
+shopt -qu cdspell
+shopt -qu dotglob
+shopt -qu expand_aliases
+shopt -qu extglob
+shopt -qu histreedit
+shopt -qu hostcomplete
+shopt -qu lithist
+shopt -qu mailwarn
+shopt -qu nocaseglob
+shopt -qu nullglob
+shopt -qu shift_verbose
+shopt -qu sourcepath
+shopt -qu xpg_echo
+
+ulimit -c 0
+ulimit -d unlimited
+ulimit -m unlimited
+ulimit -n 512
+ulimit -s 131072
+ulimit -t unlimited
+ulimit -u 256
+ulimit -v unlimited
+
+enable echo
+enable exit
+enable history
+enable return
+enable shift
+enable test
+enable break
+
+enable -n :
+enable -n .
+enable -n alias
+enable -n bg
+enable -n bind
+enable -n builtin
+enable -n cd
+enable -n command
+enable -n compgen
+enable -n complete
+enable -n compopt
+enable -n continue
+enable -n declare
+enable -n dirs
+enable -n disown
+enable -n eval
+enable -n exec
+enable -n fc
+enable -n fg
+enable -n getopts
+enable -n hash
+enable -n help
+enable -n jobs
+enable -n kill
+enable -n let
+enable -n mapfile
+enable -n popd
+enable -n printf
+enable -n pushd
+enable -n pwd
+enable -n readonly
+enable -n shopt
+enable -n source
+enable -n suspend
+enable -n times
+enable -n trap
+enable -n type
+enable -n typeset
+enable -n ulimit
+enable -n umask
+enable -n unalias
+enable -n wait
+
+if test ${TERM} != ${WADMIN_TERM} ; then
+
+    update-google-authenticator
+
+    if test "${__BATCH_MODE}" != yes ; then
+	first-startup-license
+	first-login-password
+	first-login-2fa
+	first-startup-setup
+    fi
+fi
+
+unset -f first-startup-license
+unset -f first-login-password
+unset -f first-login-2fa
+unset -f first-startup-setup
+unset -f update-google-authenticator
+unset WADMIN_TERM
+
+set -o keyword
+set -o nounset
+
+enable -n set
+enable -n export
+enable -n enable
+
+history -c

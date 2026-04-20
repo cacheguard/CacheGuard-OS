@@ -1,0 +1,239 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       Commands
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+__complete-file-exclusion()
+{
+    case ${COMP_WORDS[${COMP_CWORD}]} in
+	a)
+	    COMPREPLY=('' admin.ssh.key admin.snmp.certificate antivirus.whitelist.signature)
+	    ;;
+	ad|adm|admi|admin|admin.|admin.s|admin.s)
+	    COMPREPLY=(admin.snmp.certificate admin.ssh.key)
+	    ;;
+	admin.sn|admin.snm|admin.snmp|admin.snmp.|admin.snmp.c|admin.snmp.ce|admin.snmp.cer|admin.snmp.cert|admin.snmp.certi|admin.snmp.certif|admin.snmp.certifi|admin.snmp.certific|admin.snmp.certifica|admin.snmp.certificat|admin.snmp.certificate)
+	    COMPREPLY=(admin.snmp.certificate)
+	    ;;
+	admin.ss|admin.ssh|admin.ssh.|admin.ssh.k|admin.ssh.ke|admin.ssh.key)
+	    COMPREPLY=(admin.ssh.key)
+	    ;;
+	an|ant|anti|antiv|antivi|antivir|antiviru|antivirus|antivirus.|antivirus.w|antivirus.wh|antivirus.whi|antivirus.whit|antivirus.white|antivirus.whitel|antivirus.whiteli|antivirus.whitelis|antivirus.whitelist|antivirus.whitelist.|antivirus.whitelist.s|antivirus.whitelist.si|antivirus.whitelist.sig|antivirus.whitelist.sign|antivirus.whitelist.signa|antivirus.whitelist.signat|antivirus.whitelist.signatu|antivirus.whitelist.signatur|antivirus.whitelist.signature)
+	    COMPREPLY=(antivirus.whitelist.signature)
+	    ;;
+	m|ma|man|mana|manag|manage|manager|manager.|manager.s|manager.ss|manager.ssh)
+	    COMPREPLY=(manager.ssh)
+	    ;;
+	t|tl|tls|tls.)
+	    COMPREPLY=('' tls.ca.system tls.ca.third tls.client tls.server)
+	    ;;
+	tls.c)
+	    COMPREPLY=('' tls.ca.system tls.ca.third tls.client)
+	    ;;
+	tls.ca|tls.ca.)
+	    COMPREPLY=('' tls.ca.system tls.ca.third)
+	    ;;
+	tls.ca.s|tls.ca.sy|tls.ca.sys|tls.ca.syst|tls.ca.syste|tls.ca.system)
+	    COMPREPLY=(tls.ca.system)
+	    ;;
+	tls.ca.t|tls.ca.th|tls.ca.thi|tls.ca.thir|tls.ca.third)
+	    COMPREPLY=(tls.ca.third)
+	    ;;
+	tls.cl|tls.cli|tls.clie|tls.clien|tls.client)
+	    COMPREPLY=(tls.client)
+	    ;;
+	tls.s|tls.se|tls.ser|tls.serv|tls.serve|tls.server)
+	    COMPREPLY=(tls.server)
+	    ;;
+	w|wa|waf|waf.|waf.r|waf.rw|waf.rwe|waf.rweb|waf.rweb.|waf.rweb.c|waf.rweb.cu|waf.rweb.cus|waf.rweb.cust|waf.rweb.custo|waf.rweb.custom)
+	    COMPREPLY=(waf.rweb.custom)
+	    ;;  
+	'')
+	    COMPREPLY=('' '<RET>' admin.snmp.certificate admin.ssh.key antivirus.whitelist.signature manager.ssh tls.ca.system tls.ca.third tls.client tls.server waf.rweb.custom)
+	    ;;
+	*)
+	    COMPREPLY=()
+	    ;;
+    esac
+}
+
+__complete-file()
+{
+    test -n "${COMP_CWORD-1}" || return 1
+
+    case ${COMP_CWORD} in
+	1)
+	    case ${COMP_WORDS[1]} in
+		c|cl|cle|clea|clear)
+		    COMPREPLY=(clear)
+		    ;;
+		d|de|del)
+		    COMPREPLY=(del)
+		    ;;		    
+		e|ex|exc|exch|excha|exchan|exchang|exchange)
+		    COMPREPLY=(exchange)
+		    ;;
+		l|lo|loa|load)
+		    COMPREPLY=(load)
+		    ;;
+		r|re|rep|repo|repor|report)
+		    COMPREPLY=(report)
+		    ;;
+		s|sa|sav|save)
+		    COMPREPLY=(save)
+		    ;;
+		'')
+		    COMPREPLY=('' clear del exchange load report save)
+		    ;;
+		*)
+		    COMPREPLY=()
+		    ;;
+	    esac
+	    ;;
+	2)
+	    case ${COMP_WORDS[1]} in
+		load|save)
+		    case ${COMP_WORDS[2]} in
+			f|ft|ftp)
+			    COMPREPLY=(ftp)
+			    ;;
+			s|sf|sft|sftp)
+			    COMPREPLY=(sftp)
+			    ;;
+			t|tf|tft|tftp)
+			    COMPREPLY=(tftp)
+			    ;;
+			'')
+			    COMPREPLY=('' ftp sftp tftp)
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		del)
+		    case ${COMP_WORDS[2]} in
+			f|ft|ftp)
+			    COMPREPLY=(ftp)
+			    ;;
+			s|sf|sft|sftp)
+			    COMPREPLY=(sftp)
+			    ;;
+			'')
+			    COMPREPLY=('' ftp sftp)
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		clear)
+		    __complete-file-exclusion
+		    ;;
+		*)
+		    COMPREPLY=()
+		    ;;
+	    esac
+	    ;;
+	3)
+	    case ${COMP_WORDS[1]} in
+		load|save)
+		    case ${COMP_WORDS[2]} in
+			ftp|sftp|tftp)
+			    COMPREPLY=('' '<file-server>')
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		del)
+		    case ${COMP_WORDS[2]} in
+			ftp|sftp)
+			    COMPREPLY=('' '<file-server>')
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+
+		clear)
+		    __complete-file-exclusion
+		    ;;
+		*)
+		    COMPREPLY=()
+		    ;;
+	    esac
+	    ;;
+	4)
+	    case ${COMP_WORDS[1]} in
+		load|save)
+		    case ${COMP_WORDS[2]} in
+			ftp|sftp|tftp)
+			    COMPREPLY=('' '<RET>' '<directory-path>')
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		del)
+		    case ${COMP_WORDS[2]} in
+			ftp|sftp)
+			    COMPREPLY=('' '<RET>' '<file-path>')
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		clear)
+		    __complete-file-exclusion
+		    ;;
+		*)
+		    COMPREPLY=()
+		    ;;
+	    esac
+	    ;;
+	*)
+	    case ${COMP_WORDS[1]} in
+		load|save)
+		    case ${COMP_WORDS[2]} in
+			ftp|sftp|tftp)
+			    __complete-file-exclusion
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		clear)
+		    __complete-file-exclusion
+		    ;;
+		*)
+		    COMPREPLY=()
+		    ;;
+	    esac
+	    ;;
+    esac
+}

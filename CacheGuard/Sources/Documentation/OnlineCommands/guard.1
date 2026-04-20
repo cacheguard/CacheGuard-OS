@@ -1,0 +1,71 @@
+Manage the URL guarding (filtering)
+.SH SYNOPSIS
+
+[1] \fBguard [filter\fR [\fBip\fR [\fBadd\fR \fI<filter-name>\fR (\fBrange\fR \fI<ip1>\fR [\fI<ip2>\fR] | \fBnetwork\fR \fI<ip>\fR [\fI<network-mask>\fR]) | \fBdel\fR \fI<filter-name>\fR | \fBraz\fR]]]
+
+[2] \fBguard [filter [time\fR [\fBadd\fR \fI<filter-name>\fR (\fBslot\fR \fI<[w-]hh:mm-hh:mm>\fR | \fBframe\fR \fI<yyyy/mm/dd-yyyy/mm/dd>\fR | \fBdate\fR \fI<[yyyy]/[mm]/[dd][-hh:mm-hh:mm]>\fR) | \fBdel\fR \fI<filter-name>\fR | \fBraz\fR]]]
+
+[3] \fBguard [filter [ldap\fR [\fBadd\fR \fI<filter-name>\fR '\fI<base-dn>\fR' \fI<login-attr>\fR '\fI<ldap-filter>\fR' | \fBdel\fR \fI<filter-name>\fR | \fBraz\fR]]]
+
+[4] \fBguard [policy\fR [\fBadd\fR \fI<policy-name>\fR ((\fBip\fR | \fBtime\fR | \fBldap\fR) \fI<filter-name>\fR)* | \fBdel\fR \fI<policy-name>\fR | \fBraz\fR]]
+
+[5] \fBguard [rule\fR [(\fBadd\fR | \fBupdate\fR | \fBadd:\fR\fI<policy-name>\fR | \fBinsert:\fR\fI<policy-name>\fR) (\fI<policy-name>\fR | \fBdefault\fR) (\fBdeny\fR | \fBallow\fR) (\fI<urllist-name>\fR)+ | \fBdel\fR (\fI<policy-name>\fR | \fBdefault\fR) | \fBraz\fR]]
+
+[6] \fBguard [rule\fR [\fBmove:(\fB-\fR|\fB+\fR)\fI<policy-name>\fR \fI<policy-name>\fR | \fBmove:\fI<position>\fR]]
+
+[7] \fBguard [ip\fR [(\fBon\fR | \fBoff\fR)]]
+
+.SH DESCRIPTION
+The URL guarding (or filtering) allows you to have control over the Web browsing in your organisation. Two guarding methods are available: the blacklist guarding and the white list guarding. Guarding with blacklists denies access to predefined URL lists, allowing access to all other URLs. Guarding with white lists permits access to predefined URL lists only, blocking all other URLs.
+
+The URL Filtering can be based on the source IP address, the access time and an LDAP request. To define a guard rule you need to create policies and filters first. A policy is the combination of several filters. A guard rule defines who (policies) can access what (URL lists).
+
+The first [1] usage form allows you to define a filter based on source IP addresses of users use the keywords \fBfilter ip add\fR followed by a filter name the keywords \fBrange\fR or \fBnetwork\fR and an IP specification. An IP \fBrange\fR is defined by giving two IP addresses. So all IP addresses between the first and second IP addresses will match the defined filter. If the second IP address is omitted the filter will match the unique given IP address. A \fBnetwork\fR is defined by giving a network IP and a network mask. If no network mask is given the value 255.255.255.0 will be used.
+
+The second [2] usage form allows you to define a filter based on access time use the keywords \fBfilter time add\fR followed by a filter name. Three types of access times are available: \fBslot\fR, \fBframe\fR and \fBdate\fR. Using the keyword \fBslot\fR allows you to define a time slot. A time slot has the format \fI[w-]hh:mm-hh:mm\fR where \fIw\fR is an optional digit between 0 and 6 representing the day of the week (0 is Sunday and 6 is Saturday) and \fIhh:mm-hh:mm\fR represents a time slot between the first \fIhh:mm\fR and second \fIhh:mm\fR (\fIhh\fR is a number between 00 and 23 representing hours while \fIhh\fR is a number beween 00 and 59 representing minutes). Using the \fBframe\fR keyword allows you to define a date frame. A date frame has the format \fIyyyy/mm/dd-yyyy/mm/dd\fR where \fIyyyy\fR, \fImm\fR and \fIdd\fR are numbers representing respectively the year (2000-2999), the month (01-12) and the day (01-31). Using the \fBdate\fR keyword allows you to define special days. A date has the format \fIyyyy/mm/dd[-hh:mm-hh:mm]\fR where \fIyyyy\fR, \fImm\fR and \fIdd\fR are numbers representing respectively the year (2000-2999), the month (01-12) and the day (01-31). If one of these numbers is omitted it will represent any value. For instance the date represented by "//01" represents the first day of every month. If the optional time slot part \fI[-hh:mm-hh:mm]\fR is given, the filter will define a time at the given date and time slot.
+
+An LDAP filter allows you to define a guarding policy based on an LDAP request. This type of filter is only applicable if the authentication mode is activated and configured adequately (see the command \fBauthenticate\fR). The third [3] usage form allows you to define a filter based on an LDAP request. To define such a filter use the keyword \fBfilter ldap add\fR followed by a filter name, the LDAP distinguished name of the target LDAP object, the LDAP attribute used to login users and an LDAP filter applied to returned objects. The LDAP server and bind configuration (if required) should be configured using the \fBauthenticate\fR command. Because LDAP distinguished names and filters contains the character '=', they must be enclosed in (simple or double) quotation marks to avoid being interpreted by the shell.
+
+A filter can be deleted using the keyword \fBdel\fR followed by the filter name. Using the keyword \fBraz\fR allows you to erase all filters in a filter type (\fBip\fR \fBtime\fR \fBldap\fR) list.
+
+Once all required filters are defined you can combine them to create policies. In a combination of filters an OR logical operand is applied to filters of the same type while an AND logical operand is applied to filters of different types. The fourth [4] usage form allows you to manage policies. To create a policy use the keywords \fBpolicy add\fR followed by a policy name and a list of filters where each filter is represented by a filter type (\fBip\fR \fBtime\fR \fBldap\fR) followed by a filter name. A policy can be deleted using the keyword \fBdel\fR followed by the policy name. Using the keyword \fBraz\fR allows you to erase all policies. Note that deleting a filter removes that filter from the policies that use it. The system contains a default policy named \fBdefault\fR which contains no filters. Use this policy to define a default rule. A default rule is applied to users not caught by defined policies. If no default rule is defined, the default behaviour is to deny all accesses to all URLs.
+
+Filter and policy names must begin with an alpha character and may contains alpha numeric characters as well as the characters "_", "-" and ".".
+
+Finally you can define a guarding rule based on policies (who) and URL lists (what). Usage forms [5] and [6] allow you to manage guarding rules. To add a rule at the end of all rules use the keywords \fBrule add\fR followed by a policy name, the keyword \fBallow\fR or \fBdeny\fR (depending on whether you want to create a blacklist guard or a white list guard) and a list of URL list name separated by a blank. A rule can be deleted using the keyword \fBdel\fR followed by the associated policy name. Using the keyword \fBraz\fR allows you to erase all rules.
+
+Please note that the order of guard rules is important as the system matches the first matching rule to allow or deny a URL for a client. To add a rule after a given rule, use the keyword \fBadd:\fR  followed by the rule name after which the new rule have to be inserted. To insert a rule before a given rule, use the keyword \fBinsert:\fR followed by the rule name before which the new rule have to be inserted. Finally the keyword \fBupdate\fR allows you to modify a rule without changing its place in the rule list.
+
+As an example completing the following commands allows you to define a policy applied to users with an IP address ranging from 172.18.2.10 to 172.18.2.100 who use the Web between 8:00AM and 5:00PM and belong the LDAP group "cn=worker,ou=groups,dc=example,dc=com". A guard URL list named WebMail is created to group sites that offer web-based email service. Then the defined policy is used to create a rule to deny the access to WebMail sites for those users.
+
+\fBguard filter add ip\fR myNetwork \fBrange\fR 172.18.2.10 172.18.2.100
+
+\fBguard filter add time\fR myHours \fBslot\fR 08:00-17:00
+
+\fBguard filter add ldap\fR myRequest 'cn=worker,ou=groups,dc=example,dc=com' memberUid 'objectclass=posixGroup'
+
+\fBguard policy add\fR myPolicy ip myNetwork time myHours ldap myRequest
+
+\fBurllist add\fR WebMail
+
+\fBurllist load create\fR WebMail \fBftp\fR ftp.cacheguard.net BL/WebMail
+
+\fBguard rule add myPolicy deny\fR WebMail
+
+\fBapply\fR
+
+Note that in this example the ftp server "ftp.cacheguard.net" should have been defined as a trusted file server previously with the command\fBaccess\fR. Also that FTP server requires login/passowrd credentials that should be configured using the command \fBpassword\fR.
+
+The sixth [6] usage form allows you to move a guard rule from one position to another in the list of guard rules. To move a rule before or after another denoted rule use the keyword \fBmove:\fR followed by the sign \fB-\fR (for before) or \fB+\fR (for after), the rule name of the denoted rule and the rule name of the rule to move. Please note that white spaces are not allowed between the keyword \fBmove:\fR, the signs \fB-\fR or \fB+\fR and the rule name of the denoted rule. To move a rule to an absolute position use the \fBmove:\fR followed by the position number and the rule name of the rule to move (the first position is the position number 1). Please note that white spaces are not allowed between the keyword \fBmove:\fR and the position number.
+
+The seventh [7] usage form allow you to activate or deactivate the usage of IP addresses instead of a domain name by Web users (clients). To allow the usage of IP addresses, turn the guard IP off. To disallow the usage of IP addresses, turn the guard IP on. Please note that by disallowing the usage of IP address in URLs you can block the usage of networks such as TOR.
+
+.SH SEE ALSO
+.B apply
+(1)
+.B authenticate
+(1)
+.B mode
+(1)
+.B urllist
+(1)

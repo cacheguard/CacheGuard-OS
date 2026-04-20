@@ -1,0 +1,49 @@
+#!/bin/bash
+
+test -n "${LFS}" || exit 1
+test -d "${LFS}" || exit 2
+
+source LFS.env
+source APPLIANCE.env
+source functions
+
+apl-configure()
+{
+    export LOG_FILENAME=configure.log
+    run /bin/bash local-configure-env.bash APPLIANCE.env LFS.env
+}
+
+install-apl-packages()
+{
+    run /bin/bash local-install-pkg.bash APPLIANCE.env LFS.env functions
+    local ret=${?}
+    move-log
+    return ${ret}
+}
+
+archive-syslinux()
+{
+    test ${SYS_ARCHITECTURE} == x86_64 || return 0
+    test -f ${LFS}/tmp/syslinux.tar.gz || return 0
+    cp -f ${LFS}/tmp/syslinux.tar.gz syslinux.tar.gz || return 1
+    sudo rm -f ${LFS}/tmp/syslinux.tar.gz
+}
+
+restore-syslinux()
+{
+    test ${SYS_ARCHITECTURE} != x86_64 || return 0
+    run /bin/bash local-restore-syslinux.bash syslinux.tar.gz
+}
+
+# Main()
+
+
+LOG_DIR=${COMPILE_LOG_DIR}-${SYS_ARCHITECTURE}
+mkdir -vp ${LOG_DIR}
+
+apl-configure
+mount-lfs
+install-apl-packages && do-stripe
+umount-lfs
+archive-syslinux
+restore-syslinux

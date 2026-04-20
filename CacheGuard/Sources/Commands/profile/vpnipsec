@@ -1,0 +1,1269 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       Commands
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+__complete-vpnipsec()
+{
+    test -n "${COMP_CWORD-1}" || return 1
+
+    case ${COMP_CWORD} in
+	1)
+	    case ${COMP_WORDS[1]} in
+		a)
+		    COMPREPLY=('' access authenticate)
+		    ;;
+		ac|acc|acce|acces|access)
+		    COMPREPLY=(access)
+		    ;;
+		au|aut|auth|authe|authen|authent|authenti|authentic|authentica|authenticat|authenticate)
+		    COMPREPLY=(authenticate)
+		    ;;
+		n)
+		    COMPREPLY=('' network nat '<RET>')
+		    ;; 
+		ne|net|netw|netwo|networ|network)
+		    COMPREPLY=(network)
+		    ;;
+		na|nat)
+		    COMPREPLY=(nat)
+		    ;;
+		s|si|sit|site)
+		    COMPREPLY=(site)
+		    ;;
+		r|re|rep|repo|repor|report)
+		    COMPREPLY=(report)
+		    ;;
+		t|to)
+		    COMPREPLY=(to)
+		    ;;
+		v|vi|via)
+		    COMPREPLY=(via)
+		    ;;		    
+		'')
+		    COMPREPLY=('' access authenticate network site report via to nat '<RET>')
+		    ;;
+		*)
+		    COMPREPLY=()
+		    ;;
+	    esac
+	    ;;
+	2)
+	    case ${COMP_WORDS[1]} in
+		access)
+		    case ${COMP_WORDS[2]} in
+			a)
+			    COMPREPLY=('' access authenticate)
+			    ;;
+			ac|acc|acce|acces|access)
+			    COMPREPLY=(access)
+			    ;;
+			au|aut|auth|authe|authen|authent|authenti|authentic|authentica|authenticat|authenticate)
+			    COMPREPLY=(authenticate)
+			    ;;
+		    	o)
+			    COMPREPLY=('' on off)
+			    ;;
+			of|off)
+			    COMPREPLY=(off)
+			    ;;
+			on)
+			    COMPREPLY=(on)
+			    ;;
+			c|co|con|conf)
+			    COMPREPLY=(conf)
+			    ;;
+			'')
+			    COMPREPLY=('' '<RET>' access authenticate conf on off)
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		authenticate)
+		    case ${COMP_WORDS[2]} in
+			p|ps|psk)
+			    COMPREPLY=(psk)
+			    ;;
+			t|tl|tls)
+			    COMPREPLY=(tls)
+			    ;;
+			e|ea|eap|eapt|eaptl|eaptls)
+			    COMPREPLY=(eaptls)
+			    ;;
+			'')
+			    COMPREPLY=('' psk eaptls tls)
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		site)
+		    case ${COMP_WORDS[2]} in
+			a|ad|add)
+			    COMPREPLY=(add)
+			    ;;
+			d|de|del)
+			    COMPREPLY=(del)
+			    ;;
+			r|ra|raz)
+			    COMPREPLY=(raz)
+			    ;;
+			'')
+			    COMPREPLY=('' '<RET>' add del raz)
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		network|via)
+		    case ${COMP_WORDS[2]} in
+			s|si|sit|site)
+			    COMPREPLY=(site)
+			    ;;
+			a|ac|acc|acce|acces|access)
+			    COMPREPLY=(access)
+			    ;;
+			'')
+			    COMPREPLY=('' '<RET>' access site)
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		to)
+		    COMPREPLY=('' '<RET>' '<site-id>')
+		    ;;
+		nat)
+		    case ${COMP_WORDS[2]} in
+			p|pu|pub|publ|publi|public)
+			    COMPREPLY=(public)
+			    ;;
+			r|ro|rol|role)
+			    COMPREPLY=(role)
+			    ;;
+			'')
+			    COMPREPLY=('' '<RET>' public role)
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		*)
+		    COMPREPLY=()
+		    ;;
+	    esac
+	    ;;
+	3)
+	    case ${COMP_WORDS[1]} in
+		access)
+		    case ${COMP_WORDS[2]} in
+			access)
+			    case ${COMP_WORDS[3]} in
+				a|ad|add)
+				    COMPREPLY=(add)
+				    ;;
+				d|de|del)
+				    COMPREPLY=(del)
+				    ;;
+				r|ra|raz)
+				    COMPREPLY=(raz)
+				    ;;
+				'')
+				    COMPREPLY=('' '<RET>' add del raz)
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			authenticate)
+			    case ${COMP_WORDS[3]} in
+				p|ps|psk)
+				    COMPREPLY=(psk)
+				    ;;
+				t|tl|tls)
+				    COMPREPLY=(tls)
+				    ;;
+				e|ea|eap|eapt|eaptl|eaptls)
+				    COMPREPLY=(eaptls)
+				    ;;
+				'')
+				    COMPREPLY=('' '<RET>' psk eaptls tls)
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			on|off)
+			    __complete-vpnipsec-access-site 0
+			    ;;
+			conf)
+			    case ${COMP_WORDS[3]} in
+				a)
+				    COMPREPLY=('' android apple)
+				    ;;
+				an|and|andr|andro|androi|android)
+				    COMPREPLY=(android)
+				    ;;
+				ap|app|appl|apple)
+				    COMPREPLY=(apple)
+				    ;;
+				l|li|lin|linu|linux)
+				    COMPREPLY=(linux)
+				    ;;
+				w|wi|win|wind|windo|window|windows)
+				    COMPREPLY=(windows)
+				    ;;
+				'')
+				    COMPREPLY=('' android apple linux windows)
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		authenticate)
+		    case ${COMP_WORDS[2]} in
+			psk)
+			    case ${COMP_WORDS[3]} in
+				a|au|aut|auto)
+				    COMPREPLY=(auto)
+				    ;;
+				'')
+				    COMPREPLY=('' auto '<pre-shared-key>')
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			eaptls|tls)
+			    COMPREPLY=('' '<tls-id>')
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		site)
+ 		    case ${COMP_WORDS[2]} in
+			add|del)
+			    COMPREPLY=('' '<site-id>')
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		network|via)
+		    case ${COMP_WORDS[2]} in
+			site)
+			    COMPREPLY=('' '<site-id>')
+			    ;;
+			access)
+			    __complete-vpnipsec-network-via 0
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		to)
+		    case ${COMP_WORDS[3]} in
+			a|ad|add)
+			    COMPREPLY=(add)
+			    ;;
+			d|de|del)
+			    COMPREPLY=(del)
+			    ;;
+			r|ra|raz)
+			    COMPREPLY=(raz)
+			    ;;
+			'')
+			    COMPREPLY=('' '<RET>' add del raz)
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		nat)
+		    case ${COMP_WORDS[2]} in
+			public)
+			    case ${COMP_WORDS[3]} in
+				a|ad|add)
+				    COMPREPLY=(add)
+				    ;;
+				d|de|del)
+				    COMPREPLY=(del)
+				    ;;
+				r|ra|raz)
+				    COMPREPLY=(raz)
+				    ;;
+				'')
+				    COMPREPLY=('' '<RET>' add del raz)
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+  			    ;;
+			role)
+			    COMPREPLY=('' '<RET>' '<site-id>')
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		*)
+		    COMPREPLY=()
+		    ;;
+	    esac
+	    ;;
+	4)
+	    case ${COMP_WORDS[1]} in
+		access)
+		    case ${COMP_WORDS[2]} in
+			access)
+			    case ${COMP_WORDS[3]} in
+				add|del)
+				    COMPREPLY=('' '<ike-id>')
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			on|off)
+			    __complete-vpnipsec-access-site 0
+			    ;;
+			conf)
+			    case ${COMP_WORDS[3]} in
+				android|apple|linux|windows)
+				    COMPREPLY=('' '<client-tls-id>' any)
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		authenticate)
+		    case ${COMP_WORDS[2]} in
+			eaptls|tls)
+			    case ${COMP_WORDS[4]} in
+		    		f|fq|fqd|fqdn)
+				    COMPREPLY=(fqdn)
+				    ;;
+				d|dn)
+				    COMPREPLY=(dn)
+				    ;;
+				'')
+				    COMPREPLY=('' '<RET>' dn fqdn)
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		site)
+		    case ${COMP_WORDS[2]} in
+			add)
+			    COMPREPLY=('' '<peer-vpn-address>')
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		network)
+		    case ${COMP_WORDS[2]} in
+			access)
+			    __complete-vpnipsec-network 0
+			     ;;
+			site)
+			    __complete-vpnipsec-network-via 1
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		via)
+		    case ${COMP_WORDS[2]} in
+			access)
+			    __complete-vpnipsec-via 0
+			     ;;
+			site)
+			    __complete-vpnipsec-network-via 1
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		to)
+		    case ${COMP_WORDS[3]} in
+			add|del)
+			    COMPREPLY=('' '<peer-vpn-address>')
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		nat)
+		    case ${COMP_WORDS[2]} in
+			public)
+			    case ${COMP_WORDS[3]} in
+				add|del)
+				    COMPREPLY=('' '<local-public-ip>')
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			role)
+			    case ${COMP_WORDS[4]} in
+				a|ac|act|acti|activ|active)
+				    COMPREPLY=(active)
+				    ;;
+				p|pa|pas|pass|passi|passiv|passive)
+				    COMPREPLY=(passive)
+				    ;;
+				r|ra|raz)
+				    COMPREPLY=(raz)
+				    ;;
+				'')
+				    COMPREPLY=('' '<RET>' active passive raz)
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		*)
+		    COMPREPLY=()
+		    ;;
+	    esac
+	    ;;
+	5)
+	    case ${COMP_WORDS[1]} in
+		access)
+		    case ${COMP_WORDS[2]} in
+			on|off)
+			    __complete-vpnipsec-access-site 0
+			    ;;
+			conf)
+			    case ${COMP_WORDS[3]} in
+				android|apple|linux|windows)
+				    case ${COMP_WORDS[5]} in
+					e|em|ema|emai|email)
+					    COMPREPLY=(email)
+					    ;;
+					s)
+					    COMPREPLY=('' save show)
+					    ;;
+					sa|sav|save)
+					    COMPREPLY=(save)
+					    ;;
+					sh|sho|show)
+					    COMPREPLY=(show)
+					    ;;
+					'')
+					    COMPREPLY=('' email save show)
+					    ;;
+					*)
+					    COMPREPLY=()
+					    ;;
+				    esac
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		site)
+		    case ${COMP_WORDS[2]} in
+			add)
+			    case ${COMP_WORDS[5]} in
+				p|ps|psk)
+				    COMPREPLY=(psk)
+				    ;;
+				t|tl|tls)
+				    COMPREPLY=(tls)
+				    ;;
+				'')
+				    COMPREPLY=('' psk tls)
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		network)
+		    case ${COMP_WORDS[2]} in
+			access)
+			    __complete-vpnipsec-network 0
+			    ;;
+			site)
+			    __complete-vpnipsec-network 1
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		via)
+		    case ${COMP_WORDS[2]} in
+			access)
+			    __complete-vpnipsec-via 0
+			     ;;
+			site)
+			    __complete-vpnipsec-via 1
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		*)
+		    COMPREPLY=()
+		    ;;
+	    esac
+	    ;;
+	6)
+	    case ${COMP_WORDS[1]} in
+		access)
+		    case ${COMP_WORDS[2]} in
+			on|off)
+			    __complete-vpnipsec-access-site 0
+			    ;;
+			conf)
+			    case ${COMP_WORDS[3]} in
+				android|apple|linux|windows)
+				    case ${COMP_WORDS[5]} in
+					email)
+					    COMPREPLY=('' '<email-address>')
+					    ;;
+					save)
+					    case ${COMP_WORDS[6]} in
+						f|ft|ftp)
+						    COMPREPLY=(ftp)
+						    ;;
+						s|sf|sft|sftp)
+						    COMPREPLY=(sftp)
+						    ;;
+						t|tf|tft|tftp)
+						    COMPREPLY=(tftp)
+						    ;;
+						'')
+						    COMPREPLY=('' ftp sftp tftp)
+						    ;;
+						*)
+						    COMPREPLY=()
+						    ;;
+					    esac
+					    ;;
+					*)
+					    COMPREPLY=()
+					    ;;
+				    esac
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		site)
+		    case ${COMP_WORDS[2]} in
+			add)
+			    case ${COMP_WORDS[5]} in
+				psk)
+				    case ${COMP_WORDS[6]} in
+					'')
+					    COMPREPLY=('' '<pre-shared-key>')
+					    ;;
+					*)
+					    COMPREPLY=()
+					    ;;
+				    esac
+				    ;;
+				tls)
+				    case ${COMP_WORDS[6]} in
+					c|ce|cer|cert|certi|certif|certifi|certific|certifica|certificat|certificate)
+					    COMPREPLY=(certificate)
+					    ;;
+					d|dn)
+					    COMPREPLY=(dn)
+					    ;;
+					f|fq|fqd|fqdn)
+					    COMPREPLY=(fqdn)
+					    ;;
+					'')
+					    COMPREPLY=('' certificate dn fqdn)
+					    ;;
+					*)
+					    COMPREPLY=()
+					    ;;
+				    esac
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		network)
+		    case ${COMP_WORDS[2]} in
+			access)
+			    __complete-vpnipsec-network 0
+			    ;;
+			site)
+			    __complete-vpnipsec-network 1
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		via)
+		    case ${COMP_WORDS[2]} in
+			access)
+			    __complete-vpnipsec-via 0
+			    ;;
+			site)
+			    __complete-vpnipsec-via 1
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+
+		*)
+		    COMPREPLY=()
+		    ;;
+	    esac
+	    ;;
+	7)
+	    case ${COMP_WORDS[1]} in
+		access)
+		    case ${COMP_WORDS[2]} in
+			on|off)
+			    __complete-vpnipsec-access-site 0
+			    ;;
+			conf)
+			    case ${COMP_WORDS[3]} in
+				android|apple|linux|windows)
+				    case ${COMP_WORDS[5]} in
+					email)
+					    COMPREPLY=('' '<RET>' '<name>')
+					    ;;
+					save)
+					    case ${COMP_WORDS[6]} in
+						ftp|sftp|tftp)
+						    COMPREPLY=('' '<file-server>')
+						    ;;
+						*)
+						    COMPREPLY=()
+						    ;;
+					    esac
+					    ;;
+					*)
+					    COMPREPLY=()
+					    ;;
+				    esac
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		site)
+		    case ${COMP_WORDS[2]} in
+			add)
+			    case ${COMP_WORDS[5]} in
+				psk)
+				    __complete-vpnipsec-access-site 4
+				    ;;
+				tls)
+				    case ${COMP_WORDS[6]} in
+					certificate)
+					    COMPREPLY=('' '<tls-id>')
+					    ;;
+					dn)
+					    COMPREPLY=('' '<distinguished-name>')
+					    ;;
+					fqdn)
+					    COMPREPLY=('' '<domain-name>')
+					    ;;
+					*)
+					    COMPREPLY=()
+					    ;;
+				    esac
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		network)
+		    case ${COMP_WORDS[2]} in
+			access)
+			    __complete-vpnipsec-network 0
+			    ;;
+			site)
+			    __complete-vpnipsec-network 1
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		via)
+		    case ${COMP_WORDS[2]} in
+			access)
+			    __complete-vpnipsec-via 0
+			    ;;
+			site)
+			    __complete-vpnipsec-via 1
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		*)
+		    COMPREPLY=()
+		    ;;
+	    esac
+	    ;;
+	*)
+	    case ${COMP_WORDS[1]} in
+		access)
+		    case ${COMP_WORDS[2]} in
+			on|off)
+			    __complete-vpnipsec-access-site 0
+			    ;;
+			conf)
+			    case ${COMP_WORDS[3]} in
+				android|apple|linux|windows)
+				    case ${COMP_WORDS[5]} in
+					save)
+					    case ${COMP_WORDS[6]} in
+						ftp|sftp|tftp)
+						    COMPREPLY=('' '<file-path>')
+						    ;;
+						*)
+						    COMPREPLY=()
+						    ;;
+					    esac
+					    ;;
+					*)
+					    COMPREPLY=()
+					    ;;
+				    esac
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		site)
+		    case ${COMP_WORDS[2]} in
+			add)
+			    case ${COMP_WORDS[5]} in
+				psk)
+				    __complete-vpnipsec-access-site 4
+				    ;;
+				tls)
+				    case ${COMP_WORDS[6]} in
+					certificate|dn|fqdn)
+					    __complete-vpnipsec-access-site 5
+					    ;;
+					*)
+					    COMPREPLY=()
+					    ;;
+				    esac
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		network)
+		    case ${COMP_WORDS[2]} in
+			access)
+			    __complete-vpnipsec-network 0
+			    ;;
+			site)
+			    __complete-vpnipsec-network 1
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		*)
+		    ;;
+	    esac
+	    ;;
+    esac
+}
+
+__complete-vpnipsec-access-site()
+{
+    OFFSET=${1}
+    COMP_CWORD=$((COMP_CWORD - OFFSET))
+    INITIAL_COMP_CWORD=3
+
+    case ${COMP_CWORD} in
+	3)
+	    COMPREPLY=('' '<RET>' aes128 aes192 aes256 aes128ctr aes192ctr aes256ctr)
+	    ;;
+	4)
+	    case ${COMP_WORDS[$[${INITIAL_COMP_CWORD} + ${OFFSET}]]} in
+		aes128|aes192|aes256|aes128ctr|aes192ctr|aes256ctr)
+		    COMPREPLY=('' '<RET>' sha1 sha256 sha384 sha512)
+		    ;;
+		*)
+		    COMPREPLY=()
+		    ;;
+	    esac
+	    ;;
+	5)
+	    case ${COMP_WORDS[$[${INITIAL_COMP_CWORD} + ${OFFSET}]]} in
+		aes128|aes192|aes256|aes128ctr|aes192ctr|aes256ctr)
+		    case ${COMP_WORDS[$[${INITIAL_COMP_CWORD} + 1 + ${OFFSET}]]} in
+			sha1|sha256|sha384|sha512)
+			    COMPREPLY=('' '<RET>' modp1536 modp2048 modp3072 modp4096 modp6144 modp8192 ecp192 ecp224 ecp256 ecp384 ecp521 ecp224bp ecp256bp ecp384bp ecp512bp)
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		*)
+		    COMPREPLY=()
+		    ;;
+	    esac
+	    ;;
+	6)
+	    case ${COMP_WORDS[$[${INITIAL_COMP_CWORD} + ${OFFSET}]]} in
+		aes128|aes192|aes256|aes128ctr|aes192ctr|aes256ctr)
+		    case ${COMP_WORDS[$[${INITIAL_COMP_CWORD} + 1 + ${OFFSET}]]} in
+			sha1|sha256|sha384|sha512)
+			    case ${COMP_WORDS[$[${INITIAL_COMP_CWORD} + 2 + ${OFFSET}]]} in
+				modp1536|modp2048|modp3072|modp4096|modp6144|modp8192|ecp192|ecp224|ecp256|ecp384|ecp521|ecp224bp|ecp256bp|ecp384bp|ecp512bp)
+				    COMPREPLY=('' '<RET>' aes128 aes192 aes256 aes128ctr aes192ctr aes256ctr)
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		*)
+		    COMPREPLY=()
+		    ;;
+	    esac
+	    ;;
+	7)
+	    case ${COMP_WORDS[$[${INITIAL_COMP_CWORD} + ${OFFSET}]]} in
+		aes128|aes192|aes256|aes128ctr|aes192ctr|aes256ctr)
+		    case ${COMP_WORDS[$[${INITIAL_COMP_CWORD} + 1 + ${OFFSET}]]} in
+			sha1|sha256|sha384|sha512)
+			    case ${COMP_WORDS[$[${INITIAL_COMP_CWORD} + 2 + ${OFFSET}]]} in
+				modp1536|modp2048|modp3072|modp4096|modp6144|modp8192|ecp192|ecp224|ecp256|ecp384|ecp521|ecp224bp|ecp256bp|ecp384bp|ecp512bp)
+				    case ${COMP_WORDS[$[${INITIAL_COMP_CWORD} + 3 + ${OFFSET}]]} in
+					aes128|aes192|aes256|aes128ctr|aes192ctr|aes256ctr)
+					    COMPREPLY=('' '<RET>' sha1 sha256 sha384 sha512)
+					    ;;
+					*)
+					    COMPREPLY=()
+					    ;;
+				    esac
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		*)
+		    COMPREPLY=()
+		    ;;
+	    esac
+	    ;;
+	8)
+	    case ${COMP_WORDS[1]} in
+		site)
+		    case ${COMP_WORDS[$[${INITIAL_COMP_CWORD} + ${OFFSET}]]} in
+			aes128|aes192|aes256|aes128ctr|aes192ctr|aes256ctr)
+			    case ${COMP_WORDS[$[${INITIAL_COMP_CWORD} + 1 + ${OFFSET}]]} in
+				sha1|sha256|sha384|sha512)
+			    case ${COMP_WORDS[$[${INITIAL_COMP_CWORD} + 2 + ${OFFSET}]]} in
+				modp1536|modp2048|modp3072|modp4096|modp6144|modp8192|ecp192|ecp224|ecp256|ecp384|ecp521|ecp224bp|ecp256bp|ecp384bp|ecp512bp)
+				    case ${COMP_WORDS[$[${INITIAL_COMP_CWORD} + 3 + ${OFFSET}]]} in
+					aes128|aes192|aes256|aes128ctr|aes192ctr|aes256ctr)
+					    case ${COMP_WORDS[$[${INITIAL_COMP_CWORD} + 4 + ${OFFSET}]]} in
+						sha1|sha256|sha384|sha512)
+						    COMPREPLY=('' '<RET>' '<remote-isakmp-port>')
+						    ;;
+						*)
+						    COMPREPLY=()
+						    ;;
+					    esac
+					    ;;
+					*)
+					    COMPREPLY=()
+					    ;;
+				    esac
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		*)
+		    COMPREPLY=()
+		    ;;
+	    esac
+	    ;;
+	9)
+	    case ${COMP_WORDS[1]} in
+		site)
+		    case ${COMP_WORDS[$[${INITIAL_COMP_CWORD} + ${OFFSET}]]} in
+			aes128|aes192|aes256|aes128ctr|aes192ctr|aes256ctr)
+			    case ${COMP_WORDS[$[${INITIAL_COMP_CWORD} + 1 + ${OFFSET}]]} in
+				sha1|sha256|sha384|sha512)
+				    case ${COMP_WORDS[$[${INITIAL_COMP_CWORD} + 2 + ${OFFSET}]]} in
+					modp1536|modp2048|modp3072|modp4096|modp6144|modp8192|ecp192|ecp224|ecp256|ecp384|ecp521|ecp224bp|ecp256bp|ecp384bp|ecp512bp)
+					    case ${COMP_WORDS[$[${INITIAL_COMP_CWORD} + 3 + ${OFFSET}]]} in
+						aes128|aes192|aes256|aes128ctr|aes192ctr|aes256ctr)
+						    case ${COMP_WORDS[$[${INITIAL_COMP_CWORD} + 4 + ${OFFSET}]]} in
+							sha1|sha256|sha384|sha512)
+							    COMPREPLY=('' '<RET>' '<remote-nat-transversal-port>')
+							    ;;
+							*)
+							    COMPREPLY=()
+							    ;;
+						    esac
+						    ;;
+						*)
+						    COMPREPLY=()
+						    ;;
+					    esac
+					    ;;
+					*)
+					    COMPREPLY=()
+					    ;;
+				    esac
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		*)
+		    COMPREPLY=()
+		    ;;
+	    esac
+	    ;;
+	*)
+	    COMPREPLY=()
+	    ;;
+    esac
+}
+
+__complete-vpnipsec-network-via()
+{
+    OFFSET=${1}
+    COMP_CWORD=$((COMP_CWORD - OFFSET))
+    INITIAL_COMP_CWORD=3
+
+    case ${COMP_CWORD} in
+	3)
+	    case ${COMP_WORDS[$[${INITIAL_COMP_CWORD} + ${OFFSET}]]} in
+		a|ad|add)
+		    COMPREPLY=(add)
+		    ;;
+		d|de|del)
+		    COMPREPLY=(del)
+		    ;;
+		r|ra|raz)
+		    COMPREPLY=(raz)
+		    ;;
+		'')
+		    COMPREPLY=('' '<RET>' add del raz)
+		    ;;
+		*)
+		    COMPREPLY=()
+		    ;;
+	    esac
+	    ;;
+	*)
+	    COMPREPLY=()
+	    ;;
+    esac
+}
+
+__complete-vpnipsec-network()
+{
+    OFFSET=${1}
+    COMP_CWORD=$((COMP_CWORD - OFFSET))
+    INITIAL_COMP_CWORD=3
+
+    case ${COMP_CWORD} in
+	4)
+	    case ${COMP_WORDS[$[${INITIAL_COMP_CWORD} + ${OFFSET}]]} in
+		add|del)
+		    case ${COMP_WORDS[$[${INITIAL_COMP_CWORD} + 1 + ${OFFSET}]]} in
+			l|lo|loc|loca|'local')
+			    COMPREPLY=('local')
+			    ;;
+			r|re|rem|remo|remot|remote)
+			    COMPREPLY=(remote)
+			    ;;
+			'')
+			    COMPREPLY=('' 'local' remote)
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		*)
+		    COMPREPLY=()
+		    ;;
+	    esac
+	    ;;
+	5)
+	    case ${COMP_WORDS[$[${INITIAL_COMP_CWORD} + ${OFFSET}]]} in
+		add|del)
+		    case ${COMP_WORDS[$[${INITIAL_COMP_CWORD} + 1 + ${OFFSET}]]} in
+			'local'|remote)
+			    case ${COMP_WORDS[$[${INITIAL_COMP_CWORD} + 2 + ${OFFSET}]]} in
+				d|de|def|defa|defau|defaul|default)
+				    COMPREPLY=(default)
+				    ;;
+				'')
+				    COMPREPLY=('' '<network-ip>' default)
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		*)
+		    COMPREPLY=()
+		    ;;
+	    esac
+	    ;;
+	6)
+	    case ${COMP_WORDS[$[${INITIAL_COMP_CWORD} + ${OFFSET}]]} in
+		add|del)
+		    case ${COMP_WORDS[$[${INITIAL_COMP_CWORD} + 1 + ${OFFSET}]]} in
+			'local'|remote)
+			    case ${COMP_WORDS[$[${INITIAL_COMP_CWORD} + 2 + ${OFFSET}]]} in
+				default)
+				    COMPREPLY=()
+				    ;;
+				*)
+				    COMPREPLY=('' '<RET>' '<network-mask>')
+				    ;;
+			    esac
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		*)
+		    COMPREPLY=()
+		    ;;
+	    esac
+	    ;;
+	*)
+	    COMPREPLY=()
+	    ;;
+    esac
+}
+
+__complete-vpnipsec-via()
+{
+    OFFSET=${1}
+    COMP_CWORD=$((COMP_CWORD - OFFSET))
+    INITIAL_COMP_CWORD=3
+
+    case ${COMP_CWORD} in
+	4)
+	    case ${COMP_WORDS[$[${INITIAL_COMP_CWORD} + ${OFFSET}]]} in
+		add|del)
+		    COMPREPLY=('' '<gateway-ip>')
+		    ;;
+		*)
+		    COMPREPLY=()
+		    ;;
+	    esac
+	    ;;
+	5)
+	    case ${COMP_WORDS[$[${INITIAL_COMP_CWORD} + ${OFFSET}]]} in
+		add)
+		    case ${COMP_WORDS[$[${INITIAL_COMP_CWORD} + 2 + ${OFFSET}]]} in
+			m|ma|mas|mast|maste|master)
+			    COMPREPLY=(master)
+			    ;;
+			b|ba|bac|back|backu|backup)
+			    COMPREPLY=(backup)
+			    ;;
+			'')
+			    COMPREPLY=('' 'master' 'backup')
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		*)
+		    COMPREPLY=()
+		    ;;
+	    esac
+	    ;;
+	6)
+	    case ${COMP_WORDS[$[${INITIAL_COMP_CWORD} + ${OFFSET}]]} in
+		add)
+		    case ${COMP_WORDS[$[${INITIAL_COMP_CWORD} + 2 + ${OFFSET}]]} in
+			master|backup)
+			    COMPREPLY=('' '<RET>' '<priority>')
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		*)
+		    COMPREPLY=()
+		    ;;
+	    esac
+	    ;;
+	*)
+	    COMPREPLY=()
+	    ;;
+    esac
+}

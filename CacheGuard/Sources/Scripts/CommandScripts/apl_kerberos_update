@@ -1,0 +1,122 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       Scripts
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+CACHEGUARD_DIR=/etc/sysconfig/cacheguard
+source ${CACHEGUARD_DIR}/constant
+source ${APPLIANCE_DIR}/etc/role
+source ${LOCAL_DIR}/lib/apl_functions
+source ${BASE_DIR}/${ADMIN_NAME}/${ENV_RDIR}/${ENV_CURRENT_NAME}
+
+kerberos-update()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    test -n "${3}" || return 3
+    test -n "${4}" || return 4
+    local keytab_file=${1}
+    local computer_name=${2}
+    local full_service_name=${3}	
+    local tag=${4}
+       
+    test -f ${keytab_file} || return 11
+
+    local message
+
+    message=$(msktutil auto-update \
+		       --no-reverse-lookups --server-behind-nat \
+		       --auto-update-interval ${KERBEROS_PASSWORD_VALIDITY_DAYS} \
+		       --keytab ${keytab_file} \
+		       --computer-name ${computer_name} \
+		       --hostname ${full_service_name} \
+		       --sasl-mechanisms "GSS-SPNEGO GSSAPI" \
+		       2>&1)
+
+    test -n "${message}" || return 0
+
+    message="KEYTAB UPDATE (${tag}/${computer_name}): ${message}"
+    logger -p daemon.alert -t apl_kerberos_update -- "${message}"
+    ${LOCAL_DIR}/bin/apl_rlogger "${message}"
+    test "${CURRENT_ADMIN_SNMP}" == False || ${LOCAL_DIR}/bin/apl_snmp_trap 23 "KerberosKeyTabUpdateStatus" "1" "${message}"
+}
+
+main()
+{
+    test-current-kerberos-auth-state || return 0
+    test ${CURRENT_HA_MODE} == False  || return 0
+    test -f ${PROXY_DIR}${KERBEROS_KEYTAB_FILE_PROXY1} || return 11
+
+    local keytab_file_sz
+
+    keytab_file_sz=$(du -bs ${PROXY_DIR}${KERBEROS_KEYTAB_FILE_PROXY1} 2> /dev/null | expand)
+    keytab_file_sz=${keytab_file_sz/ *}
+    keytab_file_sz=$[${keytab_file_sz} / 1024]
+
+    if test ${keytab_file_sz} -ge ${MAX_KEYTAB_FILE_SZ} ; then
+	local message="The size of the Kerberos KeyTab file exceeded the maximum limit of ${MAX_KEYTAB_FILE_SZ}. Think about re-initializing the Kerberos authentication."
+	logger -p daemon.alert -t apl_kerberos_update -- "${message}"
+	${LOCAL_DIR}/bin/apl_rlogger "${message}"
+	test "${CURRENT_ADMIN_SNMP}" == False || ${LOCAL_DIR}/bin/apl_snmp_trap 23 "KerberosKeyTabUpdateStatus" "2" "${message}"
+    fi
+
+    ! test-current-kerberos-web-is-active || \
+	kerberos-update \
+	    ${PROXY_DIR}${KERBEROS_KEYTAB_FILE_PROXY1} \
+	    ${CURRENT_KERBEROS_SERVICE_NAME} \
+	    ${CURRENT_KERBEROS_SERVICE_NAME}.${CURRENT_DOMAIN_NAME} \
+	    fProxy
+
+    if test-current-kerberos-rweb-is-active ; then
+	local computer_name site_name
+	local i=0 elt range
+
+	for elt in ${CURRENT_KERBEROS_RWEB_LIST}
+	do
+	    range=$[${i} % 2]
+	    case ${range} in
+		0)
+		    site_name=${elt}
+		    ;;
+		1)
+		    computer_name=${elt}
+		    kerberos-update \
+			${PROXY_DIR}${KERBEROS_KEYTAB_FILE_PROXY1} \
+			${computer_name} \
+			${site_name} \
+			rProxy
+		    ;;
+		*)
+		    return 1
+		    ;;
+	    esac
+	    ((i++))
+	done
+    fi
+
+    diff --brief ${PROXY_DIR}${KERBEROS_KEYTAB_FILE_PROXY1} ${WEB_SERVER_DIR}${KERBEROS_KEYTAB_FILE_PROXY2} > /dev/null 2>&1 || \
+	cp -f ${PROXY_DIR}${KERBEROS_KEYTAB_FILE_PROXY1} ${WEB_SERVER_DIR}${KERBEROS_KEYTAB_FILE_PROXY2}
+}
+
+# Main()
+
+main "${@}"

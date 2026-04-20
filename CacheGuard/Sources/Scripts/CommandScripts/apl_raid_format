@@ -1,0 +1,107 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       Scripts
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+CACHEGUARD_DIR=/etc/sysconfig/cacheguard
+source ${CACHEGUARD_DIR}/constant
+source ${APPLIANCE_DIR}/etc/role
+source /usr/local/lib/apl_common
+
+raid-reset-hd()
+{
+    test -n "${1}" || return 11
+    local hd=${1}
+
+    local pp=$(get-partition-prefix ${hd})
+
+    mdadm --quiet --zero-superblock ${hd}${pp}${RAID_PARTITION_NB} --force > /dev/null 2>&1
+    dd if=/dev/zero of=${hd} bs=512 count=8 > /dev/null 2>&1
+    blockdev -q --rereadpt ${hd} > /dev/null 2>&1
+}
+
+raid-format-hd()
+{
+    test -n "${1}" || return 11
+    local hd=${1}
+
+    local ret
+    local commands="mklabel ${PARTITION_LABEL_TYPE} unit s"
+
+    local hd_name=${hd:5}
+    local sector_sz=$(get-disk-sector-sz ${hd_name})
+    local sectors_per_kb=$((1024 / sector_sz))
+    local pp=$(get-partition-prefix ${hd_name})
+
+    local begin_sector=$((FIRST_PARTITION_BEGINING_SECTOR * sectors_per_kb))
+    local end_sector=$((begin_sector + (FIRST_PARTITION_BEGINING_SECTOR * sectors_per_kb) - 1))
+
+    commands="${commands} mkpart primary ext2 ${begin_sector} ${end_sector}"
+    commands="${commands} name ${GRUB_PARTITION_NB} GRUB"
+
+    ((begin_sector = end_sector + 1))
+    ((end_sector = begin_sector + (EFI_SZ * sectors_per_kb) - 1))
+    commands="${commands} mkpart primary fat32 ${begin_sector} ${end_sector}"
+    commands="${commands} name ${EFI_PARTITION_NB} EFI"
+
+    ((begin_sector = end_sector + 1))
+    commands="${commands} mkpart primary ext2 ${begin_sector} 100%"
+    commands="${commands} name ${RAID_PARTITION_NB} RAID"
+
+    commands="${commands} quit"
+
+    ((sectors = (EFI_SZ + FIRST_PARTITION_BEGINING_SECTOR) * sectors_per_kb))
+    ((blank_count = sectors / sector_sz))
+    dd if=/dev/zero of=${hd} bs=${sector_sz} count=${blank_count} conv=notrunc > /dev/null 2>&1
+
+    partprobe ${hd}
+    blockdev -q --rereadpt ${hd} > /dev/null 2>&1
+    rm -f ${hd}${pp}${RAID_PARTITION_NB}
+
+    parted ${hd} --align cylinder --script -- ${commands}
+    ret=${?}
+
+    if test ${ret} -eq 0 ; then
+	partprobe ${hd}
+	blockdev -q --rereadpt ${hd} > /dev/null 2>&1
+	commands="set ${GRUB_PARTITION_NB} bios_grub on set ${EFI_PARTITION_NB} esp on set ${RAID_PARTITION_NB} raid on quit"
+	parted ${hd} --align cylinder --script -- ${commands}
+	ret=$[${ret}*10 + ${?}]
+    fi
+
+    return ${ret}
+}
+
+main()
+{
+    test -n "${1}" || return 11
+    local hd=${1}
+
+    test ${hd:0:5} == "/dev/" || hd="/dev/${hd}"
+
+    raid-reset-hd ${hd}
+    raid-format-hd ${hd}
+}
+
+# Main()
+
+main "${@}"

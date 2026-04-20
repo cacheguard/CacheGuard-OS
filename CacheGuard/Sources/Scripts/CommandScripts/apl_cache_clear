@@ -1,0 +1,115 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       Scripts
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+source /usr/local/lib/apl_functions
+
+reset-cache-clear-log()
+{
+    echo -n > ${CACHE_CLEAR_LOG}
+    chmod 640 ${CACHE_CLEAR_LOG}
+    chown ${ADMIN_NAME}:${GROUP_NAME} ${CACHE_CLEAR_LOG}
+}
+
+cache-clear-log()
+{
+    test -n "${1}" || return 1
+    local message=${1}
+
+    local date=$(date +"%Y/%m/%d-%T")
+    echo -n "0 ${date} ${message}" >> ${CACHE_CLEAR_LOG}
+}
+
+cache-clear-log-abort()
+{
+    echo >> ${CACHE_CLEAR_LOG}
+}
+
+cache-clear-log-ret()
+{
+    test -n "${1}" || return 1
+    local err_code=${1}
+
+    if test ${err_code} -eq 0 ; then
+	echo "[OK]" >> ${CACHE_CLEAR_LOG}
+    else
+	echo "[KO]" >> ${CACHE_CLEAR_LOG}
+    fi
+}
+
+clean-exit()
+{
+    trap "" USR1 INT QUIT TERM
+
+    local code=${1}
+    wait
+    manage-appliance-unlock
+    cache-clear-log-abort
+    cache-clear-log "Aborting the Cache Clear operation"
+    cache-clear-log-ret ${?}
+    exit ${code}
+}
+
+main()
+{
+    trap "clean-exit 100" USR1 INT QUIT TERM
+
+    manage-appliance-lock
+    reset-cache-clear-log
+
+    cache-clear-log "Beginig Cache Clear"
+    cache-clear-log-ret ${?}
+
+    cache-clear-log "Stopping the Health Check service"
+    /etc/rc.d/init.d/health stop > /dev/null 2>&1
+    cache-clear-log-ret ${?}
+
+    cache-clear-log "rCache clearing in progress"
+    /etc/rc.d/init.d/httpd clear > /dev/null 2>&1
+    cache-clear-log-ret ${?}
+
+    cache-clear-log "Stopping the Proxy service"
+    /etc/rc.d/init.d/squid stop > /dev/null 2>&1
+    cache-clear-log-ret ${?}
+
+    cache-clear-log "Cache clearing in progress"
+    /etc/rc.d/init.d/squid clearssl > /dev/null 2>&1
+    /etc/rc.d/init.d/squid clear > /dev/null 2>&1
+    cache-clear-log-ret ${?}
+
+    cache-clear-log "Starting the Proxy service"
+    /etc/rc.d/init.d/squid start > /dev/null 2>&1
+    cache-clear-log-ret ${?}
+
+    cache-clear-log "Starting the Health Check service"
+    /etc/rc.d/init.d/health start > /dev/null 2>&1
+    cache-clear-log-ret ${?}
+
+    cache-clear-log "Ending the cache clearing"
+    cache-clear-log-ret ${?}
+    manage-appliance-unlock
+}
+
+# Main()
+
+main "${@}"

@@ -1,0 +1,268 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       Commands
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+source functions
+
+test -z "${TRANSACTION}" || exit 106
+
+get-sha1-fingerprint()
+{
+    local passwd=${1}
+
+    sha1=$(echo -n "${passwd}" | openssl dgst -sha1 2> /dev/null)
+    sha1=${sha1/*= }
+
+    echo -n ${sha1}
+}
+
+print-registration-state()
+{
+    test ${TERM} != ${WADMIN_TERM} || return 1
+
+    if is-registered-appliance ; then
+	case ${CLOUD_NAME} in
+	    aws|azure)
+		echo "This appliance is running on a public cloud and has been automatically registered."
+		;;
+	    *)
+		echo -n "This appliance has been registered. "
+		subscribe_url=$(get-subscription-url)
+		if test ${?} -eq 0 ; then
+		    echo "Feel free to subscribe to a plan or check the state of your subscription at: ${subscribe_url}."
+		else
+		    echo "To subscribe to a plan or check the state of your subscription the appliance should be connected to the internet and have access to the registration services."
+		fi
+		;;
+	esac
+    else
+	case ${CLOUD_NAME} in
+	    aws|azure)
+		echo "The registration is automatically done on an appliance that runs on a public cloud. However, something went wrong during the registration of this appliance."
+		;;
+	    *)
+		echo -n "This appliance is not yet registered. Feel free to register your appliance in order to get its free and unique S/N. "
+		register_url=$(get-registration-otp-url)
+		if test ${?} -eq 0 ; then
+		    echo "You can follow the link \"${register_url}\" to get your registration OTP (One Time Password)."
+		else
+		    echo "To initiate the registration process the appliance should be connected to the internet and have access to registration services."
+		fi
+		;;
+	esac
+    fi
+}
+
+read-license()
+{
+    test ${TERM} != ${WADMIN_TERM} || return 0
+    test "${__BATCH_MODE}" != yes || error 111
+
+    local response
+
+    apl-man license
+    echo -n "Do you accept the terms of the ${COMMERCIAL_NAME} License (Y|N) [Y]? "
+    read response
+    test -z "${response}" -o "${response}" == y -o "${response}" == Y || return 1
+}
+
+reset-registration()
+{
+    rm -f \
+       ${TMP_DIR}/${REGISTER_EMAIL} \
+       ${TMP_DIR}/${REGISTER_OTP} \
+       ${TMP_DIR}/${REGISTER_KEY} \
+       ${TMP_DIR}/${UNREGISTER_SN} \
+       ${TMP_DIR}/${EMBEDDED_VPNSUBSCR_REGISTER_KEY}
+
+    NEWENV=1
+}
+
+is-embedded-registration-required()
+{
+    test -n "${1}" || return 1
+    local embedded=${1}
+
+    case ${CLOUD_NAME} in
+	aws|azure)
+	    case ${CLOUD_USAGE} in
+		payg)
+		    if test "${CLOUD_VALID_IP}" == no ; then
+			return 0
+		    else
+			if member "${CLOUD_EMBEDDED_APPLICATIONS}" ${embedded} ; then
+			    return 156
+			else
+			    return 186
+			fi
+		    fi
+		    ;;
+		byol)
+		    return 0
+		    ;;
+		*)
+		    return 0
+		    ;;
+	    esac
+	    ;;
+	*)
+	    return 0
+	    ;;
+    esac
+}
+
+run()
+{
+    init-global-variables
+
+    test -z "${TRANSACTION}" || return 106
+    ! is-in-manager-conf-context || return 212
+    user-has-admin-rights || return 31
+
+    if test -z "${ARGS[1]}" ; then
+	echo
+	print-registration-state
+	echo
+	return 0
+    fi
+
+    local rtype=${ARGS[1]}
+
+    case ${rtype} in
+	appliance)
+	    case ${CLOUD_NAME} in
+		aws|azure)
+		    return 143
+		    ;;
+		*)
+		    ;;
+	    esac
+	    ! is-registered-appliance || return 185
+	    local age=${ARGS[2]}
+	    case ${age} in
+		new)
+		    local email=${ARGS[3]}
+		    test -n "${email}" || return 1
+		    check-email "${email}" || return 17
+		    shift-args
+		    ;;
+		old)
+		    ;;
+		*)
+		    return 1
+		    ;;
+	    esac
+
+	    local otp
+
+	    if test -n "${ARGS[3]}" ; then
+		otp=${ARGS[3]}
+	    else
+		test ${TERM} != ${WADMIN_TERM} || return 0
+		test "${__BATCH_MODE}" != yes || error 111
+
+		echo -n "Please enter the obtained OTP: "
+		stty -echo
+		read otp
+		stty echo
+		echo
+	    fi
+	    test -n "${otp}" || return 0
+
+	    read-license || return 0
+
+	    reset-registration
+	    local sha1_otp=$(get-sha1-fingerprint "${otp}")
+	    test "${age}" != new || echo "${email}" > ${TMP_DIR}/${REGISTER_EMAIL}
+	    echo ${sha1_otp} > ${TMP_DIR}/${REGISTER_OTP}
+	    NEWENV=1
+	    ;;
+
+	license)
+	    local key=${ARGS[2]}
+	    if test -z "${key}" ; then
+		rm -f ${TMP_DIR}/${REGISTER_KEY}
+		NEWENV=1
+		return 0
+	    fi
+
+	    is-licensed || return 156
+	    is-registered-appliance || return 8
+
+	    if test ${TERM} != ${WADMIN_TERM} ; then
+		read-license || return 0
+	    fi
+
+	    reset-registration
+	    echo "${key}" > ${TMP_DIR}/${REGISTER_KEY}
+	    NEWENV=1
+	    ;;
+
+	clear)
+ 	    case ${CLOUD_NAME} in
+		aws|azure)
+		    return 143
+		    ;;
+		*)
+		    ;;
+	    esac
+	    is-registered-appliance || return 8
+	    reset-registration
+	    touch ${TMP_DIR}/${UNREGISTER_SN}
+	    NEWENV=1
+	    ;;
+	embedded)
+	    test ${APL_ROLE} == 'gateway' || return 232
+
+	    local embedded=${ARGS[2]}
+	    case ${embedded} in
+		${EMBEDDED_VPNSUBSCR_CLI_NAME})
+		    embedded=$(get-embedded-internal-name ${embedded})
+		    ;;
+		*)
+		    INDIRECT_ERROR_CODE=519
+		    return 254
+		    ;;
+	    esac
+
+	    local key=${ARGS[3]}
+
+	    if test -z "${key}" ; then
+		rm -f ${TMP_DIR}/${EMBEDDED_VPNSUBSCR_REGISTER_KEY}
+		NEWENV=1
+		return 0
+	    fi
+
+	    is-registered-appliance || return 8
+	    is-embedded-registration-required ${embedded} || return ${?}
+
+	    echo "${key}" > ${TMP_DIR}/${EMBEDDED_VPNSUBSCR_REGISTER_KEY}
+	    NEWENV=1
+	    ;;
+	*)
+	    return 1
+	    ;;
+    esac
+}
+
+main "${@}"

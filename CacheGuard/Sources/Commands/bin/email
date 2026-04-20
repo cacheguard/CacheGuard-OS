@@ -1,0 +1,339 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       Commands
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+source functions
+
+show-email-ftp()
+{
+    echo-command-form "email ftp"
+    echo-mark-cur
+    echo-value "${CURRENT_ANONYMOUS_FTP_EMAIL}"
+
+    if test "${CURRENT_ANONYMOUS_FTP_EMAIL}" != "${ANONYMOUS_FTP_EMAIL}" ; then
+	echo-command-form "email ftp"
+	echo-mark-new
+	echo-value "${ANONYMOUS_FTP_EMAIL}"
+    fi
+}
+
+show-email-admin()
+{
+    local lt gt
+
+    if test "${TERM}" == "${WADMIN_TERM}" ; then
+	lt='&lt;'
+	gt='&gt;'
+    else
+	lt='<'
+	gt='>'
+    fi
+
+    echo-command-form "email admin"
+    echo-mark-cur
+    if test -n "${CURRENT_ADMINISTRATOR_NAME}" ; then
+	echo-value "${CURRENT_ADMINISTRATOR_NAME} ${lt}${CURRENT_ADMINISTRATOR_EMAIL}${gt}"
+    else
+	echo-value "${lt}${CURRENT_ADMINISTRATOR_EMAIL}${gt}"
+    fi
+
+    if test "${CURRENT_ADMINISTRATOR_EMAIL}" != "${ADMINISTRATOR_EMAIL}" -o \
+	    "${CURRENT_ADMINISTRATOR_NAME}" != "${ADMINISTRATOR_NAME}" ; then
+	echo-command-form "email admin"
+	echo-mark-new
+	if test -n "${ADMINISTRATOR_NAME}" ; then
+	    echo-value "${ADMINISTRATOR_NAME} ${lt}${ADMINISTRATOR_EMAIL}${gt}"
+	else
+	    echo-value "${ADMINISTRATOR_EMAIL}"
+	fi
+    fi
+}
+
+show-email-account()
+{
+    local server port user
+
+    server=${CURRENT_EMAIL_ACCOUNT_SERVER_FQDN}
+    port=${CURRENT_EMAIL_ACCOUNT_SERVER_PORT}
+    user=${CURRENT_EMAIL_ACCOUNT_USERNAME}
+
+    test -n "${server}" || server=$(get-null-value)
+    test -n "${port}" || port=$(get-null-value)
+    test -n "${user}" || user=$(get-null-value)
+
+    echo-command-form "email account"
+    echo-mark-cur
+    echo-value "${server} ${port} ${user} ..."
+
+    if test "${CURRENT_EMAIL_ACCOUNT_SERVER_FQDN}" != "${EMAIL_ACCOUNT_SERVER_FQDN}" -o \
+	    "${CURRENT_EMAIL_ACCOUNT_SERVER_PORT}" != "${EMAIL_ACCOUNT_SERVER_PORT}" -o \
+	    "${CURRENT_EMAIL_ACCOUNT_USERNAME}" != "${EMAIL_ACCOUNT_USERNAME}" -o \
+	    "${CURRENT_EMAIL_ACCOUNT_PASSWORD}" != "${EMAIL_ACCOUNT_PASSWORD}" ; then
+
+	server=${EMAIL_ACCOUNT_SERVER_FQDN}
+	port=${EMAIL_ACCOUNT_SERVER_PORT}
+	user=${EMAIL_ACCOUNT_USERNAME}
+
+	test -n "${server}" || server=$(get-null-value)
+	test -n "${port}" || port=$(get-null-value)
+	test -n "${user}" || user=$(get-null-value)
+
+	echo-command-form "email account"
+	echo-mark-new
+	echo-value "${server} ${port} ${user} ..."
+    fi
+}
+
+show-email()
+{
+    echo-begin-show
+    case ${1} in
+	ftp)
+	    show-email-ftp
+	    ;;
+	admin)
+	    show-email-admin
+	    ;;
+	account)
+	    show-email-account
+	    ;;
+	'')
+	    show-email-ftp
+	    show-email-admin
+	    show-email-account
+	    ;;
+	
+	*)
+	    error 255
+	    ;;
+    esac
+    echo-end-show
+}
+
+manage-account()
+{
+    test -n "${1}" || return 255
+    local mode=${1}
+
+    local server=${ARGS[1]}
+    local port=${ARGS[2]}
+    local username=${ARGS[3]}
+    local password=${ARGS[4]}
+
+    case ${server} in
+	auto)
+	    server=$(get-email-mx ${ADMINISTRATOR_EMAIL})
+	    ;;
+	raz)
+	    ;;
+	'')
+	    if test -z "${port}" -a -z "${username}" -a -z "${password}" ; then
+		show-email account
+		return 0
+	    fi
+	    ;;
+	*)
+	    check-sitename ${server} || return 78
+	    ;;
+    esac
+
+    if test -n "${port}" ; then
+	if ! check-port-nb1 ${port} ; then
+	    INDIRECT_ERROR_CODE=516
+	    return 254
+	fi
+    fi
+
+    if test -n "${username}" ; then
+	if ! check-email-username ${username} ; then
+	    INDIRECT_ERROR_CODE=517
+	    return 254
+	fi
+    fi
+
+    if test ${TERM} != ${WADMIN_TERM} ; then
+	if test -z "${password}" ; then
+
+	    test "${__BATCH_MODE}" != yes || return 111
+
+	    if test -z "${TRANSACTION}" ; then
+		echo -n "Please enter the email account password: "
+		stty -echo
+		read password
+		stty echo
+		echo
+	    fi
+
+	    mode=clear
+	fi
+    fi
+
+    if ! check-external-password-length "${password}" ; then
+	INDIRECT_ERROR_CODE=531
+	return 254
+    fi
+
+    if test ${TERM} != ${WADMIN_TERM} -o -n "${password}" ; then
+	case ${mode} in
+	    clear)
+		;;
+	    encrypted)
+		password=$(decrypt-password "encrypted:${password}" "${EMAIL_PASSWD}")
+		;;
+	    *)
+		return 255
+		;;
+	esac
+	export EMAIL_ACCOUNT_PASSWORD=${password}
+    fi
+
+    if test "${server}" == raz ; then
+	unset EMAIL_ACCOUNT_SERVER_FQDN
+    else
+	export EMAIL_ACCOUNT_SERVER_FQDN=${server}
+    fi
+
+    export EMAIL_ACCOUNT_SERVER_PORT=${port}
+    export EMAIL_ACCOUNT_USERNAME=${username}
+
+    SAVENV=1
+}
+
+send-email-test()
+{
+    test -n "${1}" || return 1
+    local email=${1}
+    local name=${2}
+    local subject=${3}
+    local message=${4}
+    local output=${5}
+
+    local body_file=/tmp/email-test.${$}
+
+    test -n "${subject}" || subject="Testing Email"
+
+    if test -n "${message}" ; then
+	echo ${message}
+    else
+	cat << EOT
+Hello,<p>
+This is a testing email sent from the ${CURRENT_SHOSTNAME}.${CURRENT_DOMAIN_NAME} appliance.<p>
+Have a great day!
+EOT
+    fi > ${body_file}
+
+    case ${output} in
+	stdout)
+	    __EMAIL_OUTPUT=stdout send-email ${email} \
+			                     "${subject}" \
+					     ${body_file} \
+					     "${name}"
+	    ;;
+	*)
+	    send-email ${email} \
+		       "${subject}" \
+		       ${body_file} \
+		       "${name}"
+	    ;;
+    esac
+
+    local ret=${?}
+    rm -f ${body_file}
+
+    return ${ret}
+}
+
+run()
+{
+    contextual-command-is-allowed || return 207
+
+    if test -z "${ARGS[1]}" ; then show-email ; return 0 ; fi
+
+    local key=${ARGS[1]}
+    
+    if test -z "${ARGS[2]}" ; then
+	case ${key} in
+	    admin)
+		show-email admin
+		return 0
+		;;
+	    ftp)
+		show-email ftp
+		return 0
+		;;
+	    account)
+		;;
+	    send)
+		;;
+	    *)
+		return 1
+		;;
+	esac
+    fi
+
+    case ${key} in
+	account)
+	    shift-args
+	    manage-account clear || return ${?}
+	    ;;
+	account:encrypted)
+	    shift-args
+	    manage-account encrypted || return ${?}
+	    ;;
+	admin|ftp|send)
+	    local email=${ARGS[2]}
+	    check-email ${email} || return 17
+
+	    case ${key} in
+		admin)
+		    local name=${ARGS[3]}
+		    check-email-name "${name}" || return 253
+		    export ADMINISTRATOR_EMAIL=${email}
+		    export ADMINISTRATOR_NAME=${name}
+		    ;;
+		ftp)
+		    export ANONYMOUS_FTP_EMAIL=${email}
+		    ;;
+		send)
+		    local name=${ARGS[3]}
+		    local subject=${ARGS[4]}
+		    local message=${ARGS[5]}
+		    local output=${ARGS[6]}
+
+		    send-email-test ${email} "${name}" "${subject}" "${message}" "${output}" || return 254
+		    test "${output}" == stdout || info 6
+		    return 0
+		    ;;
+		*)
+		    return 255
+		    ;;
+	    esac
+	    SAVENV=1
+	    ;;
+	*)
+	    return 1
+	    ;;
+    esac
+}
+
+main "${@}"

@@ -1,0 +1,130 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       InitScript
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+source /lib/lsb/init-functions
+
+CACHEGUARD_DIR=/etc/sysconfig/cacheguard
+source ${CACHEGUARD_DIR}/constant
+source ${APPLIANCE_DIR}/etc/role
+
+IPTABLES_CONFIG=/etc/sysconfig/iptables
+
+test -x /usr/sbin/xtables-legacy-multi || exit 1
+test -L /usr/sbin/iptables || exit 3
+test -L /usr/sbin/iptables-restore || exit 5
+test -L /usr/sbin/iptables-save || exit 7
+test -L ${IPTABLES_CONFIG} || exit 9
+
+IPTABLES=iptables
+IPTABLES_RESTOR=iptables-restore
+IPTABLES_SAVE=iptables-save
+SERV=Firewall
+
+iftable() {
+    if fgrep -qsx ${1} /proc/net/ip_tables_names ; then
+	${IPTABLES} -t "${@}"
+    fi
+}
+
+case "${1}" in
+    start)
+	log_info_msg "Starting ${SERV}..."
+	tables=$(cat /proc/net/ip_tables_names 2>/dev/null)
+	${IPTABLES} -F && ${IPTABLES} -X && ${IPTABLES} -Z && \
+	    for table in ${tables}; do ${IPTABLES} -t ${table} -F; done && \
+	    for table in ${tables}; do ${IPTABLES} -t ${table} -X; done && \
+	    for table in ${tables}; do ${IPTABLES} -t ${table} -Z; done && \
+	    grep -v "^[[:space:]]*#" ${IPTABLES_CONFIG} | \
+	    grep -v '^[[:space:]]*$' | ${IPTABLES_RESTOR} -c &&
+	RETVAL=0 || RETVAL=1
+	evaluate_retval
+	exit ${RETVAL}
+	;;
+    stop)
+	log_info_msg "Stopping ${SERV}..."
+	tables=$(cat /proc/net/ip_tables_names 2>/dev/null)
+	iftable filter -P INPUT ACCEPT && \
+	    iftable raw    -P PREROUTING ACCEPT && \
+	    iftable raw    -P OUTPUT ACCEPT && \
+	    iftable filter -P OUTPUT ACCEPT && \
+	    iftable filter -P FORWARD ACCEPT && \
+	    iftable nat    -P PREROUTING ACCEPT && \
+	    iftable nat    -P POSTROUTING ACCEPT && \
+	    iftable nat    -P OUTPUT ACCEPT && \
+	    iftable mangle -P PREROUTING ACCEPT && \
+	    iftable mangle -P INPUT ACCEPT && \
+	    iftable mangle -P FORWARD ACCEPT && \
+	    iftable mangle -P OUTPUT ACCEPT && \
+	    iftable mangle -P POSTROUTING ACCEPT && \
+	    for table in ${tables} ; do ${IPTABLES} -t ${table} -F ; done && \
+	    for table in ${tables} ; do ${IPTABLES} -t ${table} -X ; done && \
+	    RETVAL=0 || RETVAL=1
+	evaluate_retval
+	exit ${RETVAL}
+	;;
+    restart)
+	${0} stop
+	sleep 1
+	${0} start
+	;;
+    save)
+	log_info_msg "Saving current rules to ${IPTABLES_CONFIG}..."
+	touch ${IPTABLES_CONFIG}
+	chmod 600 ${IPTABLES_CONFIG}
+	${IPTABLES_SAVE} -c > ${IPTABLES_CONFIG} \
+	    2>/dev/null && \
+	    RETVAL=0 || RETVAL=1
+	evaluate_retval
+	exit ${RETVAL}
+	;;
+    panic)
+	echo $"Changing target policies to DROP..."
+	iftable filter -P INPUT DROP && \
+	    iftable raw    -P PREROUTING DROP && \
+	    iftable raw    -P OUTPUT DROP && \
+	    iftable filter -P FORWARD DROP && \
+	    iftable filter -P OUTPUT DROP && \
+	    iftable mangle -P PREROUTING DROP && \
+	    iftable mangle -P OUTPUT DROP && \
+	    iftable mangle -P POSTROUTING DROP && \
+	    iftable mangle -P INPUT DROP && \
+	    iftable mangle -P FORWARD DROP && \
+	    RETVAL=0 || RETVAL=1
+	evaluate_retval
+	exit ${RETVAL}
+	;;
+    status)
+	tables=$(cat /proc/net/ip_tables_names 2>/dev/null)
+	for table in ${tables} ; do
+	    echo $"Table: ${table}"
+	    ${IPTABLES} -t ${table} --list -n
+	done && RETVAL=0 || RETVAL=1
+	exit ${RETVAL}
+	;;
+    
+    *)
+	echo "Usage: ${0} {start|stop|restart|status|save}"
+	exit 1
+	;;
+esac

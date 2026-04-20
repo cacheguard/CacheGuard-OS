@@ -1,0 +1,133 @@
+Manage the Web access authentication
+.SH SYNOPSIS
+
+[1] \fBauthenticate\fR [(\fBweb\fR | \fBrweb\fR) [\fBon\fR | \fBoff\fR]]
+
+[2] \fBauthenticate\fR [mode\fR [(\fBldap\fR | \fBkerberos\fR) [\fBon\fR | \fBoff\fR]]]
+
+[3] \fBauthenticate\fR [ldap [request\fR ['\fI<user-base-dn>\fR' '\fI<login-attr>\fR' ['\fI<passwd-attr>\fR' ['\fI<ldap-filter>\fR' ['\fI<group-dn>\fR']]]]]]
+
+[4] \fBauthenticate\fR [\fBldap server\fR [(\fBraz\fR | (\fBadd\fR | \fBdel\fR) (\fBldap\fR | \fBldaps\fR | \fBsldap\fR) \fI<name>\fR \fI<ip>\fR [\fI<port>]\fR)]]
+
+[5] \fBauthenticate\fR [\fBldaps\fR [\fBca\fR [\fBraz\fR | \fBset\fR \fI<ca-id>\fR]]]
+
+[6] \fBauthenticate\fR [\fBldap [binddn\fR ['\fI<dn>\fR' [(\fBoff\fR | \fBon\fR) \fI<password>\fR]]]]
+
+[7] \fBauthenticate\fR [\fBldap\fR [\fBtest\fR [<login-name> [<password>]]]]
+
+[8] \fBauthenticate\fR [\fBkerberos\fR [(\fBencrypt\fR [(\fBdes\fR | \fBaes\fR)]) | (\fBweb\fR \fI<canonical-name>\fR) | (\fBhapassword\fR \fI<shared-password>\fR)]]
+
+[9] \fBauthenticate\fR [\fBkerberos\fR [\fBserver\fR [(\fBraz\fR | (\fBadd\fR | \fBdel\fR) \fI<kerberos-server>\fR)]]]
+
+[10] \fBauthenticate\fR [\fBkerberos\fR [\fBrweb\fR [\fBadd\fR \fI<site-name>\fR \fI<canonical-name>\fR  | \fBdel\fR \fI<site-name>\fR | \fBraz\fR]]]
+
+[11] \fBauthenticate\fR [\fBkerberos\fR [(\fBcreate\fR \fI<admin-user>\fR [\fI<admin-password>\fR [\fBwait\fR]]) | \fBreport\fR]]
+
+[12] \fBauthenticate\fR [\fBad [rdn\fR [<host-relative-dn>]]]
+
+.SH DESCRIPTION
+
+This command is used to configure the authentication module. The authentication module allows restricting the Web (or rWeb) usage to authenticated users only.
+
+The first [1] usage form allows you to define target authenticated users. The keyword \fBrweb\fR specifies users accessing reverse websites (see the command \fBrweb\fR) while the keyword \fBweb\fR specifies forwarding users accessing all other websites. Forwarding users are located behind the appliance while end-uses of reverse websites can be located in front of the appliance (coming form the internet) as well as behind the appliance. Keywords \fBon\fR and \fBoff\fR allow you respectively to activate or deactivate the authentication for a target.
+
+The second [2] usage form allows you to set the authentication mode. Two authentication modes are supported: LDAP and Kerberos. With the LDAP authentication, the browser basic authentication is used. In this authentication mode, the user is asked to enter its login/password in a popup window (the user should have an account on the LDAP server). With the Kerberos authentication, no login/password is requested as the authentication is negotiated with the Kerberos domain controller (and the same credentials used to login to the client machine is then used - This is called SSO: Single Sign On).
+
+While in most cases, only one of these two authentication modes is to be activated you, you have the possibility to activate both modes at. In this case, the authentication behaviour would then be as follows:
+
+\(bu Forwarding users accessing the Web are authenticated using the Kerberos protocol first. If the Kerberos authentication fails, the LDAP authentication is used.
+
+\(bu Reverse users accessing cloaked/protected websites are authenticated the same way as before if the WAF mode is deactivated. With the WAF mode being activated, two behaviours are possible: if the Kerberos mode is explicitly activated for the reverse website (see usage form number ten), only the Kerberos authentication is used. Otherwise the LDAP authentication is used.
+
+Usage forms from the third to sixth [3][4][5][6] allow you to configure the LDAP authentication. To configure LDAP authentication, use the keyword \fBldap\fR followed by the appropriate argument.
+
+The third usage form allows you to set the LDAP request sent to LDAP servers. To set the LDAP request use the keyword \fBrequest\fR followed by:
+
+\(bu The base DN (Distinguished Name) under which users are located.
+
+\(bu The attribute name that contains the user login.
+
+\(bu The the attribute name that contain the user password (if not specified, the bind method is used).
+
+\(bu The LDAP search filter to locate users under the base DN.
+
+\(bu Optionally an LDAP group identified by its DN  to which users should belong.
+
+Empty values ('') can be used as the \fI<passwd-attr>\fR and the \fI<ldap-filter>\fR arguments. If an empty value is specified as the \fI<passwd-attr>\fR, an LDAP binding is performed during the basic authentication phase instead of a comparison of the entered password against the value stored in the \fI<passwd-attr>\fR LDP attribute (this is the preferred method used by Microsoft\[rg] AD (Active Directory\[rg]). Please note that the login attribute in AD\[rg] is \fIsAMAccountName\fR (or \fIcn\fR). Note that there is a limitation in specifying a password attribute: When the \fBwaf\fR mode is activated or the \fBantivirus\fR and \fBcompress\fR modes are both activated, the given password attribute is ignored and the LDAP bind is used instead.
+
+In case where an optional LDAP group is specified, members of that group should be identified by their DN and stored in the \fImember\fR attribute of that group. Please note that as LDAP DNs and filters contains the character '=' they must be enclosed in quotation marks to avoid being interpreted by the shell. For instance consider the following command:
+
+\fBauthenticate ldap request\fR \fI'ou=people,dc=example,dc=com' 'uid' '' 'objectClass=inetOrgPerson' 'cn=web,ou=groups,dc=example,dc=com'\fR
+
+This command allows you to authenticate users of the class \fIinetOrgPerson\fR registered under the object \fIou=people,dc=example,dc=com\fR and identified by the LDAP attributes \fIcn\fR. In addition, this command specifies a group identified by the DN \fIcn=web,cn=groups,dc=example,dc=com\fR to which users should belong to be considered as properly identifed.
+
+As another example to request a Microsoft\[rg] AD (Active Directory\[rg]) you can use the following command:
+
+\fBauthenticate ldap requestt\fR  \fI'cn=users,dc=example,dc=com' sAMAccountName\fR
+
+The fourth [4] usage form allows you to manage LDAP servers. To add an LDAP server, use the keyword \fBadd\fR followed by the LDAP protocol (\fBldap\fR, \fBldaps\fR or \fBsldap\fR), the LDAP server network name, IP address and optionally port number. If no port number is specified, standard port numbers are used (389 for ldap/sldap and 636 for ldaps).  Allowed LDAP protocol types are: \fBldap\fR, \fBldaps\fR and \fBsldap\fR. The protocol type \fBldap\fR stands for the clear (without encryption) LDAP protocol while \fBldaps\fR and \fBsldap\fR are used for SSL/TLS encrypted LDAP protocols. To specify LDAP over SSL/TLS use the type \fBldaps\fR. To specify SSL/TLS encryption within LDAP, use the type \fBsldap\fR (refers to \fISTARTTLS\fR). Note that the \fBsldap\fR type cannot be mixed with other types. That means if the LDAP servers list contains an \fBsldap\fR server, all other LDAP servers must be \fBsldap\fR servers. To delete an LDAP server replace the keyword \fBadd\fR by the keyword \fBdel\fR in the latter syntax. To erase all LDAP servers use the keyword \fBraz\fR.
+
+For a higher level of security, an SSL certificate presented by an LDAP\fBS\fR server can be verified against the CA certificate that was used to sign it. The fifth [5] usage form allows you to activate this feature by specifying the CA certificate ID (\fI<ca-id>\fR) to be used for verification. To add and import a CA certificate, see the \fBtls\fR command.
+
+Usually LDAP servers require that a client (here the an appliance) authenticate itself before being able to send LDAP request. This authentication process is called binding. The sixth [6] usage form allows you to activate of deactivate the LDAP binding and configure the DN (Distinguished Name) and password to use for the binding process. To activate the binding, use the keyword \fBbinddn\fR followed by the DN of a privileged user (usually the \fIadministrator\fR user), the keyword \fBon\fR and the authentication password for that privileged user (on the LDAP server). The password specified here should not be longer that 64 characters. You can also use the command \fBpassword\fR to set the binding password. If no binding is required, use the keyword \fBoff\fR instead of the keyword on (no password is required). Tip: the Bind DN for a Microsoft\[rg] AD (Active Directory\[rg]) is usually in the form of: \fIcn=administrator,cn=users,dc=example,dc=com\fR.
+
+The seventh [7] usage form allows you to test the authentication against configured LDAP servers. Please note that as with any other commands the new configuration should be applied using the command \fBapply\fR before being able to test the authentication.
+
+Usage forms eighth to twelfth [8][9][10][11][12] allow you to configure the Kerberos authentication against an AD\[rg] server. The keyword \fBencrypt\fR allows you to set the encryption type to use during authentication negotiations. Allowed encryption types are \fBdes\fR and \fBaes\fR. The keyword \fBweb\fR allows you to set the name by which the appliance system is identified as a Web proxy. This should typically be the name that you use to set Web proxies at the client side (the Web browser). Please note that a canonical short name should be specified here (\fIproxy\fR for instance). See below the definition of a valid canonical name.
+
+In an HA configuration (with two or more redundant nodes), in order to allow the service continuity (in case of a failure on a node), all nodes should use the same service name and share the same account password on Kerberos servers. In this case the used password should never expire or change (if you modify the account password on an HA node, think about modifying it on all other HA nodes). The keyword \fBhapassword\fR allows you to set the shared account password. Refer to the commands \fBha\fR and \fBvrrp\fR to get help on how to configure the HA mode.
+
+Please note that in a non HA configuration (with a stand alone node), the \fBhapassword\fR is not used as the system generates a random password and automatically changes it whenever it get older than 21 days.
+
+To enable the Kerberos authentication mode, at least one Kerberos server (preferably two) should be specified. Kerberos servers can be specified by their DNS names or IP addresses. The present system is compatible with AD\[rg] domain controller. To use an AD\[rg] as a Kerberos server, the relative base DN of the present system should be specified in order to allow the AD\[rg] to identify it in its LDAP directory tree. To get the relative base DN of an LDAP object, you should  remove the name specification prefix (cn=\fI<name>\fR) and the domain name specification part in an FDN (Full Distinguish Name). For instance if your domain name (see the \fBdomainname\fR command) is \fIexample.com\fR and if your system is identified by the FDN \fIcn=proxy,cn=computers,dc=example,dc=com\fR in your AD\[rg] LDAP directory tree, your relative base DN will be \fIcn=computers\fR. The \fBauthenticate ad rdn\fR usage form allows you to specify that relative base DN.
+
+The Kerberos authentication can also be activated for users of reverse websites provided that users to authenticate depend on the same Kerberos servers as the reverse proxy (\fBrweb\fR module). The Kerberos authentication is not activated for all reverse websites but only for reverse websites that are associated to a canonical name (short hostname). To associate a canonical name to a reverse website use the keywords \fBauthenticate kerberos rweb add\fR followed by an existing reverse website name and a valid canonical name. See below the definition of a valid canonical name. To deactivate the Kerberos authentication for a reverse website use the  keywords \fBauthenticate kerberos rweb del\fR followed by the reverse website name. To deactivate the Kerberos authentication for all reverse websites use the keywords \fBauthenticate kerberos rweb raz\fR.
+
+It is important to note that the first time the Kerberos authentication mode is activated (after the \fBapply\fR operation), the Kerberos authentication should be initialised. During the initialisation process all LDAP objects associated to services provided by the proxy (\fIHTTP/proxy.example.com\fR in the example above) and the reverse proxy are created in AD\[rg]. Also the initialisation process allows your system to obtain a Kerberos tickets. To this end, it is necessary to use an AD\[rg] account with administrator permissions (user \fIadministrator\fR for instance). The \fBauthenticate kerberos create\fR \fI<admin-user>\fR usage form allows you to initialise the Kerberos authentication. The initialisation process runs in background unless the \fI<admin-password>\fR is specified on the command line and the \fBwait\fR keyword is used. This command requires that you interactively enter the password associated to the used administrator account. The given password here is not permanently saved and is removed after having obtained a Kerberos ticket. Please note that the Kerberos initialisation is an asynchronous operation and is executed in background. The \fBreport\fR keyword allows you to display a report of the last Kerberos initialisation operation.
+
+.SH GENERAL NOTES
+Because an LDAP filter or a distinguished name contains the equal character, it should be quoted with simple or double quotes. Otherwise the shell interpreter considers that as a variable setting.
+
+.SH KERBEROS NOTES
+
+Since the security of Kerberos authentication is in part based upon the time stamps of tickets, it is critical to have accurately set clocks on Kerberos servers and the present system. For this doing, the usage of NTP servers is highly recommended (see the command \fBntp\fR).
+
+Regarding the Kerberos encryption type, if your AD is running on a Windows\[rg] server 2003 you should use the DES encryption type. For Windows\[rg] server 2008 and above the AES encryption type should be used (DES is an acronym of Data Encryption Standard while AES stands for Advanced Encryption Standard).
+
+A canonical name is a string beginning with an alphanumeric character with a maximum length of 14 characters and containing a combination of alphanumeric and the dash ("\fI-\fR") characters. A canonical name should contain at least one alphabetic character and can't begin or end with the dash character.
+
+.SH KERBEROS, AD\[rg] AND FIREWALL
+\(bu If your appliance is placed behind a third party firewall, you should allow the following traffic in order to allow the kerberos authentication against AD\[rg] servers:
+
+\(bu Kerberos traffic (TCP 88) form the appliance to the Kerberos servers (AD\[rg]).
+
+\(bu Kerberos password traffic (UDP 464) form the appliance to Kerberos servers (AD\[rg]).
+
+\(bu LDAP traffic (TCP 389) form the appliance to the AD\[rg] servers.
+
+.SH LIMITATIONS
+The authentication is not supported in transparent mode.
+
+.SH SEE ALSO
+.B access
+(1)
+.B clock
+(1)
+.B domainname
+(1)
+.B ha
+(1)
+.B mode
+(1)
+.B ntp
+(1)
+.B password
+(1)
+.B rweb
+(1)
+.B tls
+(1)
+.B vrrp
+(1)
+.B waf
+(1)

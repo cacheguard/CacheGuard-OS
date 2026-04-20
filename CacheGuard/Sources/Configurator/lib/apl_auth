@@ -1,0 +1,615 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       Configurator
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+set-auth-parameters()
+{
+    export LDAP_HOSTS=$(print-ldap-urls "${LDAP_SERVER_LIST}")
+    export DOMAIN_NAME_DN=$(get-domain-controller-chain ${DOMAIN_NAME})
+}
+
+test-ldap-auth-state()
+{
+    test ${AUTHENTICATE_MODE} == True || return 111
+    test ${AUTHENTICATE_LDAP} == True || return 113
+    test -n "${LDAP_BASE_DN}" -a -n "${LDAP_LOGIN}" -a -n "${LDAP_SERVER_LIST}" || return 115
+}
+
+test-kerberos-auth-state()
+{
+    test ${AUTHENTICATE_MODE} == True || return 111
+    test ${AUTHENTICATE_KERBEROS} == True || return 113
+    test -n "${KERBEROS_SERVER_LIST}" || return 115
+}
+
+test-ldap-auth-attribute-group-ok()
+{
+    test -n "${LDAP_GROUP_DN}"
+}
+
+test-auth-state()
+{
+    test-ldap-auth-state || test-kerberos-auth-state
+}
+
+test-kerberos-create-required()
+{
+    test ${AUTHENTICATE_MODE} == True || return 111
+    test ${AUTHENTICATE_KERBEROS} == True || return 113
+    test ${AUTHENTICATE_MODE} == ${CURRENT_AUTHENTICATE_MODE} || return 0
+    test ${AUTHENTICATE_KERBEROS} == ${CURRENT_AUTHENTICATE_KERBEROS} || return 0
+
+    test ${KERBEROS_ENCRYPT_TYPE} == ${CURRENT_KERBEROS_ENCRYPT_TYPE} || return 0
+    test ${KERBEROS_HA_SHARED_PASSWORD} == ${CURRENT_KERBEROS_HA_SHARED_PASSWORD} || return 0
+    test "${KERBEROS_SERVER_LIST}" == "${CURRENT_KERBEROS_SERVER_LIST}" || return 0
+
+    test ${HA_MODE} == ${CURRENT_HA_MODE} || return 0
+
+    if test ${WEB_MODE} == True ; then
+	test ${WEB_MODE} == ${CURRENT_WEB_MODE} || return 0
+	test ${KERBEROS_SERVICE_NAME} == ${CURRENT_KERBEROS_SERVICE_NAME} || return 0
+    fi
+    
+    if test ${RWEB_MODE} == True ; then
+	test ${RWEB_MODE} == ${CURRENT_RWEB_MODE} || return 0
+	test "${KERBEROS_RWEB_LIST}" == "${CURRENT_KERBEROS_RWEB_LIST}" || return 0
+	return 115
+    else
+	return 117
+    fi
+}
+
+is-rweb-kerberos()
+{
+    test -n "${1}" || return 1
+    local in_name=${1}
+
+    local i=0 n=0 elt range
+    local name
+
+    for elt in ${KERBEROS_RWEB_LIST}
+    do
+	range=$[${i} % 2]
+	case ${range} in
+	    0)
+		name=${elt}
+		;;
+	    1)
+		test ${name} != ${in_name} || return 0
+		;;
+	    *)
+		;;
+	esac
+	((i++))
+    done
+
+    return 11
+}
+
+set-kerberos-create-state()
+{
+    if test-kerberos-auth-state ; then
+	! test-kerberos-create-required || touch ${TMP_DIR}/${KERBEROS_CREATE_FILENAME}
+    else
+	rm -f ${TMP_DIR}/${KERBEROS_CREATE_FILENAME}
+    fi
+}
+
+get-auth-squid-acl()
+{
+    test ${AUTHENTICATE_MODE} == True || return 11
+
+    if test ${AUTHENTICATE_LDAP} == True ; then
+	if test-ldap-auth-attribute-group-ok ; then
+	    echo "authenticate ldap-group"
+	else
+	    echo "authenticate"
+	fi
+    else
+	test ${AUTHENTICATE_KERBEROS} == False || echo "authenticate"
+    fi	    
+}
+
+gen-httpd-auth-ldap-general()
+{
+    local users=16
+
+    test  ${WEB_MODE} == False -o  ${AUTHENTICATE_WEB} == False || ((users +=  USERS_NB))
+    test ${RWEB_MODE} == False -o ${AUTHENTICATE_RWEB} == False || ((users += RUSERS_NB))
+
+    echo "LDAPCacheEntries ${users}"
+    echo "LDAPCacheTTL ${AUTHENTICATE_LDAP_TTL}"
+    echo "LDAPConnectionTimeout ${LDAP_CONNECTION_TIMEOUT}"
+    echo "LDAPOpCacheEntries ${users}"
+    echo "LDAPOpCacheTTL 7200"
+    echo "LDAPSharedCacheSize 0"
+
+    if test -s ${LDAP_DIR}/${LDAP_CA} ; then
+	echo "LDAPVerifyServerCert On"
+	echo "LDAPTrustedGlobalCert CA_BASE64 ${LDAP_DIR}/${LDAP_CA}"
+    else
+	echo "LDAPVerifyServerCert Off"
+    fi
+}
+
+gen-httpd-auth-kerberos-general()
+{
+    :
+}
+
+gen-httpd-rweb-auth-ldap-conf()
+{
+    local elt i=0
+    local proto name ip port
+
+    echo "AuthType Basic"
+    echo "AuthName \"Please authenticate yourself\""
+    echo "AuthBasicProvider ldap"
+    echo "AuthLDAPCompareDNOnServer On"
+    echo "AuthLDAPDereferenceAliases always"
+    echo "AuthLDAPGroupAttribute \"member\""
+    echo "AuthLDAPGroupAttributeIsDN On"
+    echo "AuthLDAPBindAuthoritative Off"
+
+    if test "${LDAP_BIND_MODE}" == True -a -s ${LDAP_DIR}/${LDAP_PASSWD} ; then
+	echo "AuthLDAPBindDN \"${LDAP_BIND_DN}\""
+	echo "AuthLDAPBindPassword \"${LDAP_BIND_PASSWORD}\""
+    fi
+
+    local uri="${LDAP_BASE_DN}?${LDAP_LOGIN}?sub?${LDAP_FILTER}"
+
+    for elt in ${LDAP_SERVER_LIST}
+    do
+	range=$[${i} % 4]
+	case ${range} in
+	    0)
+		proto=${elt}
+		;;
+	    1)
+		name=${elt}
+		;;
+	    2)
+		ip=${elt}
+		;;
+	    3)
+		port=${elt}
+
+		case ${proto} in
+		    ldap)
+			echo "AuthLDAPUrl \"ldap://${ip}:${port}/${uri}\""
+			;;
+		    ldaps)
+			echo "AuthLDAPUrl \"ldaps://${name}:${port}/${uri}\" SSL"
+			;;
+		    sldap)
+			echo "AuthLDAPUrl \"ldap://${name}:${port}/${uri}\" TLS"
+			;;
+		    *)
+			;;
+		esac
+		;;
+	    *)
+		;;
+	esac
+	((i++))
+    done
+
+    if test-ldap-auth-attribute-group-ok ; then
+	echo "Require ldap-group ${LDAP_GROUP_DN}"
+    else
+	echo "Require valid-user"
+    fi
+    echo "Satisfy All"
+}
+
+gen-httpd-rweb-auth-kerberos-conf()
+{
+    test -n "${1}" || return 1
+    local name=${1}
+
+    local realm=${DOMAIN_NAME^^}
+
+    echo "AuthType GSSAPI"
+    echo "AuthName \"SSO on ${realm}\""
+
+    echo "GssapiSSLonly Off"
+    echo "GssapiLocalName On"
+    echo "GssapiConnectionBound Off"
+    echo "GssapiSignalPersistentAuth Off"
+    echo "GssapiUseSessions Off"
+    test ${HA_MODE} == False || echo "GssapiSessionKey key:${KERBEROS_HA_SHARED_PASSWORD}"
+    echo "GssapiCredStore keytab:${KERBEROS_KEYTAB_FILE_PROXY2}"
+    echo "GssapiDelegCcacheUnique Off"
+    echo "GssapiBasicAuth On"
+    echo "GssapiNegotiateOnce Off"
+    echo "GssapiImpersonate Off"
+    echo "GssapiPublishErrors Off"
+    echo "GssapiBasicTicketTimeout 300"
+    echo "GssapiPublishMech Off"
+
+    echo "Require valid-user"
+    echo "Satisfy All"
+}
+
+gen-auth-ldap-squid()
+{
+    test-ldap-auth-state || return 1
+
+    local ldap_req_timeout=45
+    local sldap password
+    ! test-sldap "${LDAP_SERVER_LIST}" || sldap=" -Z"
+
+    local passwd_opt filter_opt
+
+    test -z "${LDAP_PASSWORD}" || passwd_opt=" -U \"${LDAP_PASSWORD}\""
+
+    if test -z "${filter}" ; then
+	filter_opt="${LDAP_LOGIN}=%s"
+    else
+	filter_opt="(&(${LDAP_FILTER})(${LDAP_LOGIN}=%s))"
+    fi
+
+    test ${LDAP_BIND_MODE} == False || password=" -D \"${LDAP_BIND_DN}\" -W \"${LDAP_DIR}/${LDAP_PASSWD}\""
+
+    echo "auth_param basic credentialsttl ${AUTHENTICATE_LDAP_TTL} seconds"
+    echo -n "auth_param basic program /libexec/basic_ldap_auth -v 3 -c ${LDAP_CONNECTION_TIMEOUT} -t ${ldap_req_timeout} -s sub -a never -R -b \"${LDAP_BASE_DN}\" -f \"${filter_opt}\"${passwd_opt}${password}${sldap} ${LDAP_HOSTS}"
+    echo
+
+    if test-ldap-auth-attribute-group-ok ; then
+
+	local group_name group_attribute group_base_dn
+	group_name=${LDAP_GROUP_DN// }
+	group_base_dn=${LDAP_GROUP_DN#*,}
+	group_name=${group_name/,*}
+	group_attribute=${group_name/=*}
+	group_name=${group_name/*=}
+	echo
+	echo -n "external_acl_type ldapgroup ipv4 children-max=${AUTH_CHILDREN} %LOGIN /libexec/ext_ldap_group_acl -v 3 -c ${LDAP_CONNECTION_TIMEOUT} -t ${ldap_req_timeout} -s sub -a never -B \"${LDAP_BASE_DN}\" -F \"${filter_opt}\" -b \"${group_base_dn}\" -f \"(&(${group_attribute}=%g)(member=%u))\"${password} ${sldap} ${LDAP_HOSTS}"
+	echo
+	echo "acl ldap-group external ldapgroup ${group_name}"
+    fi
+
+    return 0
+}
+
+gen-squid-auth-kerberos-service()
+{
+    echo -n "auth_param negotiate program /libexec/negotiate_kerberos_auth -k ${KERBEROS_KEYTAB_FILE_PROXY1} -r -s "
+}
+
+gen-squid-auth-kerberos-service-named()
+{
+    gen-squid-auth-kerberos-service
+    echo "HTTP/${KERBEROS_SERVICE_NAME}.${DOMAIN_NAME}"
+}
+
+gen-squid-auth-kerberos-service-not-named()
+{
+    gen-squid-auth-kerberos-service
+    echo "GSS_C_NO_NAME"
+}
+
+gen-squid-auth-kerberos()
+{
+    echo "auth_param negotiate realm Please authenticate yourself"
+    if test ${PROXY2_MODE} == True ; then
+	gen-squid-auth-kerberos-service-named
+    else
+	if test ${RWEB_MODE} == True -a -n "${KERBEROS_RWEB_LIST}" ; then
+	    gen-squid-auth-kerberos-service-not-named
+	else
+	    gen-squid-auth-kerberos-service-named
+	fi
+    fi
+}
+
+gen-auth-wrapper-squid()
+{
+    echo "auth_param negotiate program /libexec/negotiate_wrapper_auth --kerberos /libexec/negotiate_kerberos_auth --ntlm /libexec/basic_ldap_auth"
+}
+
+gen-squid-auth-access()
+{
+    local auth_acl=${1}
+    test -n "${auth_acl}" || return 1
+
+    if test ${AUTHENTICATE_KERBEROS} == True ; then
+	if test ${AUTHENTICATE_LDAP} == True ; then
+	    gen-auth-wrapper-squid
+	    gen-squid-auth-kerberos
+	    gen-auth-ldap-squid
+	    echo "acl authenticate proxy_auth REQUIRED"
+	else
+	    gen-squid-auth-kerberos
+	    echo "acl authenticate proxy_auth REQUIRED"
+	fi
+    else
+	if test ${AUTHENTICATE_LDAP} == True ; then
+	    gen-auth-ldap-squid
+	    echo "acl authenticate proxy_auth REQUIRED"
+	fi
+    fi
+}
+
+gen-auth-dummy-squid-access()
+{
+    echo "auth_param basic program /libexec/dummy_auth"
+    echo "acl dummy-auth proxy_auth REQUIRED"
+}
+
+set-ldap-passwd()
+{
+    test -n "${1}" || return 1
+    local context=${1}
+
+    if test ${LDAP_BIND_MODE} == False ; then
+	rm -f ${PROXY_DIR}${LDAP_DIR}/${LDAP_PASSWD}
+	rm -f ${LDAP_DIR}/${LDAP_PASSWD}
+	return 0
+    fi
+
+    case ${context} in
+	apply)
+	    test "${LDAP_BIND_PASSWORD}" != "${CURRENT_LDAP_BIND_PASSWORD}" || return 0
+	    ;;
+	*)
+	    ;;
+    esac
+
+    touch ${PROXY_DIR}${LDAP_DIR}/${LDAP_PASSWD}
+    chown ${SQUID_UID}:${SQUID_GID} ${PROXY_DIR}${LDAP_DIR}/${LDAP_PASSWD}
+    chmod 400 ${PROXY_DIR}${LDAP_DIR}/${LDAP_PASSWD}
+    echo "${LDAP_BIND_PASSWORD}" > ${PROXY_DIR}${LDAP_DIR}/${LDAP_PASSWD}
+
+    touch ${LDAP_DIR}/${LDAP_PASSWD}
+    chown ${HTTPD_UID}:${HTTPD_GID} ${LDAP_DIR}/${LDAP_PASSWD}
+    chmod 400 ${LDAP_DIR}/${LDAP_PASSWD}
+    echo "${LDAP_BIND_PASSWORD}" > ${LDAP_DIR}/${LDAP_PASSWD}
+}
+
+gen-ldap-conf()
+{
+    echo "DEREF never"
+    echo "REFERRALS on"
+    echo "VERSION 2"
+    echo "SASL_NOCANON off"
+    echo "SASL_CBINDING none"
+    echo "SASL_REALM ${DOMAIN_NAME^^}"
+
+    echo "GSSAPI_SIGN off"
+    echo "GSSAPI_ENCRYPT off"
+    echo "GSSAPI_ALLOW_REMOTE_PRINCIPAL off"
+
+    echo "URI ${LDAP_HOSTS}"
+    echo "BASE ${DOMAIN_NAME_DN}"
+
+    test ${LDAP_BIND_MODE} == False || echo "BINDDN ${LDAP_BIND_DN}"
+
+    if test -s ${PROXY_DIR}${LDAP_DIR}/${LDAP_CA} ; then
+	echo "TLS_REQCERT demand"
+	echo "TLS_REQSAN demand"
+	echo "TLS_CRLCHECK none"
+	echo "TLS_CACERT ${LDAP_DIR}/${LDAP_CA}"
+    else
+	echo "TLS_REQCERT never"
+	echo "TLS_REQSAN never"
+    fi
+}
+
+set-file-server-passwd()
+{
+    test "${FILE_SERVER_PASSWORD_LIST}" != "${CURRENT_FILE_SERVER_PASSWORD_LIST}" || return 0
+
+    local base=${BASE_DIR}/${ACCOUNT}
+
+    log "Updating file servers password list"
+
+    if test -z "${FILE_SERVER_PASSWORD_LIST}" ; then
+	rm -f ${base}/.netrc.ftp
+	rm -f ${base}/.netrc.sftp
+	log-result 0
+	return 0
+    fi
+
+    local protocol server login password
+    local elt i=0 range
+
+    local tmp_ftp_file=/tmp/.netrc.ftp.${$}
+    local tmp_sftp_file=/tmp/.netrc.sftp.${$}
+    rm -f ${tmp_ftp_file} ${tmp_sftp_file}
+
+    for elt in ${FILE_SERVER_PASSWORD_LIST}
+    do
+	range=$[${i} % 4]
+	case ${range} in
+	    0)
+		protocol=${elt}
+		;;
+	    1)
+		server=${elt}
+		;;
+	    2)
+		login=${elt}
+		;;
+	    3)
+		password=${elt}
+
+		case ${protocol} in
+		    ftp)
+			echo "machine ${server} login ${login} password ${password}" >> ${tmp_ftp_file}
+			;;
+		    sftp)
+			echo "machine ${server} login ${login} password ${password}" >> ${tmp_sftp_file}
+			;;
+		    *)
+			;;
+		esac
+		;;
+	    *)
+		log-result 11
+		return 11
+		;;
+	esac
+	((i++))
+    done
+
+    local ret=0
+
+    if test -f ${tmp_ftp_file} ; then
+	install -m 640 -o ${ACCOUNT} -g ${GROUP_NAME} ${tmp_ftp_file} ${base}/.netrc.ftp &&
+	rm -f ${tmp_ftp_file}
+	ret=$[${ret} + ${?}]
+    fi
+
+    if test -f ${tmp_sftp_file} ; then
+	install -m 640 -o ${ACCOUNT} -g ${GROUP_NAME} ${tmp_sftp_file} ${base}/.netrc.sftp
+	rm -f ${tmp_sftp_file}
+    fi
+
+    log-result ${ret}
+    return ${ret}
+}
+
+get-file-server-credentials()
+{
+    test -n "${1}" || return 11
+    test -n "${2}" || return 12
+    test -n "${3}" || return 13
+    local state=${1}
+    local in_protocol=${2}
+    local in_server=${3}
+
+    case ${state} in
+	new)
+	    local file_server_password_list=${FILE_SERVER_PASSWORD_LIST}
+	    ;;
+	cur)
+	    local file_server_password_list=${CURRENT_FILE_SERVER_PASSWORD_LIST}
+	    ;;
+	*)
+	    return 4
+	    ;;
+    esac
+
+    local protocol server login password
+    local elt i=0 range
+
+    for elt in ${file_server_password_list}
+    do
+	range=$[${i} % 4]
+	case ${range} in
+	    0)
+		protocol=${elt}
+		;;
+	    1)
+		server=${elt}
+		;;
+	    2)
+		login=${elt}
+		;;
+	    3)
+		password=${elt}
+
+		if test ${protocol} == ${in_protocol} -a ${server} == ${in_server} ; then
+		    echo -n "${login} ${password}"
+		    break
+		fi
+		;;
+	    *)
+		return 15
+		;;
+	esac
+	((i++))
+    done
+
+    test "${protocol}" == ${in_protocol} -a "${server}" == ${in_server}
+}
+
+gen-kerberos-conf()
+{
+    test -n "${1}" || return 1
+    local location=${1}
+
+    local keytab_file dc
+    local realm=${DOMAIN_NAME^^}
+
+    case ${location} in
+	global)
+	    keytab_file=${PROXY_DIR}${KERBEROS_KEYTAB_FILE_PROXY1}
+	    ;;
+	proxy)
+	    keytab_file=${KERBEROS_KEYTAB_FILE_PROXY1}
+	    ;;
+	web)
+	    keytab_file=${KERBEROS_KEYTAB_FILE_PROXY2}
+	    ;;
+	*)
+	    return 11
+	    ;;
+    esac
+
+    echo "[libdefaults]"
+    echo "default_realm = ${realm}"
+    echo "dns_lookup_kdc = no"
+    echo "dns_lookup_realm = no"
+    echo "rdns = no"
+    echo "ticket_lifetime = 24h"
+    echo "default_keytab_name = ${keytab_file}"
+
+    case ${KERBEROS_ENCRYPT_TYPE} in
+	des)
+	    echo "default_tgs_enctypes = rc4-hmac des-cbc-crc des-cbc-md5"
+	    echo "default_tkt_enctypes = rc4-hmac des-cbc-crc des-cbc-md5"
+	    echo "permitted_enctypes = rc4-hmac des-cbc-crc des-cbc-md5"
+	    ;;
+	aes)
+	    echo "default_tgs_enctypes = aes256-cts-hmac-sha1-96 rc4-hmac des-cbc-crc des-cbc-md5"
+	    echo "default_tkt_enctypes = aes256-cts-hmac-sha1-96 rc4-hmac des-cbc-crc des-cbc-md5"
+	    echo "permitted_enctypes = aes256-cts-hmac-sha1-96 rc4-hmac des-cbc-crc des-cbc-md5"
+	    ;;
+	*)
+	    ;;
+    esac
+
+    echo
+
+    echo "[realms]"
+    echo "${realm} = {"
+
+    for dc in ${KERBEROS_SERVER_LIST}
+    do
+	echo "kdc = ${dc}"
+    done
+
+    echo "admin_server = ${KERBEROS_SERVER_LIST/ *}"
+    echo "default_domain = ${DOMAIN_NAME}"
+    echo "}"
+
+    echo
+
+    echo "[domain_realm]"
+    echo ".${DOMAIN_NAME} = ${realm}"
+    echo "${DOMAIN_NAME} = ${realm}"
+}
+
+LIB_APL_AUTH=Yes

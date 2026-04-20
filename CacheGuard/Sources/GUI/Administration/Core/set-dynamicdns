@@ -1,0 +1,73 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       GUI
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+set-dyndns()
+{
+    local transaction=/tmp/${TRANSACTION_FILE}.wadmin.${REMOTE_USER}.${$}
+    rm -f ${transaction}
+
+    local state=${VALUES[0]}
+
+    case ${state} in
+	off)
+	    echo "dynamicdns ${state}" > ${transaction}
+	    ;;
+	on)
+	    local provider=${VALUES[1]}
+	    local hostname=${VALUES[2]}
+	    local password=${VALUES[4]}
+
+	    if test -z "${password}" -o -z "${hostname}" -o -z "${password}" ; then
+		gen-gui-error 2
+		return 0
+	    fi
+
+	    case ${provider} in
+		changeip|myonlineportal|noip)
+
+		    local username=${VALUES[3]}
+
+		    if test -z "${username}" ; then
+			gen-gui-error 2
+			return 0
+		    fi
+		    echo "dynamicdns ${state} ${provider} ${hostname} ${username} '${password}'" > ${transaction}
+		    ;;
+		*)
+		    echo "dynamicdns ${state} ${provider} ${hostname} '${password}'" > ${transaction}
+		    ;;
+	    esac
+	    ;;
+	*)
+	    ;;
+    esac
+
+    local interval=${VALUES[5]}
+
+    echo "dynamicdns interval ${interval}" >> ${transaction}
+
+    execute-transaction ${transaction}
+}
+
+set-dyndns

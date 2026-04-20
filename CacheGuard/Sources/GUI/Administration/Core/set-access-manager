@@ -1,0 +1,77 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       GUI
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+set-access-manager()
+{
+    local pos=0
+    local role_pos interface_pos ip_pos ssh_key_pos
+    local entry_pos del_pos shift_pos
+    local ssh_key
+
+    local transaction=/tmp/${TRANSACTION_FILE}.wadmin.${REMOTE_USER}.${$}
+    rm -f ${transaction}
+
+    while test ${pos} -lt ${ATTRIBUTE_NB}
+    do
+	entry_pos=${pos}
+	del_pos=$[${pos} + 1]
+
+	if [[ "${ATTRIBUTES[${del_pos}]}" =~ ^del_[0-9]+$ ]] ; then
+	    shift_pos=0
+	else
+	    shift_pos=1
+	fi
+
+	role_pos=$[${pos} - ${shift_pos} + 2]
+	interface_pos=$[${pos} - ${shift_pos} + 3]
+	ip_pos=$[${pos} - ${shift_pos} + 4]
+	ssh_key_pos=$[${pos} - ${shift_pos} + 5]
+
+	ssh_key=${VALUES[${ssh_key_pos}]}
+	
+	if test ${shift_pos} -ne 0 ; then
+	    if test "${VALUES[${entry_pos}]}" == anew ; then
+		if test -n "${VALUES[${ip_pos}]}" ; then
+
+		    if test -n "${ssh_key}" ; then
+			ssh_key=$(remove-eol-from-ssh-public-key "${ssh_key}")
+			echo "access manager add ${VALUES[${role_pos}]} ${VALUES[${interface_pos}]} ${VALUES[${ip_pos}]} '${ssh_key}'" >> ${transaction}
+		    else
+			echo "access manager add ${VALUES[${role_pos}]} ${VALUES[${interface_pos}]} ${VALUES[${ip_pos}]}" >> ${transaction}
+		    fi
+		fi
+	    fi
+	    pos=$[${pos} + 5]
+	else
+	    echo "access manager del ${VALUES[${role_pos}]}" >> ${transaction}
+	    pos=$[${pos} + 6]
+	fi
+    done
+
+    execute-transaction ${transaction}    
+}
+
+# Main()
+
+set-access-manager

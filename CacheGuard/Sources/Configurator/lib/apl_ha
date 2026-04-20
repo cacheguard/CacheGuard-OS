@@ -1,0 +1,822 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       Configurator
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+set-vrrp-ip-1()
+{
+    local list=${1}
+
+    local elt range i=0
+    local ip state prio vrrp_id
+    local max_prio=-1
+
+    local vrrp_ip_list
+    local nb=0
+    local vrrp_master_ip="0.0.0.0"
+
+    for elt in ${list}
+    do
+	range=$[${i} % 4]
+	case ${range} in
+	    0)
+		ip=${elt}
+		;;
+	    1)
+		state=${elt}
+		;;
+	    2)
+		prio=${elt}
+		if test ${prio} -gt ${max_prio} ; then
+		    vrrp_master_ip=${ip}
+		    max_prio=${prio}
+		fi
+		;;
+	    3)
+		vrrp_id=${elt}
+		vrrp_ip_list="${vrrp_ip_list} ${ip}"
+	
+		((nb++))
+		;;
+	    *)
+		return 1
+		;;
+	esac
+	((i++))
+    done
+
+    _VRRP_IP_LIST=${vrrp_ip_list:1}
+    _VRRP_IP_NB=${nb}
+    _VRRP_MASTER_IP=${vrrp_master_ip}
+}
+
+set-vrrp-ip()
+{
+    test -n "${1}" || return 1
+    local state=${1}
+
+    case "${state}" in
+	new)
+	    export VRRP_EXTERNAL_IP_LIST=""
+	    export VRRP_EXTERNAL_IP_LIST_NB=0
+
+	    export VRRP_AUXILIARY_IP_LIST=""
+	    export VRRP_AUXILIARY_IP_LIST_NB=0
+
+	    export VRRP_WEB_IP_LIST=""
+	    export VRRP_WEB_IP_LIST_NB=0
+	    export VRRP_WEB_MASTER_IP="0.0.0.0"
+
+	    export VRRP_RWEB_IP_LIST=""
+	    export VRRP_RWEB_IP_LIST_NB=0
+	    export VRRP_RWEB_MASTER_IP="0.0.0.0"
+
+	    export VRRP_AV_IP_LIST=""
+	    export VRRP_AV_IP_LIST_NB=0
+	    export VRRP_AV_MASTER_IP="0.0.0.0"
+
+	    test ${HA_MODE} == True || return 0
+	    ;;
+	cur)
+	    export CURRENT_VRRP_EXTERNAL_IP_LIST=""
+	    export CURRENT_VRRP_EXTERNAL_IP_LIST_NB=0
+
+	    export CURRENT_VRRP_AUXILIARY_IP_LIST=""
+	    export CURRENT_VRRP_AUXILIARY_IP_LIST_NB=0
+
+	    export CURRENT_VRRP_WEB_IP_LIST=""
+	    export CURRENT_VRRP_WEB_IP_LIST_NB=0
+	    export CURRENT_VRRP_WEB_MASTER_IP="0.0.0.0"
+
+	    export CURRENT_VRRP_RWEB_IP_LIST=""
+	    export CURRENT_VRRP_RWEB_IP_LIST_NB=0
+	    export CURRENT_VRRP_RWEB_MASTER_IP="0.0.0.0"
+
+	    export CURRENT_VRRP_AV_IP_LIST=""
+	    export CURRENT_VRRP_AV_IP_LIST_NB=0
+	    export CURRENT_VRRP_AV_MASTER_IP="0.0.0.0"
+
+	    test ${CURRENT_HA_MODE} == True || return 0
+	    ;;
+	*)
+	    return 1
+	    ;;
+    esac
+
+    local flag
+    local devices dev i=0 n
+    local interfaces interface have_vrrp_interfaces
+    declare -a interfaces
+    
+    case "${state}" in
+	new)
+	    set-vrrp-ip-1 "${VRRP_EXTERNAL_LIST}"
+	    VRRP_EXTERNAL_IP_LIST=${_VRRP_IP_LIST}
+	    VRRP_EXTERNAL_IP_LIST_NB=${_VRRP_IP_NB}
+
+	    set-vrrp-ip-1 "${VRRP_AUXILIARY_LIST}"
+	    VRRP_AUXILIARY_IP_LIST=${_VRRP_IP_LIST}
+	    VRRP_AUXILIARY_IP_LIST_NB=${_VRRP_IP_NB}
+
+	    if test ${VLAN_MODE} == True ; then
+
+		if test ${WEB_MODE} == True ; then
+		    set-vrrp-ip-1 "${VRRP_WEB_LIST}"
+		    VRRP_WEB_IP_LIST=${_VRRP_IP_LIST}
+		    VRRP_WEB_IP_LIST_NB=${_VRRP_IP_NB}
+		    VRRP_WEB_MASTER_IP=${_VRRP_MASTER_IP}
+		    devices="${IF_WEB}"
+		    interfaces[${i}]=web ; ((i++))
+		fi
+
+		if test ${RWEB_MODE} == True ; then
+		    if ! member "${devices}" ${IF_RWEB} ; then
+			set-vrrp-ip-1 "${VRRP_RWEB_LIST}"
+			VRRP_RWEB_IP_LIST=${_VRRP_IP_LIST}
+			VRRP_RWEB_IP_LIST_NB=${_VRRP_IP_NB}
+			VRRP_RWEB_MASTER_IP=${_VRRP_MASTER_IP}
+			if test -z "${devices}" ; then
+			    devices="${IF_RWEB}"
+			else
+			    devices="${devices} ${IF_RWEB}"
+			fi
+			interfaces[${i}]=rweb ; ((i++))
+		    fi
+		fi
+		
+		if test ${AV_MODE} == True ; then
+
+		    unset flag
+
+		    test ${AV_INTERNAL} == False  || flag='yes'
+		    test ${VPN_IPSEC_MODE} == False -o ${AV_VPN_IPSEC} == False || flag='yes'
+
+		    if test -n "${flag}" ; then
+			if ! member "${devices}" ${IF_AV} ; then
+			    set-vrrp-ip-1 "${VRRP_AV_LIST}"
+			    VRRP_AV_IP_LIST=${_VRRP_IP_LIST}
+			    VRRP_AV_IP_LIST_NB=${_VRRP_IP_NB}
+			    VRRP_AV_MASTER_IP=${_VRRP_MASTER_IP}
+			    if test -z "${devices}" ; then
+				devices="${IF_AV}"
+			    else
+				devices="${devices} ${IF_AV}"
+			    fi
+			    interfaces[${i}]=antivirus ; ((i++))
+			fi
+		    fi
+		fi
+	    else
+		set-vrrp-ip-1 "${VRRP_INTERNAL_LIST}"
+		VRRP_WEB_IP_LIST=${_VRRP_IP_LIST}
+		VRRP_WEB_IP_LIST_NB=${_VRRP_IP_NB}
+		VRRP_WEB_MASTER_IP=${_VRRP_MASTER_IP}
+		devices="${IF_WEB}"
+		interfaces[${i}]=web ; ((i++))
+	    fi
+
+	    n=${i}
+
+	    for ((i=0 ; i<n ; i++))
+	    do
+		interface=${interfaces[${i}]}
+		case ${interface} in
+		    web)
+			test ${VRRP_WEB_IP_LIST_NB} -eq 0 || have_vrrp_interfaces="${have_vrrp_interfaces} ${interface}"
+			;;
+		    rweb)
+			test ${VRRP_RWEB_IP_LIST_NB} -eq 0 || have_vrrp_interfaces="${have_vrrp_interfaces} ${interface}"
+			;;
+		    antivirus)
+			test ${VRRP_AV_IP_LIST_NB} -eq 0 || have_vrrp_interfaces="${have_vrrp_interfaces} ${interface}"
+			;;
+		    *)
+			;;
+		esac
+	    done
+
+	    have_vrrp_interfaces="${have_vrrp_interfaces:1}"
+	    for interface in web rweb antivirus
+	    do
+		! member "${have_vrrp_interfaces}" ${interface} || continue
+		case ${interface} in
+		    web)
+			if member "${have_vrrp_interfaces}" rweb ; then
+			    VRRP_WEB_IP_LIST=${VRRP_RWEB_IP_LIST}
+			    VRRP_WEB_IP_LIST_NB=${VRRP_RWEB_IP_LIST_NB}
+			    VRRP_WEB_MASTER_IP=${VRRP_RWEB_MASTER_IP}
+			elif member "${have_vrrp_interfaces}" antivirus ; then
+			    VRRP_WEB_IP_LIST=${VRRP_AV_IP_LIST}
+			    VRRP_WEB_IP_LIST_NB=${VRRP_AV_IP_LIST_NB}
+			    VRRP_WEB_MASTER_IP=${VRRP_AV_MASTER_IP}
+			fi
+			;;
+		    rweb)
+			if member "${have_vrrp_interfaces}" web ; then
+			    VRRP_RWEB_IP_LIST=${VRRP_WEB_IP_LIST}
+			    VRRP_RWEB_IP_LIST_NB=${VRRP_WEB_IP_LIST_NB}
+			    VRRP_RWEB_MASTER_IP=${VRRP_WEB_MASTER_IP}
+			elif member "${have_vrrp_interfaces}" antivirus ; then
+			    VRRP_RWEB_IP_LIST=${VRRP_AV_IP_LIST}
+			    VRRP_RWEB_IP_LIST_NB=${VRRP_AV_IP_LIST_NB}
+			    VRRP_RWEB_MASTER_IP=${VRRP_AV_MASTER_IP}
+			fi
+			;;
+		    antivirus)
+			if member "${have_vrrp_interfaces}" web ; then
+			    VRRP_AV_IP_LIST=${VRRP_WEB_IP_LIST}
+			    VRRP_AV_IP_LIST_NB=${VRRP_WEB_IP_LIST_NB}
+			    VRRP_AV_MASTER_IP=${VRRP_WEB_MASTER_IP}
+			elif member "${have_vrrp_interfaces}" rweb ; then
+			    VRRP_AV_IP_LIST=${VRRP_RWEB_IP_LIST}
+			    VRRP_AV_IP_LIST_NB=${VRRP_RWEB_IP_LIST_NB}
+			    VRRP_AV_MASTER_IP=${VRRP_RWEB_MASTER_IP}
+			fi			
+			;;
+		    *)
+			;;
+		esac
+
+	    done
+	    ;;
+	cur)
+	    set-vrrp-ip-1 "${CURRENT_VRRP_EXTERNAL_LIST}"
+	    CURRENT_VRRP_EXTERNAL_IP_LIST=${_VRRP_IP_LIST}
+	    CURRENT_VRRP_EXTERNAL_IP_LIST_NB=${_VRRP_IP_NB}
+
+	    set-vrrp-ip-1 "${CURRENT_VRRP_AUXILIARY_LIST}"
+	    CURRENT_VRRP_AUXILIARY_IP_LIST=${_VRRP_IP_LIST}
+	    CURRENT_VRRP_AUXILIARY_IP_LIST_NB=${_VRRP_IP_NB}
+
+	    if test ${CURRENT_VLAN_MODE} == True ; then
+
+		if test ${CURRENT_WEB_MODE} == True ; then
+		    set-vrrp-ip-1 "${CURRENT_VRRP_WEB_LIST}"
+		    CURRENT_VRRP_WEB_IP_LIST=${_VRRP_IP_LIST}
+		    CURRENT_VRRP_WEB_IP_LIST_NB=${_VRRP_IP_NB}
+		    CURRENT_VRRP_WEB_MASTER_IP=${_VRRP_MASTER_IP}
+		    devices="${CURRENT_IF_WEB}"
+		    interfaces[${i}]=web ; ((i++))
+		fi
+		
+		if test ${CURRENT_RWEB_MODE} == True ; then
+		    if ! member "${devices}" ${CURRENT_IF_RWEB} ; then
+			set-vrrp-ip-1 "${CURRENT_VRRP_RWEB_LIST}"
+			CURRENT_VRRP_RWEB_IP_LIST=${_VRRP_IP_LIST}
+			CURRENT_VRRP_RWEB_IP_LIST_NB=${_VRRP_IP_NB}
+			CURRENT_VRRP_RWEB_MASTER_IP=${_VRRP_MASTER_IP}
+			if test -z "${devices}" ; then
+			    devices="${CURRENT_IF_RWEB}"
+			else
+			    devices="${devices} ${CURRENT_IF_RWEB}"
+			fi
+			interfaces[${i}]=rweb ; ((i++))
+		    fi
+		fi
+		
+		if test ${CURRENT_AV_MODE} == True ; then
+		    unset flag
+		    test ${CURRENT_AV_INTERNAL} == False  || flag='yes'
+		    test ${CURRENT_VPN_IPSEC_MODE} == False -o ${CURRENT_AV_VPN_IPSEC} == False || flag='yes'
+		    if test -n "${flag}" ; then
+			if ! member "${devices}" ${CURRENT_IF_AV} ; then
+			    set-vrrp-ip-1 "${CURRENT_VRRP_AV_LIST}"
+			    CURRENT_VRRP_AV_IP_LIST=${_VRRP_IP_LIST}
+			    CURRENT_VRRP_AV_IP_LIST_NB=${_VRRP_IP_NB}
+			    CURRENT_VRRP_AV_MASTER_IP=${_VRRP_MASTER_IP}
+			    if test -z "${devices}" ; then
+				devices="${CURRENT_IF_AV}"
+			    else
+				devices="${devices} ${CURRENT_IF_AV}"
+			    fi
+			    interfaces[${i}]=antivirus ; ((i++))
+			fi
+		    fi
+		fi
+	    else
+		set-vrrp-ip-1 "${CURRENT_VRRP_INTERNAL_LIST}"
+		CURRENT_VRRP_WEB_IP_LIST=${_VRRP_IP_LIST}
+		CURRENT_VRRP_WEB_IP_LIST_NB=${_VRRP_IP_NB}
+		CURRENT_VRRP_WEB_MASTER_IP=${_VRRP_MASTER_IP}
+		devices="${CURRENT_IF_WEB}"
+		interfaces[${i}]=web ; ((i++))
+	    fi
+
+	    n=${i}
+
+	    for ((i=0 ; i<n ; i++))
+	    do
+		interface=${interface[${i}]}
+		case ${interface} in
+		    web)
+			test ${CURRENT_VRRP_WEB_IP_LIST_NB} eq 0 || have_vrrp_interfaces="${have_vrrp_interfaces} ${interface}"
+			;;
+		    rweb)
+			test ${CURRENT_VRRP_RWEB_IP_LIST_NB} eq 0 || have_vrrp_interfaces="${have_vrrp_interfaces} ${interface}"
+			;;
+		    antivirus)
+			test ${CURRENT_VRRP_AV_IP_LIST_NB} eq 0 || have_vrrp_interfaces="${have_vrrp_interfaces} ${interface}"
+			;;
+		    *)
+			;;
+		esac
+	    done
+
+	    have_vrrp_interfaces="${have_vrrp_interfaces:1}"
+
+	    for interface in web rweb antivirus
+	    do
+		! member "${have_vrrp_interfaces}" ${interface} || continue
+		case ${interface} in
+		    web)
+			if member "${have_vrrp_interfaces}" rweb ; then
+			    CURRENT_VRRP_WEB_IP_LIST=${CURRENT_VRRP_RWEB_IP_LIST}
+			    CURRENT_VRRP_WEB_IP_LIST_NB=${CURRENT_VRRP_RWEB_IP_LIST_NB}
+			    CURRENT_VRRP_WEB_MASTER_IP=${CURRENT_VRRP_RWEB_MASTER_IP}
+			elif member "${have_vrrp_interfaces}" antivirus ; then
+			    CURRENT_VRRP_WEB_IP_LIST=${CURRENT_VRRP_AV_IP_LIST}
+			    CURRENT_VRRP_WEB_IP_LIST_NB=${CURRENT_VRRP_AV_IP_LIST_NB}
+			    CURRENT_VRRP_WEB_MASTER_IP=${CURRENT_VRRP_AV_MASTER_IP}
+			fi
+			;;
+		    rweb)
+			if member "${have_vrrp_interfaces}" web ; then
+			    CURRENT_VRRP_RWEB_IP_LIST=${CURRENT_VRRP_WEB_IP_LIST}
+			    CURRENT_VRRP_RWEB_IP_LIST_NB=${CURRENT_VRRP_WEB_IP_LIST_NB}
+			    CURRENT_VRRP_RWEB_MASTER_IP=${CURRENT_VRRP_WEB_MASTER_IP}
+			elif member "${have_vrrp_interfaces}" antivirus ; then
+			    CURRENT_VRRP_RWEB_IP_LIST=${CURRENT_VRRP_AV_IP_LIST}
+			    CURRENT_VRRP_RWEB_IP_LIST_NB=${CURRENT_VRRP_AV_IP_LIST_NB}
+			    CURRENT_VRRP_RWEB_MASTER_IP=${CURRENT_VRRP_AV_MASTER_IP}
+			fi
+			;;
+		    antivirus)
+			if member "${have_vrrp_interfaces}" web ; then
+			    CURRENT_VRRP_AV_IP_LIST=${CURRENT_VRRP_WEB_IP_LIST}
+			    CURRENT_VRRP_AV_IP_LIST_NB=${CURRENT_VRRP_WEB_IP_LIST_NB}
+			    CURRENT_VRRP_AV_MASTER_IP=${CURRENT_VRRP_WEB_MASTER_IP}
+			elif member "${have_vrrp_interfaces}" rweb ; then
+			    CURRENT_VRRP_AV_IP_LIST=${CURRENT_VRRP_RWEB_IP_LIST}
+			    CURRENT_VRRP_AV_IP_LIST_NB=${CURRENT_VRRP_RWEB_IP_LIST_NB}
+			    CURRENT_VRRP_AV_MASTER_IP=${CURRENT_VRRP_RWEB_MASTER_IP}
+			fi
+			;;
+		    *)
+			;;
+		esac
+
+	    done
+	    ;;
+	*)
+	    return 1
+	    ;;
+    esac
+}
+
+gen-keepalived-vrrp-conf()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    local interface=${1}
+    local device=${2}
+
+    local vrrp_list vrrp_ip vrrp_state vrrp_priority vrrp_id
+    local i=0 elt range
+
+    local rip prf brd bond_vrrp_device bond_mode script
+
+    local auth_pass=z53!GakQfSz6!!qX
+    local name_prefix="${SHOSTNAME}.${DOMAIN_NAME}:${interface}"
+
+    case ${interface} in
+	internal)
+	    vrrp_list="${VRRP_INTERNAL_LIST}"
+	    rip=${IP_WEB_IP}
+	    prf=${IP_WEB_PRF}
+	    brd=${IP_WEB_BRD}
+	    bond_mode=${BOND_INTERNAL_MODE}
+	    bond_vrrp_device=${IF_INTERNAL}
+	    script="check_bond_internal"
+	    ;;
+	external)
+	    vrrp_list="${VRRP_EXTERNAL_LIST}"
+	    rip=${IP_EXTERNAL_IP}
+	    prf=${IP_EXTERNAL_PRF}
+	    brd=${IP_EXTERNAL_BRD}
+	    bond_mode=${BOND_EXTERNAL_MODE}
+	    bond_vrrp_device=${IF_EXTERNAL}
+	    script="check_bond_external"
+	    ;;
+	auxiliary)
+	    vrrp_list="${VRRP_AUXILIARY_LIST}"
+	    rip=${IP_AUXILIARY_IP}
+	    prf=${IP_AUXILIARY_PRF}
+	    brd=${IP_AUXILIARY_BRD}
+	    bond_mode=${BOND_AUXILIARY_MODE}
+	    bond_vrrp_device=${IF_AUXILIARY}
+	    script="check_bond_auxiliary"
+	    ;;
+	web)
+	    vrrp_list="${VRRP_WEB_LIST}"
+	    rip=${IP_WEB_IP}
+	    prf=${IP_WEB_PRF}
+	    brd=${IP_WEB_BRD}
+	    bond_mode=${BOND_INTERNAL_MODE}
+	    bond_vrrp_device=${IF_INTERNAL}
+	    script="check_bond_internal"
+	    ;;
+	rweb)
+	    vrrp_list="${VRRP_RWEB_LIST}"
+	    rip=${IP_RWEB_IP}
+	    prf=${IP_RWEB_PRF}
+	    brd=${IP_RWEB_BRD}
+	    bond_mode=${BOND_INTERNAL_MODE}
+	    bond_vrrp_device=${IF_INTERNAL}
+	    script="check_bond_internal"
+	    ;;
+	antivirus)
+	    vrrp_list="${VRRP_AV_LIST}"
+	    rip=${IP_AV_IP}
+	    prf=${IP_AV_PRF}
+	    brd=${IP_AV_BRD}
+	    bond_mode=${BOND_INTERNAL_MODE}
+	    bond_vrrp_device=${IF_INTERNAL}
+	    script="check_bond_internal"
+	    ;;
+	*)
+	    return 2
+	    ;;
+    esac
+
+    for elt in ${vrrp_list}
+    do
+	range=$[${i} % 4]
+	case ${range} in
+	    0)
+		vrrp_ip=${elt}
+		;;
+	    1)
+		vrrp_state=${elt}
+		;;
+	    2)
+		vrrp_priority=${elt}
+		;;
+	    3)
+		vrrp_id=${elt}
+
+		if test "${vrrp_state}" == "master" ; then state=MASTER ; else state=BACKUP ; fi
+		echo
+		echo "vrrp_instance ${name_prefix}_${vrrp_ip} {"
+		echo -e "\tpreempt"
+		echo -e "\tinterface ${device}"
+		echo -e "\tlvs_sync_daemon_interface ${device}"
+		echo -e "\tstate ${vrrp_state}"
+		echo -e "\tpriority ${vrrp_priority}"
+		echo -e "\tadvert_int ${VRRP_ADVERT_INTERVAL}"
+		echo -e "\tgarp_master_delay 3"
+		echo -e "\tmcast_src_ip ${rip}"
+		echo -e "\tauthentication {"
+		echo -e "\t\tauth_type AH"
+		echo -e "\t\tauth_pass ${auth_pass}"
+		echo -e "\t}"
+		echo -e "\tvirtual_router_id ${vrrp_id}"
+		echo -e "\tvirtual_ipaddress {"
+		echo -e "\t\t${vrrp_ip}/${prf} brd ${brd} dev ${device} scope global"
+		echo -e "\t}"
+
+		echo -e "\ttrack_interface {"
+		echo -e "\t\t${IF_INTERNAL}"
+		if test ${APL_ROLE} == 'gateway' ; then
+		    echo -e "\t\t${IF_EXTERNAL}"
+		    test -z "${IF_AUXILIARY}" -o ${IP_AUXILIARY_IP} == 0.0.0.0 || echo -e "\t\t${IF_AUXILIARY}"
+		fi
+		echo -e "\t}"
+
+		if test ${bond_mode} == True ; then
+		    echo -e "\ttrack_script {"
+		    echo -e "\t\t${script}"
+		    echo -e "\t}"
+		fi
+		
+		echo -e "\tnotify /usr/local/bin/apl_vrrp_monitor"
+		echo "}"
+		;;
+	    *)
+		return 1
+		;;
+	esac
+	((i++))
+    done
+}
+
+gen-keepalived-sync-group-1()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    test -n "${2}" || return 3
+    local nb1=${1}
+    local vrrp_device1=${2}
+    local vrrp_device2=${3}
+    
+    local name_prefix="${SHOSTNAME}.${DOMAIN_NAME}"
+    
+    local vrrp_list1
+    local vrrp_list2
+    
+    case ${vrrp_device1} in
+	web)
+	    vrrp_list1=${VRRP_WEB_LIST}
+	    ;;
+	rweb)
+	    vrrp_list1=${VRRP_RWEB_LIST}
+	    ;;
+	antivirus)
+	    vrrp_list1=${VRRP_AV_LIST}
+	    ;;
+	internal)
+	    vrrp_list1=${VRRP_INTERNAL_LIST}
+	    ;;
+	external)
+	    vrrp_list1=${VRRP_EXTERNAL_LIST}
+	    ;;
+	auxiliary)
+	    vrrp_list1=${VRRP_AUXILIARY_LIST}
+	    ;;
+	*)
+	    ;;
+    esac
+    
+    
+    case ${vrrp_device2} in
+	web)
+	    vrrp_list2=${VRRP_WEB_LIST}
+	    ;;
+	rweb)
+	    vrrp_list2=${VRRP_RWEB_LIST}
+	    ;;
+	antivirus)
+	    vrrp_list2=${VRRP_AV_LIST}
+	    ;;
+	internal)
+	    vrrp_list2=${VRRP_INTERNAL_LIST}
+	    ;;
+	external)
+	    vrrp_list2=${VRRP_EXTERNAL_LIST}
+	    ;;
+	auxiliary)
+	    vrrp_list2=${VRRP_AUXILIARY_LIST}
+	    ;;
+	*)
+	    ;;
+    esac
+	
+    local i1=0 elt1 range1
+    local i2=0 elt2 range2 nb2=1
+    local vrrp_ip1 vrrp_state1 vrrp_priority1
+    local vrrp_ip2 vrrp_state2 vrrp_priority2
+    
+    echo
+    
+    for elt1 in ${vrrp_list1}
+    do
+	range1=$[${i1} % 4]
+	case ${range1} in
+	    0)
+		vrrp_ip1=${elt1}
+		;;
+	    1)
+		vrrp_state1=${elt1}
+		;;
+	    2)
+		vrrp_priority1=${elt1}
+		;;
+	    3)
+		echo "vrrp_sync_group group_${nb1}_${nb2} {"
+		echo -e "\tgroup {"
+		echo -e "\t\t${name_prefix}:${vrrp_device1}_${vrrp_ip1}"
+		
+		for elt2 in ${vrrp_list2}
+		do
+		    range2=$[${i2} % 4]
+		    case ${range2} in
+			0)
+			    vrrp_ip2=${elt2}
+			    ;;
+			1)
+			    vrrp_state2=${elt2}
+			    ;;
+			2)
+			    vrrp_priority2=${elt2}
+			    ;;
+			3)
+			    
+			    if test ${vrrp_state1} == ${vrrp_state2} -a ${vrrp_priority1} == ${vrrp_priority2} ; then
+				echo -e "\t\t${name_prefix}:${vrrp_device2}_${vrrp_ip2}"
+			    fi
+			    ;;
+			*)
+			    return 2
+			    ;;
+		    esac
+		    ((i2++))
+		done
+		
+		echo -e "\t}"
+		
+		echo "}"
+		((nb2++))
+		;;
+	    *)
+		return 1
+		;;
+	esac
+	((i1++))
+    done
+}
+
+gen-keepalived-sync-group()
+{
+    local vrrp_interfaces
+    local interface
+
+    if test ${VLAN_MODE} == True ; then
+
+	test -z "${VRRP_WEB_LIST}" -o ${WEB_MODE} == False || vrrp_interfaces=" web"
+	test -z "${VRRP_RWEB_LIST}" -o ${RWEB_MODE} == False || vrrp_interfaces="${vrrp_interfaces} rweb"
+
+	if test -n "${VRRP_AV_LIST}" -a ${AV_MODE} == True ; then
+	    ${AV_INTERNAL} == False || interface='yes'
+	    test ${VPN_IPSEC_MODE} == False -o ${AV_VPN_IPSEC} == False || interface='yes'
+	    test -z "${interface}" || vrrp_interfaces="${vrrp_interfaces} antivirus"
+	fi
+
+	test -z "${VRRP_EXTERNAL_LIST}" || vrrp_interfaces="${vrrp_interfaces} external"
+	test -z "${IF_AUXILIARY}" -o ${IP_AUXILIARY_IP} == 0.0.0.0 -o -z "${VRRP_AUXILIARY_LIST}" || vrrp_interfaces="${vrrp_interfaces} auxiliary"
+    else
+	if test -n "${VRRP_INTERNAL_LIST}" ; then
+	    if test ${WEB_MODE} == True ; then
+		vrrp_interfaces=" internal"
+	    else
+		if test ${AV_MODE} == True ; then
+		    ${AV_INTERNAL} == False || interface='yes'
+		    test ${VPN_IPSEC_MODE} == False -o ${AV_VPN_IPSEC} == False || interface='yes'
+		    test -z "${interface}" || vrrp_interfaces=" internal"
+		fi
+	    fi
+	fi
+	test -z "${VRRP_EXTERNAL_LIST}" || vrrp_interfaces="${vrrp_interfaces} external"
+	test -z "${IF_AUXILIARY}" -o ${IP_AUXILIARY_IP} == 0.0.0.0 -o -z "${VRRP_AUXILIARY_LIST}" || vrrp_interfaces="${vrrp_interfaces} auxiliary"
+    fi
+
+    vrrp_interfaces=${vrrp_interfaces:1}
+
+    local vrrp_device_first
+    local vrrp_device_rest
+    local vrrp_device
+    local nb=1
+
+    while true
+    do
+        # Lenfth of vrrp_interfaces > 1
+	test "${vrrp_interfaces}" != "${vrrp_interfaces// }" || break
+	
+	vrrp_device_first=${vrrp_interfaces/ *}
+	vrrp_device_rest=${vrrp_interfaces#* }
+	
+	for vrrp_device in ${vrrp_device_rest}
+	do
+	    gen-keepalived-sync-group-1 ${nb} ${vrrp_device_first} ${vrrp_device}
+	    ((nb++))
+	done
+	vrrp_interfaces=${vrrp_device_rest}
+    done
+}
+
+echo-vrrp-script-default()
+{
+    echo -e "\tinterval ${VRRP_ADVERT_INTERVAL}"
+    echo -e "\tfall 3"
+    echo -e "\trise 2"
+}
+
+gen-keepalived-conf()
+{
+    echo "# Configuration File for keepalived"
+    echo
+    echo "global_defs {"
+    echo -e "\tnotification_email {"
+    echo -e "\t\t${ADMINISTRATOR_EMAIL}"
+    echo -e "\t}"
+    echo -e "\tlvs_id ${UNIQUE_SHOSTNAME}"
+    echo "}"
+
+    test ${HA_MODE} == True || return 0
+
+    if test ${BOND_INTERNAL_MODE} == True ; then
+	echo
+	echo "vrrp_script check_bond_internal {"
+	echo -e "\tscript \"/usr/local/bin/apl_is_link_attached ${IF_INTERNAL} ${BOND_INTERNALS}\""
+	echo-vrrp-script-default
+	echo "}"
+	echo
+    fi
+
+    if test ${BOND_EXTERNAL_MODE} == True ; then
+	echo
+	echo "vrrp_script check_bond_external {"
+	echo -e "\tscript \"/usr/local/bin/apl_is_link_attached ${IF_EXTERNAL} ${BOND_EXTERNALS}\""
+	echo-vrrp-script-default
+	echo "}"
+	echo
+    fi
+
+    if test -n "${IF_AUXILIARY}" -a ${IP_AUXILIARY_IP} != 0.0.0.0 ; then
+	if test ${BOND_AUXILIARY_MODE} == True ; then
+	    echo
+	    echo "vrrp_script check_bond_auxiliary {"
+	    echo -e "\tscript \"/usr/local/bin/apl_is_link_attached ${IF_AUXILIARY} ${BOND_AUXILIARIES}\""
+	    echo-vrrp-script-default
+	    echo "}"
+	    echo
+	fi
+    fi
+
+    gen-keepalived-vrrp-conf external ${IF_EXTERNAL}
+    test -z "${IF_AUXILIARY}" -o ${IP_AUXILIARY_IP} == 0.0.0.0 || gen-keepalived-vrrp-conf auxiliary ${IF_AUXILIARY}
+
+    if test ${VLAN_MODE} == False ; then
+	gen-keepalived-vrrp-conf internal ${IF_INTERNAL}
+    else
+	local devices
+
+	if test ${WEB_MODE} == True ; then
+	    gen-keepalived-vrrp-conf web ${IF_WEB}
+	    devices="${IF_WEB}"
+	fi
+
+	if test ${RWEB_MODE} == True ; then
+	    if ! member "${devices}" ${IF_RWEB} ; then
+		gen-keepalived-vrrp-conf rweb ${IF_RWEB}
+		if test -z "${devices}" ; then
+		    devices="${IF_RWEB}"
+		else
+		    devices="${devices} ${IF_RWEB}"
+		fi
+	    fi
+	fi
+
+	if test ${AV_MODE} == True ; then
+
+	    local dev
+	    test ${AV_INTERNAL} == False  || dev='yes'
+	    test ${VPN_IPSEC_MODE} == False -o ${AV_VPN_IPSEC} == False || dev='yes'
+
+	    if test -n "${dev}" ; then
+		if ! member "${devices}" ${IF_AV} ; then
+		    gen-keepalived-vrrp-conf antivirus ${IF_AV}
+		    if test -z "${devices}" ; then
+			devices="${IF_AV}"
+		    else
+			devices="${devices} ${IF_AV}"
+		    fi
+		fi
+	    fi
+	fi
+    fi
+    gen-keepalived-sync-group
+}
+
+set-ha-parameters()
+{
+    if test ${HA_MODE} == True ; then
+	HEALTH_CHECK_INTERVAL=5000000
+    else
+	HEALTH_CHECK_INTERVAL=20000000
+    fi
+}
+
+gen-sysconfig-health()
+{
+    echo "INTERVAL=${HEALTH_CHECK_INTERVAL}"
+}
+
+LIB_APL_HA=Yes

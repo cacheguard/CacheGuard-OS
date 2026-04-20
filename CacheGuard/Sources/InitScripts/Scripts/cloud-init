@@ -1,0 +1,454 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       InitScript
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+source /lib/lsb/init-functions
+
+CACHEGUARD_DIR=/etc/sysconfig/cacheguard
+source ${CACHEGUARD_DIR}/constant
+source ${LOCAL_DIR}/lib/apl_functions
+source ${LOCAL_DIR}/lib/apl_cloud
+source ${APPLIANCE_DIR}/lib/lib-ip
+
+case ${CLOUD_NAME} in
+    azure)
+	;;
+    aws)
+	;;
+    *)
+	exit 0
+	;;
+esac
+
+update-cloud-usage()
+{
+    sed -i \
+	-e "s/^CLOUD_USAGE=.*$/CLOUD_USAGE=${CLOUD_USAGE}/" \
+	${HARD_DIR}/cloud.conf
+}
+
+setup-cloud-routes()
+{
+    test -n "${1}" || return 1
+    test -n "${2}"
+    local in_gw=${1}
+    local in_routes=${2}
+
+    local default_route="0.0.0.0 0.0.0.0 ${in_gw} 50 ${in_gw}"
+
+    if test -z "${in_routes}" ; then
+	echo "${default_route}"
+	return 0
+    fi
+
+    local out_routes
+    local elt range i=0
+    local ip netmask gateway weight pinged
+    local default_found fabric_found
+
+    for elt in ${in_routes}
+    do
+	range=$[${i} % 5]
+	case ${range} in
+	    0)
+		ip=${elt}
+		;;
+	    1)
+		netmask=${elt}
+		;;
+	    2)
+		gateway=${elt}
+		;;
+	    3)
+		weight=${elt}
+		;;
+	    4)
+		pinged=${elt}
+
+		if test ${ip} == '0.0.0.0' -a ${netmask} == '0.0.0.0' ; then
+		    if test -z "${default_found}" ; then
+			out_routes="${out_routes} ${default_route}"
+			default_found=yes
+		    fi
+		else
+		    out_routes="${out_routes} ${ip} ${netmask} ${gateway} ${weight} ${pinged}"
+		fi
+		;;
+	    *)
+		return 1
+		;;
+	esac
+	((i++))
+    done
+    out_routes=${out_routes:1}
+
+    test -n "${default_found}" || out_routes="${out_routes} ${default_route}"
+
+    echo ${out_routes}
+}
+
+get-cloud-name-servers()
+{
+    test -f ${CLOUD_RESOLV_DIR}/resolv.conf || return 11
+
+    local key ip
+    local list
+
+    while read key ip
+    do
+	test -n "${ip}" || continue
+	test "${key}" == nameserver || continue
+
+	list="${list} ${ip}"
+    done < ${CLOUD_RESOLV_DIR}/resolv.conf
+    list=${list:1}
+
+    echo ${list}
+}
+
+update-cloud-ip-conf1()
+{
+    local external_ip external_mk
+    local internal_ip internal_mk
+    local external_gw_info external_gw
+    local internal_gw internal_routes
+    local remote_ip remote_mask remote_network
+
+    local external_net=$(ip address show dev ${CLOUD_NETWORK_MAIN_DEV} 2> /dev/null | tail -2 | head -1)
+
+    if test "${external_net/*net */net}" != net ; then
+	external_ip='0.0.0.0'
+	external_mk='0.0.0.0'
+    else
+
+	local external_ip_px=${external_net/*inet /} ; external_ip_px=${external_ip_px/ brd*}
+	external_ip=${external_ip_px/\/*}
+	external_mk=$(get-netmask ${external_ip_px})
+
+	if test -z "${external_ip}" -o -z "${external_mk}"  ; then
+	    external_ip='0.0.0.0'
+	    external_mk='0.0.0.0'
+	fi
+    fi
+
+    local default_route=$(ip route 2> /dev/null | grep 'default via')
+
+    if test -n "${default_route}" ; then
+	external_gw_info=${default_route/default via }
+	external_gw=${external_gw_info/ dev*}
+    fi
+
+    if test ${APL_ROLE} == gateway ; then
+
+	local internal_net=$(ip address show dev ${CLOUD_NETWORK_SECOND_DEV} 2> /dev/null | tail -2 | head -1)
+
+	if test "${internal_net/*net */net}" != net ; then
+	    internal_ip='0.0.0.0'
+	    internal_mk='0.0.0.0'
+	else
+	    local internal_ip_px=${internal_net/*inet /} ; internal_ip_px=${internal_ip_px/ brd*}
+	    internal_ip=${internal_ip_px/\/*}
+	    internal_mk=$(get-netmask ${internal_ip_px})
+
+	    if test -z "${internal_ip}" -o -z "${internal_mk}" ; then
+		internal_ip='0.0.0.0'
+		internal_mk='0.0.0.0'
+	    else
+		if test -z "${CLOUD_PROVISION_STATE}" ; then
+		    if test \
+			   -n "${CLOUD_PROXY_CLIENT_IP_PX}" \
+			   -a "${CLOUD_PROXY_CLIENT_IP_PX}" != '0.0.0.0/0' \
+			   -a "${CLOUD_PROXY_CLIENT_IP_PX}" != '127.0.0.1/32' ; then
+			case ${CLOUD_NAME} in
+			    azure|aws)
+				internal_gw=$(get-first-ip ${internal_ip} ${internal_mk})
+				;;
+			    *)
+				internal_gw=$(get-first-ip ${internal_ip} ${internal_mk})
+				;;
+			esac
+
+			remote_ip=${CLOUD_PROXY_CLIENT_IP_PX/\/*}
+			remote_mask=$(get-netmask ${CLOUD_PROXY_CLIENT_IP_PX})
+			remote_network=$(get-network ${remote_ip} ${remote_mask})
+			internal_routes="${remote_network} ${remote_mask} ${internal_gw} 50 ${internal_gw}"
+		    fi
+		fi
+	    fi
+	fi
+    fi
+
+    local route routes n i=0
+    declare -a routes
+
+    routes[${i}]=$(get-variable-value-from-file ${ABASE_DIR}/${ENV_RDIR}/${ENV_NAME} IP_ROUTE_LIST)
+    test -z "${external_gw}" || routes[${i}]=$(setup-cloud-routes ${external_gw} "${routes[${i}]}")
+    ((i++))
+
+    routes[${i}]=$(get-variable-value-from-file ${ABASE_DIR}/${ENV_RDIR}/${ENV_CURRENT_NAME} CURRENT_IP_ROUTE_LIST)
+    test -z "${external_gw}" || routes[${i}]=$(setup-cloud-routes ${external_gw} "${routes[${i}]}")
+    ((i++))
+
+    routes[${i}]=$(get-variable-value-from-file ${ABASE_DIR}/${ENV_RDIR}/${ENV_CANCEL_NAME} IP_ROUTE_LIST)
+    test -z "${external_gw}" || routes[${i}]=$(setup-cloud-routes ${external_gw} "${routes[${i}]}")
+    ((i++))
+
+    n=${i}
+    i=0
+
+    case ${APL_ROLE} in
+	gateway)
+
+	    local fw_dos_web_limit=0
+
+	    for userenv_name in ${ENV_NAME} ${ENV_CURRENT_NAME} ${ENV_CANCEL_NAME}
+	    do
+		route=${routes[${i}]}
+		test -z "${internal_routes}" || route="${internal_routes} ${route}"
+		sed -i \
+		    -e "s@IP_EXTERNAL_IP='.*'@IP_EXTERNAL_IP='${external_ip}'@" \
+		    -e "s@IP_EXTERNAL_MASK='.*'@IP_EXTERNAL_MASK='${external_mk}'@" \
+		    -e "s@IP_INTERNAL_IP='.*'@IP_INTERNAL_IP='${internal_ip}'@" \
+		    -e "s@IP_INTERNAL_MASK='.*'@IP_INTERNAL_MASK='${internal_mk}'@" \
+		    -e "s@IP_ROUTE_LIST='.*'@IP_ROUTE_LIST='${route}'@" \
+		    -e "s@FW_DOS_WEB_LIMIT='.*'@FW_DOS_WEB_LIMIT='${fw_dos_web_limit}'@" \
+		    ${ABASE_DIR}/${ENV_RDIR}/${userenv_name}
+		((i++))
+	    done || return 11
+	    ;;
+	manager)
+	    local name_servers=$(get-cloud-name-servers)
+
+	    for userenv_name in ${ENV_NAME} ${ENV_CURRENT_NAME} ${ENV_CANCEL_NAME}
+	    do
+		route=${routes[${i}]}
+		sed -i \
+		    -e "s@IP_INTERNAL_IP='.*'@IP_INTERNAL_IP='${external_ip}'@" \
+		    -e "s@IP_INTERNAL_MASK='.*'@IP_INTERNAL_MASK='${external_mk}'@" \
+		    -e "s@IP_ROUTE_LIST='.*'@IP_ROUTE_LIST='${route}'@" \
+		    -e "s@NAME_SERVER_LIST=''@NAME_SERVER_LIST='${name_servers}'@" \
+		    ${ABASE_DIR}/${ENV_RDIR}/${userenv_name}
+		((i++))
+	    done || return 13
+	    ;;
+	*)
+	    ;;
+    esac
+
+    sed -i \
+	-e "s/CLOUD_NETWORK_MAIN_DEV=.*/CLOUD_NETWORK_MAIN_DEV=${CLOUD_NETWORK_MAIN_DEV}/" \
+	-e "s/CLOUD_NETWORK_SECOND_DEV=.*/CLOUD_NETWORK_SECOND_DEV=${CLOUD_NETWORK_SECOND_DEV}/" \
+	-e "s/CLOUD_NETWORK_MAIN_IP=.*/CLOUD_NETWORK_MAIN_IP=${external_ip}/" \
+	-e "s/CLOUD_NETWORK_MAIN_MASK=.*/CLOUD_NETWORK_MAIN_MASK=${external_mk}/" \
+	-e "s/CLOUD_NETWORK_SECOND_IP=.*/CLOUD_NETWORK_SECOND_IP=${internal_ip}/" \
+	-e "s/CLOUD_NETWORK_SECOND_MASK=.*/CLOUD_NETWORK_SECOND_MASK=${internal_mk}/" \
+	-e "s/CLOUD_NETWORK_MAIN_GATEWAY=.*/CLOUD_NETWORK_MAIN_GATEWAY=${external_gw}/" \
+	-e "s/CLOUD_PROVISION_STATE=.*/CLOUD_PROVISION_STATE=IP_PROVISIONED/" \
+	${HARD_DIR}/cloud.conf || return 21
+
+    return 0
+}
+
+update-cloud-ip-conf()
+{
+    local ret
+    update-cloud-ip-conf1
+    ret=${?}
+
+    test ${ret} -ne 0 || return 0
+
+    sed -i \
+	-e "s/CLOUD_PROVISION_STATE=.*/CLOUD_PROVISION_STATE=ERROR_PROVISIONED//" \
+	${HARD_DIR}/cloud.conf
+
+    return ${ret}
+}
+
+cloud-init-vpnsubscr()
+{
+    test -n "${CLOUD_EMBEDDED_VPNSUBSCR_SERVICE_ID}" || return 0
+
+    apl_ea_vpnsubscr_cloud_init "${CLOUD_EMBEDDED_VPNSUBSCR_SERVICE_ID}" "${CLOUD_CONTACT_EMAIL}" "${CLOUD_CONTACT_FIRST_NAME}" "${CLOUD_CONTACT_LAST_NAME}"
+}
+
+cloud-init-embedded()
+{
+    cloud-init-vpnsubscr
+}
+
+provision-azure()
+{
+    local retval=0
+
+    if test -z "${CLOUD_PROVISION_STATE}" -o "${CLOUD_PROVISION_STATE}" == ERROR_PROVISIONED ; then
+
+	update-cloud-usage
+	log_info_msg "Setting IP configuration for Azure..."
+	update-cloud-ip-conf
+
+	retval=${?}
+	[ ${retval} -eq 0 ]
+	evaluate_retval
+    fi
+
+    return ${retval}
+}
+
+add-load-ssh-public-key()
+{
+    case ${CLOUD_NAME} in
+	azure)
+	    return 11
+	    ;;
+	aws)
+	    ;;
+	*)
+	    return 255
+	;;
+    esac
+
+    test -n "${CLOUD_AWS_TOKEN}" || return 11
+
+    local index_name tmp_file=/tmp/aws-ssh-public-key.${$}
+
+    index_name=$(curl --disable --fail -4 --no-show-error --silent --connect-timeout ${CURL_CONNECT_TIMEOUT} --max-time ${CURL_MAX_TIME} \
+		      --header "X-aws-ec2-metadata-token: ${CLOUD_AWS_TOKEN}" \
+		      --url http://${CLOUD_METADATA_IP}/latest/meta-data/public-keys 2> /dev/null)
+
+    test ${?} -eq 0 || return 13
+    [[ "${index_name}" =~ ^[[:digit:]]{1,3}=[[:print:]]{1,255}$ ]] || return 15
+
+    local index=${index_name/=*}
+    local name=${index_name/*=}
+
+    curl --disable --fail -4 --no-show-error --silent --connect-timeout ${CURL_CONNECT_TIMEOUT} --max-time ${CURL_MAX_TIME} \
+	 --header "X-aws-ec2-metadata-token: ${CLOUD_AWS_TOKEN}" \
+	 --url http://${CLOUD_METADATA_IP}/latest/meta-data/public-keys/${index}/openssh-key \
+	 --output ${tmp_file} 2> /dev/null
+
+    if test ${?} -ne 0 ; then
+	rm -f ${tmp_file}
+	return 21
+    fi
+
+    name=${name:0:${MAX_NAME_LEN}}
+    [[ "${name}" =~ ^[a-zA-Z]([a-zA-Z0-9_\-])*$ ]] || name='aws'
+
+    su --login admin --command "admin ssh key add ${name}"
+    mv -f ${tmp_file} ${TMP_DIR}/loaded.ssh.key.${name}
+}
+
+provision-aws()
+{
+    test -n "${CLOUD_PROVISION_STATE}" -a "${CLOUD_PROVISION_STATE}" != ERROR_PROVISIONED || update-cloud-usage
+
+    log_info_msg "Setting IP configuration for AWS..."
+    update-cloud-ip-conf
+
+    local retval=${?}
+    [ ${retval} -eq 0 ]
+    evaluate_retval
+
+    test ${retval} -eq 0 || return 11
+
+    if ! is-admin-ssh-key-provisioned ; then
+
+	log_info_msg "Setting the SSH admin access for AWS..."
+
+	add-load-ssh-public-key
+	retval=${?}
+
+	test ${retval} -ne 0 || set-admin-ssh-key-provisioned
+	
+	[ ${retval} -eq 0 ]
+	evaluate_retval
+
+    fi
+
+    if ! is-admin-password--provisioned ; then
+
+	log_info_msg "Setting Web Administration access for AWS..."
+
+	test -n "${AWS_STACK}" -a -n "${AWS_REGION}" -a -n "${AWS_RESOURCE}" -a -n "${AWS_CONFIGSETS}"
+	retval=${?}
+
+	if test ${retval} -eq 0 ; then
+	    cfn-init --stack="${AWS_STACK}" --region="${AWS_REGION}" --resource="${AWS_RESOURCE}"  --configsets="${AWS_CONFIGSETS}"
+	    retval=${?}
+
+	    if test ${retval} -eq 0 ; then
+
+		set-admin-password-provisioned
+		[ ${retval} -eq 0 ]
+		evaluate_retval
+	    else
+		[ ${retval} -eq 0 ]
+		evaluate_retval
+	    fi
+	else
+	    [ ${retval} -eq 0 ]
+	    evaluate_retval
+	fi
+    fi
+
+    return ${retval}
+}
+
+cloud-init-load-data()
+{
+    local data_name=$(get-cloud-data-name)
+
+    log_info_msg "Loading ${data_name}..."
+    cloud-load-data
+    local retval=${?}
+
+    [ ${retval} -eq 0 ]
+    evaluate_retval
+    return ${retval}
+}
+
+provision-cloud()
+{
+    case ${CLOUD_NAME} in
+	azure)
+	    provision-azure
+	    ;;
+	aws)
+	    provision-aws
+	    ;;
+	*)
+	    ;;
+    esac
+}
+
+case "${1}" in
+    start)
+	cloud-init-load-data
+	provision-cloud
+	cloud-init-embedded
+	;;
+    *)
+	echo "Usage: ${0} {start}"
+	exit 1
+	;;
+esac

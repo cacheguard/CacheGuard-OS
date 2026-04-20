@@ -1,0 +1,97 @@
+<a name='main' class='doc-title'></a>
+<h1>The WAF</h1>
+
+WAF stands for Web Application Firewall and protects Web applications from malicious Web requests intended to compromise or damage applications and/or servers. CacheGuard appliance integrates a WAF that works jointly with the <a href="/doc/guide/reverse_mode.html">Web Server Cloaking</a> to provide an enhanced level of security for Web servers. The WAF can protect against content attacks such as, but not limited to, XSS (Cross-site Scripting), SQL injection and command injection. Malicious requests are blocked before they reach real Web servers (hosts).
+
+<p>
+<center><img width='600' src="/doc/image/content_filtering.png" class="schema" /></center>
+
+To enable the WAF, both <strong>rweb</strong> and <strong>waf</strong> modes must be activated using the <a href="/doc/command/mode.html">mode rweb on</a> and <a href="/doc/command/mode.html">mode waf on</a> commands. You can refer to the <a href="/doc/guide/reverse_mode.html">Web Server Cloaking</a> section to learn how to configure the <strong>rweb</strong> mode. Then use the <a href="/doc/command/waf.html">waf</a> command to configure content filtering for protected Web applications. The CacheGuard WAF provides two types of content filtering that may be activated concurrently on the same appliance. The two content-filtering types are as follows:
+<ul>
+  <li type='circle'><strong>Generic Filtering</strong>: rejects known content attacks; it may be activated globally (for all websites) or per protected website.</li>
+  <li type='circle'><strong>Customised Filtering</strong>: allows you to permit or deny Web requests that you design yourself on a per-website basis.</li>
+</ul>
+
+<a name='generic' class='doc-title'></a><h2>Generic Filters</h2>
+
+Generic WAF rules are organised in groups called filters (a filter is composed of WAF rules). Each blocking rule in a generic filter has a score (an integer) and whenever a rule matches in Web traffic its score is added to a global tally. Once a threshold score is reached for a given transaction, the WAF blocks the traffic. Generic filters are provided by <a href="https://owasp.org/" target='_blank'>OWASP</a> and are classified as follows:
+
+<ul>
+<li type='circle'><strong>dliis</strong>: rules to prevent data leakage from IIS applications.</li>
+<li type='circle'><strong>dljava</strong>: rules to prevent data leakage from Java applications.</li>
+<li type='circle'><strong>dlphp</strong>: rules to prevent data leakage from PHP applications.</li>
+<li type='circle'><strong>dlsql</strong>: rules to prevent data leakage from SQL requests.</li>
+<li type='circle'><strong>java</strong>: rules to protect Java applications.</li>
+<li type='circle'><strong>lfi</strong>: rules to protect against Local File Inclusion attacks.</li>
+<li type='circle'><strong>nodejs</strong>: rules to protect Node.js applications.</li>
+<li type='circle'><strong>php</strong>: rules to protect PHP applications.</li>
+<li type='circle'><strong>rce</strong>: rules to protect against Remote Code Execution attacks.</li>
+<li type='circle'><strong>rfi</strong>: rules to protect against Remote File Inclusion attacks.</li>
+<li type='circle'><strong>sf</strong>: rules to protect against Session Fixation attacks.</li>
+<li type='circle'><strong>sqli</strong>: rules to protect against SQL injection attacks.</li>
+<li type='circle'><strong>xss</strong>: rules to protect against cross-site scripting attacks.</li>
+</ul>
+
+Generic filters may be activated or deactivated globally. For example, to activate the WAF and protect all websites (cloaked by the reverse Web proxy in <strong>rweb</strong> mode) against SQL injection attacks, use the following commands:
+<ul>
+  <li><i>mode rweb on</i></li>
+  <li><i>mode waf on</i></li>
+  <li><i>waf generic sqli on</i></li>
+  <li><i>apply</i></li>
+</ul>
+
+If no generic WAF filter is specified for a website, that website is protected by globally activated generic WAF filters. If a particular website requires specific protection, you may activate or deactivate generic WAF filters for that website. For example, to deactivate the <strong>sqli</strong> generic filter for the <i>www.example.com</i> website, use:
+<ul>
+  <li><i>waf rweb generic www.example.com sqli off</i></li>
+  <li><i>apply</i></li>
+</ul>
+
+<a name='custom' class='doc-title'></a><h2>Custom Filters</h2>
+Custom WAF filters provide precise control over Web requests for a specific website. A custom WAF filter consists of custom WAF rules defined in a textual file that you load into a CacheGuard appliance. A custom WAF rule permits or denies a Web request according to its HTTP method and content. A rule is defined in one, two or three lines depending on the specified HTTP method.
+<p>
+A custom WAF rule must begin with the <strong>rule</strong> keyword followed by an identifier, an action (<strong>allow</strong> or <strong>deny</strong>) and an HTTP method (in lowercase). Supported HTTP methods are <i>GET</i>, <i>HEAD</i> and <i>POST</i>. For the <i>GET</i> and <i>POST</i> methods, a second optional line may specify allowed contents (the path and arguments) in the Web request. That second line must begin with the <strong>uri</strong> keyword and be followed by a PCRE (Perl Compatible Regular Expression) that specifies allowed contents. For the <i>POST</i> method, a third optional line may specify allowed contents in the <i>POST</i> body. That line must begin with the <strong>body</strong> keyword and be followed by a regular expression specifying allowed data in the body of the <i>POST</i> request.
+<p>
+As an example, the following custom WAF filter includes six rules: the first and second rules allow <i>GET</i> requests on "<i>/</i>" and "<i>/index.html</i>" respectively. The third rule allows <i>POST</i> requests to "<i>/cgi-bin/set-phone.cgi</i>" with a body matching "<i>name=&lt;string&gt;&amp;phone=&lt;numbers&gt;</i>". The final three rules deny any other Web requests.
+
+<pre>
+rule r1 allow get
+uri "^/$"
+
+rule r2 allow get
+uri "^/index\.html$"
+
+rule r3 allow post
+uri "^/cgi-bin/set-phone.cgi$"
+body "^name=[[:print:]]*\&phone=[[:digit:]]*$"
+
+rule r4 deny get
+rule r5 deny head
+rule r6 deny post
+</pre>
+
+To apply this custom WAF filter to the <i>www.example.com</i> website, save it on a trusted file server and then load it into your CacheGuard appliance and associate it with the <i>www.example.com</i> website. Refer to the <a href="/doc/command/access.html">access file</a> command manual to learn how to declare a trusted file server. The following commands load a custom WAF filter from a file named <i>www.example.com.rules</i> on a TFTP server at <i>172.18.2.1</i> and apply it to the website:
+<ul>
+  <li><i>waf rweb custom www.example.com load tftp 172.18.2.1 www.example.com.rules</i></li>
+  <li><i>apply</i></li>
+</ul>
+
+When a custom WAF filter is loaded, the custom WAF rule compiler validates its content and rejects the load if an error is detected. Note that when generic WAF filters are combined with a custom WAF filter, generic filters are applied first. Malicious requests are therefore rejected by generic filters before reaching the custom filter.
+
+<a name='reputation' class='doc-title'></a><h2>Reputation Filters</h2>
+
+CacheGuard appliance can block Web requests originating from IP addresses with a poor reputation. Reputation-based filtering can block requests from specific countries or from entries listed in an RBL (Real Time Blacklist). See the <a href="/doc/command/waf.html">waf</a> command manual for more information on reputation-based filtering.
+
+<a name='waudit' class='doc-title'></a><h2>Website Auditing</h2>
+
+A Web-auditing GUI is integrated into the CacheGuard appliance and permits inspection of HTTP requests for a given website. Web auditing helps you determine why a Web request was blocked and which WAF rule (generic or custom) caused the block. To enable Web auditing for the <i>www.example.com</i> website, use the following commands:
+<ul>
+  <li><i>admin waudit on</i></li>
+  <li><i>waf rweb audit www.example.com on</i></li>
+  <li><i>apply</i></li>
+</ul>
+
+The Web-auditing GUI is accessible via <i>https://&lt;cacheguard-ip-address&gt;:8091</i> where <i>&lt;cacheguard-ip-address&gt;</i> is the CacheGuard appliance IP address. The IP address to use depends on the administration access policy and topology configured on the appliance. Refer to the <a href="/doc/command/access.html">access admin</a> and <a href="/doc/command/access.html">admin topology</a> command manuals for further information. The screenshot below shows the Web-auditing GUI.
+
+<center><img src="/doc/image/webaudit_screenshot.png" class="schema" /></center>
+
+Sometimes a WAF rule unintentionally matches legitimate traffic (a false-positive). Web auditing assists in detecting such false positives so they may be addressed either by modifying the Web application (when feasible) or by bypassing the rules that cause the false positives. Refer to the <a href="/doc/command/waf.html">waf</a> command manual to learn more about WAF rule bypassing.

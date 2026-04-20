@@ -1,0 +1,18 @@
+CacheDirLength 2
+CacheDirLevels 3
+CacheEnable mem /
+CacheEnable disk /
+CacheDefaultExpire 3600
+CacheMaxExpire 604800
+CacheLastModifiedFactor 0.1
+CacheIgnoreCacheControl Off
+CacheIgnoreNoLastMod Off
+CacheIgnoreQueryString Off
+CacheStoreNoStore Off
+CacheStorePrivate Off
+CacheIgnoreHeaders None
+CacheIgnoreURLSessionIdentifiers None
+CacheIgnoreURLSessionIdentifiers jsessionid
+CacheLock off
+CacheLockMaxAge 5
+CacheLockPath /tmp/mod_cache-lock

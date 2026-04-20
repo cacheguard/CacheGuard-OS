@@ -1,0 +1,107 @@
+<a name='main' class='doc-title'></a>
+<h1>CacheGuard Overview</h1>
+
+The User’s Guide enables you to quickly and concisely learn how to configure and administer a CacheGuard appliance. For a detailed description of each command used in this guide, please refer to the Commands Manual. The Web administration GUI provided with CacheGuard-OS serves as a front end to the CLI and, therefore, is not documented separately.
+<p>
+CacheGuard Gateway allows you to connect your networks to the Internet securely and confidently while protecting your IT infrastructure against harmful traffic. Additionally, CacheGuard Gateway enables you to provide the QoS (Quality of Service) required by your most critical network traffic, such as VoIP. What makes CacheGuard Gateway a unique solution is its dual functionality: in forwarding mode, it protects your users connecting to the Internet, while in reverse mode, it protects your Web applications. To deploy a CacheGuard Gateway, simply install CacheGuard-OS on the machine of your choice. The only requirement is that the machine must have at least two NICs (Network Interface Cards). For assistance with CacheGuard-OS installation, please refer to the <a href="/doc/guide/installation.html">Getting Started</a> section.
+<p>
+<center><img width='600' src="/doc/image/utm.png" class="schema" /></center>
+<p>
+CacheGuard-OS integrates a range of network security and traffic optimisation features such as, but not limited to, a firewall, VPN, Web antivirus, filtering proxy, reverse proxy, WAF, traffic shaping and Web caching. All these features can be securely and efficiently activated simultaneously on the same machine, ensuring optimal use of the underlying hardware resources.
+
+<a name='why' class='doc-title'>
+  <h2>Using CacheGuard-OS</h2>
+</a>
+
+Implementing and configuring CacheGuard-OS is both straightforward and efficient, even if you are not a networking or security specialist. With CacheGuard-OS, all the complexity of the integrated open-source software is hidden beneath the surface, allowing you simply to turn the key and benefit from a powerful and reliable engine.
+
+<a name='technical' class='doc-title'>
+  <h2>CacheGuard Gateway Functions</h2>
+</a>
+
+<table>
+  <tbody>
+    <tr valign="top">
+      <td align="left" width="50%">
+        <strong>CacheGuard-OS Network Optimisation</strong>
+        <p>
+        <ul style="line-height: 20px;">
+          <li>Network appliance</li>
+          <li>Internet gateway</li>
+          <li>Web load balancer</li>
+          <li>802.1q VLANs</li>
+          <li>NTP support</li>
+          <li>Traffic shaping</li>
+          <li>DHCP server</li>
+          <li>Caching DNS</li>
+        </ul>
+      </td>
+      <td align="left" width="50%">
+        <strong>CacheGuard-OS IP Security</strong>
+        <p>
+        <ul style="line-height: 20px;">
+          <li>Internal, external, and auxiliary zoning</li>
+          <li>Forwarding and reverse Web proxy</li>
+          <li>Transparent HTTP proxy</li>
+          <li>Proxy chaining and parallel implementation</li>
+          <li>Access lists</li>
+          <li>IP firewall with NAT and PAT</li>
+          <li>IPsec VPN in site-to-site or remote access modes</li>
+          <li>Protection against SYN flood, port scanning, spoofing, and more</li>
+        </ul>
+      </td>
+    </tr>
+    <tr valign="top">
+      <td align="left">
+        <strong>CacheGuard-OS Web Security</strong>
+        <p>
+        <ul style="line-height: 20px;">
+          <li>URL guarding based on URL blacklists, whitelists, and regular expressions</li>
+          <li>URL guarding policies based on access time, IP, and LDAP requests</li>
+          <li>Automatic blacklist updating</li>
+          <li>Web Application Firewall (XSS, SQL injection, etc.)</li>
+          <li>Access logging</li>
+          <li>LDAP and Kerberos AD authentication</li>
+          <li>SSL terminator</li>
+          <li>SSL mediator/inspector</li>
+          <li>Web gateway antivirus</li>
+          <li>Antivirus service for emails</li>
+        </ul>
+      </td>
+      <td align="left">
+        <strong>CacheGuard-OS High Availability</strong>
+        <p>
+        <ul style="line-height: 20px;">
+          <li>RAID capabilities</li>
+          <li>Backup and restore on a spare machine</li>
+          <li>Ethernet link bonding</li>
+          <li>VRRP redundancy</li>
+          <li>Multi-WAN support</li>
+        </ul>
+      </td>
+    </tr>
+    <tr valign="top">
+      <td align="left">
+        <strong>CacheGuard-OS Web Optimisation</strong>
+        <p>
+        <ul style="line-height: 20px;">
+          <li>Persistent Web caching</li>
+          <li>HTTP compression</li>
+          <li>Web cache sharing</li>
+          <li>Traffic shaping</li>
+        </ul>
+      </td>
+      <td align="left">
+        <strong>CacheGuard-OS Administration</strong>
+        <p>
+        <ul style="line-height: 20px;">
+          <li>CLI (Command Line Interface) configuration</li>
+          <li>Console port administration</li>
+          <li>Remote administration via Web GUI and SSH</li>
+          <li>Logging to remote Syslog servers</li>
+          <li>SNMP agent and trap generation</li>
+        </ul>
+      </td>
+    </tr>
+  </tbody>
+</table>

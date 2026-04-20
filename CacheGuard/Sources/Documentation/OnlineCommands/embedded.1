@@ -1,0 +1,28 @@
+Manage embedded applications
+.SH SYNOPSIS
+
+[1] \fBembedded\fR [\fBbevypn\fR [\fBoff\fR [\fI<site-name>\fR [\fI<tls-id>\fR[:\fI<ca-id>\fR]]] | \fBon\fR \fI<site-name>\fR \fI<tls-id>\fR[:\fI<ca-id>\fR]]]
+
+.SH DESCRIPTION
+This command allows you to manage embedded application. Embedded applications are applications that are built on top of a CacheGuard Gateway appliance and run on the appliance itself.
+
+The first [1] usage form allows you to activate or deactivate embedded applications. To activate an embedded application, use the embedded application reference followed by the \fBon\fR keyword and appropriate arguments according to the embedded application to activate. Please note that the first time you activate an embedded application, you will need to register a license key that allows you to use it. You can refer to the \fBregister\fR command for further information on how to register a license key. To deactivate an embedded application, use the embedded application reference followed by the \fBoff\fR keyword.
+
+To date, the only available embedded application is the \fBbevypn\fR (for \fIMy VPN\fR) application. The \fBbevypn\fR application is an HTTPS Web application that allows you to easily create and manage VPN subscribers. To activate the \fBbevypn\fR embedded application, you must give it a public website name (could be an IP address) and associate it to a server TLS identifier. Please note that the chosen name should differ from reverse website names managed by the \fBrweb\fR command.
+
+To use the \fBbevypn\fR application you must be authenticated through a login name and password. When you activate the application from a deactivated state, by default the password is set to the password used to login the administrator Web GUI. Afterwards, the password can be modified via the \fBbevypn\fR application itself. The login name to use is always \fIadmin\fR. You can refer to the the \fBbevypn\fR documentation to get help on how to configure and use it.
+
+.SH LIMITATION
+Embedded applications can't be activated in HA mode.
+
+.SH SEE ALSO
+.B apply
+(1)
+.B ha
+(1)
+.B register
+(1)
+.B rweb
+(1)
+B tls
+(1)

@@ -1,0 +1,407 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       Commands
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+__complete-system()
+{
+    test -n "${COMP_CWORD-1}" || return 1
+
+    case ${COMP_CWORD} in
+	1)
+	    case ${COMP_WORDS[1]} in
+		a|ar|arc|arch|archi|archit|archite|architec|architect|architectu|architectur|architecture)
+		    COMPREPLY=(architecture)
+		    ;;
+		b|ba|bac|back|backu|backup)
+		    COMPREPLY=(backup)
+		    ;;
+		c|cp|cpu)
+		    COMPREPLY=(cpu)
+		    ;;
+		d|di|dis|disk)
+		    COMPREPLY=(disk)
+		    ;;
+		e|en|end)
+		    COMPREPLY=(end)
+		    ;;
+		h|ha|har|hard)
+		    COMPREPLY=(hard)
+		    ;;
+		m)
+		    COMPREPLY=('' machine memory)
+		    ;;
+		ma|mac|mach|machi|machin|machine)
+		    COMPREPLY=(machine)
+		    ;;
+		me|mem|memo|memor|memory)
+		    COMPREPLY=(memory)
+		    ;;
+		p|pa|pat|patc|patch)
+		    COMPREPLY=(patch)
+		    ;;
+		r)
+		    COMPREPLY=('' raid report role)
+		    ;;
+		ra|rai|raid)
+		    COMPREPLY=(raid)
+		    ;;
+		re|rep|repo|repo|repor|report)
+		    COMPREPLY=(report)
+		    ;;
+		ro|rol|role)
+		    COMPREPLY=(role)
+		    ;;
+		s)
+		    COMPREPLY=('' soft serial)
+		    ;;
+		so|sof|soft)
+		    COMPREPLY=(soft)
+		    ;;
+		se|ser|seri|seria|serial)
+		    COMPREPLY=(serial)
+		    ;;
+		u|uu|uui|uuid)
+		    COMPREPLY=(uuid)
+		    ;;
+		'')
+		    COMPREPLY=('' '<RET>' architecture backup cpu disk end hard machine patch raid report role soft serial uuid)
+		    ;;
+		*)
+		    COMPREPLY=()
+		    ;;
+	    esac
+	    ;;
+	2)
+	    case ${COMP_WORDS[1]} in
+		soft)
+		    case ${COMP_WORDS[2]} in
+			c|ch|che|chec|check)
+			    COMPREPLY=(check)
+			    ;;
+			'')
+			    COMPREPLY=('' '<RET>' check)
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		backup)
+		    case ${COMP_WORDS[2]} in
+			c)
+			    COMPREPLY=(create clear)
+			    ;;
+			cl|cle|clea|clear)
+			    COMPREPLY=(clear)
+			    ;;
+			cr|cre|crea|creat|create)
+			    COMPREPLY=(create)
+			    ;;
+			l|lo|loa|load)
+			    COMPREPLY=(load)
+			    ;;
+			s|sa|sav|save)
+			    COMPREPLY=(save)
+			    ;;
+			'')
+			    COMPREPLY=('' '<RET>' create clear load save)
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		patch)
+		    case ${COMP_WORDS[2]} in
+			f|ft|ftp)
+			    COMPREPLY=(ftp)
+			    ;;
+			s|sf|sft|sftp)
+			    COMPREPLY=(sftp)
+			    ;;
+			t|tf|tft|tftp)
+			    COMPREPLY=(tftp)
+			    ;;
+			a|al|alo|aloa|aload)
+			    COMPREPLY=(aload)
+			    ;;
+			'')
+			    COMPREPLY=('' aload ftp sftp tftp)
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		report)
+		    case ${COMP_WORDS[2]} in
+			a|an|ant|anti|antiv|antivi|antivir|antiviru|antivirus)
+			    COMPREPLY=(antivirus)
+			    ;;
+			c)
+			    COMPREPLY=('' connection counter cpu)
+			    ;;
+			co)
+			    COMPREPLY=('' connection counter)
+			    ;;
+			cou|coun|count|counte|counter)
+			    COMPREPLY=(counter)
+			    ;;
+			con|conn|conne|connec|connect|connecti|connectio|connection)
+			    COMPREPLY=(connection)
+			    ;;
+			cp|cpu)
+			    COMPREPLY=(cpu)
+			    ;;
+			d|di|dis|disk)
+			    COMPREPLY=(disk)
+			    ;;
+			g|ga|gat|gate|gatew|gatewa|gateway)
+			    COMPREPLY=(gateway)
+			    ;;
+			l)
+			    COMPREPLY=('' link load)
+			    ;;
+			lo|loa|load)
+			    COMPREPLY=(load)
+			    ;;
+			li|lin|link)
+			    COMPREPLY=(link)
+			    ;;
+			m|me|mem|memo|memor|memory)
+			    COMPREPLY=(memory)
+			    ;;
+			r|ra|rai|raid)
+			    COMPREPLY=(raid)
+			    ;;
+			s|se|ser|serv|servi|servic|service)
+			    COMPREPLY=(service)
+			    ;;
+			v|vp|vpn|vpni|vpnip|vpnips|vpnipse|vpnipsec)
+			    COMPREPLY=(vpnipsec)
+			    ;;
+			'')
+			    COMPREPLY=('' antivirus counter disk raid gateway link connection load memory service vpnipsec)
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		*)
+		    
+		    COMPREPLY=()
+		    ;;
+	    esac
+	    ;;
+	3)
+	    case ${COMP_WORDS[1]} in
+		report)
+		    case ${COMP_WORDS[2]} in
+			counter)
+			    case ${COMP_WORDS[3]} in
+				f|"fi"|fir|fire|firew|firewa|firewal|firewall)
+				    COMPREPLY=(firewall)
+				    ;;
+				g|gu|gua|guar|guard)
+				    COMPREPLY=(guard)
+				    ;;
+				a)
+				    COMPREPLY=('' antivirus avserver)
+				    ;;
+				an|ant|anti|antiv|antivi|antivir|antiviru|antivirus)
+				    COMPREPLY=(antivirus)
+				    ;;
+				av|avs|avse|avser|avserv|avserve|avserver)
+				    COMPREPLY=(avserver)
+				    ;;
+				w)
+				    COMPREPLY=('' web waf)
+				    ;;
+				wa|waf)
+				    COMPREPLY=(waf)
+				    ;;
+				we|web)
+				    COMPREPLY=(web)
+				    ;;
+				r|rw|rwe|rweb)
+				    COMPREPLY=(rweb)
+				    ;;
+				'')
+				    COMPREPLY=('' firewall web rweb guard antivirus avserver waf)
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		patch)
+		    case ${COMP_WORDS[2]} in
+			ftp|sftp|tftp)
+			    COMPREPLY=('' '<file-server>')
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		backup)
+		    case ${COMP_WORDS[2]} in
+			create)
+			    case ${COMP_WORDS[3]} in
+				r|re|rep|repo|repor|report)
+				    COMPREPLY=(report)
+				    ;;
+				w|wa|wai|wait)
+				    COMPREPLY=(wait)
+				    ;;
+				'')
+				    COMPREPLY=('' '<RET>' report wait)
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			load|save)
+			    case ${COMP_WORDS[3]} in
+				f|ft|ftp)
+				    COMPREPLY=(ftp)
+				    ;;
+				s|sf|sft|sftp)
+				    COMPREPLY=(sftp)
+				    ;;
+				t|tf|tft|tftp)
+				    COMPREPLY=(tftp)
+				    ;;
+				'')
+				    COMPREPLY=('' ftp sftp tftp)
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		*)
+		    COMPREPLY=()
+		    ;;
+	    esac
+	    ;;
+	4)
+	    case ${COMP_WORDS[1]} in
+		report)
+		    case ${COMP_WORDS[2]} in
+			counter)
+			    case ${COMP_WORDS[3]} in
+				firewall|web|rweb|guard|antivirus|avserver|waf)
+				    case ${COMP_WORDS[4]} in
+				    	r|ra|raz)
+					    COMPREPLY=(raz)
+					    ;;
+					'')
+					    COMPREPLY=('' '<RET>' raz)
+					    ;;
+					*)
+					    COMPREPLY=()
+					    ;;
+				    esac
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		patch)
+		    case ${COMP_WORDS[2]} in
+			ftp|sftp|tftp)
+			    COMPREPLY=('' '<file-path>')
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		backup)
+		    case ${COMP_WORDS[2]} in
+			load|save)
+			    case ${COMP_WORDS[3]} in
+				ftp|sftp|tftp)
+				    COMPREPLY=('' '<file-server>')
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			*)
+			    ;;
+		    esac
+		    ;;
+		*)
+		    COMPREPLY=()
+		    ;;
+	    esac
+	    ;;
+	5)
+	    case ${COMP_WORDS[1]} in
+		backup)
+		    case ${COMP_WORDS[2]} in
+			load|save)
+			    case ${COMP_WORDS[3]} in
+				ftp|sftp|tftp)
+				    COMPREPLY=('' '<file-path>')
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			*)
+			    ;;
+		    esac
+		    ;;
+		*)
+		    COMPREPLY=()
+		    ;;
+	    esac
+	    ;;
+	*)
+	    COMPREPLY=()
+	    ;;
+    esac
+}

@@ -1,0 +1,316 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       Commands
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+__complete-help()
+{
+    test -n "${COMP_CWORD-1}" || return 1
+
+    case ${COMP_CWORD} in
+	1)
+	    case ${COMP_WORDS[1]} in
+		a)
+		    COMPREPLY=(admin access antivirus apply authenticate)
+		    ;;
+		ad|adm|admi|admin)
+		    COMPREPLY=(admin)
+		    ;;
+		ac|acc|acce|acces|access)
+		    COMPREPLY=(access)
+		    ;;
+		an|ant|anti|antiv|antivi|antivir|antiviru|antivirus)
+		    COMPREPLY=(antivirus)
+		    ;;
+		ap|app|appl|apply)
+		    COMPREPLY=(apply)
+		    ;;
+		au|aut|auth|authe|authen|authent|authenti|authentic|authentica|authenticat|authenticate)
+		    COMPREPLY=(authenticate)
+		    ;;
+		b|bo|bon|bond)
+		    COMPREPLY=(bond)
+		    ;;
+		c)
+		    COMPREPLY=(cache cancel clear clock conf countrylist)
+		    ;;
+		ca)
+		    COMPREPLY=(cache cancel)
+		    ;;
+		cac|cach|cache)
+		    COMPREPLY=(cache)
+		    ;;
+		can|canc|cance|cancel)
+		    COMPREPLY=(cancel)
+		    ;;
+		cl)
+		    COMPREPLY=(clear clock)
+		    ;;
+		cle|clea|clear)
+		    COMPREPLY=(clear)
+		    ;;
+		clo|cloc|clock)
+		    COMPREPLY=(clock)
+		    ;;
+		co)
+		    COMPREPLY=('' conf countrylist)
+		    ;;
+		con|conf)
+		    COMPREPLY=(conf)
+		    ;;
+		cou|coun|count|countr|country|countryl|countryli|countrylis|countrylist)
+		    COMPREPLY=(countrylist)
+		    ;;
+		d)
+		    COMPREPLY=('' dhcp dns domainname dynamicdns)
+		    ;;
+		dh|dhc|dhcp)
+		    COMPREPLY=(dhcp)
+		    ;;
+		dn|dns)
+		    COMPREPLY=(dns)
+		    ;;
+		do|dom|doma|domai|domain|domainn|domainna|domainnam|domainname)
+		    COMPREPLY=(domainname)
+		    ;;
+		dy|dyn|dyna|dynam|dynami|dynamic|dynamicd|dynamicdn|dynamicdns)
+		    COMPREPLY=(dynamicdns)
+		    ;;
+		e)
+		    COMPREPLY=('' email embedded end error exit)
+		    ;;
+		em)
+		    COMPREPLY=('' email embedded)
+		    ;;
+		ema|ema|emai|email)
+		    COMPREPLY=(email)
+		    ;;
+		emb|embe|embed|embedd|embedde|embedded)
+		    COMPREPLY=(embedded)
+		    ;;
+		en|end)
+		    COMPREPLY=(end)
+		    ;;
+		er|err|erro|error)
+		    COMPREPLY=(error)
+		    ;;
+		ex|exi|exit)
+		    COMPREPLY=(exit)
+		    ;;
+		f)
+		    COMPREPLY=('' factoryreset file firewall)
+		    ;;
+		fa|fac|fact|facto|factor|factory|factoryr|factoryre|factoryres|factoryrese|factoryreset)
+		    COMPREPLY=(factoryreset)
+		    ;;
+		'fi')
+		    COMPREPLY=('' file firewall)
+		    ;;
+		fil|file)
+		    COMPREPLY=(file)
+		    ;;
+		fir|fire|firew|firewa|firewal|firewall)
+		    COMPREPLY=(firewall)
+		    ;;
+		g|gu|gua|guar|guard)
+		    COMPREPLY=(guard)
+		    ;;
+		h)
+		    COMPREPLY=('' halt help history hostname)
+		    ;;
+		ha|hal|halt)
+		    COMPREPLY=(halt)
+		    ;;
+		he|hel|help)
+		    COMPREPLY=(help)
+		    ;;
+		hi|his|hist|histo|histor|history)
+		    COMPREPLY=(history)
+		    ;;
+		ho|hos|host|hostn|hostna|hostnam|hostname)
+		    COMPREPLY=(hostname)
+		    ;;
+		i)
+		    COMPREPLY=(informtion ip)
+		    ;;
+		ip)
+		    COMPREPLY=(ip)
+		    ;;
+		'in'|inf|info|infor|inform|informa|informat|informati|informatio|information)
+		    COMPREPLY=(information)
+		    ;;
+		k|ke|key|keyb|keybo|keyboa|keyboar|keyboard)
+		    COMPREPLY=(keyboard)
+		    ;;
+		j|jo|job)
+		    COMPREPLY=(job)
+		    ;;
+		l)
+		    COMPREPLY=(ldap license link log)
+		    ;;
+		ld|lda|ldap)
+		    COMPREPLY=(ldap)
+		    ;;
+		li)
+		    COMPREPLY=(license link)
+		    ;;
+		lic|lice|licen|licens|license)
+		    
+		    COMPREPLY=(license)
+		    ;;
+		lin|link)
+		    
+		    COMPREPLY=(link)
+		    ;;
+		lo|log)
+		    COMPREPLY=(log)
+		    ;;
+		m)
+		    COMPREPLY=('' manager mode)
+		    ;;
+		ma|man|mana|manag|manage|manager)
+		    COMPREPLY=(manager)
+		    ;;
+		mo|mod|mode)
+		    COMPREPLY=(mode)
+		    ;;
+		n|nt|ntp)
+		    COMPREPLY=(ntp)
+		    ;;
+		p)
+		    COMPREPLY=('' password peer ping port)
+		    ;;
+		pa|pas|pass|passw|passwo|passwor|password)
+		    COMPREPLY=(password)
+		    ;;
+		pe|pee|peer)
+		    COMPREPLY=(peer)
+		    ;;
+		pi|pin|ping)
+		    COMPREPLY=(ping)
+		    ;;
+		po|por|port)
+		    COMPREPLY=(port)
+		    ;;
+		q|qo|qos)
+		    COMPREPLY=(qos)
+		    ;;
+		r)
+		    COMPREPLY=('' rweb reboot register)
+		    ;;
+		re)
+		    COMPREPLY=('' reboot register)
+		    ;;
+		reb|rebo|reboo|reboot)
+		    COMPREPLY=(reboot)
+		    ;;
+		reg|regi|regis|regist|registe|register)
+		    COMPREPLY=(register)
+		    ;;
+		rw|rwe|rweb)
+		    COMPREPLY=(rweb)
+		    ;;
+		s)
+		    COMPREPLY=('' setup sslmediate system)
+		    ;;
+		se|"set"|setu|setup)
+		    COMPREPLY=(setup)
+		    ;;
+		ss|ssl|sslm|sslme|sslmed|sslmedi|sslmedia|sslmediat|sslmediate)
+		    COMPREPLY=(sslmediate)
+		    ;;
+		sy|sys|syst|syste|system)
+		    COMPREPLY=(system)
+		    ;;
+		t)
+		    COMPREPLY=('' timezone timezonelist tls traceroute transaction transparent tweb)
+		    ;;
+		ti|tim|'time'|timez|timezo|timezon|timezone)
+		    COMPREPLY=('' timezone timezonelist)
+		    ;;
+		tw|twe|tweb)
+		    COMPREPLY=(tweb)
+		    ;;
+		tr|tra)
+		    COMPREPLY=('' traceroute transparent transaction)
+		    ;;
+		tran|trans)
+		    COMPREPLY=('' transparent transaction)
+		    ;;
+		trac|trace|tracer|tracero|tracerou|tracerout|traceroute)
+		    COMPREPLY=(traceroute)
+		    ;;
+		transa|transac|transact|transacti|transactio|transaction)
+		    COMPREPLY=(transaction)
+		    ;;
+		transp|transpa|transpar|transpare|transparen|transparent)
+		    COMPREPLY=(transparent)
+		    ;;
+		timezonel|timezoneli|timezonelis|timezonelist)
+		    COMPREPLY=(timezonelist)
+		    ;;
+		tl|tls)
+		    COMPREPLY=(tls)
+		    ;;
+		u)
+		    COMPREPLY=('' urllist usleep)
+		    ;;
+		ur|url|urll|urlli|urllis|urllist)
+		    COMPREPLY=(urllist)
+		    ;;
+		us|usl|usle|uslee|usleep)
+		    COMPREPLY=(usleep)
+		    ;;		    
+		v)
+		    COMPREPLY=('' vlan vpnipsec vrrp)
+		    ;;
+		vl|vla|vlan)
+		    COMPREPLY=(vlan)
+		    ;;
+		v|vp|vpn|vpni|vpnip|vpnips|vpnipse|vpnipsec)
+		    COMPREPLY=(vpnipsec)
+		    ;;		    
+		vr|vrr|vrrp)
+		    COMPREPLY=(vrrp)
+		    ;;
+		w|wa)
+		    COMPREPLY=('' waf warning)
+		    ;;
+		waf)
+		    COMPREPLY=(waf)
+		    ;;
+		war|warn|warni|warnin|warning)
+		    COMPREPLY=(warning)
+		    ;;
+		'')
+		    COMPREPLY=('' '<RET>' access admin antivirus apply authenticate bond cancel clear clock conf countrylist dns domainname dynamicdns email error exit factoryreset firewall guard halt help hostname information ip job keyboard log mode manager ntp password peer port qos reboot setup service sslmediate system timezone timezonelist transaction urllist vrrp vlan vpnipsec waf warning)
+		    ;;
+		*)
+		    COMPREPLY=()
+		    ;;
+	    esac
+	    ;;
+	*)
+	    COMPREPLY=()
+	    ;;
+    esac
+}

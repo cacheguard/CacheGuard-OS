@@ -1,0 +1,2 @@
+Cannot resolve a URN
+Your Web Gateway cannot support this URN

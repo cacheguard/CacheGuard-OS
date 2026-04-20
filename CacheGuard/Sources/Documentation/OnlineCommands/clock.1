@@ -1,0 +1,28 @@
+Manage the internal clock's date & time
+.SH SYNOPSIS
+
+[1] \fBclock\fR [\fI<YYYY/MM/DD-hh:mm:ss>\fR]
+
+.SH DESCRIPTION
+This command is used to get or set the internal clock's date & time. YYYY is a four digit year (2065 for instance), MM a two digit month (between 01 and 12) and DD a two digit day (01 for the first day of a month, 31 for the last day of March for instance). The time is specified by a two digit hour
+.I hh
+(between 1 and 23), a two digit minute
+.I mm
+and a two digit second
+.I ss
+(for example 12:00:00 specifies noon - 13:00:00 for 01:00 PM and 08:30:00 for 8:30 AM).
+
+Date elements are separated by the character
+.B "/"
+;  time elements are separated by the character
+.B ":"
+and date and time are separated by the
+.B "_"
+(underscore) character. An example of a complete date & time specification is
+.I 2065/04/10_02:30.23.
+It specifies the following date & time: April 10, 2065 02:30:23 AM.
+.SH SEE ALSO
+.B ntp
+(1)
+.B timezone
+(1)

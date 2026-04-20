@@ -1,0 +1,4 @@
+503
+Service unavailable
+The Web Gateway is temporarily unable to service your request - Please try again later
+Reasons may be maintenance downtime or capacity problems

@@ -1,0 +1,11 @@
+SecRule REQUEST_METHOD "^GET$" id:300,log,auditlog,severity:6,allow,chain
+SecRule REQUEST_URI "^/$"
+
+SecRule REQUEST_METHOD "^GET$" id:302,log,auditlog,severity:6,allow,chain
+SecRule REQUEST_URI "^/styles\.css$"
+
+SecRule REQUEST_METHOD "^GET$" id:304,log,auditlog,severity:6,allow,chain
+SecRule REQUEST_URI "^/favicon\.ico$"
+
+SecRule REQUEST_METHOD "^GET$" id:306,log,auditlog,severity:6,allow,chain
+SecRule REQUEST_URI "^/ha.pac$"

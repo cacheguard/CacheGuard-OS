@@ -1,0 +1,40 @@
+Manage the DHCP server
+.SH SYNOPSIS
+
+[1] \fBdhcp\fR [\fBrange\fR [\fBraz\fR | (\fBadd\fR | \fBdel\fR) \fI<ip1>\fR \fI<ip2>\fR]]
+
+[2] \fBdhcp\fR [\fBfixed\fR [\fBraz\fR | \fBadd\fR \fI<hostname>\fR \fI<mac-address>\fR \fI<ip>\fR | \fBdel\fR \fI<hostname>\fR]]
+
+[3] \fBdhcp\fR [\fBpeer\fR (\fBmaster\fR | \fBslave\fR) [\fBraz\fR | (\fBadd\fR | \fBdel\fR) \fI<peer-ip>\fR]]
+
+[4] \fBdhcp\fR \fBreport\fR
+
+.SH DESCRIPTION
+CacheGuard integrates a built-in DHCP (Dynamic Host Configuration Protocol) server. This command allows you to configure the DHCP server. See the command
+.B mode 
+to activate the DHCP server.
+
+Without any argument, this command displays the DHCP configuration. To display only a specific DHCP feature give the DHCP feature name (\fBrange\fR, \fBfixed\fR or \fBpeer\fR).
+
+The first [1] usage form allows you to add or delete an IP range. To add a DHCP IP range use the keywords \fBrange add\fR followed by the lowest and highest IP addresses in a range. To delete a DHCP IP range use the keywords \fBrange del\fR followed by the lowest and highest IP addresses in a range. To erase all ranges, use the keywords \fBrange raz\fR.
+
+Note that the DHCP server supports a limited number of IP address leases. The maximum number of supported IP address leases is the number of users configured during the installation phase.
+
+The second [2] usage form allows you to associate a fixed IP address to a client. To associate a fixed IP address to a client use the keywords \fBfixed add\fR followed by the host name of the client, its MAC address and the fixed IP address. A valid MAC address is a sequence of 6 hexadecimal values between 00 and FF separated by the colon (":") character (for instance 00:01:02:03:04:05). To disassociate a fixed IP address from a client use the keywords \fBfixed del\fR followed by the host name of the client. To erase the list of fixed IP address use keywords \fBfixed raz\fR.
+
+The third [3] usage form allows you to define a remote DHCP server as a failover peer for the local DHCP server. When using the DHCP failover feature, two CacheGuards must be configured as DHCP peer servers each for other (one must be configured as \fBmaster\fR and the other as \fBslave\fR).
+
+To define a remote CacheGuard as a DHCP peer server for the local CacheGuard, use the keywords \fBpeer add\fR followed by the role and the internal IP address of the remote CacheGuard (when using VLANs, give the IP address configured for the \fBpeer\fR VLAN on the remote CacheGuard). The role is defined using the keywords \fBmaster\fR or \fBslave\fR.
+
+To delete a DHCP peer server use the keywords \fBpeer del\fR followed by the role and IP address of the remote CacheGuard. To erase all DHCP peer servers use the keywords \fBpeer raz\fR.
+
+The fourth [4] usage form allows you to display a report on active DHCP leases managed by the system.
+
+.SH LIMITATIONS
+Please note that only one unique DHCP peer server may be configured.
+
+.SH SEE ALSO
+.B apply
+(1)
+.B mode
+(1)

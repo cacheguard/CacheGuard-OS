@@ -1,0 +1,33 @@
+########################################################################
+# Begin /etc/sysconfig/modules
+#
+# Description : Module auto-loading configuration
+#
+# Authors     :
+#
+# Version     : 00.00
+#
+# Notes       : The syntax of this file is as follows:
+#  		<module> [<arg1> <arg2> ...]
+#
+# Each module should be on it's own line, and any options that you want
+# passed to the module should follow it.  The line deliminator is either
+# a space or a tab.
+########################################################################
+
+ipv6
+
+ifb numifbs=4
+
+nf_conntrack_tftp
+nf_conntrack_ftp
+nf_conntrack_sip
+
+nf_nat_tftp
+nf_nat_ftp
+nf_nat_sip
+
+ehci_hcd
+uhci_hcd
+ohci_hcd
+usbhid

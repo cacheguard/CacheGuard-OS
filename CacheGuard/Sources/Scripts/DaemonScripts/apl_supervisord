@@ -1,0 +1,317 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       Scripts
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+CACHEGUARD_DIR=/etc/sysconfig/cacheguard
+source ${CACHEGUARD_DIR}/constant
+source ${APPLIANCE_DIR}/etc/role
+
+read-action-args()
+{
+    test -n "${1}" || return 1
+    local user=${1}
+
+    local arg_file=${RUN_DIR}/${SUPERVISOR_ARGS}/${user}
+
+    local arg args i=0
+    test -f ${arg_file} || return 1
+
+    unset ACTION_ARGS
+
+    while read arg
+    do
+	ACTION_ARGS[${i}]=${arg}
+	((i++))
+    done < ${arg_file}
+
+    rm -f ${arg_file}
+}
+
+apl-ldap-test()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    local pid=${1}
+    local user=${2}
+
+    read-action-args ${user} || return 11
+    apl_ldap_test "${ACTION_ARGS[0]}" "${ACTION_ARGS[1]}" "${ACTION_ARGS[2]}" > ${TMP_DIR}/${AUTH_LDAP_TEST}.${pid}.tmp
+    chown ${user}:${GROUP_NAME} ${TMP_DIR}/${AUTH_LDAP_TEST}.${pid}.tmp
+    mv -f ${TMP_DIR}/${AUTH_LDAP_TEST}.${pid}.tmp ${TMP_DIR}/${AUTH_LDAP_TEST}.${pid}
+}
+
+apl-kerberos-create()
+{
+    test -n "${1}" || return 1
+    local user=${2}
+
+    read-action-args ${user} || return 11
+    test -n "${ACTION_ARGS[0]}" || return 13
+    test -n "${ACTION_ARGS[1]}" || return 15
+    apl_kerberos_create "${ACTION_ARGS[0]}" "${ACTION_ARGS[1]}"
+}
+
+apl-keyboard()
+{
+    test -n "${1}" || return 1
+    local user=${1}
+
+    read-action-args ${user} || return 11
+    test -n "${ACTION_ARGS[0]}" || return 13
+
+    apl_keyboard ${ACTION_ARGS[0]}
+}
+
+apl-failed-login()
+{
+    test -n "${1}" || return 1
+    local user=${1}
+
+    read-action-args ${user} || return 11
+    test -n "${ACTION_ARGS[0]}" || return 13
+    test -n "${ACTION_ARGS[1]}" || return 15
+    local interface=${ACTION_ARGS[0]}
+    local remote_ip=${ACTION_ARGS[1]}
+
+    apl_alert_login failed ${interface} ${remote_ip}
+}
+
+apl-2fa-update-timestamp()
+{
+    test -n "${1}" || return 1
+    local user=${1}
+
+    read-action-args ${user} || return 11
+    test -n "${ACTION_ARGS[0]}" || return 13
+
+    local status=${ACTION_ARGS[0]}
+    apl_update_2fa_timestamp ${user} ${status}
+}
+
+start-loop()
+{
+    local command rest
+    local action pid user
+    local args
+
+    while true
+    do
+	read command < ${RUN_DIR}/${SUPERVISOR_FIFO}
+	# If Interrupted system call by EINTR do nothing
+	test ${?} -eq 0 || continue
+
+	action=${command/ *}
+	rest=${command#* }
+	user=${rest/ *}
+	rest=${rest#* }
+	pid=${rest/ *}
+
+	test "${pid}" != "${action}" || unset pid
+
+	case "${action}" in
+	    password-console|password-wadmin|password-login|qos-report|authenticate-ldap-test|health-av|health-disk|health-gateway|health-link|health-raid|health-rcache|health-service|health-tls|health-vpnipsec|connection|ip-neighbour|vpnipsec-report|snmp-trap-test|syslog-test)
+	    ;;
+	    2fa-copy-conf|2fa-revert-copy-conf|2fa-update-timestamp)
+		test ${user} != ${ADMIN_NAME} || continue
+		;;
+	    *)
+		test ${user} == ${ADMIN_NAME} || continue
+		;;
+	esac
+
+	case "${action}" in
+
+	    apply)
+		nice --adjustment=-14 apl_apply &
+		;;
+	    
+	    apply-cancel)
+	     	nice --adjustment=-15 apl_apply_cancel &
+		;;
+
+	    authenticate-ldap-test)
+		apl-ldap-test ${pid} ${user} &
+		;;
+
+	    av-create)
+		apl_av_create &
+		;;
+
+	    av-update)
+		apl_av_update &
+		;;
+
+	    av-update-report)
+		nice --adjustment=-8 apl_health_check ${pid} av-update &
+		;;
+
+	    backup)
+		apl_backup &
+		;;
+
+	    cache-clear)
+		apl_cache_clear &
+		;;
+
+	    failed-login)
+		apl-failed-login ${user} &
+		;;
+
+	    halt)
+		nice --adjustment=-16 apl_halt &
+		;;
+
+	    ha-failover)
+		apl_ha failover &
+		;;
+
+	    ha-active)
+		apl_ha active &
+		;;
+
+	    health)
+		nice --adjustment=-8 apl_health_check ${pid} &
+		;;
+
+	    health-av)
+		nice --adjustment=-8 apl_health_check ${pid} av-update passive &
+		;;
+
+	    health-disk)
+		nice --adjustment=-8 apl_health_check ${pid} disk io:health &
+		;;
+
+	    health-gateway)
+		nice --adjustment=-8 apl_path_check ${pid} gateway &
+		;;
+
+	    health-link)
+		nice --adjustment=-8 apl_health_check ${pid} link &
+		;;
+
+	    health-raid)
+		nice --adjustment=-8 apl_health_check ${pid} disk raid &
+		;;
+
+	    health-rcache)
+		nice --adjustment=-8 apl_health_check ${pid} disk rcache &
+		;;
+
+	    health-service)
+		nice --adjustment=-8 apl_health_check ${pid} service passive &
+		;;
+
+	    health-tls)
+		nice --adjustment=-8 apl_health_check ${pid} tls &
+		;;
+
+	    health-vpnipsec)
+		nice --adjustment=-8 apl_health_check ${pid} vpnipsec &
+		;;
+
+	    connection)
+		nice --adjustment=-8 apl_health_check ${pid} connection &
+		;;
+
+	    ip-neighbour)
+		apl_ip_neighbour ${pid} &
+		;;
+
+	    kerberos-create)
+		apl-kerberos-create ${user} &
+		;;
+
+	    keyboard)
+		apl-keyboard ${user} &
+		;;
+
+	    logrotate)
+		apl_logrotate &
+		;;
+
+	    ntp-restart)
+		apl_ntp_service restart &
+		;;
+
+	    password-console|password-wadmin|password-login)
+		apl_password ${user} ${action/password-} &
+		;;
+
+	    qos-report)
+		apl_qos_report ${pid} &
+		;;
+
+	    vpnipsec-report)
+		apl_vpnipsec_report ${pid} &
+		;;
+
+	    reboot)
+		nice --adjustment=-16 apl_reboot &
+		;;
+
+	    snmp-trap-test)
+		apl_snmp_trap 10 Test dummy &
+		;;
+
+	    syslog-test)
+		apl_rlogger "Testing message from ${TECHNICAL_NAME}" &
+		;;
+
+	    update-av-regular-downloaded-sz)
+		apl_av_regular_update_downloaded_sz &
+		;;
+
+	    update-av-extended-create-downloaded-sz)
+		apl_av_extended_create_update_downloaded_sz &
+		;;
+
+	    urllist-update)
+		NON_INTERACTIVE=yes apl_urllist_update &
+		;;
+
+	    2fa-copy-conf)
+		test -f ${BASE_DIR}/${user}/${TWO_FACTOR_GOOGLE_AUTHENTICATOR} || continue
+		cp -a \
+		    ${BASE_DIR}/${user}/${TWO_FACTOR_GOOGLE_AUTHENTICATOR} \
+		    ${HOME_DIR}/${user}/${TWO_FACTOR_GOOGLE_AUTHENTICATOR} &
+		;;
+
+	    2fa-revert-copy-conf)
+		test -f ${HOME_DIR}/${user}/${TWO_FACTOR_GOOGLE_AUTHENTICATOR} || continue
+		cp -a \
+		   ${HOME_DIR}/${user}/${TWO_FACTOR_GOOGLE_AUTHENTICATOR} \
+		   ${BASE_DIR}/${user}/${TWO_FACTOR_GOOGLE_AUTHENTICATOR} &
+		;;
+
+	    2fa-update-timestamp)
+		apl-2fa-update-timestamp ${user} &
+		;;
+	    *)
+		;;
+	esac
+    done
+}
+
+# Main()
+
+start-loop "${@}"

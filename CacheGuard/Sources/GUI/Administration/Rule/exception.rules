@@ -1,0 +1,96 @@
+SecRule REQUEST_METHOD "^GET$" id:400,log,auditlog,severity:5,allow,chain
+SecRule REQUEST_URI "^/gui/tls-print\.apl\?[[:print:]]{0,291}\+(key|csr|certificate|der|conf|certificate|pkcs12|pfx|password)$"
+
+SecRule REQUEST_METHOD "^GET$" id:402,log,auditlog,severity:5,allow,chain
+SecRule REQUEST_URI "^/gui/waf-rweb-custom-print\.apl\?[[:print:]]{0,192}$"
+
+SecRule REQUEST_METHOD "^GET$" id:404,log,auditlog,severity:5,allow,chain
+SecRule REQUEST_URI "^/gui/waf-rweb-denyurl-print\.apl\?[[:print:]]{0,192}$"
+
+SecRule REQUEST_METHOD "^GET$" id:406,log,auditlog,severity:5,allow,chain
+SecRule REQUEST_URI "^/gui/waf-rweb-generic\.apl(\?[[:print:]]{0,192})?$"
+
+SecRule REQUEST_METHOD "^GET$" id:408,log,auditlog,severity:5,allow,chain
+SecRule REQUEST_URI "^/gui/rweb-host\.apl(\?[[:print:]]{0,192})?$"
+
+SecRule REQUEST_METHOD "^GET$" id:410,log,auditlog,severity:5,allow,chain
+SecRule REQUEST_URI "^/gui/edit-rweb-site\.apl(\?[[:print:]]{0,192})?$"
+
+SecRule REQUEST_METHOD "^GET$" id:412,log,auditlog,severity:5,allow,chain
+SecRule REQUEST_URI "^/gui/edit-guard-policy\.apl(\?[[:print:]]{0,192})?$"
+
+SecRule REQUEST_METHOD "^GET$" id:414,log,auditlog,severity:5,allow,chain
+SecRule REQUEST_URI "^/gui/edit-guard-rule\.apl(\?[[:print:]]{0,192})?$"
+
+SecRule REQUEST_METHOD "^GET$" id:416,log,auditlog,severity:5,allow,chain
+SecRule REQUEST_URI "^/gui/ping\.apl\?[[:print:]]{1,256}$"
+
+SecRule REQUEST_METHOD "^GET$" id:418,log,auditlog,severity:5,allow,chain
+SecRule REQUEST_URI "^/gui/traceroute\.apl\?[[:print:]]{1,256}$"
+
+SecRule REQUEST_METHOD "^GET$" id:420,log,auditlog,severity:5,allow,chain
+SecRule REQUEST_URI "^/gui/admin-snmp-trap-test\.apl\?[[:digit:]]{0,4}$"
+
+SecRule REQUEST_METHOD "^GET$" id:422,log,auditlog,severity:5,allow,chain
+SecRule REQUEST_URI "^/gui/log-syslog-test\.apl\?[[:digit:]]{0,4}$"
+
+SecRule REQUEST_METHOD "^GET$" id:424,log,auditlog,severity:5,allow,chain
+SecRule REQUEST_URI "^/gui/authenticate-ldap-test\.apl\?[[:digit:]]{0,4}\&[[:print:]]{0,192}\&[[:print:]]{0,192}$"
+
+SecRule REQUEST_METHOD "^GET$" id:426,log,auditlog,severity:5,allow,chain
+SecRule REQUEST_URI "^/gui/ldap-search\.apl\?[[:digit:]]{0,4}\&[[:print:]]{0,1152}$"
+
+SecRule REQUEST_METHOD "^GET$" id:428,log,auditlog,severity:5,allow,chain
+SecRule REQUEST_URI "^/gui/ip-neighbour\.apl\?[[:print:]]{0,1152}$"
+
+SecRule REQUEST_METHOD "^GET$" id:430,log,auditlog,severity:5,allow,chain
+SecRule REQUEST_URI "^/gui/urllist-download-percentage\.apl(\?[[:print:]]{1,192})?$"
+
+SecRule REQUEST_METHOD "^GET$" id:432,log,auditlog,severity:5,allow,chain
+SecRule REQUEST_URI "^/gui/patch-download-percentage\.apl$"
+
+SecRule REQUEST_METHOD "^GET$" id:434,log,auditlog,severity:5,allow,chain
+SecRule REQUEST_URI "^/gui/backup-exchanged-percentage\.apl(\?(create|clear|load|save))?$"
+
+SecRule REQUEST_METHOD "^GET$" id:436,log,auditlog,severity:5,allow,chain
+SecRule REQUEST_URI "^/gui/conf-download\.apl(\?[[:print:]]{1,384})?$"
+
+SecRule REQUEST_METHOD "^GET$" id:438,log,auditlog,severity:5,allow,chain
+SecRule REQUEST_URI "^/gui/system-soft-check\.apl$"
+
+SecRule REQUEST_METHOD "^GET$" id:440,log,auditlog,severity:5,allow,chain
+SecRule REQUEST_URI "^/gui/panel-board\.apl(\?expanddiv=board-[[:digit:]]{1,2}(\&menuadministrationboard=[[:digit:]]{1,2}|\?not-found|\?blocked)?)?$"
+
+SecRule REQUEST_METHOD "^GET$" id:442,log,auditlog,severity:5,allow,chain
+SecRule REQUEST_URI "^/gui/refresh-health-checks\.apl$"
+
+SecRule REQUEST_METHOD "^GET$" id:444,log,auditlog,severity:5,allow,chain
+SecRule REQUEST_URI "^/gui/refresh-shortcuts\.apl\?[[:digit:]]{0,16}$"
+
+SecRule REQUEST_METHOD "^GET$" id:446,log,auditlog,severity:5,allow,chain
+SecRule REQUEST_URI "^/gui/ntp-update\.apl\?[[:digit:]]{0,4}$"
+
+SecRule REQUEST_METHOD "^GET$" id:448,log,auditlog,severity:5,allow,chain
+SecRule REQUEST_URI "^/gui/update-vpnipsec-report\.apl\?(access|site)$"
+
+SecRule REQUEST_METHOD "^GET$" id:450,log,auditlog,severity:5,allow,chain
+SecRule REQUEST_URI "^/gui/update-manager-gateway-operation\.apl\?(pull|push|apply)$"
+
+SecRule REQUEST_METHOD "^GET$" id:452,log,auditlog,severity:5,allow,chain
+SecRule REQUEST_URI "^/gui/vpnipsec-access-conf-print\.apl\?(android|apple|linux|windows)\+[[:print:]]{1,96}$"
+
+SecRule REQUEST_METHOD "^GET$" id:454,log,auditlog,severity:5,allow,chain
+SecRule REQUEST_URI "^/gui/email-test\.apl\?[[:print:]]{1,256}$"
+
+SecRule REQUEST_METHOD "^POST$" id:500,severity:5,allow,chain
+SecRule REQUEST_BODY "^csrf_cookie=[[:print:]]{0,128}(\&[[:print:]]{1,192}=[[:print:]]{1,128}){0,32}$" chain
+SecRule REQUEST_URI "^/gui/dashboard-save\.apl$"
+
+SecRule REQUEST_METHOD "^POST$" id:502,severity:5,allow,chain
+SecRule REQUEST_BODY "^csrf_cookie=[[:print:]]{0,128}$" chain
+SecRule REQUEST_URI "^/gui/dashboard-reset-save\.apl$"
+
+SecRule REQUEST_METHOD "^POST$" id:504,log,auditlog,severity:5,allow,chain
+SecRule MULTIPART_NAME "^(csrf_cookie|upload|submit)$" chain
+SecRule MULTIPART_FILENAME "^[[:print:]]{0,192}$" chain
+SecRule REQUEST_URI "^/gui/conf-load-save\.apl$"

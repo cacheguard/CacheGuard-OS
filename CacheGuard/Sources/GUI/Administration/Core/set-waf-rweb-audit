@@ -1,0 +1,50 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       GUI
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+set-audit()
+{
+    local pos=0 entry_pos audit_pos audit
+    local name_pos
+
+    local transaction=/tmp/${TRANSACTION_FILE}.wadmin.${REMOTE_USER}.${$}
+    rm -f ${transaction}
+
+    while test ${pos} -lt ${ATTRIBUTE_NB}
+    do
+	name_pos=${pos}
+	audit_pos=$[${pos} + 1]
+	
+	if test "${ATTRIBUTES[${audit_pos}]}" == audit ; then	  
+	    echo "waf rweb audit ${VALUES[${name_pos}]} on" >> ${transaction}
+	    pos=$[${pos} + 2]
+	else
+	    echo "waf rweb audit ${VALUES[${name_pos}]} off" >> ${transaction}
+	    pos=$[${pos} + 1]
+	fi
+    done
+    
+    execute-transaction ${transaction}
+}
+
+set-audit

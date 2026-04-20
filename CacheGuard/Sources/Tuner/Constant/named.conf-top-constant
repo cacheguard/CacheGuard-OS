@@ -1,0 +1,32 @@
+acl bogusnets { 0.0.0.0/8; 224.0.0.0/3; };
+acl loopback { 127.0.0.1/32; };
+
+controls { };
+
+logging {
+	category		"default" { "null"; };
+};
+
+
+options {
+	version			"";
+	dnssec-validation	auto;
+	allow-notify		{ none; };
+	allow-query		{ loopback; web; };
+	allow-recursion		{ loopback; web; };
+	allow-transfer		{ none; };
+	listen-on		{ loopback; listen_ip; };
+	listen-on-v6		{ none; };
+	blackhole		{ bogusnets; };
+
+	notify			no;
+	zone-statistics		no;
+	recursion		yes;
+	match-mapped-addresses	no;
+
+	query-source		address *;
+
+	directory		"/zone";
+	bindkeys-file		"/etc/bind.keys";
+    	pid-file		"/var/named.pid";
+	session-keyfile		"/var/session.key";

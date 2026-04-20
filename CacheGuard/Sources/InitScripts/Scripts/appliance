@@ -1,0 +1,513 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       InitScript
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+source /lib/lsb/init-functions
+
+CACHEGUARD_DIR=/etc/sysconfig/cacheguard
+source ${CACHEGUARD_DIR}/constant
+source ${LOCAL_DIR}/lib/apl_functions
+
+SERV="Appliance"
+
+save-keyboard-1()
+{
+    grep -v KEYMAP /etc/sysconfig/console
+    echo "KEYMAP=\"${KEYMAP}\""
+}
+
+save-keyboard-2()
+{
+    echo ${KEYMAP}
+}
+
+save-keyboard()
+{
+    save-keyboard-1 > /tmp/etc.sysconfig.console.${$}
+    mv -f /tmp/etc.sysconfig.console.${$} /etc/sysconfig/console
+
+    save-keyboard-2 > /tmp/admin.etc.keymap.${$}
+    mv -f /tmp/admin.etc.keymap.${$} ${ETC_DIR}/keymap
+}
+
+test-keyboard()
+{
+    dialog --no-shadow --ascii-lines --backtitle "${COMMERCIAL_NAME}-${OS_GENERATION} v${OS_VERSION} VE Installation" --title "Keyboard Test" --no-cancel --max-input 32 --inputbox "\nType some characters to test your keyboard selection:" 10 40 2>> /dev/null
+}
+
+setup-keyboard()
+{
+    local console=$(get-console)
+    ! is-serial-console ${console} || return 0
+
+    source /etc/sysconfig/console
+    cd /usr/share/keymaps/i386
+    local files=$(find . -type f 2> /dev/null | sort)
+    local keyboard keyboards
+    cd ${INSTALL_DIR}
+
+    for keyboard in ${files}
+    do
+	keyboard=${keyboard:2}
+	! [[ "${keyboard}" =~ ^.*include/.* ]] || continue
+	keyboard=${keyboard/\.map\.gz}
+	keyboards="${keyboards} ${keyboard/*\/} ${keyboard}"
+    done
+    keyboards=${keyboards:1}
+
+    local ret
+
+    while true
+    do
+	dialog --no-shadow --ascii-lines --backtitle "${COMMERCIAL_NAME}-${OS_GENERATION} v${OS_VERSION} VE Installation" --title "Keyboard selection" --no-cancel --extra-button --extra-label "Test" --default-item "${KEYMAP}" --menu "Please select your keyboard type:\n\n" 20 0 16 ${keyboards} 2> /tmp/VARIABLE_KEYMAP
+
+	ret=${?}
+
+	local keymap=$(cat /tmp/VARIABLE_KEYMAP)
+	rm -f /tmp/VARIABLE_KEYMAP
+
+	loadkeys --quiet ${keymap} > /dev/null 2>&1
+	KEYMAP=${keymap}
+
+	test ${ret} -eq 3 || break
+	test-keyboard
+    done
+
+    save-keyboard
+}
+
+make-directories()
+{
+    test ${APL_ROLE} == 'manager' || return 0
+
+    install -d -m 755 -o ${ADMIN_NAME} -g ${GROUP_NAME} ${ABASE_DIR}/${MANAGER_REPOSITORY_RDIR}
+    install -d -m 755 -o ${ADMIN_NAME} -g ${GROUP_NAME} ${ABASE_DIR}/${MANAGER_TEMPLATE_RDIR}
+    install -d -m 755 -o ${ADMIN_NAME} -g ${GROUP_NAME} ${ABASE_DIR}/${MANAGER_GATEWAY_RDIR}
+    install -d -m 755 -o ${ADMIN_NAME} -g ${GROUP_NAME} ${MANAGER_LOG_DIR}
+
+    install -d -m 1777 -o root -g root ${TMP_TEMPLATE_DIR}
+    install -d -m 1777 -o root -g root ${TMP_GATEWAY_DIR}
+}
+
+set-vpn-psk()
+{
+    test ${APL_ROLE} == 'gateway' || return 0
+
+    log_info_msg "Generating the IPsec VPN Pre Shared Key..."
+
+    local secret=$(random-psk)
+    local psk_file=${ABASE_DIR}/${ENV_RDIR}/${VPN_IPSEC_RDIR}/${IPSEC_AUTHENTICATE_PSK_FILENAME}
+
+    secret=$(ROOT_DIR=${ADMIN_DIR} encrypt-password "clear:${secret}" "${IPSEC_PASSWD}")
+    echo "${secret}" > /tmp/${IPSEC_AUTHENTICATE_PSK_FILENAME}.${$}
+
+    install -m 640 -o ${ADMIN_NAME} -g ${GROUP_NAME} /tmp/${IPSEC_AUTHENTICATE_PSK_FILENAME}.${$} ${psk_file}
+    install -m 640 -o ${ADMIN_NAME} -g ${GROUP_NAME} /tmp/${IPSEC_AUTHENTICATE_PSK_FILENAME}.${$} ${psk_file}.current
+
+    rm -f /tmp/${IPSEC_AUTHENTICATE_PSK_FILENAME}.${$}
+
+    evaluate_retval   
+}
+
+gen-uuid()
+{
+    local k1 k2 k3 k4 k5
+
+    if test -f ${HARD_DIR}/hw-links ; then
+
+	local eth mac info
+	read eth mac info < ${HARD_DIR}/hw-links
+	mac=${mac//:}
+	mac=${mac:4}
+
+	len=${#mac}
+	if test ${len} == 8 ; then
+	    k1=${mac}
+	else
+	    k1=$(random-phrase-base16 8)
+	fi
+    else
+	k1=$(random-phrase-base16 8)
+    fi
+	
+    k2=$(random-phrase-base16 4)
+    k3=$(random-phrase-base16 4)
+    k4=$(random-phrase-base16 4)
+    k5=$(random-phrase-base16 12)
+
+    local uuid="${k1}-${k2}-${k3}-${k4}-${k5}"
+
+    echo ${uuid}
+}
+
+set-apl-uuid()
+{
+    gen-uuid > ${HARD_DIR}/apl-uuid
+}
+
+init-tls()
+{
+    local tls=default
+
+    log_info_msg "Generating appliance SSL certificates..."
+
+    cp -f ${SSL_SERVER_DIR}/${tls}.conf ${TMP_DIR}/${TLS_SERVER}.${tls}.conf
+    cp -f ${SSL_CA_DIR}/${SYSTEM_CA}.conf ${TMP_DIR}/${SYSTEM_CA}.conf
+
+    generate-tls-server ${tls} &&
+	generate-system-ca &&
+	install-generated-system-ca &&
+	clean-generated-system-ca
+
+    evaluate_retval
+}
+
+reset-crontab()
+{
+    gen-crontab > /tmp/crontab &&
+	install -m 644 -o root -g root /tmp/crontab /etc/crontab
+
+    gen-av-extended-cron > /tmp/${AV_EXTENDED_CRON_FILENAME}.cron &&
+	install -m 644 -o root -g root /tmp/${AV_EXTENDED_CRON_FILENAME}.cron /etc/cron.d/${AV_EXTENDED_CRON_FILENAME}
+
+    rm -f \
+       /tmp/crontab \
+       /tmp/${AV_EXTENDED_CRON_FILENAME}.cron
+}
+
+read-license()
+{
+    local response license=${APPLIANCE_DIR}/man/man1/license.1
+
+    man -r 'Press <SPACE> to continue or <Q> to Quit' ${license}
+    echo
+    echo -n "Do you accept the terms of the ${COMMERCIAL_NAME}-OS License (Y|N) [Y]? "
+    read response
+    test -z "${response}" -o "${response}" == y -o "${response}" == Y || return 1
+}
+
+appliance-first-startup()
+{
+    test ! -f ${HARD_DIR}/${FIRST_STARTUP} || return 0
+
+    make-directories
+    set-vpn-psk
+    set-apl-uuid
+    init-tls
+
+    local hard=$(get-machine-type)
+
+    if test ${hard} == "OS" ; then
+	set-first-startup-action setup
+	return 0
+    fi
+
+    reset-crontab
+    setup-keyboard
+
+    case "${CLOUD_CONSOLE:0:4}" in
+	ttyS)
+	    set-first-startup-action license
+	    ;;
+	*)
+	    read-license
+	    if test ${?} -ne 0 ; then
+		shutdown -nfr now > /dev/null 2>&1
+		return 0
+	    fi
+	    set-first-startup-action setup
+	    ;;
+    esac
+}
+
+appliance-end-apply()
+{
+    test -n "${1}" || return 1
+    local code=${1}
+
+    clean-patch
+    log-result ${code}
+    log "Ending the Apply operation"
+    log-result 0
+}
+
+appliance-apply-patch()
+{
+    test -d /root/apply-patch || return 0
+
+    local code
+    log "Continuing to apply the patch"
+
+    if test ! -f /root/apply-patch/PATCH.env ; then code=1 ; appliance-end-apply ${code} ; return ${code} ; fi
+    source /root/apply-patch/PATCH.env
+
+    if test "${PATCH_REBOOT_APPLIANCE}" != yes ; then code=3 ; appliance-end-apply ${code} ; return ${code} ; fi
+
+    if test -x /root/apply-patch/pre-reboot.bash ; then
+	/root/apply-patch/pre-reboot.bash
+	if test ${?} -ne 0 ; then code=5 ; appliance-end-apply ${code} ; return ${code} ; fi
+    fi
+
+    if test -f ${TMP_DIR}/${PATCH_DIR_NAME}/patch.tar ; then
+	cd /
+	tar --strip-components=1 -xpf ${TMP_DIR}/${PATCH_DIR_NAME}/patch.tar reboot-patch 2> /dev/null
+	if test ${?} -ne 0 ; then code=7 ; appliance-end-apply ${code} ; return ${code} ; fi
+    else
+	code=9 ; appliance-end-apply ${code} ; return ${code}
+    fi
+
+    if test -x /root/apply-patch/post-reboot.bash ; then
+	/root/apply-patch/post-reboot.bash
+	if test ${?} -ne 0 ; then code=11 ; appliance-end-apply ${code} ; return ${code} ; fi
+    fi
+
+    apl_remove_inactive_kernels
+    if test ${?} -ne 0 ; then code=13 ; appliance-end-apply ${code} ; return ${code} ; fi
+
+    appliance-end-apply 0
+}
+
+appliance-start-lcd()
+{
+    [ -f /usr/local/bin/lcd4linux ] || return 0
+    [ -f /etc/sysconfig/lcd4linux ] && source /etc/sysconfig/lcd4linux
+    lcd4linux ${OPTIONS} -f /etc/lcd4linux-start.conf
+}
+
+appliance-clean-all-lock()
+{
+    rm -f ${PROXY_RUN_DIR}/squid.pid
+    rm -f ${WEB_RUN_DIR}/httpd.pid
+    rm -f ${LOCK_DIR}/*
+}
+
+appliance-clean-av()
+{
+    rm -rf ${AV_DB_DIR}/${CLAMAV_TMP_DIR_PREFIX}*
+}
+
+appliance-check-usage()
+{
+    is-licensed || return 0
+
+    local msg=$(cat ${LOCAL_DIR}/${TECHNICAL_NAME}/etc/.file1)
+    msg=$(echo -en "${msg}")
+
+    log_info_msg "${msg}..."
+
+    local retval=0
+
+    test -f /etc/${TECHNICAL_NAME}/${SN_SN} || retval=1
+    test -f /etc/${TECHNICAL_NAME}/${LIC_KEY} || retval=3
+
+    if test ${retval} -eq 0 ; then
+
+	local sn=$(cat /etc/${TECHNICAL_NAME}/${SN_SN})
+	local key=$(cat /etc/${TECHNICAL_NAME}/${LIC_KEY})
+
+	if is-regular-usage "${sn}" "${key}" ; then
+	    is-regular-subscription || retval=5
+	else
+	    retval=7
+	fi
+    fi
+
+    test ${retval} -eq 0
+    evaluate_retval
+    return ${retval}
+}
+
+appliance-gen-gui-auth-phrase()
+{
+    local key file
+
+    phrase=$(random-phrase-base62)
+    echo ${phrase} > ${ADMIN_DIR}${GUI_AUTHENTICATION_KEY_FILE}
+    echo ${phrase} > ${WEB_SERVER_DIR}${GUI_AUTHENTICATION_KEY_FILE}
+
+    chmod 640 ${ADMIN_DIR}${GUI_AUTHENTICATION_KEY_FILE}
+    chown ${SUPERADMIN_NAME}:${GROUP_NAME} ${ADMIN_DIR}${GUI_AUTHENTICATION_KEY_FILE}
+
+    chmod 600 ${WEB_SERVER_DIR}${GUI_AUTHENTICATION_KEY_FILE}
+    chown filter:filter ${WEB_SERVER_DIR}${GUI_AUTHENTICATION_KEY_FILE}
+}
+
+appliance-clean-squid-init()
+{
+    test -f /var/lock/squid.init || return 0
+    /etc/rc.d/init.d/squid force-build
+}
+
+appliance-clean-health-checks()
+{
+    rm -f \
+       ${RUN_DIR}/${DISKS_STATS_IO_FILENAME} \
+       ${RUN_DIR}/${DISKS_STATS_TIME_IO_FILENAME}
+}
+
+appliance-restore-run-config()
+{
+    local run_conf_file base_conf_file
+    local run_conf_files=$(ls ${CONF_RUN_DIR}/*.backup 2> /dev/null)
+
+    for run_conf_file in ${run_conf_files}
+    do
+	base_conf_file=$(file-basename ${run_conf_file} .backup)
+	cp -f ${run_conf_file} ${CONF_RUN_DIR}/${base_conf_file}
+    done
+}
+
+appliance-clean-reboot()
+{
+    rm -f /fastboot
+}
+
+appliance-reconfigure()
+{
+    local do_cleaning do_operation retval
+
+    if test \
+	   -f ${LOCK_DIR}/apl_apply -o \
+	   -f ${LOCK_DIR}/apl_configure -o \
+	   -f ${LOCK_DIR}/apl_rollback ; then
+
+	do_cleaning=yes
+    fi
+
+    rm -f ${LOCK_DIR}/apl_*
+
+    if test -n "${do_cleaning}" ; then
+
+	do_operation=yes
+	log_info_msg "Cleaning OS configuration..."
+	apl_rollback ${ADMIN_NAME}
+	retval=${?}
+
+    elif test "${RAM_MODIFIED}" == yes ; then
+
+	do_operation=yes
+	log_info_msg "New RAM size OS configuration..."
+	apl_configure ${ADMIN_NAME}
+	retval=${?}
+
+    elif test -n "${CLOUD_NAME}" ; then
+
+	case ${CLOUD_NAME} in
+	    azure)
+		case ${CLOUD_PROVISION_STATE} in
+		    IP_PROVISIONED)
+			do_operation=yes
+			;;
+		    CONF_PROVISIONED)
+			;;
+		    ERROR_PROVISIONED)
+			;;
+		    *)
+			;;
+		esac
+		;;
+	    aws)
+		case ${CLOUD_PROVISION_STATE} in
+		    IP_PROVISIONED)
+			do_operation=yes
+			;;
+		    CONF_PROVISIONED)
+			do_operation=yes
+			;;
+		    ERROR_PROVISIONED)
+			;;
+		    *)
+			;;
+		esac
+		;;
+	    *)
+		;;
+	esac
+
+	if test -n "${do_operation}" ; then
+
+	    log_info_msg "Cloud OS configuration..."
+	    apl_configure ${ADMIN_NAME}
+	    retval=${?}
+
+	    if test ${retval} -eq 0 ; then
+		sed -i \
+		    -e "s/CLOUD_PROVISION_STATE=.*/CLOUD_PROVISION_STATE=CONF_PROVISIONED/" \
+		    ${HARD_DIR}/cloud.conf
+		retval=${?}
+	    fi
+	fi
+    fi
+
+    if test -z "${do_operation}" ; then
+
+	if test -f ${CONF_DIR}/${CACHE_RECONFIGURE_BACKUP_FILENAME} ; then
+	    do_operation=yes
+	    rm -f ${CONF_DIR}/${CACHE_RECONFIGURE_BACKUP_FILENAME} &&
+		apl_configure ${ADMIN_NAME}
+	    retval=${?}
+	fi
+    fi
+
+    if test -n "${do_operation}" ; then
+	retval=${?}
+	[ ${retval} -eq 0 ]
+	evaluate_retval
+    fi
+}
+
+appliance-if-restore-configuration()
+{
+    ls ${LOCK_DIR}/* > /dev/null 2>&1 || return 0
+
+    log_info_msg "Cleaning users configuration..."
+    apl_clean_configuration
+    evaluate_retval
+}
+
+case "${1}" in
+    start)
+	appliance-first-startup
+	appliance-clean-av
+	appliance-apply-patch
+	appliance-start-lcd
+	appliance-check-usage
+	appliance-gen-gui-auth-phrase
+	appliance-clean-squid-init
+	appliance-clean-health-checks
+	appliance-clean-reboot
+
+	##############################
+	### The order is important ###
+	##############################
+
+	appliance-reconfigure
+	appliance-restore-run-config
+	appliance-if-restore-configuration
+	appliance-clean-all-lock
+	;;
+    *)
+	echo "Usage: ${0} start"
+	exit 1
+	;;
+esac

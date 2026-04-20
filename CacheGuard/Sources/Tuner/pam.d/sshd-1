@@ -1,0 +1,20 @@
+auth [success=1 default=ignore] pam_unix.so nullok
+auth requisite pam_deny.so
+auth required pam_permit.so
+
+account [success=1 new_authtok_reqd=done default=ignore] pam_unix.so
+account requisite pam_deny.so
+account required pam_permit.so
+
+password [success=1 default=ignore] pam_unix.so obscure yescrypt
+password requisite pam_deny.so
+password required pam_permit.so
+
+session [default=1] pam_permit.so
+session requisite pam_deny.so
+session required pam_permit.so
+session required pam_unix.so
+
+password [success=1 default=ignore] pam_unix.so obscure yescrypt
+password requisite pam_deny.so
+password required pam_permit.so

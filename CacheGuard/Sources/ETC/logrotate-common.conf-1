@@ -1,0 +1,12 @@
+daily
+nomail
+missingok
+ifempty
+create 0600 root root
+nocompress
+compresscmd /bin/gzip
+uncompresscmd /bin/gunzip
+compressext .gz
+compressoptions -9n
+tabooext + .old .save .tmp
+sharedscripts

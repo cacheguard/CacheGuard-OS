@@ -1,0 +1,1217 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       Commands
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+__complete-tls()
+{
+    test -n "${COMP_CWORD-1}" || return 1
+
+    case ${COMP_CWORD} in
+	1)
+	    case ${COMP_WORDS[1]} in
+		c)
+		    COMPREPLY=('' ca client)
+		    ;;
+		ca)
+		    COMPREPLY=(ca)
+		    ;;
+		cl|cli|clie|clien|client)
+		    COMPREPLY=(client)
+		    ;;
+		o|oc|ocs|ocsp)
+		    COMPREPLY=(ocsp)
+		    ;;
+		r|re|rep|repo|repor|report)
+		    COMPREPLY=(report)
+		    ;;
+		s|se|ser|serv|serve|server)
+		    COMPREPLY=(server)
+		    ;;
+		'')
+		    COMPREPLY=('' ca client ocsp report server)
+		    ;;
+		*)
+		    COMPREPLY=()
+		    ;;
+	    esac
+	    ;;
+	2)
+	    case ${COMP_WORDS[1]} in
+		ca)
+		    case ${COMP_WORDS[2]} in
+			s|sy|sys|syst|syste|system)
+			    COMPREPLY=(system)
+			    ;;
+			t|th|thi|thir|third)
+			    COMPREPLY=(third)
+			    ;;
+			'')
+			    COMPREPLY=('' system third)
+			    ;;
+			*)
+			  COMPREPLY=()
+			  ;;
+		    esac
+		    ;;
+		client)
+		    case ${COMP_WORDS[2]} in
+			a|ad|add)
+			    COMPREPLY=(add)
+			    ;;
+			d)
+			    COMPREPLY=(days del)
+			    ;;
+			de|del)
+			    COMPREPLY=(del)
+			    ;;
+			da|day|days)
+			    COMPREPLY=(days)
+			    ;;
+			f|'fi'|fin|fing|finge|finger|fingerp|fingerpr|fingerpri|fingerprin|fingerprint)
+			    COMPREPLY=(fingerprint)
+			    ;;
+			g|ge|gen|gene|gener|genera|generat|generate)
+			    COMPREPLY=(generate)
+			    ;;
+			l|lo|loa|load)
+			    COMPREPLY=(load)
+			    ;;
+			r)
+			    COMPREPLY=('' raz revoke)
+			    ;;
+			ra|raz)
+			    COMPREPLY=(raz)
+			    ;;
+			re|rev|revo|revok|revoke)
+			    COMPREPLY=(revoke)
+			    ;;
+			s)
+			    COMPREPLY=('' save show)
+			    ;;
+			sa|sav|save)
+			    COMPREPLY=(save)
+			    ;;
+			sh|sho|show)
+			    COMPREPLY=(show)
+			    ;;
+			'')
+			    COMPREPLY=('' '<RET>' add days del fingerprint generate load raz revoke save show)
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		ocsp)
+		    case ${COMP_WORDS[2]} in
+		    	d|da|day|days)
+			    COMPREPLY=(days)
+			    ;;
+			h|ho|hos|host)
+			    COMPREPLY=(host)
+			    ;;
+			t|tl|tls)
+			    COMPREPLY=(tls)
+			    ;;
+
+			'')
+			    COMPREPLY=('' '<RET>' days host tls)
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		server)
+		    case ${COMP_WORDS[2]} in
+			a|ad|add)
+			    COMPREPLY=(add)
+			    ;;
+			d)
+			    COMPREPLY=('' '<RET>' days del)
+			    ;;
+			da|day|days)
+			    COMPREPLY=(days)
+			    ;;
+			de|del)
+			    COMPREPLY=(del)
+			    ;;
+			f|'fi'|fin|fing|finge|finger|fingerp|fingerpr|fingerpri|fingerprin|fingerprint)
+			    COMPREPLY=(fingerprint)
+			    ;;
+			g|ge|gen|gene|gener|genera|generat|generate)
+			    COMPREPLY=(generate)
+			    ;;
+			l|lo|loa|load)
+			    COMPREPLY=(load)
+			    ;;
+			r)
+			    COMPREPLY=('' raz revoke)
+			    ;;
+			ra|raz)
+			    COMPREPLY=(raz)
+			    ;;
+			re|rev|revo|revok|revoke)
+			    COMPREPLY=(revoke)
+			    ;;
+			s)
+			    COMPREPLY=('' show save)
+			    ;;
+			sa|sav|save)
+			    COMPREPLY=(save)
+			    ;;
+			sh|sho|show)
+			    COMPREPLY=(show)
+			    ;;
+			'')
+			    COMPREPLY=('' '<RET>' add days del fingerprint generate load raz revoke save show)
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		*)
+		    COMPREPLY=()
+		    ;;
+		
+	    esac
+	    ;;
+	3)
+	    case ${COMP_WORDS[1]} in
+		ca)
+		    case ${COMP_WORDS[2]} in
+			third)
+			    case ${COMP_WORDS[3]} in
+				a|ad|add)
+				    COMPREPLY=(add)
+				    ;;
+				d|de|del)
+				    COMPREPLY=(del)
+				    ;;
+				l|lo|loa|load)
+				    COMPREPLY=(load)
+				    ;;
+				f|'fi'|fin|fing|finge|finger|fingerp|fingerpr|fingerpri|fingerprin|fingerprint)
+				    COMPREPLY=(fingerprint)
+				    ;;
+				r|ra|raz)
+				    COMPREPLY=(raz)
+				    ;;
+				s|sh|sho|show)
+				    COMPREPLY=(show)
+				    ;;
+				'')
+				    COMPREPLY=('' '<RET>' add load del fingerprint raz show)
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			system)
+			    case ${COMP_WORDS[3]} in
+				g|ge|gen|gene|gener|genera|generat|generate)
+				    COMPREPLY=(generate)
+				    ;;
+				f|'fi'|fin|fing|finge|finger|fingerp|fingerpr|fingerpri|fingerprin|fingerprint)
+				    COMPREPLY=(fingerprint)
+				    ;;
+				l|lo|loa|load)
+				    COMPREPLY=(load)
+				    ;;
+				s)
+				    COMPREPLY=('' show save)
+				    ;;
+				sa|sav|save)
+				    COMPREPLY=(save)
+				    ;;
+				sh|sho|show)
+				    COMPREPLY=(show)
+				    ;;
+				'')
+				    COMPREPLY=('' generate fingerprint load save show)
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		client)
+		    case ${COMP_WORDS[2]} in
+			add|del|fingerprint|generate|load|revoke|save|show)
+			    COMPREPLY=('' '<tls-id>')
+			    ;;
+			days)
+			    COMPREPLY=('' '<RET>' '<validity-days>')
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		ocsp)
+		    case ${COMP_WORDS[2]} in
+			host)
+			    COMPREPLY=('' '<RET>' '<name>' '<ip>')
+			    ;;
+			days)
+			    COMPREPLY=('' '<RET>' '<response-validity-days>')
+			    ;;
+			tls)
+			    case ${COMP_WORDS[3]} in
+				r|ra|raz)
+				    COMPREPLY=(raz)
+				    ;;
+				s|se|'set')
+				    COMPREPLY=('set')
+				    ;;
+				'')
+				    COMPREPLY=('' '<RET>' set raz)
+				    ;;
+				*)
+				    ;;
+			    esac
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		server)
+		    case ${COMP_WORDS[2]} in
+			days)
+			    COMPREPLY=('' '<RET>' '<validity-days>')
+			    ;;
+			add|del|fingerprint|generate|load|save|show)
+			    COMPREPLY=('' '<tls-id>')
+			    ;;
+			raz)
+			    COMPREPLY=()
+			    ;;
+			revoke)
+			    COMPREPLY=('' '<tls-id>')
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		*)
+		    COMPREPLY=()
+		    ;;
+	    esac
+	    ;;
+	4)
+	    case ${COMP_WORDS[1]} in
+		ca)
+		    case ${COMP_WORDS[2]} in
+			system)
+			    case ${COMP_WORDS[3]} in
+				save|show)
+				    case ${COMP_WORDS[4]} in
+					k|ke|key)
+					    COMPREPLY=(key)
+					    ;;
+					c|ce|cer|cert|certi|certif|certifi|certific|certifica|certificat|certificate)
+					    COMPREPLY=(certificate)
+					    ;;
+					d|de|der)
+					    COMPREPLY=(der)
+					    ;;
+					'')
+					    COMPREPLY=('' certificate der key)
+					    ;;
+					*)
+					    COMPREPLY=()
+					    ;;
+				    esac
+				    ;;
+				load)
+				    case ${COMP_WORDS[4]} in
+					k|ke|key)
+					    COMPREPLY=(key)
+					    ;;
+					c|ce|cer|cert|certi|certif|certifi|certific|certifica|certificat|certificate)
+					    COMPREPLY=(certificate)
+					    ;;
+					'')
+					    COMPREPLY=('' certificate key)
+					    ;;
+					*)
+					    COMPREPLY=()
+					    ;;
+				    esac
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			third)
+			    case ${COMP_WORDS[3]} in
+				add|del|fingerprint|load|show)
+				    COMPREPLY=('' '<ca-id>')
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		client)
+		    case ${COMP_WORDS[2]} in
+			show)
+			    case ${COMP_WORDS[4]} in
+				c|ce|cer|cert|certi|certif|certifi|certific|certifica|certificat|certificate)
+				    COMPREPLY=(certificate)
+				    ;;
+				k|ke|key)
+				    COMPREPLY=(key)
+				    ;;
+				'')
+				    COMPREPLY=('' certificate key)
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			add)
+			    COMPREPLY=('' '<RET>' '<validity-days>')
+			    ;;
+			del)
+			    case ${COMP_WORDS[4]} in
+				p|pr|pri|priv|priva|privat|private)
+				    COMPREPLY=(private)
+				    ;;
+				'')
+				    COMPREPLY=('' '<RET>' private)
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			generate)
+			    case ${COMP_WORDS[4]} in
+				c|ca|can|canc|cance|cancel)
+				    COMPREPLY=(cancel)
+				    ;;
+				'')
+				    COMPREPLY=('' '<RET>' cancel)
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+ 			revoke)
+			    case ${COMP_WORDS[4]} in
+				k|ke|key|keyC|keyCo|keyCom|keyComp|keyCompr|keyCompro|keyComprom|keyCompromi|keyCompromis|keyCompromise)
+				    COMPREPLY=(keyCompromise)
+				    ;;
+				C|CA|CAC|CACo|CACom|CAComp|CACompr|CACompro|CAComprom|CACompromi|CACompromis|CACompromise)
+				    COMPREPLY=(CACompromise)
+				    ;;
+				a|af|aff|affi|affil|affili|affilia|affiliat|affiliati|affiliatio|affiliation|affiliationC|affiliationCh|affiliationCha|affiliationChan|affiliationChang|affiliationChange|affiliationChanged)
+				    COMPREPLY=(affiliationChanged)
+				    ;;
+				s|su|sup|supe|super|supers|superse|supersed|supersede|superseded)
+				    COMPREPLY=(superseded)
+				    ;;
+				c)
+				    COMPREPLY=('' cancel cessationOfOperation)
+				    ;;
+				ca|can|canc|cance|cancel)
+				    COMPREPLY=(cancel)
+				    ;;
+				ce|ces|cess|cessa|cessat|cessati|cessatio|cessation|cessationO|cessationOf|cessationOfO|cessationOfOp|cessationOfOpe|cessationOfOper|cessationOfOpera|cessationOfOperat|cessationOfOperati|cessationOfOperatio|cessationOfOperation)
+				    COMPREPLY=(cessationOfOperation)
+				    ;;
+				u|un|uns|unsp|unspe|unspec|unspeci|unspecif|unspecifi|unspecifie|unspecified)
+				    COMPREPLY=(unspecified)
+				    ;;
+				'')
+				    COMPREPLY=('' keyCompromise CACompromise affiliationChanged superseded cancel cessationOfOperation unspecified)
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			save)
+			    case ${COMP_WORDS[4]} in
+				k|ke|key)
+				    COMPREPLY=(key)
+				    ;;
+				c|ce|cer|cert|certi|certif|certifi|certific|certifica|certificat|certificate)
+				    COMPREPLY=(certificate)
+				    ;;
+				p)
+				    COMPREPLY=('' '<RET>' password pfx pkcs12)
+				    ;;
+				pa|pas|pass|passw|passwo|passwor|password)
+				    COMPREPLY=(password)
+				    ;;
+				pk|pkc|pkcs|pkcs1|pkcs12)
+				    COMPREPLY=(pkcs12)
+				    ;;
+				pf|pfx)
+				    COMPREPLY=(pfx)
+				    ;;
+				'')
+				    COMPREPLY=('' certificate key password pfx pkcs12)
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			load)
+			    case ${COMP_WORDS[4]} in
+				c|ce|cer|cert|certi|certif|certifi|certific|certifica|certificat|certificate)
+				    COMPREPLY=(certificate)
+				    ;;
+				'')
+				    COMPREPLY=('' certificate)
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		ocsp)
+		    case ${COMP_WORDS[2]} in
+			tls)
+			    case ${COMP_WORDS[3]} in
+				'set')
+				    COMPREPLY=('' '<tls-id>')
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		server)
+		    case ${COMP_WORDS[2]} in
+			generate)
+			    case ${COMP_WORDS[4]} in
+				s|si|sig|sign)
+				    COMPREPLY=(sign)
+				    ;;
+				'')
+				    COMPREPLY=('' '<RET>' sign)
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			revoke)
+			    case ${COMP_WORDS[4]} in
+				k|ke|key|keyC|keyCo|keyCom|keyComp|keyCompr|keyCompro|keyComprom|keyCompromi|keyCompromis|keyCompromise)
+				    COMPREPLY=(keyCompromise)
+				    ;;
+				C|CA|CAC|CACo|CACom|CAComp|CACompr|CACompro|CAComprom|CACompromi|CACompromis|CACompromise)
+				    COMPREPLY=(CACompromise)
+				    ;;
+				a|af|aff|affi|affil|affili|affilia|affiliat|affiliati|affiliatio|affiliation|affiliationC|affiliationCh|affiliationCha|affiliationChan|affiliationChang|affiliationChange|affiliationChanged)
+				    COMPREPLY=(affiliationChanged)
+				    ;;
+				s|su|sup|supe|super|supers|superse|supersed|supersede|superseded)
+				    COMPREPLY=(superseded)
+				    ;;
+				c)
+				    COMPREPLY=('' cancel cessationOfOperation)
+				    ;;
+				ca|can|canc|cance|cancel)
+				    COMPREPLY=(cancel)
+				    ;;
+				ce|ces|cess|cessa|cessat|cessati|cessatio|cessation|cessationO|cessationOf|cessationOfO|cessationOfOp|cessationOfOpe|cessationOfOper|cessationOfOpera|cessationOfOperat|cessationOfOperati|cessationOfOperatio|cessationOfOperation)
+				    COMPREPLY=(cessationOfOperation)
+				    ;;
+				u|un|uns|unsp|unspe|unspec|unspeci|unspecif|unspecifi|unspecifie|unspecified)
+				    COMPREPLY=(unspecified)
+				    ;;
+				'')
+				    COMPREPLY=('' keyCompromise CACompromise affiliationChanged superseded cancel cessationOfOperation unspecified)
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			load|save|show)
+			    case ${COMP_WORDS[4]} in
+				c)
+				    COMPREPLY=('' certificate csr)
+				    ;;
+				ce|cer|cert|certi|certif|certifi|certific|certifica|certificat|certificate)
+				    COMPREPLY=(certificate)
+				    ;;
+				cs|csr)
+				    COMPREPLY=(csr)
+				    ;;
+				k|ke|key)
+				    COMPREPLY=(key)
+				    ;;
+				'')
+				    COMPREPLY=('' certificate csr key)
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		*)
+		    COMPREPLY=()
+		    ;;
+	    esac
+	    ;;
+	5)
+	    case ${COMP_WORDS[1]} in
+		server)
+		    case ${COMP_WORDS[2]} in
+			generate)
+			    case ${COMP_WORDS[4]} in
+				sign)
+				    case ${COMP_WORDS[5]} in
+					o|oc|ocs|ocsp)
+					    COMPREPLY=(ocsp)
+					    ;;
+					'')
+					    COMPREPLY=('' '<RET>' ocsp)
+					    ;;
+					*)
+					    COMPREPLY=()
+					    ;;
+				    esac
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			load|save)
+			    case ${COMP_WORDS[4]} in
+				certificate|csr|key)
+				    case ${COMP_WORDS[5]} in
+					f|ft|ftp)
+					    COMPREPLY=(ftp)
+					    ;;
+					s|sf|sft|sftp)
+					    COMPREPLY=(sftp)
+					    ;;
+					t|tf|tft|tftp)
+					    COMPREPLY=(tftp)
+					    ;;
+					'')
+					    COMPREPLY=('' ftp sftp tftp)
+					    ;;
+					*)
+					    COMPREPLY=()
+					    ;;
+				    esac
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		ca)
+		    case ${COMP_WORDS[2]} in
+			system)
+			    case ${COMP_WORDS[3]} in
+				load|save)
+				    case ${COMP_WORDS[4]} in
+					certificate|der|key)
+					    if test ${COMP_WORDS[4]} != der -o ${COMP_WORDS[3]} != load ; then
+						case ${COMP_WORDS[5]} in
+						    f|ft|ftp)
+							COMPREPLY=(ftp)
+							;;
+						    s|sf|sft|sftp)
+							COMPREPLY=(sftp)
+							;;
+						    t|tf|tft|tftp)
+							COMPREPLY=(tftp)
+							;;
+						    '')
+							COMPREPLY=('' ftp sftp tftp)
+							;;
+						    *)
+							COMPREPLY=()
+							;;
+						esac
+					    fi
+					    ;;
+					*)
+					    COMPREPLY=()
+					    ;;
+				    esac
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			third)
+			    case ${COMP_WORDS[3]} in
+				add)
+				    case ${COMP_WORDS[5]} in
+					o)
+					    COMPREPLY=('' on off)
+					    ;;
+					of|off)
+					    COMPREPLY=(off)
+					    ;;
+					on)
+					    COMPREPLY=(on)
+					    ;;
+					'')
+					    COMPREPLY=('' '<RET>' on off)
+					    ;;
+					*)
+					    COMPREPLY=()
+					    ;;
+				    esac
+				    ;;
+				load)
+				    case ${COMP_WORDS[5]} in
+					f|ft|ftp)
+					    COMPREPLY=(ftp)
+					    ;;
+					s|sf|sft|sftp)
+					    COMPREPLY=(sftp)
+					    ;;
+					t|tf|tft|tftp)
+					    COMPREPLY=(tftp)
+					    ;;
+					'')
+					    COMPREPLY=('' ftp sftp tftp)
+					    ;;
+					*)
+					    COMPREPLY=()
+					    ;;
+				    esac
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		client)
+		    case ${COMP_WORDS[2]} in
+			del)
+			    case ${COMP_WORDS[4]} in
+				private)
+				    case ${COMP_WORDS[5]} in
+					c|ca|can|canc|cance|cancel)
+					    COMPREPLY=(cancel)
+					    ;;
+					'')
+					    COMPREPLY=('' '<RET>' cancel)
+					    ;;
+					*)
+					    COMPREPLY=()
+					    ;;
+				    esac
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			save)
+			    case ${COMP_WORDS[4]} in
+				key|certificate|password|pfx|pkcs12)
+				    case ${COMP_WORDS[5]} in
+					f|ft|ftp)
+					    COMPREPLY=(ftp)
+					    ;;
+					s|sf|sft|sftp)
+					    COMPREPLY=(sftp)
+					    ;;
+					t|tf|tft|tftp)
+					    COMPREPLY=(tftp)
+					    ;;
+					'')
+					    COMPREPLY=('' ftp sftp tftp)
+					    ;;
+					*)
+					    COMPREPLY=()
+					    ;;
+				    esac
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			load)
+			    case ${COMP_WORDS[4]} in
+				certificate)
+				    case ${COMP_WORDS[5]} in
+					f|ft|ftp)
+					    COMPREPLY=(ftp)
+					    ;;
+					s|sf|sft|sftp)
+					    COMPREPLY=(sftp)
+					    ;;
+					t|tf|tft|tftp)
+					    COMPREPLY=(tftp)
+					    ;;
+					'')
+					    COMPREPLY=('' ftp sftp tftp)
+					    ;;
+					*)
+					    COMPREPLY=()
+					    ;;
+				    esac
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+
+			add)
+			    case ${COMP_WORDS[5]} in
+				n|no|noo|nooc|noocs|noocsp)
+				    COMPREPLY=(noocsp)
+				    ;;
+				o|oc|ocs|ocsp)
+				    COMPREPLY=(ocsp)
+				    ;;
+				'')
+				    COMPREPLY=('' '<RET>' noocsp ocsp)
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		*)
+		    COMPREPLY=()
+		    ;;
+	    esac
+	    ;;
+	6)
+	    case ${COMP_WORDS[1]} in
+		ca)
+		    case ${COMP_WORDS[2]} in
+			system)
+			    case ${COMP_WORDS[3]} in
+				load|save)
+				    case ${COMP_WORDS[4]} in
+					key|certificate)
+					    case ${COMP_WORDS[5]} in
+						ftp|sftp|tftp)
+						    COMPREPLY=('' '<file-server>')
+						    ;;
+						*)
+						    COMPREPLY=()
+						    ;;
+					    esac
+					    ;;
+					*)
+					    COMPREPLY=()
+					    ;;
+				    esac
+				    ;;
+				der)
+				    case ${COMP_WORDS[4]} in
+					save)
+					    case ${COMP_WORDS[5]} in
+						ftp|sftp|tftp)
+						    COMPREPLY=('' '<file-server>')
+						    ;;
+						*)
+						    COMPREPLY=()
+						    ;;
+					    esac
+					    ;;
+					*)
+					    COMPREPLY=()
+					    ;;
+				    esac
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			third)
+			    case ${COMP_WORDS[3]} in
+				load)
+				    case ${COMP_WORDS[5]} in
+					ftp|sftp|tftp)
+					    COMPREPLY=('' '<file-server>')
+					    ;;
+					*)
+					    COMPREPLY=()
+					    ;;
+				    esac
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		client)
+		    case ${COMP_WORDS[2]} in
+			save)
+			    case ${COMP_WORDS[4]} in
+				key|certificate|password|pfx|pkcs12)
+				    case ${COMP_WORDS[5]} in
+					ftp|sftp|tftp)
+					    COMPREPLY=('' '<file-server>')
+					    ;;
+					*)
+					    COMPREPLY=()
+					    ;;
+				    esac
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			load)
+			    case ${COMP_WORDS[4]} in
+				certificate)
+				    case ${COMP_WORDS[5]} in
+					ftp|sftp|tftp)
+					    COMPREPLY=('' '<file-server>')
+					    ;;
+					*)
+					    COMPREPLY=()
+					    ;;
+				    esac
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			add)
+			    case ${COMP_WORDS[5]} in
+				noocsp|ocsp)
+				    COMPREPLY=('' '<RET>' '<private-key-size>')
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		server)
+		    case ${COMP_WORDS[2]} in
+			load|save)
+			    case ${COMP_WORDS[4]} in
+				certificate|csr|key)
+				    case ${COMP_WORDS[5]} in
+					ftp|sftp|tftp)
+					    COMPREPLY=('' '<file-server>')
+					    ;;
+					*)
+					    COMPREPLY=()
+					    ;;
+				    esac
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		*)
+		    COMPREPLY=()
+		    ;;
+	    esac
+	    ;;
+	7)
+	    case ${COMP_WORDS[1]} in
+		ca)
+		    case ${COMP_WORDS[2]} in
+			system)
+			    case ${COMP_WORDS[3]} in
+				load|save)
+				    case ${COMP_WORDS[4]} in
+					    key|certificate)
+					    case ${COMP_WORDS[5]} in
+						ftp|sftp|tftp)
+						    COMPREPLY=('' '<file-path>')
+						    ;;
+						*)
+						    COMPREPLY=()
+						    ;;
+					    esac
+					    ;;
+					*)
+					    COMPREPLY=()
+					    ;;
+				    esac
+				    ;;
+				der)
+				    case ${COMP_WORDS[4]} in
+					save)
+					    case ${COMP_WORDS[5]} in
+						ftp|sftp|tftp)
+						    COMPREPLY=('' '<file-path>')
+						    ;;
+						*)
+						    COMPREPLY=()
+						    ;;
+					    esac
+					    ;;
+					*)
+					    COMPREPLY=()
+					    ;;
+				    esac
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			third)
+			    case ${COMP_WORDS[3]} in
+				load)
+				    case ${COMP_WORDS[5]} in
+					ftp|sftp|tftp)
+					    COMPREPLY=('' '<file-path>')
+					    ;;
+					*)
+					    COMPREPLY=()
+					    ;;
+				    esac
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		server)
+		    case ${COMP_WORDS[2]} in
+			load|save)
+			    case ${COMP_WORDS[4]} in
+				certificate|csr|key)
+				    case ${COMP_WORDS[5]} in
+					ftp|sftp|tftp)
+					    COMPREPLY=('' '<file-path>')
+					    ;;
+					*)
+					    COMPREPLY=()
+					    ;;
+				    esac
+				    ;;
+				*)
+				    COMPREPLY=()
+			    ;;
+			    esac
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		client)
+		    case ${COMP_WORDS[2]} in
+			save)
+			    case ${COMP_WORDS[4]} in
+				key|certificate|password|pfx|pkcs12)
+				    case ${COMP_WORDS[5]} in
+					ftp|sftp|tftp)
+					    COMPREPLY=('' '<file-path>')
+					    ;;
+					*)
+					    COMPREPLY=()
+					    ;;
+				    esac
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			load)
+			    case ${COMP_WORDS[4]} in
+				certificate)
+				    case ${COMP_WORDS[5]} in
+					ftp|sftp|tftp)
+					    COMPREPLY=('' '<file-path>')
+					    ;;
+					*)
+					    COMPREPLY=()
+					    ;;
+				    esac
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		*)
+		    COMPREPLY=()
+		    ;;
+	    esac
+	    ;;
+	8)
+	    case ${COMP_WORDS[1]} in
+		server)
+		    case ${COMP_WORDS[2]} in
+			load)
+			    case ${COMP_WORDS[4]} in
+				csr)
+				    case ${COMP_WORDS[5]} in
+					ftp|sftp|tftp)
+					    COMPREPLY=('' '<RET>' '<days>')
+					    ;;
+					*)
+					    COMPREPLY=()
+					    ;;
+				    esac
+				    ;;
+				*)
+				    COMPREPLY=()
+			    ;;
+			    esac
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		*)
+		    COMPREPLY=()
+		    ;;
+	    esac
+	    ;;
+	9)
+	    case ${COMP_WORDS[1]} in
+		server)
+		    case ${COMP_WORDS[2]} in
+			load)
+			    case ${COMP_WORDS[4]} in
+				csr)
+				    case ${COMP_WORDS[5]} in
+					ftp|sftp|tftp)
+					    case ${COMP_WORDS[9]} in
+						o|oc|ocs|ocsp)
+						    COMPREPLY=(ocsp)
+						    ;;
+						'')
+						    COMPREPLY=('' '<RET>' ocsp)
+						    ;;
+						*)
+						    COMPREPLY=()
+						    ;;
+					    esac
+					    ;;
+					*)
+					    COMPREPLY=()
+					    ;;
+				    esac
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+	    esac
+	    ;;
+	*)
+	    COMPREPLY=()
+	    ;;
+    esac
+}

@@ -1,0 +1,855 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       Configurator
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+set-waf-parameters()
+{
+    unset WAF_CONF_FILES
+
+    WAF_REQUEST_CONF_FILES[0]="REQUEST-930-APPLICATION-ATTACK-LFI"
+    WAF_REQUEST_CONF_FILES[1]="REQUEST-931-APPLICATION-ATTACK-RFI"
+    WAF_REQUEST_CONF_FILES[2]="REQUEST-932-APPLICATION-ATTACK-RCE"
+    WAF_REQUEST_CONF_FILES[3]="REQUEST-933-APPLICATION-ATTACK-PHP"
+    WAF_REQUEST_CONF_FILES[4]="REQUEST-934-APPLICATION-ATTACK-NODEJS"
+    WAF_REQUEST_CONF_FILES[5]="REQUEST-941-APPLICATION-ATTACK-XSS"
+    WAF_REQUEST_CONF_FILES[6]="REQUEST-942-APPLICATION-ATTACK-SQLI"
+    WAF_REQUEST_CONF_FILES[7]="REQUEST-943-APPLICATION-ATTACK-SESSION-FIXATION"
+    WAF_REQUEST_CONF_FILES[8]="REQUEST-944-APPLICATION-ATTACK-JAVA"
+
+    WAF_RESPONSE_CONF_FILES[0]="RESPONSE-951-DATA-LEAKAGES-SQL"
+    WAF_RESPONSE_CONF_FILES[1]="RESPONSE-952-DATA-LEAKAGES-JAVA"
+    WAF_RESPONSE_CONF_FILES[2]="RESPONSE-953-DATA-LEAKAGES-PHP"
+    WAF_RESPONSE_CONF_FILES[3]="RESPONSE-954-DATA-LEAKAGES-IIS"
+
+    WAF_RULE_ID=${WAF_RULE_ID_INIT}
+    WAF_GENERIC_RULE_STATES="1110010100000"
+}
+
+gen-waf-allow-from-local()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    local name=${1}
+    local ip=${2}
+
+    local id=${WAF_RULE_ID} ; ((WAF_RULE_ID++))
+
+    ip=${ip//./\\.}
+
+    echo "SecRule REQUEST_METHOD \"^GET$\" \"msg:'Internal Web proxy request: Matched signature %{TX.0} %{REQUEST_URI}',id:${id},nolog,capture,severity:5,allow,chain\""
+    echo "SecRule REQUEST_URI \"^/squid-internal-dynamic/netdb$\" \"chain\""
+    echo "SecRule REMOTE_ADDR \"^${ip}$\" \"t:none\""
+}
+
+gen-waf-imethods-rule()
+{
+    test -n "${1}" || return 1
+    local name=${1}
+
+    test ${WAF_IMETHODS} == deny || return 0
+
+    local id=${WAF_RULE_ID} ; ((WAF_RULE_ID++))
+    echo "SecRule REQUEST_METHOD \"!^((GET|HEAD|POST|OPTIONS))$\" \"id:${id},log,capture,msg:'${msg}',t:none,severity:1,drop\""
+}
+
+gen-waf-common-conf()
+{
+    echo "include ${WEB_SERVER_DIR}/etc/modsecurity-common.conf"
+}
+
+gen-waf-setup-rules()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    test -n "${3}" || return 3
+    local in_app=${1}
+    local in_denyurl=${2}
+    local waf_dos_limit=${3}
+    local in_num_arg=${4}
+    local in_files_size=${5}
+
+    local app state anomaly req_content extension header charset rbl_value rbl value
+    local ms_waf_no_scoring_level ms_scores ms_req_contents ms_assertions ms_methods ms_anomalies ms_dev_extensions ms_denied_headers ms_static_extensions ms_charsets ms_reputation_rbl ms_dos ms_collection_timeout
+
+    ### Values to Tune ####
+
+    local url_encoded=0
+    local apps='cpanel drupal dokuwiki nextcloud wordpress xenforo'
+    local anomalies='critical=5 error=4 warning=3 notice=2'
+
+    local req_contents="application/x-www-form-urlencoded
+			multipart/form-data
+	    		multipart/related\
+	    		text/xml
+	    		application/xml
+	    		application/soap+xml
+	    		application/x-amf
+	    		application/json
+	    		application/cloudevents+json
+	    		application/cloudevents-batch+json
+	    		application/octet-stream
+	    		application/csp-report
+	    		application/xss-auditor-report
+	    		text/plain"
+
+    local httpv="HTTP/1.0 HTTP/1.1 HTTP/2 HTTP/2.0"
+
+    local dev_extensions="asa asax ascx axd backup bak bat cdx cer cfg cmd com config conf cs csproj csr dat db dbf dll dos htr htw ida idc idq inc ini key licx lnk log mdb old pass pdb pol printer pwd rdb resources resx sql swp sys vb vbs vbproj vsdisco webinfo xsd xsx"
+
+    local static_extensions="jpg jpeg png gif js css ico svg webp"
+    local denied_headers="proxy lock-token content-range if"
+    local charsets="utf-8 iso-8859-1 iso-8859-15 windows-1252"
+
+    local dos_counter=${waf_dos_limit/ *}
+    local dos_slice=${waf_dos_limit#* } ; dos_slice=${dos_slice/ *}
+    local dos_timeout=${waf_dos_limit/* }
+    local reputation_timeout=${dos_timeout}
+
+    if test ${in_app} == ${TECHNICAL_NAME} ; then
+	local waf_response_body=512
+	local waf_request_body_files=$[128 * 1024]
+	local waf_request_body_no_files=$[128 * 1024]
+	local waf_num_arg=${in_num_arg}
+	local waf_arg_name_length=128
+	local waf_arg_length=1024
+	local waf_total_arg_length=$[${waf_num_arg} + (${waf_arg_length} + ${waf_arg_name_length}) * ${waf_num_arg}]
+	local waf_files_size=${in_files_size}
+	local waf_combined_files_sizes=${waf_files_size}
+
+	local denyurl=${in_denyurl/*:}
+
+	if test -n "${denyurl}" ; then
+	    echo "<If \"-U '${denyurl}'\">"
+	    echo "ErrorDocument 403 ${denyurl}"
+	    echo "</If>"
+	fi
+
+	echo "SecDefaultAction \"phase:1,log,auditlog,deny,status:403\""
+	echo "SecDefaultAction \"phase:2,log,auditlog,deny,status:403\""
+    else
+	local waf_response_body=$(min-value ${WAF_RESPONSE_BODY} $[1024 * 1024])
+	local waf_request_body_files=$(min-value $[${MAX_UPLOAD_FILE_SZ} + ${WAF_REQUEST_BODY}] $[1024 * 1024])
+	local waf_request_body_no_files=$(min-value ${WAF_REQUEST_BODY} $[1024 * 1024])
+	local waf_num_arg=${WAF_NUM_ARG}
+	local waf_arg_name_length=${WAF_ARG_NAME_LENGTH}
+	local waf_arg_length=${WAF_ARG_LENGTH}
+	local waf_total_arg_length=${WAF_TOTAL_ARG_LENGTH}
+	local waf_files_size=$[${WAF_FILES_SIZE} * 1024]
+	local waf_combined_files_sizes=$[${waf_files_size} * 5]
+
+	echo "SecDefaultAction \"phase:1,log,auditlog,pass\""
+	echo "SecDefaultAction \"phase:2,log,auditlog,pass\""
+    fi
+
+    local sampling_pct=100
+    local utf8_encoding=0
+    local reputation_block=1
+
+    ### Automatic Values ####
+
+    ms_waf_no_scoring_level=$(max-value ${WAF_NO_SCORING_LEVEL} ${WAF_LEVEL})
+
+    for app in ${apps}
+    do
+	if test ${app} == "${in_app}" ; then
+	    state=1
+	else
+	    state=0
+	fi
+	ms_assertions="${ms_assertions},setvar:tx.crs_exclusions_${app}=${state}"
+    done
+
+    if test ${WAF_IMETHODS} == deny ; then
+	ms_methods="GET HEAD POST OPTIONS"
+    else
+	ms_methods="GET HEAD POST OPTIONS PUT PATCH DELETE CONNECT TRACE"
+    fi
+
+    ms_scores="setvar:tx.inbound_anomaly_score_threshold=${WAF_REQUEST_SCORE},setvar:tx.outbound_anomaly_score_threshold=${WAF_RESPONSE_SCORE}"
+
+    for anomaly in ${anomalies}	
+    do
+	ms_anomalies="${ms_anomalies},setvar:tx.${anomaly/=*}_anomaly_score=${anomaly/*=}"
+    done
+    ms_anomalies=${ms_anomalies:1}
+
+    for req_content in ${req_contents}
+    do
+	ms_req_contents="${ms_req_contents} |${req_content}|"
+    done
+    ms_req_contents=${ms_req_contents:1}
+
+
+    for extension in ${dev_extensions}
+    do
+	ms_dev_extensions="${ms_dev_extensions} .${extension}/"
+    done
+    dev_extensions=${dev_extensions:1}
+
+    for header in ${denied_headers}
+    do
+	ms_denied_headers="${ms_denied_headers} /${header}/"
+    done
+    ms_denied_headers=${ms_denied_headers:1}
+
+    for extension in ${static_extensions}
+    do
+	ms_static_extensions="${ms_static_extensions} /.${extension}/"
+    done
+    ms_static_extensions=${ms_static_extensions:1}
+
+    for charset in ${charsets}
+    do
+	ms_charsets="${ms_charsets}|${charset}"
+    done
+    ms_charsets=${ms_charsets:1}
+
+    for rbl_value in ${WAF_REPUTATION_RBL}
+    do
+	rbl=${rbl_value/:*}
+	value=${rbl_value/*:}
+	ms_reputation_rbl="${ms_reputation_rbl},setvar:tx.block_${rbl}_ip=${value}"
+    done
+    ms_reputation_rbl=${ms_reputation_rbl:1}
+
+    ms_dos="tx.dos_burst_time_slice=${dos_slice}',setvar:'tx.dos_counter_threshold=${dos_counter}',setvar:'tx.dos_block_timeout=${dos_timeout}"
+    ms_collection_timeout=$(max-value ${reputation_timeout} ${dos_timeout})
+
+    ### Automatic Generation ####
+
+    echo "SecResponseBodyLimit $[${waf_response_body} * 1024]"
+    echo "SecRequestBodyLimit $[${waf_request_body_files} * 1024]"
+    echo "SecRequestBodyNoFilesLimit $[${waf_request_body_no_files} * 1024]"
+
+    echo "SecAction \"id:900000,phase:1,nolog,pass,t:none,setvar:tx.paranoia_level=${WAF_LEVEL}\""
+    echo "SecAction \"id:900001,phase:1,nolog,pass,t:none,setvar:tx.executing_paranoia_level=${ms_waf_no_scoring_level}\""
+    echo "SecAction \"id:900010,phase:1,nolog,pass,t:none,setvar:tx.enforce_bodyproc_urlencoded=${url_encoded}\""
+    echo "SecAction \"id:900100,phase:1,nolog,pass,t:none,${ms_anomalies}\""
+    echo "SecAction \"id:900110,phase:1,nolog,pass,t:none,${ms_scores}\""
+    echo "SecAction \"id:900130,phase:1,nolog,pass,t:none${ms_assertions}\""
+    echo "SecAction \"id:900200,phase:1,nolog,pass,t:none,setvar:'tx.allowed_methods=${ms_methods}'\""
+    echo "SecAction \"id:900220,phase:1,nolog,pass,t:none,setvar:'tx.allowed_request_content_type=${ms_req_contents}'\""
+    echo "SecAction \"id:900230,phase:1,nolog,pass,t:none,setvar:'tx.allowed_http_versions=${httpv}'\""
+    echo "SecAction \"id:900240,phase:1,nolog,pass,t:none,setvar:'tx.restricted_extensions=${ms_dev_extensions}'\""
+    echo "SecAction \"id:900250,phase:1,nolog,pass,t:none,setvar:'tx.restricted_denied_headers=${ms_denied_headers}'\""
+    echo "SecAction \"id:900260,phase:1,nolog,pass,t:none,setvar:'tx.static_extensions=${ms_static_extensions}'\""
+    echo "SecAction \"id:900280,phase:1,nolog,pass,t:none,setvar:'tx.allowed_request_content_type_charset=${ms_charsets}'"
+
+    echo "SecAction \"id:900300,phase:1,nolog,pass,t:none,setvar:tx.max_num_args=${waf_num_arg}\""
+    echo "SecAction \"id:900310,phase:1,nolog,pass,t:none,setvar:tx.arg_name_length=${waf_arg_name_length}\""
+    echo "SecAction \"id:900320,phase:1,nolog,pass,t:none,setvar:tx.arg_length=${waf_arg_length}\""
+    echo "SecAction \"id:900330,phase:1,nolog,pass,t:none,setvar:tx.total_arg_length=${waf_total_arg_length}\""
+    echo "SecAction \"id:900340,phase:1,nolog,pass,t:none,setvar:tx.max_file_size=${waf_files_size}\""
+    echo "SecAction \"id:900350,phase:1,nolog,pass,t:none,setvar:tx.combined_file_sizes=${waf_combined_files_sizes}\""
+
+    echo "SecAction \"id:900400,phase:1,pass,nolog,setvar:tx.sampling_percentage=${sampling_pct}\""
+
+    local rbl_key=$(decrypt-password "${WAF_REPUTATION_RBL_KEY}" "${WAF_REPUTATION_RBL_PASSWD}")
+
+    if test -n "${rbl_key}" ; then
+	echo "SecHttpBlKey ${rbl_key}"
+	echo "SecAction \"id:900500,phase:1,nolog,pass,t:none,${ms_reputation_rbl}\""
+    fi
+
+    local waf_reputation_countries=$(sqlite3 ${USERENV_DIR}/${CONFIGURATION_DB_NAME} \
+					     "SELECT country FROM waf_reputation_country WHERE reputation = TRUE;")
+    echo "SecAction \"id:900600,phase:1,nolog,pass,t:none,setvar:'tx.high_risk_country_codes=$(echo ${waf_reputation_countries^^})'\""
+
+    echo "SecAction \"id:900700,phase:1,nolog,pass,t:none,setvar:'${ms_dos}'\""
+    echo "SecAction \"id:900950,phase:1,nolog,pass,t:none,setvar:tx.crs_validate_utf8_encoding=${utf8_encoding}\""
+    echo "SecAction \"id:900960,phase:1,nolog,pass,t:none,setvar:tx.do_reput_block=${reputation_block}\""
+    echo "SecAction \"id:900970,phase:1,nolog,pass,t:none,setvar:tx.reput_block_duration=${reputation_timeout}\""
+
+    echo "SecCollectionTimeout ${ms_collection_timeout}"
+
+    echo "SecAction \"id:900990,phase:1,nolog,pass,t:none,setvar:tx.crs_setup_version=332\""
+
+    echo "include ${WEB_SERVER_DIR}/etc/modsecurity-common.rules"
+
+    echo "include ${WEB_SERVER_DIR}/etc/rules/REQUEST-901-INITIALIZATION.conf"
+    echo "include ${WEB_SERVER_DIR}/etc/rules/REQUEST-903.9001-DRUPAL-EXCLUSION-RULES.conf"
+    echo "include ${WEB_SERVER_DIR}/etc/rules/REQUEST-903.9002-WORDPRESS-EXCLUSION-RULES.conf"
+    echo "include ${WEB_SERVER_DIR}/etc/rules/REQUEST-903.9003-NEXTCLOUD-EXCLUSION-RULES.conf"
+    echo "include ${WEB_SERVER_DIR}/etc/rules/REQUEST-903.9004-DOKUWIKI-EXCLUSION-RULES.conf"
+    echo "include ${WEB_SERVER_DIR}/etc/rules/REQUEST-903.9005-CPANEL-EXCLUSION-RULES.conf"
+    echo "include ${WEB_SERVER_DIR}/etc/rules/REQUEST-903.9006-XENFORO-EXCLUSION-RULES.conf"
+    echo "include ${WEB_SERVER_DIR}/etc/rules/REQUEST-905-COMMON-EXCEPTIONS.conf"
+    echo "include ${WEB_SERVER_DIR}/etc/rules/REQUEST-910-IP-REPUTATION.conf"
+    echo "include ${WEB_SERVER_DIR}/etc/rules/REQUEST-911-METHOD-ENFORCEMENT.conf"
+    echo "include ${WEB_SERVER_DIR}/etc/rules/REQUEST-912-DOS-PROTECTION.conf"
+    echo "include ${WEB_SERVER_DIR}/etc/rules/REQUEST-913-SCANNER-DETECTION.conf"
+    echo "include ${WEB_SERVER_DIR}/etc/rules/REQUEST-920-PROTOCOL-ENFORCEMENT.conf"
+    echo "include ${WEB_SERVER_DIR}/etc/rules/REQUEST-921-PROTOCOL-ATTACK.conf"
+    echo "include ${WEB_SERVER_DIR}/etc/rules/REQUEST-922-MULTIPART-ATTACK.conf"
+}
+
+gen-waf-request-rules()
+{
+    test -n "${1}" || return 1
+    local flags=${1}
+
+    local len_req=${#WAF_REQUEST_CONF_FILES[@]}
+    for ((i=0; i<len_req; i++))
+    do
+	flag=${flags:${i}:1}
+	test ${flag} -eq 0 || echo "include ${WEB_SERVER_DIR}/etc/rules/${WAF_REQUEST_CONF_FILES[${i}]}.conf"
+    done
+
+    echo "include ${WEB_SERVER_DIR}/etc/rules/REQUEST-949-BLOCKING-EVALUATION.conf"
+}
+
+gen-waf-response-rules()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    local flags=${1}
+    local len_req=${2}
+
+    echo "include ${WEB_SERVER_DIR}/etc/rules/RESPONSE-950-DATA-LEAKAGES.conf"
+
+    local i j flag
+    local len_rsp=${#WAF_RESPONSE_CONF_FILES[@]}
+    for ((i=0; i<len_rsp; i++))
+    do
+	((j = i + len_req))
+	flag=${flags:${j}:1}
+	test ${flag} -eq 0 || echo "include ${WEB_SERVER_DIR}/etc/rules/${WAF_RESPONSE_CONF_FILES[${i}]}.conf"
+    done
+
+    echo "include ${WEB_SERVER_DIR}/etc/rules/RESPONSE-959-BLOCKING-EVALUATION.conf"
+}
+
+gen-waf-final-rules()
+{
+    local denyurl=${1}
+
+    local rule action rules="949110 959100"
+
+    if test -n "${denyurl}" ; then
+	action="t:none,redirect:'${denyurl}'"
+    else
+	action="t:none,deny,status:403"
+    fi
+
+    for rule in ${rules}
+    do
+	echo "SecRuleUpdateActionById ${rule} \"${action}\""
+    done
+}
+
+get-generic-waf-rules()
+{
+    test -n "${1}" || return 1
+    local in_name=${1}
+
+    local i=0 elt range
+    local name waf_rules
+
+    for elt in ${_WAF_RWEB_GENERIC}
+    do
+	range=$[${i} % 2]
+	case ${range} in
+	    0)
+		name=${elt}
+		;;
+	    1)
+		waf_rules=${elt}
+		if test ${name} == ${in_name} ; then
+		    echo ${waf_rules}
+		    return 0
+		fi
+		;;
+	    *)
+		echo
+		return 1
+		;;
+	esac
+	((i++))
+    done
+    
+    echo ${WAF_GENERIC}
+}
+
+gen-gui-rules()
+{
+    test -n "${1}" || return 1
+    local gui=${1}
+
+    cat ${gui}.rules-constant
+}
+
+gen-wadmin-rules()
+{
+    gen-gui-rules ${WADMIN_NAME}
+}
+
+gen-waudit-rules()
+{
+    gen-gui-rules ${WAUDIT_NAME}
+}
+
+save-waf-rules()
+{
+    local name rule rules
+    local base=${USERENV_DIR}/${WAF_RDIR}
+
+    rules=$(ls ${base}/*.rules.current 2> /dev/null)
+    for rule in ${rules}
+    do
+	name=$(file-basename ${rule} .rules.current)
+	test -f ${base}/${name}.rules || rm -f ${rule}
+    done
+    
+    rules=$(ls ${base}/*.rules 2> /dev/null)
+    for rule in ${rules}
+    do
+	if test -f ${rule}.current ; then
+	    diff --brief ${rule} ${rule}.current > /dev/null 2>&1 || install -m 644 -o ${ACCOUNT} -g ${GROUP_NAME} ${rule} ${rule}.current
+	else
+	    install -m 644 -o ${ACCOUNT} -g ${GROUP_NAME} ${rule} ${rule}.current
+	fi
+    done
+}
+
+get-waf-rule-eol()
+{
+    test -n "${1}" || return 1
+    local chain_nb=${1}
+
+    if test ${chain_nb} -gt 0 ; then
+	local eol="chain\""
+    else
+	local eol="t:none\""
+    fi
+
+    echo ${eol}
+}
+
+gen-waf-regexp2()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 1
+    test -n "${3}" || return 1
+    local msg=${1}
+    local method=${2}
+    local action=${3}
+    local denyurl=${4}
+    local uri_regexp=${5}
+    local body_regexp=${6}
+    local ip_regexp=${7}
+
+    local severity act
+    local chain_nb=0 eol
+    local http_method=${method^^}
+    local log="log,capture"
+    local trans="t:none,t:replaceNulls,t:compressWhitespace"
+    local id=${WAF_CUSTOM_RULE_ID} ; ((WAF_CUSTOM_RULE_ID++))
+
+    test -z "${uri_regexp}" || ((chain_nb++))
+    test -z "${body_regexp}" || ((chain_nb++))
+    test -z "${ip_regexp}" || ((chain_nb++))
+
+    case ${action} in
+	allow)
+	    act="allow"
+	    severity=5
+	    ;;
+	deny)
+	    if test -n "${denyurl}" ; then
+		act="redirect:${denyurl},status:302"
+	    else
+		act="deny,status:403"
+	    fi
+	    severity=2
+	    ;;
+	*)
+	    ;;
+    esac
+
+    echo
+
+    eol=$(get-waf-rule-eol ${chain_nb})
+    echo "SecRule REQUEST_METHOD \"^${http_method}$\" \"msg:'${msg}',id:${id},${trans},${log},severity:${severity},${act},${eol}"
+    if test -n "${uri_regexp}" ; then
+	((chain_nb--))
+	eol=$(get-waf-rule-eol ${chain_nb})
+	echo "SecRule REQUEST_URI \"${uri_regexp}\" \"${eol}"
+    fi
+
+    if test -n "${body_regexp}" ; then
+	((chain_nb--))
+	eol=$(get-waf-rule-eol ${chain_nb})
+	test ${method} != post || echo "SecRule REQUEST_BODY \"${body_regexp}\" \"${eol}"
+    fi
+
+    if test -n "${ip_regexp}" ; then
+	((chain_nb--))
+	eol=$(get-waf-rule-eol ${chain_nb})
+	echo "SecRule REMOTE_ADDR \"${ip_regexp}\" \"${eol}"
+    fi
+}
+
+gen-waf-regexp1()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    local name=${1}
+    local ifile=${2}
+
+    local key action methods
+    local uri_regexp body_regexp ip_regexp
+    local arg1 arg2 arg3 arg4
+
+    local rule_nb=1 ret=0
+    local msg="This HTTP method is not allowed"
+    local denyurl=$(rweb-get-denyurl "${name}" "${_RWEB_SITE_DENYURL_LIST}")
+    denyurl=${denyurl//\"/\\\"}
+
+    echo "# Custom WAF rules for \"${name}\" - Please do not edit this file."
+
+    while read -r arg1 arg2 arg3 arg4
+    do
+	test -n "${arg1}" || continue
+	test "${arg1:0:1}" != "#" || continue
+
+	set -f
+
+	case ${arg1} in
+	    rule)
+		if test ${rule_nb} -gt ${MAX_WAF_RULES_NB} ; then
+		    ret=10
+		    break
+		fi
+		if test -n "${key}" ; then
+		    gen-waf-regexp2 "${msg}" ${methods} ${action} "${denyurl}" "${uri_regexp}" "${body_regexp}" "${ip_regexp}"
+		    unset key
+		fi
+		key=${arg2}
+		action=${arg3}
+		methods=${arg4// }
+		msg="Custom rule ${key}: Matched signature %{TX.0} %{REQUEST_URI}"
+		unset uri_regexp
+		unset body_regexp
+		unset ip_regexp
+		((rule_nb++))
+		;;
+	    uri)
+		test -n "${uri_regexp}" || uri_regexp=$(format-regexp "${arg2}")
+		;;
+	    body)
+		case ${methods} in
+		    post)
+			test -n "${body_regexp}" || body_regexp=$(format-regexp "${arg2}")
+			;;
+		    *)
+			;;
+		esac
+		;;
+	    ip)
+		test -n "${ip_regexp}" || ip_regexp=$(format-regexp "${arg2}")
+		;;
+	    *)
+		;;
+	esac
+	set +f
+    done < ${ifile}
+
+    test -z "${key}" || gen-waf-regexp2 "${msg}" ${methods} ${action} "${denyurl}" "${uri_regexp}" "${body_regexp}" "${ip_regexp}"
+
+    return ${ret}
+}
+
+gen-waf-regexp()
+{
+    test -n "${1}" || return 1
+    local name=${1}
+
+    WAF_CUSTOM_RULE_ID=${WAF_CUSTOM_RULE_ID_INIT}
+    log "Compiling custom ${name:0:24} WAF rules"
+    local base=${WAF_DIR}
+
+    safe-generate gen-waf-regexp1 ${name} ${base}/${name}.rules ${WEB_WAF_DIR}/${name}.rules
+    local ret=${?}
+    log-result ${ret}
+}
+
+set-custom-waf-rules()
+{
+    test -n "${1}" || return 1
+    local mode=${1}
+
+    local name rule rules
+    local base=${WAF_DIR}
+
+    rules=$(ls ${base}/*.rules.current 2> /dev/null)
+    for rule in ${rules}
+    do
+	name=$(file-basename ${rule} .rules.current)
+	if test ! -f ${base}/${name}.rules ; then
+	    log "Removing ${name:0:24} WAF rules"
+	    rm -f ${WEB_WAF_DIR}/${name}.rules*
+	    log-result ${?}
+	fi
+    done
+
+    local ret denyurl current_denyurl
+    
+    rules=$(ls ${base}/*.rules 2> /dev/null)
+
+    for rule in ${rules}
+    do
+	name=$(file-basename ${rule} .rules)
+	conf-lock-file ${rule}
+
+	if test ${mode} == force ; then
+	    gen-waf-regexp ${name}
+	    conf-unlock-file ${rule}
+	    continue
+	fi
+
+	if test -f ${rule}.current ; then
+	    diff --brief ${rule} ${rule}.current > /dev/null
+	    ret=${?}
+	    if test ${ret} -ne 0 ; then
+		gen-waf-regexp ${name}
+	    else
+		denyurl=$(rweb-get-denyurl "${name}" "${_RWEB_SITE_DENYURL_LIST}")
+		current_denyurl=$(rweb-get-denyurl "${name}" "${CURRENT_RWEB_SITE_DENYURL_LIST}")
+
+		if test "${denyurl}" != "${current_denyurl}" ; then
+		    gen-waf-regexp ${name}
+		fi
+	    fi
+	else
+	    gen-waf-regexp ${name}
+	fi
+
+	conf-unlock-file ${rule}
+    done
+
+    return 0
+}
+
+gen-waf-rules-rweb()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    local name=${1}
+    local waf_rules=${2}
+    local denyurl=${3}
+
+    local application=$(get-rweb-waf-application-type ${name} new)
+
+    gen-waf-setup-rules ${application} "denyurl:${denyurl}" "${WAF_DOS_LIMIT}"
+    gen-waf-request-rules ${waf_rules}
+
+    gen-waf-response-rules ${waf_rules} ${#WAF_REQUEST_CONF_FILES[@]}
+    echo "include ${WEB_SERVER_DIR}/etc/rules/RESPONSE-980-CORRELATION.conf"
+
+    gen-waf-rweb-bypass-rules ${name}
+    gen-waf-final-rules "${denyurl}"
+}
+
+gen-av-waf-rules()
+{
+    local denyurl=${1}
+
+    test ${AV_MODE} == True || return 0
+    local severity=1 action
+    if test -n "${denyurl}" ; then
+	action="redirect:${denyurl},status:302"
+    else
+	action="deny,status:403"
+    fi
+
+    local id=${WAF_RULE_ID} ; ((WAF_RULE_ID++))
+    echo "SecRule FILES_TMPNAMES \"@inspectFile /bin/avscan\" \"phase:2,log,${action},severity:${severity},id:${id},capture,msg:'Malware file injection detected.',t:none,t:replaceNulls,t:compressWhitespace\""
+
+}
+
+gen-waf-log()
+{
+    test ${LOG_MODE} == True -a ${LOG_TYPE_WAF/:*} == True || return 0
+
+    echo "LogLevel error"
+    echo "ErrorLogFormat \"%{REAL_CLIENT_IP}e %M\""
+    echo "ErrorLog syslog:local4"
+}
+
+gen-tranform-rule()
+{
+    local id=${WAF_RULE_ID} ; ((WAF_RULE_ID++))
+    echo "SecRule ARGS \"^.*$\" \"id:${id},t:none,t:lowercase,t:replaceNulls,t:compressWhitespace,nolog,pass\""
+}
+
+gen-waf-custom-rweb-rules()
+{
+    test -n "${1}" || return 1
+    local name=${1}
+    
+    gen-tranform-rule
+
+    if test -f ${WEB_WAF_DIR}/${name}.rules.new -o -f ${WEB_WAF_DIR}/${name}.rules ; then
+	local len=${#WEB_SERVER_DIR}
+	local dir=${WEB_WAF_DIR:${len}}
+
+	echo "include ${dir:1}/${name}.rules"
+    fi
+}
+
+gen-waf-rweb-bypass-rules()
+{
+    test -n "${1}" || return 1
+    local in_name=${1}
+
+    local i=0 elt range
+    local name ids id
+
+    for elt in ${_WAF_RWEB_BYPASS_RULE_LIST}
+    do
+	range=$[${i} % 2]
+	case ${range} in
+	    0)
+		name=${elt}
+		;;
+	    1)
+		ids=${elt}
+		if test ${name} == ${in_name} ; then
+		    ! check-expr-ip ${in_name} ids="920350:${ids}"
+		    echo "SecRuleRemoveById ${ids//:/ }"
+		    return 0
+		fi
+		;;
+	    *)
+		return 1
+		;;
+	esac
+	((i++))
+    done
+}
+
+gen-generic-rules()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    test -n "${3}" || return 3
+    local waf_num_arg=${1}
+    local waf_files_size=${2}
+    local waf_dos_limit=${3}
+    local denyurl=${4}
+
+    gen-waf-setup-rules ${TECHNICAL_NAME} "denyurl:${denyurl}" "${waf_dos_limit}" ${waf_num_arg} ${waf_files_size}
+    gen-waf-request-rules ${WAF_GENERIC_RULE_STATES}
+    gen-waf-response-rules ${WAF_GENERIC_RULE_STATES} ${#WAF_REQUEST_CONF_FILES[@]}
+
+    echo "SecRuleRemoveById 920350"
+}
+
+gen-waf-rules()
+{
+    test -n "${1}" || return 1
+    local in_type=${1}
+
+    local waf_dos_limit
+
+    case ${in_type} in
+	"${WADMIN_NAME}")
+	    waf_dos_limit="1000 60 300"
+	    local conf_file_sz=$[64 * 1024]
+
+	    if test ${APL_ROLE} == 'manager' ; then
+		local manager_factor=$[${MANAGER_TEMPLATE_NB} + ${MANAGER_GATEWAY_NB}]
+		((conf_file_sz *= manager_factor))
+	    fi
+
+	    gen-generic-rules $[32 * 256] ${conf_file_sz} "${waf_dos_limit}" "/${GUI_DIR_NAME}/${GUI_HOME_PAGE}.apl?not-found"
+	    echo "SecRuleRemoveById 950109"
+	    gen-tranform-rule
+	    echo "include ${GUI_DIR}/etc/${in_type}.rules"
+	    ;;
+	"${WAUDIT_NAME}")
+	    waf_dos_limit="500 60 300"
+	    gen-generic-rules 16 0 "${waf_dos_limit}" "/${GUI_DIR_NAME}/${GUI_HOME_PAGE}.apl?not-found"
+	    gen-tranform-rule
+	    echo "include ${WEB_SERVER_DIR}/etc/${in_type}.rules"
+	    ;;
+	webserver)
+	    waf_dos_limit="1000 60 600"
+	    gen-generic-rules 8 0 "${waf_dos_limit}"
+	    gen-tranform-rule
+	    echo "include ${WEB_SERVER_DIR}/etc/${in_type}.rules"
+	    ;;
+        rweb)
+	    test -n "${2}" || return 2
+	    test -n "${3}" || return 3
+	    local in_name=${2}
+	    local in_waf_rules=${3}
+	    local in_denyurl=${4}
+
+	    gen-waf-rules-rweb ${in_name} ${in_waf_rules} "${in_denyurl}"
+	    gen-av-waf-rules "${in_denyurl}"
+	    gen-waf-log
+	    ;;
+	*)
+	    ;;
+    esac
+}
+
+commit-waf-rweb-rules()
+{
+    local new rule rweb base
+    local news=$(ls ${WEB_WAF_DIR}/*.rules.new 2> /dev/null)
+
+    for new in ${news}
+    do
+	base=$(file-basename ${new} .new)
+	mv -f ${new} ${WEB_WAF_DIR}/${base}
+    done
+
+    local rules=$(ls ${WEB_WAF_DIR}/*.rules 2> /dev/null)
+    for rule in ${rules}
+    do
+	rweb=$(file-basename ${rule} .rules)
+	member "${RWEB_SITE_NAME_LIST}" ${rweb} || \
+	    rm -f \
+	       ${rule} \
+	       ${WAF_DIR}/${rweb}.rules \
+	       ${WAF_DIR}/${rweb}.rules.current
+    done
+
+    rm -f ${WEB_WAF_DIR}/*.rules.old
+}
+
+restore-waf-rweb-rules()
+{
+    local old base
+    local olds=$(ls ${WEB_WAF_DIR}/*.rules.old 2> /dev/null)
+
+    for old in ${olds}
+    do
+	base=$(file-basename ${old} .old)
+	cp -f ${old} ${WEB_WAF_DIR}/${base}
+    done
+}
+
+LIB_APL_WAF=Yes

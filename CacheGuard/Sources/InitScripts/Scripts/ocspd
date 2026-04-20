@@ -1,0 +1,162 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       InitScript
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+source /lib/lsb/init-functions
+
+CACHEGUARD_DIR=/etc/sysconfig/cacheguard
+source ${CACHEGUARD_DIR}/constant
+source ${APPLIANCE_DIR}/etc/role
+
+PROG=ocspd
+FPROG=/usr/bin/openssl
+SERV="OCSP Service"
+
+[ ! -f /etc/sysconfig/${PROG} ] || source /etc/sysconfig/${PROG}
+
+OCSP_PORT=${OCSP_PORT:-8084}
+OCSP_DAYS=${OCSP_DAYS:-7}
+TLS_PATH=${TLS_PATH-${SSL_CA_DIR}/${SYSTEM_CA}}
+
+[ -x ${FPROG} ] || exit 1
+[ -f ${SSL_CTL_DIR}/index.txt ] || exit 11
+[ -s ${SSL_CA_DIR}/${SYSTEM_CA}.certificate ] || exit 13
+[ -s ${TLS_PATH}.key ] || exit 15
+[ -s ${TLS_PATH}.certificate ] || exit 17
+
+PROCESS_COUNT=${PROCESS_COUNT-1}
+
+update-pid-file()
+{
+    local tmp_processes=/tmp/ocspd.processes.${$}
+    local owner pid rest
+    local pids
+
+    ps -ef | grep "${FPROG} ocsp" | grep --invert-match grep 2> /dev/null > ${tmp_processes}
+
+    while read owner pid rest
+    do
+	pids="${pids} ${pid}"
+    done < ${tmp_processes}
+    pids=${pids:1}
+
+    rm -f ${tmp_processes}
+
+    if test -n "${pids}" ; then
+	echo ${pids} > /var/run/${PROG}.pid
+    else
+	rm -f /var/run/${PROG}.pid
+    fi
+
+    test -n "${pids}"
+}
+
+wait4-time-wait-clearing()
+{
+    local time_wait_tmp_file=/tmp/time-wait.${$}
+
+    local recv send local_addr peer_addr
+    local port found
+
+    while true
+    do
+	found=0
+	ss --numeric --tcp state TIME-WAIT  2> /dev/null | tail -n +2  2> /dev/null > ${time_wait_tmp_file}
+	while read recv send local_addr peer_addr
+	do
+	    port=${local_addr/*:}
+	    if test "${port}" == "${OCSP_PORT}" ; then
+		found=1
+		break
+	    fi
+	done < ${time_wait_tmp_file}
+	if test ${found} -eq 1 ; then
+	    usleep 500000
+	else
+	    break
+	fi
+    done
+
+    rm -f ${time_wait_tmp_file}
+}
+
+case "${1}" in
+    start)
+	# Start daemons.
+	if update-pid-file ; then
+	    echo $"${PROG}: already running"
+	    exit 1
+	fi
+	log_info_msg "Starting ${SERV}..."
+	wait4-time-wait-clearing
+	${FPROG} ocsp \
+		-ignore_err \
+		-index ${SSL_CTL_DIR}/index.txt \
+		-ndays ${OCSP_DAYS} \
+		-rkey ${TLS_PATH}.key \
+		-rsigner ${TLS_PATH}.certificate \
+		-CA ${SSL_CA_DIR}/${SYSTEM_CA}.certificate \
+		-multi ${PROCESS_COUNT} \
+		-port ${OCSP_PORT} > /dev/null 2>&1 &
+
+	usleep 500000
+	update-pid-file
+	RETVAL=${?}
+	[ ${RETVAL} -eq 0 ]
+	evaluate_retval
+	exit ${RETVAL}
+	;;
+
+    stop)
+	# Stop daemons.
+	log_info_msg "Stopping ${SERV}... "
+	update-pid-file
+	PIDS=$(cat /var/run/${PROG}.pid 2> /dev/null)
+
+	if [ -n "${PIDS}" ] ; then
+	    kill -KILL ${PIDS} 2> /dev/null
+	    RETVAL=${?}
+	else
+	    RETVAL=1
+	fi
+
+	rm -f /var/run/${PROG}.pid
+	[ ${RETVAL} -eq 0 ]
+	evaluate_retval
+	exit ${RETVAL}
+	;;
+    
+    restart)
+	${0} stop
+	${0} start
+	;;
+
+    status)
+	update-pid-file
+	statusproc -p /var/run/${PROG}.pid ${PROG}
+	;;
+    *)
+	echo "Usage: ${0} {start|stop|restart|status}"
+	exit 1
+	;;
+esac

@@ -1,0 +1,249 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       InitScript
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+source /lib/lsb/init-functions
+
+CACHEGUARD_DIR=/etc/sysconfig/cacheguard
+source ${CACHEGUARD_DIR}/constant
+source ${APPLIANCE_DIR}/etc/role
+source ${HARD_DIR}/model.conf
+
+PROG="sshd"
+FPROG=/usr/sbin/${PROG}
+CONFIG_FILE=/etc/sshd_config
+
+[ -f /etc/sysconfig/${PROG} ] && source /etc/sysconfig/${PROG}
+[ -x ${FPROG} ] || exit 0
+[ -f ${CONFIG_FILE} ] || exit 0
+
+SERV="SSH Service"
+KEYGEN_COM=/usr/bin/ssh-keygen
+KEYGEN_OPT="-q -a 24 -Z aes256-ctr"
+RETVAL=0
+
+get-host-key-fp()
+{
+    test -n "${1}" || return 1
+    ktype=${1}
+
+    local key_file fp
+
+    case ${ktype} in
+	rsa)
+	    key_file=${SSH_HOST_RSA_KEY_FILE}
+	    ;;
+	*)
+	    return 11
+	    ;;
+    esac
+
+    fp=$(${KEYGEN_COM} -lf ${key_file}.pub 2> /dev/null)
+    fp=${fp#* }
+    fp=${fp/ *}
+
+    echo ${fp}
+}
+
+get-manager-key-fp()
+{
+    local key_file=${ABASE_DIR}/.ssh/id_rsa
+    local fp=$(${KEYGEN_COM} -lf ${key_file}.pub 2> /dev/null)
+
+    fp=${fp#* }
+    fp=${fp/ *}
+
+    echo ${fp}
+}
+
+do_host_rsa_keygen()
+{
+    local fp
+
+    [ ! -s ${SSH_HOST_RSA_KEY_FILE} ] || return 0
+
+    log_info_msg "Generating SSH2 RSA Appliance Key..."
+
+    rm -f ${SSH_HOST_RSA_KEY_FILE}
+    ${KEYGEN_COM} ${KEYGEN_OPT} -t rsa -b 4096 -C 'server@gateway' -N '' -f ${SSH_HOST_RSA_KEY_FILE} > /dev/null 2>&1
+    RETVAL=${?}
+
+    if [ ${RETVAL} -eq 0 ] ; then
+	chmod 400 ${SSH_HOST_RSA_KEY_FILE}
+	chmod 444 ${SSH_HOST_RSA_KEY_FILE}.pub
+	fp=$(get-host-key-fp rsa)
+	echo ${fp} > ${HARD_DIR}/${SSH_HOST_RSA_FP}
+	[ ${RETVAL} -eq 0 ]
+	evaluate_retval
+    else
+	[ ${RETVAL} -eq 0 ]
+	evaluate_retval
+    fi
+}
+
+do_manager_rsa_keygen()
+{
+    test ${APL_ROLE} == 'manager' || return 0
+
+    local key_file=${ABASE_DIR}/.ssh/id_rsa
+
+    [ ! -s ${key_file} ] || return 0
+
+    local ret1 ret2
+
+    log_info_msg "Generating SSH2 RSA Manager Key..."
+
+    ${KEYGEN_COM} ${KEYGEN_OPT} -t rsa -b 4096 -C ${ADMIN_NAME}@manager -N '' -f ${key_file} > /dev/null 2>&1 ; ret1=${?}
+    test -s ${key_file} -a -s ${key_file}.pub &&
+	chown ${ADMIN_NAME}:${GROUP_NAME} ${ABASE_DIR}/.ssh/{id_rsa,id_rsa.pub} ; ret2=${?}
+    RETVAL=$[${ret1} + ${ret2}]
+
+    if [ ${RETVAL} -eq 0 ] ; then
+	fp=$(get-manager-key-fp)
+	echo ${fp} > ${SSH_MANAGER_RSA_FP_FILE}
+	[ ${RETVAL} -eq 0 ]
+	evaluate_retval
+    else
+	[ ${RETVAL} -eq 0 ]
+	evaluate_retval
+    fi
+}
+
+do_sanity_check() {
+    log_info_msg "Checking the configuration sanity..."
+    ${FPROG} -f ${CONFIG_FILE} -t
+    RETVAL=${?}
+    [ ${RETVAL} -eq 0 ]
+    evaluate_retval
+}
+
+reset-host-keys()
+{
+    rm -f \
+       ${SSH_HOST_RSA_KEY_FILE} \
+       ${SSH_HOST_RSA_KEY_FILE}.pub
+}
+
+reset-manager-keys()
+{
+    local key_file=${ABASE_DIR}/.ssh/id_rsa
+
+    rm -f \
+       ${key_file} \
+       ${key_file}.pub
+}
+
+stop-all-sshd()
+{
+    local pid rest i=0
+    local main_pid
+    local tmp_procs_file=/tmp/sshd-process-list.${$}
+
+    test ! -f /var/run/${PROG}.pid || main_pid=$(cat /var/run/${PROG}.pid 2> /dev/null)
+
+    ps -e | grep ${PROG} > ${tmp_procs_file}
+
+    while read pid rest
+    do
+	test ${pid} != "${main_pid}" || continue
+	test ${pid} != "${$}" || continue
+	test ${pid} != "${PPID}" || continue
+
+	case $[${i} % 2] in
+	    0)
+		kill ${pid} > /dev/null 2>&1
+		;;
+	    1)
+		;;
+	    *)
+		;;
+	esac
+	((i++))
+    done < ${tmp_procs_file}
+
+    killproc -p /var/run/${PROG}.pid ${FPROG}
+    rm -f ${tmp_procs_file}
+}
+
+case "${1}" in
+    start)
+	# Create keys if necessary
+	do_host_rsa_keygen
+	do_manager_rsa_keygen
+
+	# Start daemons.
+	log_info_msg "Starting ${SERV}..."
+	start_daemon -n -14 ${FPROG} -f ${CONFIG_FILE} ${OPTIONS}
+	RETVAL=${?}
+	[ ${RETVAL} -eq 0 ] && touch /var/lock/${PROG}
+	evaluate_retval
+	exit ${RETVAL}
+	;;
+    stop)
+	# Stop daemons.
+	log_info_msg "Stopping ${SERV}... "
+	stop-all-sshd
+	RETVAL=${?}
+	usleep 300000
+	[ ${RETVAL} -eq 0 ] && rm -f /var/lock/${PROG}
+	evaluate_retval
+	exit ${RETVAL}
+	;;
+    reload)
+	# Re
+	echo $"Reloading ${SERV}..."
+	killproc ${FPROG} -HUP
+	RETVAL=${?}
+	[ ${RETVAL} -eq 0 ]
+	evaluate_retval
+	exit ${RETVAL}
+	;;
+    restart)
+	${0} stop
+	${0} start
+	;;
+    status)
+	statusproc ${PROG}
+	;;
+    reset-host)
+	${0} stop
+	reset-host-keys
+	do_host_rsa_keygen
+	${0} start
+	;;
+    host-rsa-keygen)
+	do_host_rsa_keygen
+	;;
+    manager-keygen)
+	reset-manager-keys
+	do_manager_rsa_keygen
+	;;
+    test)
+	do_sanity_check
+	exit ${?}
+	;;
+    *)
+	echo "Usage: ${0} {start|stop|reload|restart|reset|status|test}"
+	exit 1
+	;;
+esac

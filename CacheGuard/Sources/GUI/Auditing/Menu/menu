@@ -1,0 +1,17 @@
+1 1 _BEGIN_ WAF_AUDITING
+1 1 _ITEM_ WAF_AUDITING Audit_Reverse_Web /gui/audit-log.apl
+1 1 _END_ WAF_AUDITING
+
+1 1 _BEGIN_ ACCESS_LOGS
+1 1 _ITEM_ ACCESS_LOGS Web_Access /gui/web-log.apl
+1 1 _ITEM_ ACCESS_LOGS rWeb_Access /gui/rweb-log.apl
+1 1 _END_ ACCESS_LOGS
+
+1 1 _BEGIN_ BLOCKED_LOGS
+1 1 _ITEM_  BLOCKED_LOGS IPsec_VPN /gui/vpnipsec-log.apl
+1 1 _ITEM_  BLOCKED_LOGS Firewall /gui/firewall-log.apl
+1 1 _ITEM_  BLOCKED_LOGS Web_Antivirus /gui/antivirus-log.apl
+1 1 _ITEM_  BLOCKED_LOGS Antivirus_Server /gui/avserver-log.apl
+1 1 _ITEM_  BLOCKED_LOGS URL_Guard /gui/guard-log.apl
+1 1 _ITEM_  BLOCKED_LOGS WAF /gui/waf-log.apl
+1 1 _END_ BLOCKED_LOGS

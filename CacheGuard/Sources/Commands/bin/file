@@ -1,0 +1,207 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       Commands
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+source functions
+
+show-report-file-exchange()
+{
+    local exchanging_files=$(ls -1tr ${TMP_DIR}/*.${PROGRESS} 2> /dev/null)
+    local file progress base i=0
+    local urllist prefix len
+
+    local report_col=$[${PRINT_COL} + 20]
+
+    echo-begin-show
+
+    for file in ${exchanging_files}
+    do
+	base=$(file-basename ${file})
+	progress=$(echo-exchanged-file-percent "${base}")
+	test "${progress}" != '100' || continue
+	base=$(file-basename ${base} .${PROGRESS})
+	case "${base}" in
+	    ${SAVED}.backup)
+		echo -n "Saving System Backup..." ; echo-value ${progress}% ${report_col}
+		;;
+	    ${LOADED}.backup)
+		echo -n "Loading System Backup..." ; echo-value ${progress}% ${report_col}
+		;;
+	    ${LOADED}.os.tar.compressed)
+		echo -n "Loading OS Patch..." ; echo-value ${progress}% ${report_col}
+		;;
+	esac
+
+	prefix="${LOADED}.${URLLIST}." len=${#prefix}
+
+	if test ${base:0:${len}} == ${prefix} ; then
+	    urllist=${base:${len}}
+	    echo -n "Loading ${urllist} content..." ; echo-value ${progress}% ${report_col}
+	fi
+	((i++))
+    done
+
+    echo -n "Number of files being exchanged" ; echo-value ${i} ${report_col}
+
+    echo-end-show
+}
+
+display-file-operation-log()
+{
+    display-log ${FILE_OPERATION_LOG}
+}
+
+run-exchange-all-files()
+{
+    test -n "${ARGS[1]}" || return 1
+    local op=${ARGS[1]}
+    local proto=${ARGS[2]}
+    local ip=${ARGS[3]}
+    local dir=${ARGS[4]}
+
+    shift-args 4
+
+    local exclusions=${ALLARGS}
+
+    test -n "${proto}" || return 1
+    test -n "${ip}" || return 1
+    test -n "${dir}" || return 1
+
+    check-file-protocol ${proto} || return 63
+    check-ip-name ${ip} || return 113
+    check-file-ip ${ip} || return 27
+
+    if test ${op} == 'del' ; then
+	case ${proto} in
+	    ftp|sftp)
+		delete-file ${proto} ${ip} "${dir}"
+		return ${?}
+		;;
+	    *)
+		return 10
+		;;
+	esac
+    fi
+
+    test -z "${dir}" || check-filename ${dir} || return 19
+    exclusions=$(uniq-elt ${exclusions})
+    check-file-exclusion ${exclusions} || return 37
+
+    TERM=${NOPROGRESS_TERM} ${LOCAL_DIR}/bin/apl_file ${op} ${proto} ${ip} ${dir} ${exclusions} &
+}
+
+clear-file()
+{
+    local exclusions=${@}
+    exclusions=$(uniq-elt ${exclusions})
+    check-file-exclusion ${exclusions} || return 37
+
+    member "${exclusions}" waf.rweb.custom || db-waf-rule-reset
+
+    exclusions=$(remove "${exclusions}" 'waf.rweb.custom')
+    exclusions=$(remove "${exclusions}" 'tls.client')
+
+    local admin_ssh_key="${LOADED}.${SSH_KEY}."
+    local admin_snmp_certificate="${LOADED}.${SNMP_SSL}.certificate"
+    local antivirus_whitelist_signature="${LOADED}.${AV_WHITELIST_SIG}"
+    local tls_ca_system="${LOADED}.${SYSTEM_CA}."
+    local tls_ca_third="${LOADED}.${THIRD_CA}."
+    local tls_server="${LOADED}.${TLS_SERVER}."
+    local tls_client="${LOADED}.${TLS_CLIENT}."
+    local manager_ssh="${LOADED}.manager.${SSH_KEY}."
+
+    local len_admin_ssh_key=${#admin_ssh_key}
+    local len_admin_snmp_certificate=${#admin_snmp_certificate}
+    local len_antivirus_whitelist_signature=${#antivirus_whitelist_signature}
+    local len_tls_ca_system=${#tls_ca_system}
+    local len_tls_ca_third=${#tls_ca_third}
+    local len_tls_server=${#tls_server}
+    local len_tls_client=${#tls_client}
+    local len_manager_ssh=${#manager_ssh}
+
+    local file
+
+    cd ${TMP_DIR}
+
+    for file in ${LOADED}.${SSH_KEY}.*.* ${LOADED}.${SNMP_SSL}.certificate ${LOADED}.${AV_WHITELIST_SIG} ${LOADED}.${SYSTEM_CA}.* ${LOADED}.${THIRD_CA}.* ${LOADED}.${TLS_SERVER}.*.* ${LOADED}.${TLS_CLIENT}.*.*
+    do
+	if test -n "${exclusions}" ; then
+	    if test ${file:0:${len_admin_ssh_key}} == ${admin_ssh_key} ; then
+		! member "${exclusions}" admin.ssh.key || continue
+	    elif test ${file:0:${len_admin_snmp_certificate}} == ${admin_snmp_certificate} ; then
+		! member "${exclusions}" admin.snmp.certificate || continue
+	    elif test ${file:0:${len_antivirus_whitelist_signature}} == ${antivirus_whitelist_signature} ; then
+		! member "${exclusions}" antivirus.whitelist.signature || continue
+	    elif test ${file:0:${len_tls_ca_system}} == ${tls_ca_system} ; then
+		! member "${exclusions}" tls.ca.system || continue
+	    elif test ${file:0:${len_tls_ca_third}} == ${tls_ca_third} ; then
+		! member "${exclusions}" tls.ca.third || continue
+	    elif test ${file:0:${len_tls_server}} == ${tls_server} ; then
+		! member "${exclusions}" tls.server || continue
+	    elif test ${file:0:${len_tls_client}} == ${tls_client} ; then
+		! member "${exclusions}" tls.client || continue
+	    elif test ${file:0:${len_manager_ssh}} == ${manager_ssh} ; then
+		! member "${exclusions}" manager.ssh || continue
+	    fi
+	fi
+
+	rm -f ${file}
+    done
+
+    cd ${HOME}
+}
+
+check-file-lock()
+{
+    test -f ${ADMIN_LOCK_DIR}/local_file
+}
+
+run()
+{
+    test -n "${ARGS[1]}" || return 1
+
+    case ${ARGS[1]} in
+	exchange)
+	    show-report-file-exchange
+	    ;;
+	del|load|save)
+	    user-has-admin-rights || return 31
+	    ! check-file-lock || return 205
+	    run-exchange-all-files
+	    ;;
+	clear)
+	    user-has-admin-rights || return 31
+	    shift-args
+	    clear-file ${ALLARGS}
+	    ;;
+	report)
+	    display-file-operation-log
+	    return 0
+	    ;;
+	*)
+	    return 1
+	    ;;
+    esac
+}
+
+main "${@}"

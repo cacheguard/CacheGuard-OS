@@ -1,0 +1,86 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       GUI
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+register-vpnsubscr-license-key()
+{
+    gui-contextual-is-allowed || return 0
+    is-embedded-activable vpnsubscr || return 0
+
+    local lic_key=${VALUES[4]}
+    if test -z "${lic_key}" ; then
+	log-command "register" "embedded ${EMBEDDED_VPNSUBSCR_CLI_NAME}"
+	execute-command "register embedded ${EMBEDDED_VPNSUBSCR_CLI_NAME}"
+    else
+	log-command "register" "embedded ${EMBEDDED_VPNSUBSCR_CLI_NAME} ${lic_key}"
+	execute-command "register embedded ${EMBEDDED_VPNSUBSCR_CLI_NAME} ${lic_key}"
+    fi
+}
+
+set-embedded-bevypn()
+{
+    local transaction=/tmp/${TRANSACTION_FILE}.wadmin.${REMOTE_USER}.${$}
+    rm -f ${transaction}
+
+    local tls
+
+    local state=${VALUES[0]}
+    local site_name=${VALUES[1]}
+    local tls_id=${VALUES[2]}
+    local ca_id=${VALUES[3]}
+
+    if test -z "${ca_id}" ; then
+	local tls=${tls_id}
+    else
+	local tls="${tls_id}:${ca_id}"
+    fi
+
+    register-vpnsubscr-license-key
+
+    case ${state} in
+	on)
+	    if test -z "${site_name}" ; then
+		gen-gui-error 7
+		return 0
+	    fi
+	    site_name=" ${site_name}"
+	    tls=" ${tls}"
+	    ;;
+	off)
+	    if test -z "${site_name}" ; then
+		unset tls
+	    else
+		site_name=" ${site_name}"
+		test -z "${tls}" || tls=" ${tls}"
+	    fi
+	    ;;
+	*)
+	    return 0
+	    ;;
+    esac
+
+    echo "embedded ${EMBEDDED_VPNSUBSCR_CLI_NAME} ${state}${site_name}${tls}" > ${transaction}
+    execute-transaction ${transaction}
+}
+
+set-embedded-bevypn

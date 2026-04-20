@@ -1,0 +1,54 @@
+AddKeysToAgent no
+AddressFamily inet
+BatchMode no
+CanonicalizeFallbackLocal yes
+
+Ciphers 3des-cbc,aes128-cbc,aes192-cbc,aes256-cbc,aes128-ctr,aes192-ctr,aes256-ctr,aes128-gcm@openssh.com,aes256-gcm@openssh.com,chacha20-poly1305@openssh.com
+
+CheckHostIP yes
+ClearAllForwardings yes
+Compression yes
+ConnectionAttempts 1
+ConnectTimeout 3
+ControlMaster no
+ControlPath none
+ControlPersist no
+EnableSSHKeysign no
+EscapeChar ~
+ExitOnForwardFailure yes
+FingerprintHash sha256
+ForkAfterAuthentication no
+ForwardAgent no
+ForwardX11 no
+ForwardX11Trusted no
+GatewayPorts no
+HashKnownHosts no
+HostbasedAuthentication no
+IdentitiesOnly yes
+IdentityFile ~/.ssh/id_rsa
+KbdInteractiveAuthentication no
+LogLevel FATAL
+
+MACs hmac-md5,hmac-md5-96,hmac-sha1,hmac-sha1-96,hmac-sha2-256,hmac-sha2-512,umac-64@openssh.com,umac-128@openssh.com,hmac-md5-etm@openssh.com,hmac-md5-96-etm@openssh.com,hmac-sha1-etm@openssh.com,hmac-sha1-96-etm@openssh.com,hmac-sha2-256-etm@openssh.com,hmac-sha2-512-etm@openssh.com,umac-64-etm@openssh.com,umac-128-etm@openssh.com
+
+NoHostAuthenticationForLocalhost yes
+NumberOfPasswordPrompts 1
+PasswordAuthentication no
+PermitLocalCommand no
+Port 22
+PreferredAuthentications publickey
+ProxyUseFdpass no
+RekeyLimit default none
+ServerAliveCountMax 1
+ServerAliveInterval 0
+SessionType default
+StdinNull no
+StrictHostKeyChecking no
+SyslogFacility AUTH
+TCPKeepAlive no
+Tunnel no
+TunnelDevice any:any
+UpdateHostKeys no
+UserKnownHostsFile /dev/null
+VerifyHostKeyDNS no
+VisualHostKey no

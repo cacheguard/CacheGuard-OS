@@ -1,0 +1,514 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       Commands
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+FilterSyntaxErrors[11]="This is not a valid filter key"
+FilterSyntaxErrors[12]="This is not a valid filtering action"
+FilterSyntaxErrors[13]="This is not a valid HTTP method or HTTP methods regular expression"
+FilterSyntaxErrors[14]="This is not a valid regular expression"
+FilterSyntaxErrors[15]="A regular expression length must be less than or equal to ${MAX_REGEXP_LEN}"
+FilterSyntaxErrors[16]="Unknown statement in custom rule file"
+FilterSyntaxErrors[17]="Empty regular expression is not allowed"
+FilterSyntaxErrors[18]="A regular expression must be delimited with double quotes"
+FilterSyntaxErrors[19]="Statement not attached to a rule"
+FilterSyntaxErrors[20]="The \"body\" statement is only allowed with the \"post\" method"
+FilterSyntaxErrors[21]="The \"body\" statement can't be used without a \"uri\" statement"
+
+db-waf-custom-is-global-locked()
+{
+    ls ${ROOT_DIR}${ADMIN_LOCK_DIR}/${ADMIN_NAME}.*.rules.super > /dev/null 2>&1
+}
+
+db-waf-check-filter-key()
+{
+    test -n "${1}" || return 1
+
+    local len=${#1}
+    test ${len} -le ${MAX_LEN} || return 2
+    [[ "${1}" =~ ^[a-zA-Z0-9][a-zA-Z0-9_\.\-]*$ ]] || return 3
+
+    return 0
+}
+
+db-waf-check-action()
+{
+    test -n "${1}" || return 1
+    
+    case "${1}" in
+	allow|deny)
+	    return 0
+	    ;;
+	*)
+	    return 1
+	    ;;
+    esac
+}
+
+db-waf-check-http-method()
+{
+    test -n "${1}" || return 1
+    
+    case "${1}" in
+	get|post|head|put|patch|delete|connect|options|trace)
+	    return 0
+	    ;;
+	*)
+	    return 1
+	    ;;
+    esac
+}
+
+db-waf-check-http-methods()
+{
+    test -n "${1}" || return 1
+    local pipe_methods=${1}
+
+    local methods=${pipe_methods//|/ }
+    local method
+
+    if test "${methods}" == "${pipe_methods}" ; then
+	method=${pipe_methods}
+	db-waf-check-http-method ${method}
+    else
+	for method in ${methods}
+	do
+	    db-waf-check-http-method ${method} || return 1
+	done
+    fi
+}
+
+db-waf-check-regexp()
+{
+    test -n "${1}" || return 18
+    local regexp=${1}
+
+    local len=${#regexp}
+    ((len--))
+
+    test "${regexp:0:1}" == '"' -a "${regexp:${len}:1}" == '"' -a ${len} -gt 0 || return 18
+    ((len--))
+
+    test ${len} -le ${MAX_REGEXP_LEN} || return 15
+
+    regexp=${regexp:1:${len}}
+
+    local tmpfile=${ADMIN_TMP_DIR}/regexp.test.${$}
+
+    echo "/${regexp//\//\\/}/" > ${tmpfile}
+    echo cacheguard >> ${tmpfile}
+
+    local failed=$(pcretest ${tmpfile} | tail -1 | grep Failed)
+    rm -f ${tmpfile}
+
+    if test -z "${failed}" ; then
+        return 0
+    else
+        echo "${failed}"
+        return 14
+    fi  
+}
+
+db-waf-syntax-error()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 1
+    local line=${1}
+    local errno=${2}
+    local freetxt=${3}
+
+    local errtxt=${FilterSyntaxErrors[${errno}]}
+
+    if test -n "${freetxt}" ; then
+	echo "Syntax error ${errno} at line ${line}: ${errtxt} - ${freetxt}" >&2
+    else
+	echo "Syntax error ${errno} at line ${line}: ${errtxt}" >&2
+    fi
+
+    RWEB_WAF_SYNTAX=1
+}
+
+db-waf-filter-check-syntax()
+{
+    test -n "${1}" || return 1
+    local ifile=${1}
+
+    test -f ${ifile} || return 2
+
+    local key action methods
+    local arg1 arg2 arg3 arg4
+    local rule_stated=0 uri_stated=0 body_stated=0 ip_stated=0
+    local line=0 rule_nb=1 regexp_error
+
+    RWEB_WAF_SYNTAX=0
+
+    while read -r arg1 arg2 arg3 arg4
+    do
+	((line++))
+	test -n "${arg1}" || continue
+	test "${arg1:0:1}" != "#" || continue
+
+	case ${arg1} in
+	    rule)
+		test ${rule_nb} -le ${MAX_WAF_RULES_NB} || break
+
+		key=${arg2}
+		action=${arg3}
+		methods=${arg4}
+
+		db-waf-check-filter-key ${key} || db-waf-syntax-error ${line} 11
+		db-waf-check-action ${action} || db-waf-syntax-error ${line} 12
+		db-waf-check-http-methods "${methods}" || db-waf-syntax-error ${line} 13
+		((rule_nb++))
+		rule_stated=1
+		uri_stated=0
+		body_stated=0
+		ip_stated=0
+		;;
+	    uri|body|ip)
+		test ${rule_stated} -eq 1 || db-waf-syntax-error ${line} 19
+		case ${arg1} in
+		    uri)
+			if test ${uri_stated} -ge 1 ; then
+			    db-waf-syntax-error ${line} 19
+			    ((uri_stated++))
+			    rule_stated=0
+			else
+			    uri_stated=1
+			fi
+			;;
+		    body)
+			if test "${methods}" != "post" ; then
+			    db-waf-syntax-error ${line} 20
+			else
+			    if test ${body_stated} -ge 1 ; then
+				db-waf-syntax-error ${line} 19
+				((body_stated++))
+				rule_stated=0
+			    else
+				if test ${uri_stated} -eq 1 ; then
+				    body_stated=1
+				else
+				    db-waf-syntax-error ${line} 21
+				fi
+			    fi
+			fi
+			;;
+		    ip)
+			if test ${ip_stated} -ge 1 ; then
+			    db-waf-syntax-error ${line} 19
+			    ((ip_stated++))
+			    rule_stated=0
+			else
+			    ip_stated=1
+			fi
+			;;
+		    *)
+			;;
+		esac
+		regexp_error=$(db-waf-check-regexp "${arg2}")
+
+		case ${?} in
+		    0)
+			;;
+		    14)
+			db-waf-syntax-error ${line} ${?} "${regexp_error}"
+			;;
+		    15|17|18)
+			db-waf-syntax-error ${line} ${?}
+			;;
+		    *)
+			db-waf-syntax-error ${line} 255
+			;;
+		esac
+		;;
+	    *)
+		db-waf-syntax-error ${line} 16
+		;;
+	esac
+    done < ${ifile}
+
+    test ${rule_nb} -le ${MAX_WAF_RULES_NB} || return 166
+    test ${RWEB_WAF_SYNTAX} -eq 0 || return 82
+}
+
+db-waf-save-filter()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 1
+    test -n "${3}" || return 1
+    test -n "${4}" || return 1
+    local name=${1}
+    local protocol=${2}
+    local ip=${3}
+    local file=${4}
+    local new=${5}
+
+    if test "${new}" == new ; then
+	local rules=${WAF_DIR}/${name}.rules
+    else
+	local rules=${WAF_DIR}/${name}.rules.current
+    fi
+
+    test -f ${rules} || return 81
+
+    save-files ${protocol} ${ip} "${rules} ${file}"
+}
+
+db-waf-load-filter-commit()
+{
+    test -n "${1}" || return 1
+    local tmp_file=${1}
+
+    test -f ${tmp_file} || return 0
+
+    local base=$(file-basename ${tmp_file})
+    local name=${base/work\.${LOADED}\.${WAF_RWEB_CUSTOM}\.}
+
+    if test -f ${WAF_DIR}/${name}.rules ; then
+	diff --brief ${tmp_file} ${WAF_DIR}/${name}.rules > /dev/null 2>&1
+	if test ${?} -ne 0 ; then
+	    cp -f ${tmp_file} ${WAF_DIR}/${name}.rules
+	    NEWENV=1
+	fi
+    else
+	cp -f ${tmp_file} ${WAF_DIR}/${name}.rules
+	NEWENV=1
+    fi
+
+    if test -f ${WAF_DIR}/${name}.rules.current ; then
+	diff --brief ${WAF_DIR}/${name}.rules ${WAF_DIR}/${name}.rules.current > /dev/null 2>&1
+	test ${?} -ne 0 || touch ${WAF_DIR}/${name}.rules.current
+    fi
+
+    rm -f ${tmp_file}
+}
+
+db-waf-load-filter()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    test -n "${3}" || return 3
+    test -n "${4}" || return 4
+    local name=${1}
+    local protocol=${2}
+    local ip=${3}
+    local file=${4}
+
+    local tmp_file=${TMP_DIR}/work.${LOADED}.${WAF_RWEB_CUSTOM}.${name}
+    load-files ${protocol} ${ip} "${file} ${tmp_file}" "" ascii
+    local ret=${?}
+
+    if test ${ret} -ne 0 ; then
+	rm -f ${tmp_file}
+	return ${ret}
+    fi
+
+    db-waf-filter-check-syntax ${tmp_file}
+    ret=${?}
+
+    if test ${ret} -ne 0 ; then
+	rm -f ${tmp_file}
+	return ${ret}
+    fi
+
+    db-waf-load-filter-commit ${tmp_file}
+    ret=${?}
+    return ${ret}
+}
+
+db-waf-rule-show2()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 1
+    local name=${1}
+    local state=${2}
+
+    local rules
+
+    echo -n "waf rweb custom"
+    case ${state} in
+	new)
+	    echo-mark-new
+	    rules=${WAF_DIR}/${name}.rules
+	    ;;
+	*)
+	    echo-mark-cur
+	    rules=${WAF_DIR}/${name}.rules.current
+	    ;;
+    esac
+
+    if test -s ${rules} ; then
+	echo-value "${name}:"
+	cat ${rules} 2> /dev/null
+    else
+	if test "${TERM}" == "${WADMIN_TERM}" ; then
+	    echo "${name}: <i>&lt;null&gt;</i>"
+	else
+	    echo-value "${name}: <null>"
+	fi
+    fi
+}
+
+db-waf-rule-show1()
+{
+    test -n "${1}" || return 1
+    local name=${1}
+
+    local rules=${WAF_DIR}/${name}.rules
+    local cur_rules=${WAF_DIR}/${name}.rules.current
+
+    db-waf-rule-show2 ${name} cur
+
+    if test -s ${rules} ; then
+	if test -s ${cur_rules} ; then
+	    diff --brief ${cur_rules} ${rules} > /dev/null 2> /dev/null
+	    test ${?} -eq 0 || db-waf-rule-show2 ${name} new
+	else
+	    db-waf-rule-show2 ${name} new
+	fi
+    else
+        test ! -s ${cur_rules} || db-waf-rule-show2 ${name} new
+    fi
+}
+
+db-waf-rule-show()
+{
+    local name=${1}
+    if test -n "${name}" ; then
+	db-waf-rule-show1 ${name}
+    else
+	local rule rules
+	local rules_null=0 rules_current_null=0
+	
+	rules=$(ls ${WAF_DIR}/*.rules.current 2> /dev/null)
+	test -n "${rules}" || rules_current_null=1
+	for rule in ${rules}
+	do
+	    name=$(file-basename ${rule} .rules.current)
+	    db-waf-rule-show1 ${name}
+	done
+	
+	rules=$(ls ${WAF_DIR}/*.rules 2> /dev/null)
+	test -n "${rules}" || rules_null=1
+	for rule in ${rules}
+	do
+	    name=$(file-basename ${rule} .rules)
+	    test -s ${WAF_DIR}/${name}.rules.current || db-waf-rule-show1 ${name}
+	done
+	
+	if test ${rules_null} -eq 1 -a ${rules_current_null} -eq 1 ; then
+	    echo -n "waf rweb custom"
+	    echo-mark-cur
+	    echo-value-null
+	fi
+    fi
+}
+
+db-waf-rule-has-changed()
+{
+    test -n "${1}" || return 1
+    local name=${1}
+
+    local rules=${WAF_DIR}/${name}.rules
+    local current_rules=${WAF_DIR}/${name}.rules.current
+
+    if test -f ${rules} ; then
+	if test -f ${current_rules} ; then
+	    diff --brief ${rules} ${current_rules} > /dev/null 2> /dev/null
+	    return ${?}
+	else
+	    return 1
+	fi
+    else
+	if test -f ${current_rules} ; then
+	    return 1
+	else
+	    return 0
+	fi
+    fi
+}
+
+db-waf-rule-show-diff()
+{
+    local rule rules
+
+    rules=$(ls ${WAF_DIR}/*.rules.current 2> /dev/null)
+    for rule in ${rules}
+      do
+      name=$(file-basename ${rule} .rules.current)
+      db-waf-rule-has-changed ${name}
+      if test ${?} -eq 0 ; then
+	  db-waf-rule-show2 ${name} cur
+	  db-waf-rule-show2 ${name} new
+      fi
+    done
+    
+    rules=$(ls ${WAF_DIR}/*.rules 2> /dev/null)
+    for rule in ${rules}
+      do
+      if test ! -s ${rule}.current ; then
+	  name=$(file-basename ${rule} .rules)
+	  db-waf-rule-has-changed ${name}
+	  if test ${?} -ne 1 ; then
+	      db-waf-rule-show2 ${name} cur
+	      db-waf-rule-show2 ${name} new
+	  fi
+      fi
+    done
+}
+
+db-waf-rule-raz()
+{
+    test -n "${1}" || return 1
+    local name=${1}
+
+    rm -f ${WAF_DIR}/${name}.rules
+
+    test ! -f ${WAF_DIR}/${name}.rules.current || NEWENV=1
+}
+
+db-waf-rule-raz-all()
+{
+    rm -f ${WAF_DIR}/*.rules
+}
+
+db-waf-rule-reset()
+{
+    local rule base rules
+
+    rules=$(ls ${WAF_DIR}/*.rules 2> /dev/null)
+    for rule in ${rules}
+    do
+	test -f ${rule}.current || rm -f ${rule}
+    done
+
+    rules=$(ls ${WAF_DIR}/*.rules.current 2> /dev/null)
+
+    for rule in ${rules}
+    do
+	base=$(file-basename ${rule} .current)
+	cp -f ${rule} ${WAF_DIR}/${base}
+	usleep 1000000
+	touch ${rule}
+    done
+}

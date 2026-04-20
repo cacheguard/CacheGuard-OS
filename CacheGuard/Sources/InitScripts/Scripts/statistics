@@ -1,0 +1,114 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       InitScript
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+source /lib/lsb/init-functions
+
+CACHEGUARD_DIR=/etc/sysconfig/cacheguard
+source ${CACHEGUARD_DIR}/constant
+source ${APPLIANCE_DIR}/etc/role
+
+RETVAL=0
+SERV="Statistics"
+PROG="apl_statisticsd"
+
+start-statistics()
+{
+    test ! -f /var/run/${PROG}.pid || return 3
+    /usr/local/bin/${PROG} > /dev/null 2>&1 &
+    local retval=${?}
+    echo ${!} > /var/run/${PROG}.pid
+    [ ${retval} -eq 0 ] && touch /var/lock/${PROG}
+    [ ${retval} -eq 0 ]
+}
+
+stop-statistics()
+{
+    local retval=0 i=0 retry=5
+
+    test -f /var/run/${PROG}.pid || return 1
+
+    local pid=$(cat /var/run/${PROG}.pid 2> /dev/null)
+    ps -p ${pid} > /dev/null 2> /dev/null
+    retval=${?}
+
+    if [ ${retval} -eq 1 ] ; then
+	rm -f /var/lock/${PROG}
+	rm -f /var/run/${PROG}.pid
+    else
+	killall -s USR1 apl_statistics 2> /dev/null
+	usleep 300000
+	while true
+	do
+	    test -f /var/lock/apl_statistics || break
+	    test ${i} -lt ${retry} || break
+	    usleep 500000
+	    ((i++))
+	done
+
+	if test ${i} -eq ${retry} ; then
+	    killall -s KILL apl_statistics 2> /dev/null
+	    rm -f /var/lock/apl_statistics
+	fi
+
+	kill -KILL ${pid} 2> /dev/null
+	retval=${?}
+	usleep 300000
+	[ ${retval} -eq 0 ] && rm -f /var/lock/${PROG} && rm -f /var/run/${PROG}.pid
+    fi
+
+    return ${retval}
+}
+
+case "${1}" in
+    start)
+	log_info_msg "Starting ${SERV}..."
+	start-statistics
+	RETVAL=${?}
+	[ ${RETVAL} -eq 0 ]
+	evaluate_retval
+	exit ${RETVAL}
+	;;
+    stop)
+	log_info_msg "Stopping ${SERV}... "
+	stop-statistics
+	RETVAL=${?}
+	[ ${RETVAL} -eq 0 ]
+	evaluate_retval
+	exit ${RETVAL}
+	;;
+    
+    restart)
+	${0} stop
+	${0} start
+	;;
+    
+    status)
+	statusproc ${PROG}
+	;;
+    
+    *)
+	echo "Usage: ${0} {start|stop|restart|status}"
+	exit 1
+	;;
+esac

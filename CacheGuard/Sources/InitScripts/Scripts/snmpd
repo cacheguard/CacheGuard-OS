@@ -1,0 +1,100 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       InitScript
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+source /lib/lsb/init-functions
+
+CACHEGUARD_DIR=/etc/sysconfig/cacheguard
+source ${CACHEGUARD_DIR}/constant
+source ${APPLIANCE_DIR}/etc/role
+
+PROG=snmpd
+FPROG=/usr/sbin/${PROG}
+
+[ ! -f /etc/sysconfig/${PROG} ] || source /etc/sysconfig/${PROG}
+[ -x ${FPROG} ] || exit 0
+[ -f /etc/snmp/${PROG}.conf ] || exit 0
+
+RETVAL=0
+SERV="SNMP Agent"
+
+store-engine-id()
+{
+    local engine_id=$(snmpget -r 1 -t 3 -v 1 -c "${COMMUNITY}" TCP:127.0.0.1:161 snmpEngineID.0 2> /dev/null)
+    engine_id=${engine_id/*: /}
+
+    echo ${engine_id} > ${RUN_DIR}/${SNMP_ENGINE_ID}
+}
+
+reset-engine-id()
+{
+    rm -f ${RUN_DIR}/${SNMP_ENGINE_ID}
+}
+
+case "${1}" in
+    start)
+	# Start daemons.
+	if [ -n "$(pidof ${PROG})" ]; then
+	    echo $"${PROG}: already running"
+	    exit 1
+	fi
+	log_info_msg "Starting ${SERV}... "
+	test ! -s /var/snmp/${PROG}.conf || VAR_CONF="/var/snmp/${PROG}.conf,"
+	start_daemon -n -10 ${FPROG} -C -c ${VAR_CONF}/etc/snmp/${PROG}.conf -p /var/run/${PROG}.pid ${SNMPD_OPTS}
+	RETVAL=${?}
+	store-engine-id
+	[ ${RETVAL} -eq 0 ] && touch /var/lock/${PROG}
+	evaluate_retval
+	exit ${RETVAL}
+	;;
+    stop)
+	# Stop daemons.
+	log_info_msg "Stopping ${SERV}... "
+	killproc ${FPROG}
+	RETVAL=${?}
+	usleep 300000
+	reset-engine-id
+	[ ${RETVAL} -eq 0 ] && rm -f /var/lock/${PROG} /var/run/${PROG}.pid
+	evaluate_retval
+	exit ${RETVAL}
+	;;
+    restart)
+	${0} stop
+	${0} start
+	;;
+    reload)
+	log_info_msg "Reloading ${SERV}..."
+	killproc -p /var/run/${PROG}.pid ${FPROG} -HUP
+	RETVAL=${?}
+	[ ${RETVAL} -eq 0 ]
+	evaluate_retval
+	exit ${RETVAL}
+	;;
+    status)
+	statusproc ${PROG}
+	;;
+    *)
+	echo "Usage: ${0} {start|stop|restart|reload|status}"
+	exit 1
+	;;
+esac

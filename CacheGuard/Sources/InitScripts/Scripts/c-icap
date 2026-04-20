@@ -1,0 +1,127 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       InitScript
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+source /lib/lsb/init-functions
+
+CACHEGUARD_DIR=/etc/sysconfig/cacheguard
+source ${CACHEGUARD_DIR}/constant
+source ${APPLIANCE_DIR}/etc/role
+source ${LOCAL_DIR}/lib/apl_common
+
+PROG=c-icap
+FPROG=${LOCAL_DIR}/bin/${PROG}
+
+[ -x ${FPROG} ] || exit 0
+
+RETVAL=0
+SERV="ICAP"
+
+clean-icap()
+{
+    rm -f /var/run/${PROG}/${PROG}.pid /var/run/${PROG}/${PROG}.ctl
+}
+
+reload-icap()
+{
+    if test ! -f /var/run/${PROG}/${PROG}.pid ; then
+	clean-icap
+	return 1
+    fi
+
+    if test ! -p /var/run/${PROG}/${PROG}.ctl ; then
+	clean-icap
+	return 2
+    fi
+
+    local pids=$(pidof ${PROG})
+    if test -z "${pids}" ; then
+	clean-icap
+	return 3
+    fi
+
+    local ppid=$(cat /var/run/${PROG}/${PROG}.pid 2> /dev/null)
+    if test -z "${ppid}" ; then
+	clean-icap
+	return 4
+    fi
+
+    if test "${pids/* /}" != "${ppid}" ; then
+	clean-icap
+	return 5
+    fi
+
+    echo -n "reconfigure" > /var/run/${PROG}/${PROG}.ctl
+}
+
+case "${1}" in
+    start)
+	# Start daemons.
+	if [ -n "$(pidof ${PROG})" ]; then
+	    echo $"${PROG}: already running"
+	    exit 1
+	fi
+	log_info_msg "Starting ${SERV}... "
+	${FPROG} -f ${LOCAL_DIR}/etc/${PROG}.conf
+	RETVAL=${?}
+	wait4-file /var/run/${PROG}/${PROG}.pid f 20 500000
+	[ ${RETVAL} -eq 0 ] && touch /var/lock/${PROG}
+	evaluate_retval
+	exit ${RETVAL}
+	;;
+
+    stop)
+	# Stop daemons.
+	log_info_msg "Stopping ${SERV}... "
+	if [ -n "$(pidof ${PROG})" ]; then
+	    test ! -p /var/run/${PROG}/${PROG}.ctl || echo -n stop > /var/run/${PROG}/${PROG}.ctl
+	fi
+	wait4-file /var/run/${PROG}/${PROG}.pid f 20 500000 reverse
+	killproc ${FPROG} -KILL
+	rm -f /var/run/${PROG}/${PROG}.{ctl,pid}
+	rm -f /var/lock/${PROG}
+	evaluate_retval
+	exit ${RETVAL}
+	;;
+    restart)
+
+	${0} stop
+	${0} start
+	;;
+
+    reload)
+	log_info_msg "Reloading ${SERV}... "
+	reload-icap
+	RETVAL=${?}
+	[ ${RETVAL} -eq 0 ]
+	evaluate_retval
+	exit ${RETVAL}
+	;;
+    status)
+	statusproc ${PROG}
+	;;
+    *)
+	echo "Usage: ${0} {start|stop|restart|reload|status}"
+	exit 1
+	;;
+esac

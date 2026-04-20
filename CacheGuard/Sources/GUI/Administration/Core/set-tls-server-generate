@@ -1,0 +1,57 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       GUI
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+tls-server-generate()
+{
+    local i input_file=/tmp/${TLS_SERVER}.${VALUES[0]}.conf.${$}
+    local sign ocsp
+
+    if gui-contextual-is-allowed ; then
+
+	if test -n "${ATTRIBUTES[9]}" ; then
+	    if test ${ATTRIBUTES[9]} == 'sign' ; then
+		sign=' sign'
+		if test -n "${ATTRIBUTES[10]}" ; then
+		    if test ${ATTRIBUTES[10]} == 'ocsp' ; then
+			ocsp=' ocsp'
+		    fi
+		fi
+	    fi
+	fi
+    fi
+
+    VALUES[1]=$(echo ${VALUES[1]} | sed -e 's/\cM//g')
+    VALUES[1]=${VALUES[1],,}
+
+    for ((i=1 ; i<9 ; i++))
+    do
+	echo ${VALUES[${i}]}
+    done > ${input_file}
+
+    log-command "tls" "server generate ${VALUES[0]} ..."
+    execute-command "tls server generate ${VALUES[0]}${sign}${ocsp}" ${input_file}
+    rm -f ${input_file}
+}
+
+tls-server-generate

@@ -1,0 +1,360 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       Commands
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+tls-get-ca-chain-level()
+{
+    local ca_chain=${1}
+
+    if test -z "${ca_chain}" ; then
+	echo 0
+	return 0
+    fi
+
+    local without_colon=${ca_chain//:}
+    local len1=${#ca_chain}
+    local len2=${#without_colon}
+    local nb=$((len1 - len2 + 1))
+
+    echo ${nb}
+}
+
+tls-server-id-exist()
+{
+    test -n "${1}" || return 1
+    local in_tls=${1}
+
+    test ${in_tls} != default || return 0
+    member "${TLS_SERVER_LIST}" "${in_tls}"
+}
+
+tls-client-pfx-exist()
+{
+    test -n "${1}" || return 1
+    local in_tls=${1}
+
+    test -f ${SSL_CLIENT_DIR}/${in_tls}.cur/${in_tls}.pfx
+}
+
+tls-ca-id-exist()
+{
+    test -n "${1}" || return 1
+    local in_tls=${1}
+
+    test ${in_tls} != ${SYSTEM_CA_ID} || return 0
+
+    local elt range i=0
+    local tls
+
+    for elt in ${TLS_CA_LIST}
+    do
+	range=$[${i} % 2]
+	case ${range} in
+	    0)
+		tls=${elt}
+		;;
+	    1)
+		test ${tls} != ${in_tls} || return 0
+		;;
+	    *)
+		return 1
+		;;
+	esac
+	((i++))
+    done
+
+    return 11
+}
+
+tls-ca-third-exist()
+{
+    test -n "${1}" || return 1
+    local name=${1}
+
+    test -s ${SSL_LOCAL_CA_DIR}/${name}.certificate
+}
+
+tls-ca-third-tmp-exist()
+{
+    test -n "${1}" || return 1
+    local name=${1}
+
+    test -s ${TMP_DIR}/${LOADED}.${THIRD_CA}.${name}
+}
+
+tls-tmp-key-exist()
+{
+    test -n "${1}" || return 1
+    local name=${1}
+
+    test -s ${TMP_DIR}/${LOADED}.${TLS_SERVER}.key.${name}
+}
+
+tls-key-exist()
+{
+    test -n "${1}" || return 1
+    local name=${1}
+
+    test -s ${SSL_SERVER_DIR}/${name}.key
+}
+
+tls-csr-exist()
+{
+    test -n "${1}" || return 1
+    local name=${1}
+
+    test -s ${SSL_SERVER_DIR}/${name}.csr
+}
+
+cancel-tls-client()
+{
+    rm -f \
+       ${SSL_CLIENT_DIR}/*.{new,days,2del,numbits} \
+       ${TMP_DIR}/${TLS_CLIENT}.*.2rev
+
+    NEWENV=1
+}
+
+raz-tls-client()
+{
+    cd ${SSL_CLIENT_DIR}
+
+    local curs=$(ls -1d *.cur 2> /dev/null) cur client
+
+    for cur in ${curs}
+    do
+	client=${cur%\.cur}
+	touch ${client}.2del
+    done
+    rm -f \
+       *.new \
+       *.days
+
+    cd ${HOME}
+
+    rm -f ${TMP_DIR}/${LOADED}.${TLS_CLIENT}.certificate.*
+    NEWENV=1
+}
+
+clean-tls-conf()
+{
+    test -n "${1}" || return 1
+    local tls=${1}
+    local ca=${2}
+
+    if test -z "${ca}" ; then
+	rm -f ${TMP_DIR}/${TLS_SERVER}.${tls}.{conf,2sign,2rev}
+    else
+	rm -f ${TMP_DIR}/${SYSTEM_CA}.conf
+    fi
+    NEWENV=1
+}
+
+clean-loaded-tls-but-csr()
+{
+    test -n "${1}" || return 1
+    local tls=${1}
+
+    rm -f \
+       ${TMP_DIR}/${LOADED}.${TLS_SERVER}.key.${tls} \
+       ${TMP_DIR}/${LOADED}.${TLS_SERVER}.certificate.${tls}
+
+    NEWENV=1
+}
+
+clean-loaded-tls-csr()
+{
+    test -n "${1}" || return 1
+    local tls=${1}
+
+    rm -f \
+       ${TMP_DIR}/${LOADED}.${TLS_SERVER}.csr.${tls} \
+       ${TMP_DIR}/${LOADED}.${TLS_SERVER}.days.${tls} \
+       ${TMP_DIR}/${LOADED}.${TLS_SERVER}.${tls}.2sign
+
+    NEWENV=1
+}
+
+load-tls-ca-system-commit()
+{
+    test -n "${1}" || return 1
+    local tmp_file=${1}
+
+    test -f ${tmp_file} || return 0
+
+    local base=$(file-basename ${tmp_file})
+    local extension=${base/work\.${LOADED}\.${SYSTEM_CA}\.}
+
+    local active_ca_file=${SSL_CA_DIR}/${SYSTEM_CA}.${extension}
+
+    if test -f ${active_ca_file} ; then
+	diff --brief ${tmp_file} ${active_ca_file} > /dev/null 2>&1
+	if test ${?} -eq 0 ; then
+	    rm -f ${tmp_file}
+	    return 0
+	else
+	    mv -f ${tmp_file} ${TMP_DIR}/${LOADED}.${SYSTEM_CA}.${extension}
+	    NEWENV=1
+	fi
+    else
+	mv -f ${tmp_file} ${TMP_DIR}/${LOADED}.${SYSTEM_CA}.${extension}
+	NEWENV=1
+    fi
+
+    clean-tls-conf CA ca
+}
+
+load-tls-ca-third-commit()
+{
+    test -n "${1}" || return 1
+    local tmp_file=${1}
+
+    test -f ${tmp_file} || return 0
+
+    local base=$(file-basename ${tmp_file})
+    local ca_id=${base/work\.${LOADED}\.${THIRD_CA}\.}
+
+    if test -f ${SSL_LOCAL_CA_DIR}/${ca_id}.certificate ; then
+	diff --brief ${tmp_file} ${SSL_LOCAL_CA_DIR}/${ca_id}.certificate > /dev/null 2>&1
+	if test ${?} -eq 0 ; then
+	    rm -f ${tmp_file}
+	    return 0
+	fi
+    fi
+
+    mv -f ${tmp_file} ${TMP_DIR}/${LOADED}.${THIRD_CA}.${ca_id}
+    NEWENV=1
+}
+
+load-tls-server-commit()
+{
+    test -n "${1}" || return 1
+    local tmp_file=${1}
+    test -f ${tmp_file} || return 0
+
+    local base=$(file-basename ${tmp_file})
+    local extension_tls=${base/work\.${LOADED}\.${TLS_SERVER}\.}
+    local extension=${extension_tls/\.*}
+    local tls=${extension_tls#*\.}
+
+    if test ${extension} != 'csr' ; then
+	if test -f ${SSL_SERVER_DIR}/${tls}.${extension} ; then
+	    diff --brief ${tmp_file} ${SSL_SERVER_DIR}/${tls}.${extension} > /dev/null 2>&1
+	    if test ${?} -eq 0 ; then
+		rm -f ${tmp_file}
+		return 0
+	    else
+		if test ${extension} == 'certificate' ; then
+		    if check-tls-cert-signed-by-system-ca server ${tls} ; then
+
+			local serial=$(get-tls-serial ${tmp_file})
+
+			if test -L ${SSL_CTL_DIR}/${serial}.pem ; then
+
+			    local cert_file=$(readlink ${SSL_CTL_DIR}/${serial}.pem 2> /dev/null)
+			    local id=$(file-basename ${cert_file} .certificate)
+
+			    if test ${id} == ${tls} ; then
+				mv -f ${tmp_file} ${TMP_DIR}/${LOADED}.${TLS_SERVER}.${extension}.${tls}
+				NEWENV=1
+			    else
+				rm -f ${tmp_file}
+				return 243
+			    fi
+			else
+			    mv -f ${tmp_file} ${TMP_DIR}/${LOADED}.${TLS_SERVER}.${extension}.${tls}
+			    NEWENV=1
+			fi
+		    else
+			mv -f ${tmp_file} ${TMP_DIR}/${LOADED}.${TLS_SERVER}.${extension}.${tls}
+			NEWENV=1
+		    fi
+		else
+		    mv -f ${tmp_file} ${TMP_DIR}/${LOADED}.${TLS_SERVER}.${extension}.${tls}
+		    NEWENV=1
+		fi
+	    fi
+	else
+	    mv -f ${tmp_file} ${TMP_DIR}/${LOADED}.${TLS_SERVER}.${extension}.${tls}
+	fi
+    else
+	mv -f ${tmp_file} ${TMP_DIR}/${LOADED}.${TLS_SERVER}.${extension}.${tls}
+	NEWENV=1
+    fi
+
+    clean-tls-conf ${tls}
+
+    if test ${extension} == 'csr' ; then
+	clean-loaded-tls-but-csr ${tls}
+    else
+	clean-loaded-tls-csr ${tls}
+    fi
+}
+
+load-tls-client-commit()
+{
+    test -n "${1}" || return 1
+    local tmp_file=${1}
+    test -f ${tmp_file} || return 0
+
+    local base=$(file-basename ${tmp_file})
+    local tls=${base/work\.${LOADED}\.${TLS_CLIENT}\.certificate\.}
+
+    if test -f ${SSL_CLIENT_DIR}/${tls}.cur/${tls}.certificate ; then
+	diff --brief ${tmp_file} ${SSL_CLIENT_DIR}/${tls}.cur/${tls}.certificate > /dev/null 2>&1
+	if test ${?} -eq 0 ; then
+	    rm -f ${tmp_file}
+	    return 0
+	else
+	    if check-tls-cert-signed-by-system-ca client ${tls} ; then
+		local serial=$(get-tls-serial ${tmp_file})
+
+		if test -L ${SSL_CTL_DIR}/${serial}.pem ; then
+
+		    local cert_file=$(readlink ${SSL_CTL_DIR}/${serial}.pem 2> /dev/null)
+		    local id=$(file-basename ${cert_file} .certificate)
+
+		    if test ${id} == ${tls} ; then
+			mv -f ${tmp_file} ${TMP_DIR}/${LOADED}.${TLS_CLIENT}.certificate.${tls}
+			rm -f ${SSL_CLIENT_DIR}/${tls}.{new,days}
+			NEWENV=1
+		    else
+			rm -f ${tmp_file}
+			return 243
+		    fi
+		else
+		    mv -f ${tmp_file} ${TMP_DIR}/${LOADED}.${TLS_CLIENT}.certificate.${tls}
+		    rm -f ${SSL_CLIENT_DIR}/${tls}.{new,days}
+		    NEWENV=1
+		fi
+	    else
+		rm -f ${tmp_file}
+		return 124
+	    fi
+	fi
+    else
+	mv -f ${tmp_file} ${TMP_DIR}/${LOADED}.${TLS_CLIENT}.certificate.${tls}
+	rm -f ${SSL_CLIENT_DIR}/${tls}.{new,days}
+	NEWENV=1
+    fi
+}

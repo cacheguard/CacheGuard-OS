@@ -1,0 +1,142 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       Commands
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+__complete-register()
+{
+    test -n "${COMP_CWORD-1}" || return 1
+
+    case ${COMP_CWORD} in
+	1)
+	    case ${COMP_WORDS[1]} in
+		a|ap|app|appl|appli|applia|applian|applianc|appliance)
+		    COMPREPLY=(appliance)
+		    ;;
+		c|cl|cle|clea|clear)
+		    COMPREPLY=(clear)
+		    ;;
+		l|li|lic|lice|licen|licens|license)
+		    COMPREPLY=(license)
+		    ;;
+		e|em|emb|embe|embed|embedd|embedde|embedded)
+		    COMPREPLY=(embedded)
+		    ;;
+		'')
+		    COMPREPLY=('' '<RET>' appliance clear embedded license)
+		    ;;
+		*)
+		    COMPREPLY=()
+		    ;;
+	    esac
+	    ;;
+	2)
+	    case ${COMP_WORDS[1]} in
+		appliance)
+		    case ${COMP_WORDS[2]} in
+			n|ne|new)
+			    COMPREPLY=(new)
+			    ;;
+			o|ol|old)
+			    COMPREPLY=(old)
+			    ;;
+			'')
+			    COMPREPLY=('' new old)
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		license)
+		    COMPREPLY=('' '<license-key>')
+		    ;;
+		embedded)
+		    case ${COMP_WORDS[2]} in
+			b|be|bev|bevy|bevyp|bevypn)
+			    COMPREPLY=(bevypn)
+			    ;;
+			'')
+			    COMPREPLY=('' '<RET>' bevypn)
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		*)
+		    COMPREPLY=()
+		    ;;
+	    esac
+	    ;;
+	3)
+	    case ${COMP_WORDS[1]} in
+		appliance)
+		    case ${COMP_WORDS[2]} in
+			new)
+			    COMPREPLY=('' '<email>')
+			    ;;
+			old)
+			    COMPREPLY=('' '<RET>' '<otp>')
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		embedded)
+		    case ${COMP_WORDS[2]} in
+			bevypn)
+			    COMPREPLY=('' '<RET>' '<license-key>')
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		*)
+		    COMPREPLY=()
+		    ;;
+	    esac
+	    ;;
+	4)
+	    case ${COMP_WORDS[1]} in
+		appliance)
+		    case ${COMP_WORDS[2]} in
+			new)
+			    COMPREPLY=('' '<RET>' '<otp>')
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		*)
+		    COMPREPLY=()
+		    ;;
+	    esac
+	    ;;
+	*)
+	    COMPREPLY=()
+	    ;;
+    esac
+}

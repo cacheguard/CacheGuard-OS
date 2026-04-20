@@ -1,0 +1,175 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       Commands
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+__complete-conf()
+{
+    test -n "${COMP_CWORD-1}" || return 1
+
+    case ${COMP_CWORD} in
+	1)
+	    case ${COMP_WORDS[1]} in
+		d|di|dif|diff)
+		    COMPREPLY=(diff)
+		    ;;
+		f|fa|fac|fact|facto|factor|factory|factoryr|factoryre|factoryres|factoryrese|factoryreset)
+		    COMPREPLY=(factoryreset)
+		    ;;
+		l|lo|loa|load)
+		    COMPREPLY=(load)
+		    ;;
+		m|ma|man|mana|manag|manage|manager)
+		    COMPREPLY=(manager)
+		    ;;
+		s|sa|sav|save)
+		    COMPREPLY=(save)
+		    ;;
+		'')
+		    COMPREPLY=('' '<RET>' manager diff factoryreset load save)
+		    ;;
+		*)
+		    COMPREPLY=()
+		    ;;
+	    esac
+	    ;;
+	2)
+	    case ${COMP_WORDS[1]} in
+		load|save)
+		    case ${COMP_WORDS[2]} in
+			f|ft|ftp)
+			    COMPREPLY=(ftp)
+			    ;;
+			s|sf|sft|sftp)
+			    COMPREPLY=(sftp)
+			    ;;
+			t|tf|tft|tftp)
+			    COMPREPLY=(tftp)
+			    ;;
+			'')
+			    COMPREPLY=('' ftp sftp tftp)
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		manager)
+		    case ${COMP_WORDS[2]} in
+			t|te|tem|temp|templ|templa|templat|template)
+			    COMPREPLY=(template)
+			    ;;
+			g|ga|gat|gate|gatew|gatewa|gateway)
+			    COMPREPLY=(gateway)
+			    ;;
+			'')
+			     COMPREPLY=('' gateway template)
+			     ;;
+			*)
+			   COMPREPLY=()
+			   ;;
+		    esac
+		    ;;
+		*)
+		    COMPREPLY=()
+		    ;;
+	    esac
+	    ;;
+	3)
+	    case ${COMP_WORDS[1]} in
+		load|save)
+		    case ${COMP_WORDS[2]} in
+			ftp|sftp|tftp)
+			    COMPREPLY=('' '<file-server>')
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		manager)
+		    case ${COMP_WORDS[2]} in
+			template)
+			    COMPREPLY=('' '<template-id>')
+			    ;;
+			gateway)
+			    COMPREPLY=('' '<gateway-id>')
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		*)
+		    COMPREPLY=()
+		    ;;
+	    esac
+	    ;;
+	4)
+	    case ${COMP_WORDS[1]} in
+		load|save)
+		    case ${COMP_WORDS[2]} in
+			ftp|sftp|tftp)
+			    COMPREPLY=('' '<file-path>')
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		*)
+		    COMPREPLY=()
+		    ;;
+	    esac
+	    ;;
+	5)
+	    case ${COMP_WORDS[1]} in
+		save)
+		    case ${COMP_WORDS[2]} in
+			ftp|sftp|tftp)
+			    case ${COMP_WORDS[5]} in
+				n|ne|new)
+				    COMPREPLY=(new)
+				    ;;
+				'')
+				    COMPREPLY=('' '<RET>' new)
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		*)
+		    COMPREPLY=()
+		    ;;
+	    esac
+	    ;;
+	*)
+	    COMPREPLY=()
+	    ;;
+    esac
+}

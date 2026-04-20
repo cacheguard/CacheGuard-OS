@@ -1,0 +1,73 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       Commands
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+source functions
+
+run()
+{
+    contextual-command-is-allowed || return 207
+
+    if test \
+	   "${CURRENT_AUTHENTICATE_MODE}" == True -a \
+	   ${CURRENT_AUTHENTICATE_LDAP} == True -a \
+	   -n "${CURRENT_LDAP_SERVER_LIST}" ; then
+
+	check-lock || return 123
+
+	local command=${ARGS[1]}
+
+	case "${command}" in
+	    search)
+		local filter=${ARGS[2]}
+		test -n "${filter}" || return 1
+		check-ldap-filter "${filter}" || return 5
+
+		local time_limit=10
+		local urls=$(print-ldap-urls "${CURRENT_LDAP_SERVER_LIST}")
+		local base="${CURRENT_LDAP_BASE_DN}"
+
+		local bind_opt sldap
+		
+		! test-sldap "${CURRENT_LDAP_SERVER_LIST}" || sldap=" -Z"
+		local password=${CURRENT_LDAP_BIND_PASSWORD}
+
+		test "${CURRENT_LDAP_BIND_MODE}" == False -o -z "${password}" || \
+		    bind_opt=" -D ${CURRENT_LDAP_BIND_DN} -w ${password}"
+
+		ldapsearch -x -LLL -H "${urls}" -a never -N -l ${time_limit} -s subtree${sldap}${bind_opt} -b ${base} ${filter} 2>&1
+		return 0
+		;;
+	    *)
+		return 1
+		;;
+	esac
+    else
+	test "${AUTHENTICATE_MODE}" == False -o -z "${LDAP_SERVER_LIST}" -o "${AUTHENTICATE_LDAP}" == False || return 134
+	test "${AUTHENTICATE_LDAP}" == True -a "${AUTHENTICATE_MODE}" == True || return 174
+	test -n "${LDAP_SERVER_LIST}" || return 175
+	return 255
+    fi
+}
+
+main "${@}"

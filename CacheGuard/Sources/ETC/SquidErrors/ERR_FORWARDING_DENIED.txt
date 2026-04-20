@@ -1,0 +1,2 @@
+Forwarding refused
+The security policy on a gateway does not allow your request to be forwarded to other gateway(s)

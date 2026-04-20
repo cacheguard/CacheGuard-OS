@@ -1,0 +1,1 @@
+SMARTD_OPTS="--interval=1800 --logfacility=local3 --quit=nodev"

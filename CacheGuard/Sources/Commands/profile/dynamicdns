@@ -1,0 +1,150 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       Commands
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+__complete-dynamicdns()
+{
+    test -n "${COMP_CWORD-1}" || return 1
+
+    case ${COMP_CWORD} in
+	1)
+	    case ${COMP_WORDS[1]} in
+		i|'in'|int|inte|inter|interv|interva|interval)
+		    COMPREPLY=(interval)
+		    ;;
+		o)
+		    COMPREPLY=('' on off)
+		    ;;
+		of|off)
+		    COMPREPLY=(off)
+		    ;;
+		on)
+		    COMPREPLY=(on)
+		    ;;
+		r|re|rep|repo|repor|report)
+		    COMPREPLY=(report)
+		    ;;
+		'')
+		    COMPREPLY=('' interval on off report '<RET>')
+		    ;;
+		*)
+		    COMPREPLY=()
+		    ;;
+	    esac
+	    ;;
+	2)
+	    case ${COMP_WORDS[1]} in
+		interval)
+		    COMPREPLY=('' '<RET>' '<minutes>')
+		    ;;
+		on)
+		    case ${COMP_WORDS[2]} in
+			c|ch|cha|chan|chang|change|changei|changeip)
+			    COMPREPLY=(changeip)
+			    ;;
+			d|dn|dns|dnsh|dnsho|dnshom|dnshome)
+			    COMPREPLY=(dnshome)
+			    ;;
+		    	f|fr|fre|free|freem|freemy|freemyi|freemyip)
+			    COMPREPLY=(freemyip)
+			    ;;
+			m|my|myo|myon|myonl|myonli|myonlin|myonline|myonlinep|myonlinepo|myonlinepor|myonlineport|myonlineporta|myonlineportal)
+			    COMPREPLY=(myonlineportal)
+			    ;;
+			n|no|noi|noip)
+			    COMPREPLY=(noip)
+			    ;;
+			'')
+			    COMPREPLY=('' '<RET>' changeip dnshome freemyip myonlineportal noip)
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		*)
+		    COMPREPLY=()
+		    ;;
+	    esac
+	    ;;
+	3)
+	    case ${COMP_WORDS[1]} in
+		on)
+		    case ${COMP_WORDS[2]} in
+			changeip|dnshome|freemyip|myonlineportal|noip)
+			    COMPREPLY=('' '<hostname>')
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		*)
+		    COMPREPLY=()
+		    ;;
+	    esac
+	    ;;
+	4)
+	    case ${COMP_WORDS[1]} in
+		on)
+		    case ${COMP_WORDS[2]} in
+			changeip|myonlineportal|noip)
+			    COMPREPLY=('' '<username>')
+			    ;;
+			dnshome)
+			    COMPREPLY=('' '<RET>' '<password>')
+			    ;;
+			freemyip)
+			    COMPREPLY=('' '<token>')
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		*)
+		    COMPREPLY=()
+		    ;;
+	    esac
+	    ;;
+	5)
+	    case ${COMP_WORDS[1]} in
+		on)
+		    case ${COMP_WORDS[2]} in
+			changeip|myonlineportal|noip)
+			    COMPREPLY=('' '<RET>' '<password>')
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		*)
+		    COMPREPLY=()
+		    ;;
+	    esac
+	    ;;
+	*)
+	    ;;
+    esac
+}

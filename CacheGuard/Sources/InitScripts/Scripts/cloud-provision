@@ -1,0 +1,119 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       InitScript
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+source /lib/lsb/init-functions
+
+CACHEGUARD_DIR=/etc/sysconfig/cacheguard
+source ${CACHEGUARD_DIR}/constant
+source ${LOCAL_DIR}/lib/apl_functions
+source ${LOCAL_DIR}/lib/apl_cloud
+
+case ${CLOUD_NAME} in
+    azure|aws)
+	[ "${CLOUD_VALID_IP}" == yes ] || exit 0
+	;;
+    *)
+	exit 0
+	;;
+esac
+
+cloud-provision-load-data()
+{
+    local data_name=$(get-cloud-data-name)
+
+    log_info_msg "Loading ${data_name}..."
+    cloud-load-data
+    local retval=${?}
+
+    [ ${retval} -eq 0 ]
+    evaluate_retval
+    return ${retval}
+}
+
+cloud-provision-notify-aws()
+{
+    local retval
+
+    log_info_msg "Notifying the AWS CFT status"
+
+    if is-admin-ssh-key-provisioned && is-admin-password--provisioned ; then
+	retval=0
+	cfn-signal --exit-code ${retval} --stack="${AWS_STACK}" --region="${AWS_REGION}" --resource="${AWS_RESOURCE}"
+        retval=${?}
+    else
+	retval=11
+    fi
+
+    [ ${retval} -eq 0 ]
+    evaluate_retval
+
+    return ${retval}
+}
+
+cloud-provision-notify()
+{
+    case ${CLOUD_NAME} in
+	aws)
+	    cloud-provision-notify-aws
+	    ;;
+	azure)
+	    set-azure-apl-provisioned
+	    ;;
+	*)
+	    ;;
+    esac
+}
+
+cloud-provision-register-appliance()
+{
+    test ! -s /etc/${TECHNICAL_NAME}/${SN_SN} -o ! -s /etc/${TECHNICAL_NAME}/${SN_PASSWD} || return 0
+    test -n "${CLOUD_CONTACT_EMAIL}" || return 199
+
+    log_info_msg "Registering the appliance and getting a S/N..."
+
+    source ${ABASE_DIR}/${ENV_RDIR}/${ENV_NAME}
+    set-registration "${CLOUD_CONTACT_EMAIL}" "${CLOUD_CONTACT_FIRST_NAME}" "${CLOUD_CONTACT_LAST_NAME}" "${CLOUD_RUN_ID}"
+    local retval=${?}
+
+    [ ${retval} -eq 0 ]
+    evaluate_retval
+
+    if test ${retval} -eq 0 ; then
+	cloud-provision-notify
+	retval=${?}
+    fi
+
+    return ${retval}
+}
+
+case "${1}" in
+    start)
+	cloud-provision-load-data || exit ${?}
+	cloud-provision-register-appliance
+	;;
+    *)
+	echo "Usage: ${0} {start}"
+	exit 1
+	;;
+esac

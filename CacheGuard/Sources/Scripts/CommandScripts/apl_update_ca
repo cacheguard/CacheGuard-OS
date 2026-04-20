@@ -1,0 +1,145 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       Scripts
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+CACHEGUARD_DIR=/etc/sysconfig/cacheguard
+source ${CACHEGUARD_DIR}/constant
+source ${APPLIANCE_DIR}/etc/role
+source ${LOCAL_DIR}/lib/apl_conf
+source ${LOCAL_DIR}/lib/apl_tls
+
+update-ca-bundle()
+{
+    test -n "${1}" || return 1
+    local ca_file=${1}
+
+    local ca_bundle_url="https://curl.se/ca/cacert.pem"
+
+    curl \
+	--disable --fail -4 \
+	--no-show-error --stderr /dev/null \
+	--header 'Cache-Control: no-cache' \
+	--location \
+	--url ${ca_bundle_url}.sha256 > ${ca_file}.sha256
+
+    if test ${?} -ne 0 ; then
+	rm -f ${ca_file}.sha256
+	return 11
+    fi
+
+    curl \
+	--disable --fail -4 \
+	--no-show-error --stderr /dev/null \
+	--header 'Cache-Control: no-cache' \
+	--location \
+	--url ${ca_bundle_url} > ${ca_file}
+
+    if test ${?} -ne 0 ; then
+	rm -f ${ca_file}.sha256
+	return 13
+    fi
+
+    local sha256_1=$(openssl sha256 ${ca_file} 2> /dev/null)
+    local sha256_2=$(cat ${ca_file}.sha256 2> /dev/null)
+
+    sha256_1=${sha256_1/*=}
+    sha256_1=$(echo ${sha256_1} | expand 2> /dev/null)
+    sha256_2=${sha256_2/ *}
+
+    rm -f ${ca_file}.sha256
+
+    test "${sha256_1}" == "${sha256_2}" || return 15
+}
+
+reload-service()
+{
+    test -n "${1}" || return 1
+    local service=${1}
+
+    is-service-active ${service} || return 0
+    local action=reload
+    local iteration=5
+
+    while true
+    do
+	test ${iteration} -gt 0 || break
+	/etc/rc.d/init.d/${service} ${action} > /dev/null 2>&1
+	test ${?} -ne 0 || break
+	sleep 3
+	((iteration--))
+    done
+
+    test ${iteration} -gt 0
+}
+
+main()
+{
+    local tmp_ca_file="/tmp/ca-bundle.crt.${$}" ret
+
+    update-ca-bundle ${tmp_ca_file}
+    ret=${?}
+
+    if test ${ret} -ne 0 ; then
+	rm -f ${tmp_ca_file}
+	logger -p daemon.alert -t apl_update_ca -- "unable to download the CA bundle file. The curl command returned the ${ret} value code."
+	return ${ret}
+    fi
+
+    diff --brief ${tmp_ca_file} /etc/ca-bundle.crt  > /dev/null 2>&1
+    ret=${?}
+
+    if test ${ret} -eq 0 ; then
+	rm -f ${tmp_ca_file}
+	return ${ret}
+    fi
+
+    install -m 444 -o root -g root ${tmp_ca_file} /etc/ca-bundle.crt
+    install -m 444 -o root -g root ${tmp_ca_file} ${SSL_VAR_DIR}/ca-bundle.crt
+    install -m 444 -o root -g root ${tmp_ca_file} ${PROXY_SSL_CA_DIR}/ca-bundle.crt
+    rm -f ${tmp_ca_file}
+
+    update-apache-ca-bundle-system
+
+    logger -p daemon.info -t apl_update_ca -- "the CA bundle file has been successfully updated."
+
+    local service services='squid httpd'
+
+    for service in ${services}
+    do
+	reload-service ${service}
+	ret=${?}
+
+	if test ${ret} -eq 0 ; then
+	    logger -p daemon.info -t apl_update_ca -- "${service} has been successfully reloaded."
+	else
+	    logger -p daemon.alert -t apl_update_ca -- "unable to reload ${service}."
+	    return ${ret}
+	fi
+    done
+
+    return 0
+}
+
+# Main()
+
+main

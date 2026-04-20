@@ -1,0 +1,67 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       GUI
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+set-guard-filter-ldap()
+{
+    local pos=0 entry_pos del_pos
+    local name_pos base_dn_pos login_attribute_pos filter_pos
+
+    local transaction=/tmp/${TRANSACTION_FILE}.wadmin.${REMOTE_USER}.${$}
+    rm -f ${transaction}
+
+    while test ${pos} -lt ${ATTRIBUTE_NB}
+    do
+	entry_pos=${pos}
+	del_pos=$[${pos} + 1]
+
+	if [[ "${ATTRIBUTES[${del_pos}]}" =~ ^del_[0-9]+$ ]] ; then
+	    shift_pos=0
+	else
+	    shift_pos=1
+	fi
+
+	name_pos=$[${pos} - ${shift_pos} + 2]
+	base_dn_pos=$[${pos} - ${shift_pos} + 3]
+	login_attribute_pos=$[${pos} - ${shift_pos} + 4]
+	filter_pos=$[${pos} - ${shift_pos} + 5]
+	
+	if test ${shift_pos} -eq 0 ; then
+	    echo "guard filter ldap del '${VALUES[${name_pos}]}'" >> ${transaction}
+	    ((pos+=6))
+	else
+	    if test "${VALUES[${entry_pos}]}" == anew -a \
+		-n "${VALUES[${name_pos}]}" -a \
+		-n "${VALUES[${base_dn_pos}]}" -a \
+		-n "${VALUES[${login_attribute_pos}]}" -a \
+		-n "${VALUES[${filter_pos}]}" ; then
+		echo "guard filter ldap add '${VALUES[${name_pos}]}' '${VALUES[${base_dn_pos}]}' '${VALUES[${login_attribute_pos}]}' '${VALUES[${filter_pos}]}'" >> ${transaction}
+	    fi
+	    ((pos+=5))
+	fi
+    done
+    
+    execute-transaction ${transaction}
+}
+
+set-guard-filter-ldap

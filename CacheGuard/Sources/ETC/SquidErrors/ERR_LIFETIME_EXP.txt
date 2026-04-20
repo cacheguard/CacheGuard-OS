@@ -1,0 +1,2 @@
+Connection lifetime expired
+The maximum connection lifetime has reached and the Gateway has terminated your request

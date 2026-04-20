@@ -1,0 +1,46 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       GUI
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+set-kerberos-dc()
+{
+    local transaction=/tmp/${TRANSACTION_FILE}.wadmin.${REMOTE_USER}.${$}
+    
+    test -z "${VALUES[0]}" || echo "authenticate kerberos encrypt '${VALUES[0]}'" > ${transaction}
+    test -z "${VALUES[1]}" || echo "authenticate ad rdn '${VALUES[1]}'" >> ${transaction}
+    test -z "${VALUES[2]}" || echo "authenticate kerberos web '${VALUES[2]}'" >> ${transaction}
+
+    if test -n "${VALUES[3]}" -a -n "${VALUES[4]}" ; then
+	if test "${VALUES[3]}" == "${VALUES[4]}" ; then
+	    echo "authenticate kerberos hapassword '${VALUES[3]}'" >> ${transaction}
+	    execute-transaction ${transaction}
+	else
+	    execute-transaction ${transaction}
+	    gen-gui-error 4
+	fi
+    else
+	execute-transaction ${transaction}
+    fi
+}
+
+set-kerberos-dc

@@ -1,0 +1,11 @@
+ldapprotover 3
+
+src local {
+    ip 127.0.0.1/255.255.255.255
+}
+
+dest self {
+     domainlist self/domains
+     urllist self/urls
+     expressionlist self/expressions
+}

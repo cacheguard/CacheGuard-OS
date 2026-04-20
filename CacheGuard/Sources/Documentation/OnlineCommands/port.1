@@ -1,0 +1,59 @@
+Manage built-in service network listening TCP/UDP ports
+.SH SYNOPSIS
+
+[1] \fBport\fR [(\fBwadmin\fR | \fBproxy\fR | \fBthttp\fR | \fBthttps\fR | \fBantivirus\fR | \fBocsp\fR | \fBisakmp\fR | \fBnatt\fR | \fBhttppeer\fR | \fBhtcppeer\fR | \fBdhcp\fR | \fBwaudit\fR) [\fI<port-number>\fR]]
+
+.SH DESCRIPTION
+Use this command to get or set IP ports for built-in services. This command requires two arguments: a port type and a valid port number. Valid port types are given in the above synopsis. A valid port number is an integer between 1024 and 49151.
+
+The \fBwadmin\fR port is associated to the administration Web GUI. The administration Web GUI allows you to configure the appliance with a Web browser using HTTPS. The administration Web GUI is reachable at the URL \fIhttps://<hostname>.<domainname>:<wadmin-port>\fR where \fI<hostname>\fR, \fI<domainname>\fR and \fI<wadmin-port>\fR are respectively the host name, the domain name and the \fBwadmin\fR port.
+
+When the proxy is in forwarding mode (\fBmode web on\fR) clients (Mozilla, Netscape, Internet Explorer...) using the proxy must use the \fBproxy\fR port configured here for the following protocols: HTTP, SSL, and FTP. In transparent mode (\fBmode tweb on\fR) all Web traffic (destined to the port 80) are transparently caught by the proxy on its \fBthttp\fR (transparent http). When the SSL mediation mode is activated in transparent mode (see the commands \fBsslmediate\fR and \fBmode\fR), the \fBthttps\fR port is used to transparently intercept HTTPS traffic. Clients should not use explicitly the \fBthttp\fR and \fBthttps\fR ports.
+
+When the antivirus is configured as a service open to external systems such as an MTA (Mail Transfer Agent), the \fBantivirus\fR configured here is used for communications between external clients and the integrated antivirus. See the commands \fBantivirus\fR and \fBaccess\fR for further information.
+
+When the OCSP mode is activated (\fBmode ocsp on\fR) the embedded OCSP server is configured to listen on the system's external IP address on the \fBocsp\fR port configured here. See the commands \fBmode\fR and \fBtls\fR for further information.
+
+When the IPsec VPN mode is activated (\fBmode vpnipsec on\fR) the IKE (Internet Key Exchange) server is configured to listen on the system's external IP address on the \fBisakmp\fR (ISAKMP: Internet Security Association and Key Management Protocol) and \fBnatt\fR (NAT Transversal) ports configured here. See the commands \fBmode\fR and \fBvpnipsec\fR for further information.
+
+The \fBhttppeer\fR and \fBhtcppeer\fR ports are used for peer intercommunications. For Share and HA Peers, peer ports must be the same in all peers to work together. The port \fBhttppeer\fR is used to connect to a Next Peer (in this case the Next Peer must have its \fBproxy\fR port set to the httppeer of its Previous Peer. The protocol associated to the \fBhttppeer\fR is HTTP which stands for Hyper Text Transfer Protocol. The protocol associated to the \fBhtcppeer\fR is HTCP which stands for Hyper Text Caching Protocol.
+
+When two appliances act as DHCP failover peer servers for each other, the \fBdhcp\fR port configured here is used for communications between those peers.
+
+The couple \fI<hostname>.<domainname>\fR must be resolved to the appliance administration IP address in your network. The administration IP address is the internal interface IP address or IP address set for the administration 802.1q pseudo device in \fBvlan\fR mode.
+
+The administration Web GUI is only available when the \fBwadmin\fR administration mode is activated. See the command \fBadmin.\fR
+
+The \fBwaudit\fR port is associated to the Web traffic auditing module (see the command \fBadmin\fR).
+
+Please note that all port numbers must be unique.
+
+.SH SEE ALSO
+.B apply
+(1)
+.B access
+(1)
+.B antivirus
+(1)
+.B admin
+(1)
+.B dhcp
+(1)
+.B domainname
+(1)
+.B hostname
+(1)
+.B ip
+(1)
+.B mode
+(1)
+.B rweb
+(1)
+.B sslmediate
+(1)
+.B vlan
+(1)
+.B vpnipsec
+(1)
+.B waf
+(1)

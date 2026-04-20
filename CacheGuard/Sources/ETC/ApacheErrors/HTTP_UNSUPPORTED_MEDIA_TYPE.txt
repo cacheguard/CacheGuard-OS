@@ -1,0 +1,3 @@
+415
+Unsupported media type
+The Web Gateway does not support the media type transmitted in the request

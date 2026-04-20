@@ -1,0 +1,754 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       Commands
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+record1-length-list()
+{
+    record-length-list 1 "${1}"
+}
+
+record2-length-list()
+{
+    record-length-list 2 "${1}"
+}
+
+record3-length-list()
+{
+    record-length-list 3 "${1}"
+}
+
+record4-length-list()
+{
+    record-length-list 4 "${1}"
+}
+
+record5-length-list()
+{
+    record-length-list 5 "${1}"
+}
+
+record6-length-list()
+{
+    record-length-list 6 "${1}"
+}
+
+record7-length-list()
+{
+    record-length-list 7 "${1}"
+}
+
+record8-length-list()
+{
+    record-length-list 8 "${1}"
+}
+
+record9-length-list()
+{
+    record-length-list 9 "${1}"
+}
+
+record10-length-list()
+{
+    record-length-list 10 "${1}"
+}
+
+record11-length-list()
+{
+    record-length-list 11 "${1}"
+}
+
+record12-length-list()
+{
+    record-length-list 12 "${1}"
+}
+
+record13-length-list()
+{
+    record-length-list 13 "${1}"
+}
+
+record14-length-list()
+{
+    record-length-list 14 "${1}"
+}
+
+record15-length-list()
+{
+    record-length-list 15 "${1}"
+}
+
+record16-length-list()
+{
+    record-length-list 16 "${1}"
+}
+
+length-list()
+{
+    record1-length-list "${1}"
+}
+
+record-member()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 1
+    test -n "${3}" || return 1
+
+    local field_num=${1}
+    local list=${2}
+    local record=${3}
+    
+    local field_num1=$[${field_num} - 1]
+    local len_record=0 elt_rec
+
+    for elt_rec in ${record}
+    do
+	len_record=$[${len_record} + 1]
+    done
+    test -n "${len_record}" || exit 255
+    
+    local i=0
+    local fields
+    local len_fields=0 elt range
+    for elt in ${list}
+    do
+	if test ${len_fields} -lt ${len_record} ; then
+	    fields="${fields} ${elt}"
+	    len_fields=$[${len_fields} + 1]
+	fi
+	
+      range=$[${i} % ${field_num}]
+      if test ${range} = ${field_num1} ; then
+	  if test "+${fields}+" == "+ ${record}+" ; then return 0 ; fi
+	  unset fields
+	  len_fields=0
+      fi
+      
+      ((i++))
+    done
+
+    return 1
+}
+
+record3-member()
+{
+    record-member 3 "${1}" "${2}"
+}
+
+remove()
+{
+    test -n "${1}" || return 1
+    if test -z "${2}" ; then echo "${1}" ;  return 2 ; fi
+    
+    local in_list=${1}
+    local record=${2}
+
+    local out_list elt
+    local found
+
+    for elt in ${in_list}
+    do
+	if test "${elt}" != "${record}" ; then
+	    out_list="${out_list} ${elt}"
+	else
+	    found=yes
+	fi
+    done
+
+    echo ${out_list:1}
+    test -n "${found}"
+}
+
+get-record-in-list()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    test -n "${3}" || return 3
+    test -n "${4}" || return 4
+    local record_len=${1}
+    local key_len=${2}
+    local in_key=${3}
+    local in_list=${4}
+    
+    local i=0 elt range
+    local key value
+    local found
+
+    local record_gap=$[${record_len} - 1]
+    local key_gap=$[${key_len} - 1]
+
+    for elt in ${in_list}
+    do
+	range=$[${i} % ${record_len}]
+	if test ${range} -lt ${key_gap} ; then
+	    key="${key} ${elt}"
+	elif test ${range} -eq ${key_gap} ; then
+	    key="${key} ${elt}"
+	    key=${key:1}
+	    if test ${key_gap} -eq ${record_gap} ; then
+		if test "${key}" == "${in_key}" ; then
+		    if test -z "${value}" ; then
+			echo -n "${key}"
+		    else
+			echo -n "${key} ${value}"
+		    fi
+		    found=yes
+		    break
+		else
+		    unset key
+		    unset value
+		fi
+	    fi
+	elif test ${range} -eq ${record_gap} ; then
+	    value="${value} ${elt}"
+	    value=${value:1}
+	    if test "${key}" == "${in_key}" ; then
+		echo -n "${key} ${value}"
+		found=yes
+		break
+	    else
+		unset key
+		unset value
+	    fi
+	else
+	    value="${value} ${elt}"
+	fi
+	((i++))
+    done
+
+    if test -n "${found}" ; then
+	return 0
+    else
+	return 21
+    fi
+}
+
+remove-record-from-list()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    test -n "${3}" || return 3
+    local record_len=${1}
+    local key_len=${2}
+    local in_key=${3}
+    local in_list=${4}
+    
+    local i=0 elt range
+    local key value out_list
+    local found
+
+    local record_gap=$[${record_len} - 1]
+    local key_gap=$[${key_len} - 1]
+
+    for elt in ${in_list}
+    do
+	range=$[${i} % ${record_len}]
+	if test ${range} -lt ${key_gap} ; then
+	    key="${key} ${elt}"
+	elif test ${range} -eq ${key_gap} ; then
+	    key="${key} ${elt}"
+	    key=${key:1}
+	    unset value
+	    if test ${key_gap} -eq ${record_gap} ; then
+		if test "${key}" == "${in_key}" ; then
+		    found=yes
+		else
+		    out_list="${out_list} ${key}"
+		fi
+		unset key
+	    fi
+	elif test ${range} -eq ${record_gap} ; then
+	    value="${value} ${elt}"
+	    value=${value:1}
+	    if test "${key}" == "${in_key}" ; then
+		found=yes
+	    else
+		out_list="${out_list} ${key} ${value}"
+	    fi
+	    unset key
+	else
+	    value="${value} ${elt}"
+	fi
+	((i++))
+    done
+    
+    echo ${out_list:1}
+
+    if test -n "${found}" ; then
+	return 0
+    else
+	return 21
+    fi
+}
+
+move-record-at-position-in-list()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    test -n "${3}" || return 3
+    test -n "${4}" || return 4
+    test -n "${5}" || return 5
+    local record_len=${1}
+    local key_len=${2}
+    local in_key=${3}
+    local in_list=${4}
+    local in_position=${5}
+
+    test ${key_len} -le ${record_len} || return 11
+    test ${record_len} -gt 1 || return 0
+
+    local record2move ; record2move=$(get-record-in-list ${record_len} ${key_len} "${in_key}" "${in_list}") || return 15
+
+    local elt range i=0 position=1
+    local key value record out_list
+    local found
+
+    local record_gap=$[${record_len} - 1]
+    local key_gap=$[${key_len} - 1]
+
+    for elt in ${in_list}
+    do
+	range=$[${i} % ${record_len}]
+
+	test ${range} -ne 0 || unset value key
+	test ${range} -ge ${key_len} || key="${key} ${elt}"
+
+	if test ${range} -eq ${record_gap} ; then
+	    if test ${record_gap} -ne ${key_gap} ; then
+		value="${value} ${elt}"
+		value=${value:1}
+	    fi
+	    key=${key:1}
+
+	    if test "${key}" == "${in_key}" ; then
+		((i++))
+		continue
+	    fi
+
+	    if test -z "${value}" ; then
+		record="${key}"
+	    else
+		record="${key} ${value}"
+	    fi
+
+	    if test "${position}" == "${in_position}" ; then
+		found=yes
+		out_list="${out_list} ${record2move} ${record}"
+	    else
+		out_list="${out_list} ${record}"
+	    fi
+	    ((position++))
+	elif test ${range} -ge ${key_len} ; then
+	    value="${value} ${elt}"
+	fi
+	((i++))
+    done
+
+    if test "${position}" == "${in_position}" ; then
+	found=yes
+	out_list="${out_list} ${record2move}"
+    fi
+
+    echo ${out_list:1}
+
+    if test -n "${found}" ; then
+	return 0
+    else
+	return 21
+    fi
+}
+
+move-record-in-list()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    test -n "${3}" || return 3
+    test -n "${4}" || return 4
+    test -n "${5}" || return 5
+    test -n "${6}" || return 6
+    local record_len=${1}
+    local key_len=${2}
+    local in_key=${3}
+    local in_list=${4}
+    local in_position_key=${5}
+    local in_position=${6}
+
+    test ${key_len} -le ${record_len} || return 11
+    test ${record_len} -gt 1 || return 0
+
+    case "${in_position}" in
+	before|after)
+	    ;;
+	*)
+	    return 13
+	    ;;
+    esac
+
+    local record2move ; record2move=$(get-record-in-list ${record_len} ${key_len} "${in_key}" "${in_list}") || return 15
+
+    if test "${in_key}" == "${in_position_key}" ; then
+	echo ${in_list}
+	return 0
+    fi
+
+    local elt range i=0
+    local key value record out_list
+    local found
+
+    local record_gap=$[${record_len} - 1]
+    local key_gap=$[${key_len} - 1]
+
+    for elt in ${in_list}
+    do
+	range=$[${i} % ${record_len}]
+
+	test ${range} -ne 0 || unset value key
+	test ${range} -ge ${key_len} || key="${key} ${elt}"
+
+	if test ${range} -eq ${record_gap} ; then
+	    if test ${record_gap} -ne ${key_gap} ; then
+		value="${value} ${elt}"
+		value=${value:1}
+	    fi
+	    key=${key:1}
+
+	    if test "${key}" == "${in_key}" ; then
+		((i++))
+		continue
+	    fi
+
+	    if test -z "${value}" ; then
+		record="${key}"
+	    else
+		record="${key} ${value}"
+	    fi
+
+	    if test "${key}" == "${in_position_key}" ; then
+		found=yes
+		case ${in_position} in
+		    before)
+			out_list="${out_list} ${record2move} ${record}"
+			;;
+		    after)
+			out_list="${out_list} ${record} ${record2move}"
+			;;
+		    *)
+			return 255
+			;;
+		esac
+	    else
+		out_list="${out_list} ${record}"
+	    fi
+	elif test ${range} -ge ${key_len} ; then
+	    value="${value} ${elt}"
+	fi
+	((i++))
+    done
+
+    test -n "${in_position_key}" || out_list="${out_list} ${record2move}"
+
+    echo ${out_list:1}
+
+    if test -n "${found}" ; then
+	return 0
+    else
+	return 21
+    fi
+}
+
+add-record-to-list()
+{
+    test -n "${1}" || return 1
+    local record=${1}
+    local list=${2}
+
+    if test -z "${list}" ; then
+	list=${record}
+    else
+	list="${list} ${record}"
+    fi
+
+    echo ${list}
+}
+
+insert-record-in-list()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    local record_len=${1}
+    local key_len=${2}
+    local in_record=${3}
+    local in_list=${4}
+    local in_insert_key=${5}
+    local in_insert_position=${6}
+
+    test ${key_len} -le ${record_len} || return 11
+    test ${record_len} -gt 1 || return 0
+
+    if test -z "${in_record}" ; then
+	echo ${in_list}
+	return 0
+    fi
+
+    if test -z "${in_list}" ; then
+	echo ${in_record}
+	test -z "${in_insert_key}"
+	return ${?}
+    fi
+
+    if test -n "${in_insert_key}" ; then
+	case "${in_insert_position}" in
+	    before|after)
+		;;
+	    *)
+		return 13
+		;;
+	esac
+    fi
+
+    local in_key
+    local elt range i=0
+    local key value out_list
+    local record_gap=$[${record_len} - 1]
+    local found
+
+    for elt in ${in_record}
+    do
+	test ${i} -ge ${key_len} || in_key="${in_key} ${elt}"
+	((i++))
+    done
+    in_key=${in_key:1}
+
+    i=0
+    for elt in ${in_list}
+    do
+	range=$[${i} % ${record_len}]
+	test ${range} -ne 0 || unset value key
+
+	if test ${range} -lt ${key_len} ; then
+	    key="${key} ${elt}"
+	elif test ${range} -eq ${record_gap} ; then
+	    value="${value} ${elt}"
+	    value=${value:1}
+	    key=${key:1}
+
+	    if test -z "${in_insert_key}" ; then
+		if test "${key}" == "${in_key}" ; then
+		    found=yes
+		else
+		    out_list="${out_list} ${key} ${value}"
+		fi
+	    else
+		if test "${key}" == "${in_insert_key}" ; then
+		    test ${in_insert_position} != before || out_list="${out_list} ${in_record}"
+		    found=yes
+		fi
+		test "${key}" == "${in_key}" || out_list="${out_list} ${key} ${value}"
+		test "${key}" != "${in_insert_key}" || test ${in_insert_position} != after || out_list="${out_list} ${in_record}"
+	    fi
+	else
+	    value="${value} ${elt}"
+	fi
+	((i++))
+    done
+
+    test -n "${in_insert_key}" || out_list="${out_list} ${in_record}"
+
+    echo ${out_list:1}
+
+    if test -n "${found}" ; then
+	return 0
+    else
+	return 21
+    fi
+}
+
+insert-record-in-slist()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    local record_len=${1}
+    local key_len=${2}
+    local in_record=${3}
+    local in_list=${4}
+
+    test ${key_len} -le ${record_len} || return 11
+    test ${record_len} -gt 0 || return 0
+
+    if test -z "${in_record}" ; then
+	echo ${in_list}
+	return 0
+    fi
+
+    if test -z "${in_list}" ; then
+	echo ${in_record}
+	return 0
+    fi
+
+    local in_key
+    local elt key record i=0
+    local out_list rest
+
+    for elt in ${in_record}
+    do
+	test ${i} -lt ${key_len} || break
+	in_key="${in_key} ${elt}"
+	((i++))
+    done
+    in_key=${in_key:1}
+    
+    while test -n "${in_list}"
+    do
+	unset record
+	for ((i=1 ; i <= record_len ; i++))
+	do
+	    elt=${in_list/ *}
+	    rest=${in_list#* }
+	    record="${record} ${elt}"
+	    test ${key_len} -ne ${i} || key=${record}
+
+	    if test "${rest}" == "${in_list}" ; then
+		unset in_list
+		break
+	    else
+		in_list=${rest}
+	    fi
+	done
+
+	record=${record:1}
+	key=${key:1}
+
+	if [[ "${in_key}" > "${key}" ]] ; then
+	    out_list="${out_list} ${record}"
+	elif [[ "${in_key}" == "${key}" ]] ; then
+	    out_list="${out_list} ${in_record} ${in_list}"
+	    break
+	else
+	    out_list="${out_list} ${in_record} ${record} ${in_list}"
+	    break
+	fi
+    done
+
+    if [[ "${in_key}" > "${key}" ]] ; then
+	out_list="${out_list} ${in_record}"
+    fi
+
+    echo ${out_list:1}
+}
+
+get-diff-list()
+{
+    local list1=${1}
+    local list2=${2}
+
+    local elt
+
+    local file1=${TMP_DIR}/list1.${$}
+    local file2=${TMP_DIR}/list2.${$}
+
+    for elt in ${list1}
+    do
+	echo ${elt}
+    done > ${file1}
+
+
+    for elt in ${list2}
+    do
+	echo ${elt}
+    done > ${file2}
+
+    diff --unified ${file1} ${file2} | grep '^[+-][^-+]' 2> /dev/null
+    rm -f ${file1} ${file2}
+}
+
+show-diff-list()
+{
+    local list1=${1}
+    local list2=${2}
+    local col=${3}
+
+    local elt i=0
+    local diff=$(get-diff-list "${list1}" "${list2}")
+
+    for elt in ${diff}
+    do
+	test ${i} -eq 0 || echo-blank-command
+	echo-value ${elt} ${col}
+	((i++))
+    done
+}
+
+revert-list()
+{
+    test -n "${1}" || return 0
+    local list=${1}
+
+    local out_list
+
+    for elt in ${list}
+    do
+	out_list="${elt} ${out_list}"
+    done
+
+    echo ${out_list}
+}
+
+get-last-elt-in-list()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 0
+    local last=${1}
+    local list=${2}
+
+    local revert_list=$(revert-list "${list}")
+    local out_list elt i=0
+
+    for elt in ${revert_list}
+    do
+	test ${i} -lt ${last} || break
+	out_list="${out_list} ${elt}"
+	((i++))
+    done
+    out_list=${out_list:1}
+
+    echo $(revert-list "${out_list}")
+}
+
+keep-ge-in-slist()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 0
+    local min=${1}
+    local list=${2}
+
+    local revert_list=$(revert-list "${list}")
+    local out_list elt
+
+    for elt in ${revert_list}
+    do
+	test ${elt} -ge ${min} || break
+	out_list="${out_list} ${elt}"
+    done
+    out_list=${out_list:1}
+
+    echo $(revert-list "${out_list}")
+}

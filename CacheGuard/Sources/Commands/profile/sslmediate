@@ -1,0 +1,189 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       Commands
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+__complete-sslmediate()
+{
+    test -n "${COMP_CWORD-1}" || return 1
+
+    case ${COMP_CWORD} in
+	1)
+	    case ${COMP_WORDS[1]} in
+		e|ex)
+		    COMPREPLY=('' '<RET>' exception expired)
+		    ;;
+		exp|expi|expir|expire|expired)
+		    COMPREPLY=(expired)
+		    ;;
+		exc|exce|excep|except|excepti|exceptio|exception)
+		    COMPREPLY=(exception)
+		    ;;
+		p)
+		    COMPREPLY=('' policy premature)
+		    ;;
+		po|pol|poli|polic|policy)
+		    COMPREPLY=(policy)
+		    ;;
+		pr|pre|prem|prema|premat|prematu|prematur|premature)
+		    COMPREPLY=(premature)
+		    ;;
+		s|se|sel|self|selfs|selfsi|selfsig|selfsign|selfsigne|selfsigned)
+		    COMPREPLY=(selfsigned)
+		    ;;
+		t|tr|tra|tran|trans|transp|transpa|transpar|transpare|transparen|transparent)
+		    COMPREPLY=(transparent)
+		    ;;
+		'')
+		    COMPREPLY=('' '<RET>' exception expired policy premature transparent)
+		    ;;
+		*)
+		    COMPREPLY=()
+		    ;;
+	    esac
+	    ;;
+	2)
+	    case ${COMP_WORDS[1]} in
+		expired|premature|selfsigned|transparent)
+		    case ${COMP_WORDS[2]} in
+			o)
+			    COMPREPLY=('' on off)
+			    ;;
+			of|off)
+			    COMPREPLY=(off)
+			    ;;
+			on)
+			    COMPREPLY=(on)
+			    ;;
+			'')
+			    COMPREPLY=('' '<RET>' on off)
+			    ;;
+		    esac
+		    ;;
+		policy)
+		    case ${COMP_WORDS[2]} in
+			a|al|all|allo|allow)
+			    COMPREPLY=(allow)
+			    ;;
+			d|de|den|deny)
+			    COMPREPLY=(deny)
+			    ;;
+			'')
+			    COMPREPLY=('' allow deny)
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+
+		exception)
+		    case ${COMP_WORDS[2]} in
+			d|'do'|dom|doma|domai|domain|domainn|domainna|domainnam|domainname)
+			    COMPREPLY=(domainname)
+			    ;;
+			u|ur|url|urll|urlli|urllis|urllist)
+			    COMPREPLY=(urllist)
+			    ;;
+			'')
+			    COMPREPLY=('' '<RET>' domainname urllist)
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		*)
+		    COMPREPLY=()
+		    ;;
+	    esac
+	    ;;
+	3)
+	    case ${COMP_WORDS[1]} in
+		exception)
+		    case ${COMP_WORDS[2]} in
+			domainname|urllist)
+			    case ${COMP_WORDS[3]} in
+				a|ad|add)
+				    COMPREPLY=(add)
+				    ;;
+				d|de|del)
+				    COMPREPLY=(del)
+				    ;;
+				r|ra|raz)
+				    COMPREPLY=(raz)
+				    ;;
+				'')
+				    COMPREPLY=('' '<RET>' add del raz)
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+	    esac
+	    ;;
+	4)
+	    case ${COMP_WORDS[1]} in
+		exception)
+		    case ${COMP_WORDS[2]} in
+			domainname)
+			    case ${COMP_WORDS[3]} in
+				add|del)
+				    COMPREPLY=('' '<RET>' '<domain-name>')
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			urllist)
+			    case ${COMP_WORDS[3]} in
+				add|del)
+				    COMPREPLY=('' '<RET>' '<urllist-name>')
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		*)
+		    COMPREPLY=()
+		    ;;
+	    esac
+	    ;;
+	*)
+	    COMPREPLY=()
+	    ;;
+    esac
+}

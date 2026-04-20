@@ -1,0 +1,1 @@
+SNMPD_OPTS="-u snmp -g snmp -r -M /usr/share/snmp/mibs -LSed"

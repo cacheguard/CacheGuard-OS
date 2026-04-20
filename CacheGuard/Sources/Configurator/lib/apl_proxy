@@ -1,0 +1,1758 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       Configurator
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+set-proxy2-parameters-new()
+{
+    set-new-proxy2-mode configurator
+}
+
+set-proxy2-parameters-cur()
+{
+    export CURRENT_PROXY2_MODE=False
+    test ${CURRENT_RWEB_MODE} == True || return 0
+
+    if test "${CURRENT_WAF_MODE}" == True ; then
+	CURRENT_PROXY2_MODE=True
+	return 0
+    fi
+
+    ! single-rweb-host "${CURRENT_RWEB_SITE_HOSTS_LIST}" || return 0
+    is-basic-rweb-balancer "${CURRENT_RWEB_SITE_BALANCER_LIST}" || CURRENT_PROXY2_MODE=True
+}
+
+get-proxy-proxy2-ratio-pct()
+{
+    test -n "${1}" || return 1
+    local proxy2_mode=${1}
+
+    local ratio
+
+    if test ${proxy2_mode} == False ; then
+	((ratio = 100))
+    else
+	((ratio = SIMULTANEOUS_USERS_NB * 100 / (SIMULTANEOUS_USERS_NB + RUSERS_NB)))
+    fi
+
+    echo -n ${ratio}
+}
+
+set-proxy2-parameters-ratio()
+{
+    local ratio=$(get-proxy-proxy2-ratio-pct ${PROXY2_MODE})
+    export PROXY_PROXY2_RATIO_PCT=${ratio}
+}
+
+get-proxy1-cache-buffer-sz()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    local free_memory_sz=${1}
+    local proxy_proxy2_pct=${2}
+
+    local cache_buffer_sz
+    local margin margin_pct=10
+
+    cache_buffer_sz=$[${free_memory_sz} * ${proxy_proxy2_pct} / 100]
+    margin=$[${cache_buffer_sz} * ${margin_pct} / 100]
+    cache_buffer_sz=$[${cache_buffer_sz} - ${margin}]
+
+    echo -n ${cache_buffer_sz}
+}
+
+set-proxy1-parameters-new()
+{    
+    if test ${SSLMEDIATE_MODE} == True ; then
+	if test ${SSLMEDIATE_TRANSPARENT} == True ; then
+	    export SSLMEDIATE_TRANSPARENT_MODE=True
+	else
+	    export SSLMEDIATE_TRANSPARENT_MODE=False
+	fi
+    else
+	export SSLMEDIATE_TRANSPARENT_MODE=False
+    fi
+
+    if test ${TRANSPARENT_MODE} == False ; then
+	TPROXY_MODE=False
+    else
+	if test ${TNAT_MODE} == True ; then
+	    TPROXY_MODE=False
+	else
+	    TPROXY_MODE=True
+	fi
+    fi
+
+    if test ${WEB_MODE} == True -o ${TRANSPARENT_MODE} == True ; then
+	SQUID_IS_ACTIVE=True
+    elif test ${RWEB_MODE} == True -a ${PROXY2_MODE} == False ; then
+	SQUID_IS_ACTIVE=True
+    else
+	SQUID_IS_ACTIVE=False
+    fi
+}
+
+set-proxy1-parameters-cur()
+{
+    if test ${CURRENT_TRANSPARENT_MODE} == False ; then
+	CURRENT_TPROXY_MODE=False
+    else
+	if test ${CURRENT_TNAT_MODE} == True ; then
+	    CURRENT_TPROXY_MODE=False
+	else
+	    CURRENT_TPROXY_MODE=True
+	fi
+    fi
+
+    if test ${CURRENT_WEB_MODE} == True -o ${CURRENT_TRANSPARENT_MODE} == True ; then
+	CURRENT_SQUID_IS_ACTIVE=True
+    elif test ${CURRENT_RWEB_MODE} == True -a ${CURRENT_PROXY2_MODE} == False ; then
+	CURRENT_SQUID_IS_ACTIVE=True
+    else
+	CURRENT_SQUID_IS_ACTIVE=False
+    fi
+}
+
+set-proxy2-parameters()
+{
+    PROXY2_SSL_CA_RDIR=${WEB_SSL_CA_DIR/${WEB_SERVER_DIR}}
+    PROXY2_SSL_LOCAL_CA_RDIR=${WEB_SSL_LOCAL_CA_DIR/${WEB_SERVER_DIR}}
+
+    set-proxy2-parameters-new
+    set-proxy2-parameters-cur
+}
+
+set-proxy1-parameters()
+{
+    export PROXY_SSL_RDIR=${PROXY_SSL_SERVER_DIR/${PROXY_DIR}}
+    export PROXY_SSL_CA_RDIR=${PROXY_SSL_CA_DIR/${PROXY_DIR}}
+    export PROXY_SSL_LOCAL_CA_RDIR=${PROXY_SSL_LOCAL_CA_DIR/${PROXY_DIR}}
+
+    export PROXY_SSL_OPTIONS="options=NO_SSLv2:NO_SSLv3:NO_TLSv1:NO_TLSv1_1 cipher=ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-AES256-GCM-SHA384:DHE-RSA-AES128-GCM-SHA256:DHE-DSS-AES128-GCM-SHA256:kEDH+AESGCM:ECDHE-RSA-AES128-SHA256:ECDHE-ECDSA-AES128-SHA256:ECDHE-RSA-AES128-SHA:ECDHE-ECDSA-AES128-SHA:ECDHE-RSA-AES256-SHA384:ECDHE-ECDSA-AES256-SHA384:ECDHE-RSA-AES256-SHA:ECDHE-ECDSA-AES256-SHA:DHE-RSA-AES128-SHA256:DHE-RSA-AES128-SHA:DHE-DSS-AES128-SHA256:DHE-RSA-AES256-SHA256:DHE-DSS-AES256-SHA:DHE-RSA-AES256-SHA:!aNULL:!eNULL:!EXPORT:!DES:!RC4:!3DES:!MD5:!PSK"
+
+    export PROXY_SSLMEDIATE_OPTIONS="ssl-bump tls-cert=${PROXY_SSL_CA_RDIR}/${SYSTEM_CA}.certificate tls-key=${PROXY_SSL_CA_RDIR}/${SYSTEM_CA}.key generate-host-certificates=on dynamic_cert_mem_cache_size=${SSL_MIMIC_CERTIFICATE_CACHE_MEMORY_SZ}MB ${PROXY_SSL_OPTIONS}"
+
+    set-proxy1-parameters-new
+    set-proxy1-parameters-cur    
+}
+
+set-proxy-parameters()
+{
+    set-proxy2-parameters
+    set-proxy2-parameters-ratio
+    set-proxy1-parameters
+}
+
+set-proxy-parameters-new()
+{
+    set-proxy2-parameters-new
+    set-proxy1-parameters-new
+}
+
+set-proxy-parameters-cur()
+{
+    set-proxy2-parameters-cur
+    set-proxy1-parameters-cur
+}
+
+gen-squid-acl-etc()
+{
+    echo "acl from-ext-ip src ${IP_EXTERNAL_IP}/32"
+    echo "acl from-web-ip src ${IP_WEB_IP}/32"
+    echo "acl to-web-ip dst ${IP_WEB_IP}/32"
+}
+
+gen-squid-acl-icap()
+{
+    echo "acl c-icap-port port ${ICAP_PORT}"
+}
+
+gen-squid-acl-web()
+{
+    local range i=0 nb=1 elt
+    local interface ip px
+
+    test ${WEB_MODE} == True || return 0
+
+    echo "acl proxy_port localport ${PROXY_PORT}"
+
+    for elt in ${ACCESS_IF_IP_PX_WEB_LIST}
+    do
+	range=$[${i} % 4]
+	case ${range} in
+	    0)
+		interface=${elt}
+		;;
+	    1)
+		ip=${elt}
+		;;
+	    2)
+		px=${elt}
+		;;
+	    3)
+		echo "acl from-client-ip-${nb} src ${ip}/${px}"
+		((nb++))
+		;;
+	    *)
+		return 1
+		;;
+	esac
+	((i++))
+    done
+}
+
+gen-squid-acl-tweb()
+{
+    local range i=0 nb=1 elt
+    local ip px
+
+    test ${TRANSPARENT_MODE} == True || return 0
+
+    echo "acl thttp_port localport ${WWW_PORT}"
+    test ${SSLMEDIATE_TRANSPARENT_MODE} == False || echo "acl thttps_port localport ${HTTPS_PORT}"
+
+    for elt in ${TRANSPARENT_IF_IP_PX_LIST}
+    do
+	range=$[${i} % 4]
+	case ${range} in
+	    0)
+		;;
+	    1)
+		ip=${elt}
+		;;
+	    2)
+		px=${elt}
+		;;
+	    3)
+		echo "acl from-tclient-ip-${nb} src ${ip}/${px}"
+		((nb++))
+		;;
+	    *)
+		return 1
+		;;
+	esac
+	((i++))
+    done
+}
+
+gen-squid-acl-rweb()
+{
+    local range i=0 nb=1 elt
+    local name
+
+    test ${RWEB_MODE} == True || return 0
+
+    local acl_not_rweb_sites
+    local acl_rweb_sites
+
+    test ${GUARD_MODE} == False || echo "acl to-self-guard-url urlpath_regex ^/${URL_DENIED_URI}$"
+
+    nb=1
+    if test ${PROXY2_MODE} == True ; then
+	for elt in ${RWEB_HTTP_NAME_IP_LIST}
+	do
+	    range=$[${i} % 2]
+	    case ${range} in
+		0)
+		    name=${elt}
+		    ;;
+		1)
+		    acl_rweb_sites="${acl_rweb_sites} to-site-${nb}"
+		    acl_not_rweb_sites="${acl_not_rweb_sites} !to-site-${nb}"
+		    echo "acl to-site-${nb} dstdomain ${name}"
+		    ((nb++))
+		    ;;
+		*)
+		    return 1
+		    ;;
+	    esac
+	    ((i++))
+	done
+    else
+	for elt in ${_RWEB_SITE_HOSTS_LIST}
+	do
+	    range=$[${i} % 2]
+	    case ${range} in
+		0)
+		    name=${elt}
+		    test ${name} != "${EMBEDDED_VPNSUBSCR_RWEB_SITE_NAME}" || _EMBEDDED_VPNSUBSCR_TO_SITE_NB=${nb}
+		    ;;
+		1)
+		    acl_rweb_sites="${acl_rweb_sites} to-site-${nb}"
+		    acl_not_rweb_sites="${acl_not_rweb_sites} !to-site-${nb}"
+		    
+		    echo "acl to-site-${nb} dstdomain ${name}"
+		    ((nb++))
+		    ;;
+		*)
+		    return 1
+		    ;;
+	    esac
+	    ((i++))
+	done
+    fi
+
+    i=0 nb=1
+    for elt in ${RWEB_SITE_STANDBY_LIST}
+    do
+	range=$[${i} % 3]
+	case ${range} in
+	    0)
+		name=${elt}
+		;;
+	    1)
+		;;
+	    2)
+		echo "acl standby-${nb} dstdomain ${name}"
+		((nb++))
+		;;
+	    *)
+		return 1
+		;;
+	esac
+	((i++))
+    done
+
+    ACL_RWEB_SITES=${acl_rweb_sites:1}
+    ACL_NOT_RWEB_SITES=${acl_not_rweb_sites:1}
+}
+
+gen-squid-acl-peer()
+{
+    local range i=0 nb=1 elt
+    local acl_not_peers
+    local ip
+    
+    for elt in ${PEER_SHARE_LIST} ${PEER_HA_LIST}
+    do
+	range=$[${i} % 2]
+	case ${range} in
+	    0)
+		ip=${elt}
+		;;
+	    1)
+		acl_not_peers="${acl_not_peers} !from-peer-ip-${nb}"
+
+		echo "acl from-peer-ip-${nb} src ${ip}/32"
+		echo "acl to-peer-ip-${nb} dst ${ip}/32"
+		((nb++))
+		;;
+	    *)
+		return 1
+		;;
+	esac
+	((i++))
+    done
+
+    ACL_NOT_PEERS="${acl_not_peers:1}"
+
+    test ${WEB_MODE} == True || return 0
+
+    i=0 nb=1
+    for elt in ${PEER_PREVIOUS_LIST}
+    do
+	range=$[${i} % 2]
+	case ${range} in
+	    0)
+		ip=${elt}
+		;;
+	    1)
+		echo "acl from-previous-peer-ip-${nb} src ${ip}/32"
+		((nb++))
+		;;
+	    *)
+		return 1
+		;;
+	esac
+	((i++))
+    done
+}
+
+gen-squid-acl-ssl()
+{
+    test ${SSLMEDIATE_MODE} == True || return 0
+
+    echo "acl sslmediate-step-1 at_step SslBump1"
+
+    if test -s ${PROXY_DOMAIN_LIST_DIR}/${SSLMEDIATE_EXCEPTIONS_FILENAME} ; then
+	local rdir=${PROXY_DOMAIN_LIST_DIR/${PROXY_DIR}}
+	echo "acl sslmediate-exception ssl::server_name \"${rdir}/${SSLMEDIATE_EXCEPTIONS_FILENAME}\""
+    fi
+}
+
+gen-squid-acl()
+{
+    gen-squid-acl-etc
+    gen-squid-acl-icap
+    gen-squid-acl-web
+    gen-squid-acl-tweb
+    gen-squid-acl-rweb
+    gen-squid-acl-peer
+    gen-squid-acl-ssl
+}
+
+gen-squid-general-common()
+{
+    echo "http_port 127.0.0.1:${PROXY_PORT}"
+
+    echo "cache_mgr ${ADMINISTRATOR_EMAIL}"
+    
+    echo "visible_hostname ${SHOSTNAME}.${DOMAIN_NAME}"
+    echo "unique_hostname ${UNIQUE_SHOSTNAME}"
+    echo "err_html_text <a href='mailto:${ADMINISTRATOR_NAME} <${ADMINISTRATOR_EMAIL}>'>${ADMINISTRATOR_NAME} &lt;${ADMINISTRATOR_EMAIL}&gt;</a>"
+    echo "ftp_user ${ANONYMOUS_FTP_EMAIL}"
+
+    if test ${FTP_PASSIVE_MODE} == True ; then
+	echo "ftp_passive on"
+    else
+	echo "ftp_passive off"
+    fi
+
+    echo debug_options ALL,${APPLIANCE_DEBUG_LEVEL}
+}
+
+gen-squid-general-guard()
+{
+    # Respect the order in compliance with the suspension mode
+
+    test ${AV_MODE} == False || echo "url_rewrite_access deny localhost"
+    if test ${RWEB_MODE} == True ; then
+	local acl
+	for acl in ${ACL_RWEB_SITES}
+	do
+	    echo "url_rewrite_access deny ${acl}"
+	done
+	echo "url_rewrite_access allow all"
+    fi
+    test ${GUARD_MODE} == True || return 0
+    echo "url_rewrite_program /bin/squidGuard -c /etc/squidGuard.conf -P"
+}
+
+gen-squid-general-dns()
+{
+    test -n "${NAME_SERVER_LIST}" || return 0
+
+    local dns dnss
+
+    
+    for dns in ${NAME_SERVER_LIST}
+    do
+	dnss="${dnss} ${dns}"
+    done
+    dnss="${dnss:1}"
+    echo "dns_nameservers ${dnss}"
+}
+
+gen-squid-general-tweb()
+{
+    test ${TRANSPARENT_MODE} == True || return 0
+
+    local transparent
+
+    if test ${TNAT_MODE} == True ; then
+	transparent='intercept'
+    else
+	transparent='tproxy'
+    fi
+
+    echo "http_port ${IP_WEB_IP}:${THTTP_PORT} ${transparent}"
+    test ${SSLMEDIATE_TRANSPARENT_MODE} == False || echo "https_port ${IP_WEB_IP}:${THTTPS_PORT} ${transparent} ${PROXY_SSLMEDIATE_OPTIONS}"
+}
+
+gen-squid-general-web()
+{
+    test ${WEB_MODE} == True || return 0
+
+    local options
+
+    test ${SSLMEDIATE_MODE} == False || options=" ${PROXY_SSLMEDIATE_OPTIONS}"
+
+    if test ${HA_MODE} == True ; then
+	local ip
+        for ip in ${VRRP_WEB_IP_LIST}
+        do
+            test ${ip} != 0.0.0.0 || continue
+            echo "http_port ${ip}:${PROXY_PORT}${options}"
+        done
+    else
+        test ${IP_WEB_IP} != 0.0.0.0 || return 0
+        echo "http_port ${IP_WEB_IP}:${PROXY_PORT}${options}"
+    fi
+}
+
+gen-squid-general-rweb()
+{
+    test ${RWEB_MODE} == True || return 0
+
+    local elt range i=0
+    local options="originserver no-query connect-timeout=3 weighted-round-robin login=PASS"
+    
+    if test ${PROXY2_MODE} == True ; then
+	if test ${TRANSPARENT_MODE} == True ; then
+
+	    test ${GUARD_MODE} == False || \
+		echo "cache_peer ${IP_WEB_IP} parent ${WWW_PORT} 0 originserver no-query connect-timeout=3 name=self-server"
+
+	    local nb=1
+
+	    for elt in ${RWEB_HTTP_NAME_IP_LIST}
+	    do
+		range=$[${i} % 2]
+		case ${range} in
+		    0)
+			;;
+		    1)
+			ip=${elt}
+			echo "cache_peer ${ip} parent ${WWW_PORT} 0 ${options} weight=50 name=backend-${nb}"
+			((nb++))
+			;;
+		    *)
+			return 1
+			;;
+		esac
+		((i++))
+	    done
+	fi
+
+	return 0
+    fi
+
+    local host_nb=1 nb=1
+    local protocol ip port weight name tls url ip_tls tls_id
+    local host names name_name
+
+    test ${GUARD_MODE} == False || \
+	echo "cache_peer ${IP_WEB_IP} parent ${WWW_PORT} 0 originserver no-query connect-timeout=3 name=self-server"
+
+    i=0
+    for elt in ${RWEB_HOST_SITES_LIST}
+    do
+	range=$[${i} % 2]
+	case ${range} in
+	    0)
+		host=${elt//_/ }
+		;;
+	    1)
+		names=$(colon2space ${elt})
+		
+		protocol=$(get-nth-arg 1 ${host})
+		ip=$(get-nth-arg 2 ${host})
+		port=$(get-nth-arg 3 ${host})
+		weight=$(get-nth-arg 4 ${host})
+
+		case ${protocol} in
+		    http)
+			echo "cache_peer ${ip} parent ${port} 0 ${options} weight=${weight} name=backend-${host_nb}"
+			;;
+		    https)
+			name=$(get-nth-arg 1 ${names})
+			name_name=${name/,*}
+			echo "cache_peer ${ip} parent ${port} 0 ${options} weight=${weight} name=backend-${host_nb} tls tls-cafile=${PROXY_SSL_CA_RDIR}/ca-bundle.crt sslcapath=${PROXY_SSL_LOCAL_CA_RDIR} ssldomain=${name_name}"
+			;;
+		    *)
+			;;
+		esac
+		((host_nb++))
+		;;
+	    *)
+		return 255
+		;;
+	esac
+	((i++))
+    done
+
+    local http_options="accel vport"
+    local https_options="${http_options} ${PROXY_SSL_OPTIONS}"
+
+    for ip in ${RWEB_HTTP_IP_LIST}
+    do
+	echo "http_port ${ip}:${WWW_PORT} ${http_options}"
+    done
+
+    for ip_tls in ${RWEB_HTTPS_IP_TLS_LIST}
+    do
+	ip=${ip_tls/:*}
+	tls=${ip_tls#*:}
+	tls_id=${tls/:*}
+
+	if test -s ${PROXY_SSL_SERVER_DIR}/${tls_id}.key ; then
+	    if test -s ${PROXY_SSL_SERVER_DIR}/${tls_id}.certificate+chain ; then
+		echo "https_port ${ip}:${HTTPS_PORT} tls-cert=${PROXY_SSL_RDIR}/${tls_id}.certificate+chain tls-key=${PROXY_SSL_RDIR}/${tls_id}.key ${https_options}"
+	    elif test -s ${PROXY_SSL_SERVER_DIR}/${tls_id}.certificate ; then
+		echo "https_port ${ip}:${HTTPS_PORT} tls-cert=${PROXY_SSL_RDIR}/${tls_id}.certificate tls-key=${PROXY_SSL_RDIR}/${tls_id}.key ${https_options}"
+	    fi
+	fi
+    done
+    
+    i=0 nb=1
+    for elt in ${RWEB_SITE_STANDBY_LIST}
+    do
+	range=$[${i} % 3]
+	case ${range} in
+	    0)
+		name=${elt}
+		;;
+	    1)
+		protocol=${elt}
+		;;
+	    2)
+		url=${elt}
+		echo "http_reply_access deny standby-${nb}"
+		case ${protocol} in
+		    none)
+			echo "deny_info INF_STANDBY_WEBSITE standby-${nb}"
+			;;
+		    *)
+			echo "deny_info ${protocol}://${url} standby-${nb}"
+			;;
+		esac
+		((nb++))
+		;;
+	    *)
+		return 1
+		;;
+	esac
+	((i++))
+    done
+}
+
+gen-squid-general-peer()
+{
+    local options
+    local ip port
+    local i=0 elt range
+
+    if test -n "${PEER_HA_LIST}" -o -n "${PEER_SHARE_LIST}" ; then
+	echo "http_port ${IP_PEER_IP}:${PEER_HTTP_PORT}"
+	echo "htcp_port ${PEER_HTCP_PORT}"
+    fi
+
+    options="connect-timeout=3 htcp"
+
+    for elt in ${PEER_SHARE_LIST}
+    do
+	range=$[${i} % 2]
+	case ${range} in
+	    0)
+		ip=${elt}
+		;;
+	    1)
+		echo "cache_peer ${ip} sibling ${PEER_HTTP_PORT} ${PEER_HTCP_PORT} proxy-only ${options}"
+		;;
+	    *)
+		return 1
+		;;
+	esac
+	((i++))
+    done
+    
+    i=0
+
+    for elt in ${PEER_HA_LIST}
+    do
+	range=$[${i} % 2]
+	case ${range} in
+	    0)
+		ip=${elt}
+		;;
+	    1)
+		echo "cache_peer ${ip} sibling ${PEER_HTTP_PORT} ${PEER_HTCP_PORT} ${options}"
+		;;
+	    *)
+		return 1
+		;;
+	esac
+	((i++))
+    done
+
+    for elt in ${PEER_NEXT_LIST}
+    do
+	range=$[${i} % 2]
+	case ${range} in
+	    0)
+		ip=${elt}
+		;;
+	    1)
+		if test "${elt}" == nil ; then
+		    port=${PROXY_PORT}
+		else
+		    port=${elt}
+		fi
+		echo "cache_peer ${ip} parent ${port} 0 connect-timeout=5 no-query sourcehash weight=50"
+		;;
+	    *)
+		return 1
+		;;
+	esac
+	((i++))
+    done
+    test -z "${PEER_NEXT_LIST}" || echo "never_direct allow all"
+    echo
+}
+
+gen-squid-general-av-compress()
+{
+    local HACK=yes
+
+    test ${WEB_MODE} == True -o ${TRANSPARENT_MODE} == True || return 0
+
+    if test ${AV_MODE} == True ; then
+	if test ${AV_RESTRICT} == True ; then
+	    local bypass=off
+	else
+	    local bypass=on
+	fi
+	local users=$[${USERS_NB} + ${RUSERS_NB}]
+	local icap_options="ipv6=off routing=off on-overload=wait bypass=${bypass} max-conn=${users}"
+
+	echo "icap_enable on"
+        echo "icap_service antivirus_request reqmod_precache icap://${ICAP_LOCAL_IP}:${ICAP_PORT}/avscan ${icap_options}"
+        echo "icap_service antivirus_response respmod_precache icap://${ICAP_LOCAL_IP}:${ICAP_PORT}/avscan ${icap_options}"
+    fi
+
+    if test ${COMPRESS_MODE} == True ; then
+	local ecap_options="bypass=off routing=off"
+	echo "ecap_enable on"
+	echo "loadable_modules /lib/ecap_adapter_gzip.so"
+	echo "ecap_service compress_response respmod_precache ecap://localhost/compress ${ecap_options}"
+    fi
+
+    if test ${COMPRESS_MODE} == True -o ${AV_MODE} == True ; then
+
+	test ${COMPRESS_MODE} == False -o ${AV_MODE} == False || echo "adaptation_service_chain antivirus_compress_response antivirus_response compress_response"
+
+	local ip
+	local i=0 nb=1 elt range
+
+	for elt in ${PEER_SHARE_LIST} ${PEER_HA_LIST}
+	do
+	    range=$[${i} % 2]
+	    case ${range} in
+		0)
+		    ip=${elt}
+		    ;;
+		1)
+		    if test ${AV_MODE} == True ; then
+			echo "adaptation_access antivirus_request deny to-peer-ip-${nb}"
+			if test ${COMPRESS_MODE} == True ; then
+			    if test -z "${HACK}" ; then
+				echo "adaptation_access antivirus_compress_response deny to-peer-ip-${nb}"
+			    else
+				echo "adaptation_access antivirus_response deny to-peer-ip-${nb}"
+			    fi
+			else
+			    echo "adaptation_access antivirus_response deny to-peer-ip-${nb}"
+			fi
+		    else
+			test ${COMPRESS_MODE} == False || echo "adaptation_access compress_response deny to-peer-ip-${nb}"
+		    fi
+		    ((nb++))
+		    ;;
+		*)
+		    return 1
+		    ;;
+	    esac
+	    ((i++))
+	done
+
+	if test ${AV_MODE} == True ; then
+	    if test -s ${PROXY_DOMAIN_LIST_DIR}/${AV_WHITELIST_DOMAIN_FILENAME} ; then
+		echo "acl av-whitelist-domains dstdomain \"${PROXY_DOMAIN_LIST_DIR/${PROXY_DIR}}/${AV_WHITELIST_DOMAIN_FILENAME}\""
+		echo "adaptation_access antivirus_request deny av-whitelist-domains"
+	    fi
+	    echo "adaptation_access antivirus_request deny connect"
+	    echo "adaptation_access antivirus_request allow all"
+
+	    if test ${COMPRESS_MODE} == True ; then
+		if test -z "${HACK}" ; then
+		    test ! -s ${PROXY_DOMAIN_LIST_DIR}/${AV_WHITELIST_DOMAIN_FILENAME} || echo "adaptation_access antivirus_compress_response deny av-whitelist-domains"
+		    echo "adaptation_access antivirus_compress_response deny to-ms-windows-update"
+		    echo "adaptation_access antivirus_compress_response deny connect"
+		    echo "adaptation_access antivirus_compress_response allow http-status-ok"
+		else
+		    test ! -s ${PROXY_DOMAIN_LIST_DIR}/${AV_WHITELIST_DOMAIN_FILENAME} || echo "adaptation_access antivirus_response deny av-whitelist-domains"
+		    echo "adaptation_access antivirus_response deny connect"
+		    echo "adaptation_access antivirus_response allow http-status-ok"
+		fi
+	    else
+		test ! -s ${PROXY_DOMAIN_LIST_DIR}/${AV_WHITELIST_DOMAIN_FILENAME} || echo "adaptation_access antivirus_response deny av-whitelist-domains"
+		echo "adaptation_access antivirus_response deny connect"
+		echo "adaptation_access antivirus_response allow http-status-ok"
+	    fi
+	else
+	    if test ${COMPRESS_MODE} == True ; then
+		echo "adaptation_access compress_response deny connect"
+		test ${EMBEDDED_VPNSUBSCR_IS_ACTIVE} == False || echo "adaptation_access compress_response deny to-site-${_EMBEDDED_VPNSUBSCR_TO_SITE_NB}"
+		echo "adaptation_access compress_response deny to-ms-windows-update"
+		echo "adaptation_access compress_response deny transfer-encoding-chunked"
+		echo "adaptation_access compress_response allow compressible-mime http-status-ok"
+	    fi
+	fi
+    fi
+}
+
+gen-squid-ssl-mediate()
+{
+    test ${SSLMEDIATE_MODE} == True || return 0
+
+    local db_ssl_rdir=${PROXY_DB_SSL_DIR/${PROXY_DIR}}
+    local local_ca_ssl_rdir=${PROXY_SSL_LOCAL_CA_DIR/${PROXY_DIR}}
+
+    echo "sslcrtd_program /libexec/security_file_certgen -s ${db_ssl_rdir} -M ${SSL_MIMIC_CERTIFICATE_CACHE_SZ}MB"
+    echo "tls_outgoing_options cafile=${PROXY_SSL_CA_RDIR}/ca-bundle.crt capath=${local_ca_ssl_rdir}"
+    echo "sslproxy_foreign_intermediate_certs ${PROXY_SSL_CA_RDIR}/${INTERMEDIATE_CA}"
+    echo "sslproxy_cert_sign signTrusted all"
+
+    if test ${SSLMEDIATE_PREMATURE} == True ; then
+	echo "sslproxy_cert_error allow sslmediate-cert-not-yet-valid"
+	echo "sslproxy_cert_error allow sslmediate-crl-not-yet-valid"
+    fi
+
+    if test ${SSLMEDIATE_EXPIRED} == True ; then
+	echo "sslproxy_cert_error allow sslmediate-crl-has-expired"
+	echo "sslproxy_cert_error allow sslmediate-cert-has-expired"
+    fi
+
+    if test ${SSLMEDIATE_SELFSIGNED} == True ; then
+	echo "sslproxy_cert_error allow sslmediate-depth-zero-self-signed-cert"
+	echo "sslproxy_cert_error allow sslmediate-self-signed-cert-in-chain"
+    fi
+
+    echo "sslproxy_cert_error deny all"
+
+    echo "ssl_bump peek sslmediate-step-1"
+
+    if test -n "${SSLMEDIATE_EXCEPTION_URLLIST_LIST}" -o -n "${SSLMEDIATE_EXCEPTION_DOMAINNAME_LIST}" ; then
+	if test ${SSLMEDIATE_POLICY} == deny ; then
+	    test ! -s ${PROXY_DOMAIN_LIST_DIR}/${SSLMEDIATE_EXCEPTIONS_FILENAME} || echo "ssl_bump splice sslmediate-exception"
+	    echo "ssl_bump bump all"
+	else
+	    test ! -s ${PROXY_DOMAIN_LIST_DIR}/${SSLMEDIATE_EXCEPTIONS_FILENAME} || echo "ssl_bump bump sslmediate-exception"
+	    echo "ssl_bump splice all"
+	fi
+    else
+	if test ${SSLMEDIATE_POLICY} == deny ; then
+	    echo "ssl_bump bump all"
+	else
+	    echo "ssl_bump splice all"
+	fi
+    fi
+}
+
+gen-squid-general-log()
+{
+    local syslog='yes'
+
+    if test ${LOG_MODE} == False ; then
+	echo "access_log none"
+	return 0
+    fi
+
+    local options
+
+    if test ${PERSISTENT_WEB_LOG} == True -a ${LOG_TYPE_WEB/:*} == True ; then
+	if test ${WEB_MODE} == True -o ${TRANSPARENT_MODE} == True ; then
+
+	    options='!localhost'
+
+	    if test ${RWEB_MODE} == True -o ${PROXY2_MODE} == False ; then
+
+		test -z "${ACL_NOT_PEERS}" || options="${options} ${ACL_NOT_PEERS}"
+		test -z "${ACL_NOT_RWEB_SITES}" || options="${options} ${ACL_NOT_RWEB_SITES}"
+
+		if test -n "${syslog}" ; then
+		    echo "access_log syslog:local5.info logformat=forward-syslog ${options}"
+		else
+		    echo "access_log daemon:/var/log/${WEB_LOG} logformat=forward ${options}"
+		fi
+	    else
+
+		test -z "${ACL_NOT_PEERS}" || options="${options} ${ACL_NOT_PEERS}"
+		if test -n "${syslog}" ; then
+		    echo "access_log syslog:local5.info logformat=forward-syslog ${options}"
+		else
+		    echo "access_log daemon:/var/log/${WEB_LOG} logformat=forward ${options}"
+		fi
+	    fi
+	fi
+    fi
+
+    if test ${PERSISTENT_RWEB_LOG} == True -a ${LOG_TYPE_RWEB/:*} == True ; then
+	if test ${RWEB_MODE} == True -a ${PROXY2_MODE} == False ; then
+	    local acl options="!squid-internal !from-ext-ip"
+	    for acl in ${ACL_RWEB_SITES}
+	    do
+		if test -n "${syslog}" ; then
+    		    echo "access_log syslog:local6.info logformat=reverse-syslog ${options} ${acl}"
+		else
+    		    echo "access_log daemon:/var/log/${RWEB_LOG} logformat=reverse ${options} ${acl}"
+		fi
+	    done
+	fi
+    fi
+
+    echo "access_log none"
+}
+
+gen-squid-general()
+{
+    gen-squid-general-common
+    gen-squid-general-guard
+    gen-squid-general-log
+    gen-squid-general-dns
+    gen-squid-general-tweb
+    gen-squid-general-web
+    gen-squid-general-rweb
+    gen-squid-general-peer
+    gen-squid-general-av-compress
+    gen-squid-ssl-mediate
+}
+
+gen-squid-access-web-web()
+{
+    test ${WEB_MODE} == True || return 0
+    local auth_acl=${1}
+    test ${AUTHENTICATE_WEB} == "True" || unset auth_acl
+
+    if test -z "${ACCESS_IF_IP_MK_WEB_LIST}" ; then
+	echo "http_access allow proxy_port squid-icons"
+	echo "http_access allow proxy_port ${auth_acl}"
+	return 0
+    fi
+
+    local i=0 nb=1 elt range
+
+    for elt in ${PEER_SHARE_LIST} ${PEER_HA_LIST}
+    do
+	range=$[${i} % 2]
+	case ${range} in
+	    0)
+		;;
+	    1)
+		echo "http_access allow from-peer-ip-${nb}"
+		((nb++))
+		;;
+	    *)
+		return 1
+		;;
+	esac
+	((i++))
+    done
+
+    i=0 nb=1
+    for elt in ${PEER_PREVIOUS_LIST}
+    do
+	range=$[${i} % 2]
+	case ${range} in
+	    0)
+		;;
+	    1)
+		echo "http_access allow from-previous-peer-ip-${nb}"
+		((nb++))
+		;;
+	    *)
+		return 1
+		;;
+	esac
+	((i++))
+    done
+    
+    i=0 nb=1
+    for elt in ${ACCESS_IF_IP_MK_WEB_LIST}
+    do
+	range=$[${i} % 4]
+	case ${range} in
+	    0|1|2)
+		;;
+	    3)
+		if test -z "${auth_acl}" ; then
+		    echo "http_access allow from-client-ip-${nb} proxy_port"
+		else
+		    echo "http_access allow from-client-ip-${nb} proxy_port squid-icons"
+		    echo "http_access allow from-client-ip-${nb} proxy_port ${auth_acl}"
+		fi
+		((nb++))
+		;;
+	    *)
+		return 1
+		;;
+	esac
+	((i++))
+    done
+}
+
+gen-squid-access-web-certificate()
+{
+    test ${SSLMEDIATE_MODE} == True || return 0
+
+    echo "http_access allow fetch_intermediate_certificate"
+}
+
+gen-squid-access-web-tweb()
+{
+    test ${TRANSPARENT_MODE} == True || return 0
+
+    local i nb elt range
+
+    i=0 nb=1
+    for elt in ${TRANSPARENT_IF_IP_MK_LIST}
+    do
+	range=$[${i} % 4]
+	case ${range} in
+	    0|1|2)
+		;;
+	    3)
+		echo "http_access allow from-tclient-ip-${nb} thttp_port"
+		test ${SSLMEDIATE_TRANSPARENT_MODE} == False || echo "http_access allow from-tclient-ip-${nb} thttps_port"
+		((nb++))
+		;;
+	    *)
+		return 1
+		;;
+	esac
+	((i++))
+    done
+}
+
+gen-squid-access-web-rweb()
+{
+    test ${RWEB_MODE} == True || return 0
+    test ${PROXY2_MODE} == False || return 0
+
+    local auth_acl=${1}
+    test ${AUTHENTICATE_RWEB} == "True" || unset auth_acl
+
+    local elt range i=0 nb=1
+    local name protocol
+
+    for elt in ${_RWEB_SITE_HOSTS_LIST}
+    do
+	range=$[${i} % 2]
+	case ${range} in
+	    0)
+		name=${elt}
+		;;
+	    1)
+		protocol=$(rweb-get-protocol ${name} configurator)
+		case ${protocol} in
+		    http)
+			echo "http_access allow rweb_port to-site-${nb} ${auth_acl}"
+			;;
+		    https)
+			echo "http_access allow ssl_rweb_port to-site-${nb} ${auth_acl}"
+			;;
+		    both)
+			echo "http_access allow rweb_port to-site-${nb} ${auth_acl}"
+			echo "http_access allow ssl_rweb_port to-site-${nb} ${auth_acl}"
+			;;
+		    *)
+			;;
+		esac
+		((nb++))
+		;;
+	    *)
+		return 1
+		;;
+	esac
+	((i++))
+    done
+}
+
+gen-squid-request-headers()
+{
+    local elt range i=0 nb=1
+    local name protocol
+
+    echo "via off"
+    if test -n "${PEER_NEXT_LIST}" -o ${RWEB_MODE} == True ; then
+       echo "forwarded_for on"
+    else
+	echo "forwarded_for off"
+    fi
+    echo "request_header_access Via deny all"
+    echo "request_header_access X-Cache allow localhost"
+    echo "request_header_access X-Cache deny all"    
+
+    if test ${ANONYMOUS_MODE} == True ; then
+	echo "request_header_access From deny all"
+	echo "request_header_access Referer deny all"
+	echo "request_header_access Server deny all"
+	echo "request_header_access Link deny all"
+    fi
+
+    if test ${WEB_MODE} == True -a -z "${PEER_NEXT_LIST}" ; then
+	i=0 nb=1
+	for elt in ${PEER_PREVIOUS_LIST}
+	do
+	    range=$[${i} % 2]
+	    case ${range} in
+		0)
+		    ;;
+		1)
+		    echo "request_header_access X-Forwarded-For allow from-previous-peer-ip-${nb}"
+		    ((nb++))
+		    ;;
+		*)
+		    return 1
+		    ;;
+	    esac
+	    ((i++))
+	done
+    fi
+
+    if test ${RWEB_MODE} == True ; then
+	i=0 nb=1
+
+	if test ${PROXY2_MODE} == True ; then
+	    if test -z "${PEER_NEXT_LIST}" ; then
+		for elt in ${RWEB_HTTP_NAME_IP_LIST}
+		do
+		    range=$[${i} % 2]
+		    case ${range} in
+			0)
+			    ;;
+			1)
+			    echo "request_header_access X-Forwarded-For allow to-site-${nb}"
+			    ((nb++))
+			    ;;
+			*)
+			    return 1
+			    ;;
+		    esac
+		    ((i++))
+		done
+	    fi
+	else
+	    for elt in ${_RWEB_SITE_HOSTS_LIST}
+	    do
+		range=$[${i} % 2]
+		case ${range} in
+		    0)
+			name=${elt}
+			;;
+		    1)
+			test -n "${PEER_NEXT_LIST}" || echo "request_header_access X-Forwarded-For allow to-site-${nb}"
+
+			protocol=$(rweb-get-protocol ${name} configurator)
+
+			case ${protocol} in
+			    https|both)
+				echo "request_header_add X-Forwarded-Proto \"https\" to-site-${nb}"
+				;;
+			    http)
+				echo "request_header_add X-Forwarded-Proto \"http\" to-site-${nb}"
+				;;
+			    *)
+				return 255
+				;;
+			esac
+			((nb++))
+			;;
+		    *)
+			return 1
+			;;
+		esac
+		((i++))
+	    done
+	fi
+    fi
+
+    test -n "${PEER_NEXT_LIST}" || echo "request_header_access X-Forwarded-For deny all"
+
+    echo "request_header_access All allow all"
+    echo "request_header_access Other allow all"
+
+    echo "follow_x_forwarded_for allow from-localhost-1"
+    echo "follow_x_forwarded_for allow from-localhost-2"
+
+    i=0 nb=1
+    for elt in ${PEER_PREVIOUS_LIST}
+    do
+	range=$[${i} % 2]
+	case ${range} in
+	    0)
+		;;
+	    1)
+		echo "follow_x_forwarded_for allow from-previous-peer-ip-${nb}"
+		((nb++))
+		;;
+	    *)
+		return 1
+		;;
+	esac
+	((i++))
+    done
+    echo "follow_x_forwarded_for deny all"
+
+    echo "acl_uses_indirect_client on"
+    echo "log_uses_indirect_client on"
+    echo
+}
+
+gen-squid-reply-headers()
+{
+    echo "reply_header_access Via deny all"
+    echo "reply_header_access ETag deny all"
+
+    if test ${TRANSPARENT_MODE} == True ; then
+	echo "reply_header_access X-Cache deny thttp_port"
+	test ${SSLMEDIATE_TRANSPARENT_MODE} == False || echo "reply_header_access X-Cache deny thttps_port"
+    fi
+#   echo "reply_header_access X-Cache deny rweb_port"
+    echo "reply_header_access X-Cache deny ssl_rweb_port"
+    echo "reply_header_access X-Cache allow all"
+    echo
+}
+
+gen-squid-access-rweb-deny-options()
+{
+    test ${RWEB_MODE} == True || return 0
+    test ${PROXY2_MODE} == False || return 0
+
+    local elt range i=0 nb=1
+
+    for elt in ${_RWEB_SITE_HOSTS_LIST}
+    do
+	range=$[${i} % 2]
+	case ${range} in
+	    0)
+	        ;;
+	    1)
+		echo "http_access deny options_method to-site-${nb}"	
+		((nb++))
+		;;
+	    *)
+		return 1
+		;;
+	esac
+	((i++))
+    done
+}
+
+gen-squid-access-web-common()
+{
+    echo "http_access allow purge localhost"
+    echo "http_access deny !valid_methods"
+    echo "http_access allow manager localhost"
+    echo "http_access deny manager"
+    echo "http_access deny !safe_ports"
+    echo "http_access deny connect !ssl_ports"
+    echo "http_access deny to-localnet"
+    echo "http_access allow localhost"
+
+    case ${CLOUD_NAME} in
+	aws)
+	    echo "http_access deny to-cloud-metadata-ip"
+	    ;;
+	azure)
+	    echo "http_access deny to-cloud-metadata-ip"
+	    echo "http_access deny to-cloud-azure-fabric-ip"
+	    ;;
+	*)
+	    ;;
+    esac
+}
+
+gen-squid-access-rweb-redirect()
+{
+    test ${RWEB_MODE} == True || return 0
+    test ${PROXY2_MODE} == False || return 0
+
+    local elt range i=0 nb=1
+    local name protocol
+
+    for elt in ${_RWEB_SITE_HOSTS_LIST}
+    do
+	range=$[${i} % 2]
+	case ${range} in
+	    0)
+		name=${elt}
+		;;
+	    1)
+		protocol=$(rweb-get-protocol ${name} configurator)
+
+		case ${protocol} in
+		    both)
+			if is-rweb-http-redirected-to-https ${name} ; then
+			    echo "http_access deny rweb_port to-site-${nb}"
+			    echo "deny_info https://${name}/%R to-site-${nb}"
+			fi
+			;;
+		    http|https)
+			;;
+
+		    *)
+			return 255
+			;;
+		esac
+
+		((nb++))
+		;;
+	    *)
+		return 1
+		;;
+	esac
+	((i++))
+    done
+}
+
+gen-squid-access-web-allow-all()
+{
+    echo "http_access allow all"
+}
+
+gen-squid-access-web-deny-all()
+{
+    echo "http_access deny all"
+}
+
+gen-squid-access-web()
+{
+    local auth_acl=${1}
+
+    echo "always_direct allow to-localhost-1"
+    echo "always_direct allow to-localhost-2"
+    echo
+    gen-squid-access-rweb-deny-options
+    gen-squid-access-web-common
+    gen-squid-access-rweb-redirect
+
+    if test ${WEB_MODE} == True ; then
+	if test -z "${ACCESS_IF_IP_MK_WEB_LIST}" -a -z "${auth_acl}" ; then
+	    gen-squid-access-web-allow-all
+	else
+	    gen-squid-access-web-certificate
+	    gen-squid-access-web-tweb
+	    gen-squid-access-web-rweb "${auth_acl}"
+	    gen-squid-access-web-web "${auth_acl}"
+	    gen-squid-access-web-deny-all
+	fi
+    else
+	if test -z "${auth_acl}" ; then
+	    gen-squid-access-web-allow-all
+	else
+	    gen-squid-access-web-certificate
+	    gen-squid-access-web-tweb
+	    gen-squid-access-web-rweb "${auth_acl}"
+	    gen-squid-access-web-deny-all
+	fi
+    fi
+}
+
+gen-squid-access-rweb()
+{
+    test ${RWEB_MODE} == True || return 0
+
+    local elt range i=0
+
+    if test ${PROXY2_MODE} == False ; then
+
+	local protocol name names name_nb
+	local host_nb=1
+
+	echo "always_direct allow to-web-ip"
+	test ${GUARD_MODE} == False || echo "cache_peer_access self-server allow to-web-ip to-self-guard-url"
+
+	for elt in ${RWEB_HOST_SITES_LIST}
+	do
+	    range=$[${i} % 2]
+	    case ${range} in
+		0)
+		    host=${elt//_/ }
+		    ;;
+		1)
+		    names=$(colon2space ${elt})
+		    protocol=$(get-nth-arg 1 ${host})
+
+		    case ${protocol} in
+			http)
+			    for name in ${names}
+			    do
+				name_nb=${name/*,}
+				echo "cache_peer_access backend-${host_nb} allow to-site-${name_nb}"
+			    done
+			    ;;
+			https)
+			    name=$(get-nth-arg 1 ${names})
+			    name_nb=${name/*,}
+			    echo "cache_peer_access backend-${host_nb} allow to-site-${name_nb}"
+			    ;;
+			*)
+			    ;;
+		    esac
+
+		    echo "cache_peer_access backend-${host_nb} deny all"
+		    ((host_nb++))
+		    ;;
+		*)
+		    return 255
+		    ;;
+	    esac
+	    ((i++))
+	done
+    else
+	test ${TRANSPARENT_MODE} == True || return 0
+
+	echo "always_direct allow to-web-ip"
+	test ${GUARD_MODE} == False || echo "cache_peer_access self-server allow to-web-ip to-self-guard-url"
+
+	local nb=1
+	for elt in ${RWEB_HTTP_NAME_IP_LIST}
+	do
+	    range=$[${i} % 2]
+	    case ${range} in
+		0)
+		    ;;
+		1)
+		    echo "cache_peer_access backend-${nb} allow to-site-${nb}"
+		    echo "cache_peer_access backend-${nb} deny all"
+		    ((nb++))
+		    ;;
+		*)
+		    return 1
+		    ;;
+	    esac
+	    ((i++))
+	done
+    fi
+}
+
+gen-squid-access-peer-web()
+{
+    test -n "${1}" || return 1
+    peer_ip=${1}
+
+    local i=0 nb=1 elt range
+
+    for elt in ${ACCESS_IF_IP_MK_WEB_LIST}
+    do
+	range=$[${i} % 4]
+	case ${range} in
+	    0|1|2)
+		;;
+	    3)
+		echo "cache_peer_access ${peer_ip} allow from-client-ip-${nb} proxy_port"
+		((nb++))
+		;;
+	    *)
+		return 1
+		;;
+	esac
+	((i++))
+    done
+}
+
+gen-squid-access-peer-tweb()
+{
+    test ${TRANSPARENT_MODE} == True || return 0
+
+    test -n "${1}" || return 1
+    peer_ip=${1}
+
+    local i=0 nb=1 elt range
+
+    for elt in ${TRANSPARENT_IF_IP_MK_LIST}
+    do
+	range=$[${i} % 4]
+	case ${range} in
+	    0|1|2)
+		;;
+	    3)
+		echo "cache_peer_access ${peer_ip} allow from-tclient-ip-${nb} thttp_port"
+		((nb++))
+		;;
+	    *)
+		return 1
+		;;
+	esac
+	((i++))
+    done
+}
+
+gen-squid-access-peer()
+{
+    local i=0 nb=1 elt range
+    local ip
+
+    for elt in ${PEER_SHARE_LIST} ${PEER_HA_LIST}
+    do
+	range=$[${i} % 2]
+	case ${range} in
+	    0)
+		ip=${elt}
+		;;
+	    1)
+		echo "htcp_access allow from-peer-ip-${nb}"
+		((nb++))
+		;;
+	    *)
+		return 1
+		;;
+	esac
+	((i++))
+    done
+    echo "htcp_access deny all"
+
+    test ${RWEB_MODE} == False -o ${PROXY2_MODE} == True || return 0
+
+    i=0
+    for elt in ${PEER_SHARE_LIST} ${PEER_HA_LIST}
+    do
+	range=$[${i} % 2]
+	case ${range} in
+	    0)
+		ip=${elt}
+		;;
+	    1)
+		if test -n "${ACCESS_IF_IP_MK_WEB_LIST}" ; then
+		    gen-squid-access-peer-web ${ip}
+		    if test -n "${TRANSPARENT_IF_IP_MK_LIST}" ; then
+			gen-squid-access-peer-tweb ${ip}
+			echo "cache_peer_access ${ip} deny all"
+		    else
+			if test ${TRANSPARENT_MODE} == True ; then
+			    echo "cache_peer_access ${ip} allow thttp_port"
+			fi
+			echo "cache_peer_access ${ip} deny all"
+		    fi
+		else
+		    if test -n "${TRANSPARENT_IF_IP_MK_LIST}" ; then
+			gen-squid-access-peer-tweb ${ip}
+			echo "cache_peer_access ${ip} allow proxy_port"
+			echo "cache_peer_access ${ip} deny all"
+		    fi
+		fi
+		;;
+	    *)
+		return 1
+		;;
+	esac
+	((i++))
+    done
+}
+
+gen-squid-access-snmp()
+{
+    echo "redirector_access deny manager"
+    echo "snmp_incoming_address 127.0.0.1"
+
+    if test ${ADMIN_SNMP} == True ; then
+	echo "snmp_port ${SNMP_PORT}"
+	echo "snmp_access allow snmp_string localhost"
+	echo "snmp_access deny all"
+    else
+	echo "snmp_port 0"
+    fi
+}
+
+gen-squid-access()
+{
+    local auth_acl=$(get-auth-squid-acl)
+
+    gen-squid-auth-access "${auth_acl}"
+    gen-squid-access-web "${auth_acl}"
+
+    gen-squid-access-rweb
+    gen-squid-access-peer
+    gen-squid-access-snmp
+}
+
+gen-squid-hosts()
+{
+    echo "# Begin /etc/hosts"
+    echo
+
+    echo "${IP_WEB_IP} ${WEB_SERVER_DENY_NAME}"
+
+    if test ${WEB_MODE} == True ; then
+	echo "${IP_WEB_IP} ${SHOSTNAME} ${SHOSTNAME}.${DOMAIN_NAME}"
+    else
+    	echo "${IP_RWEB_IP} ${SHOSTNAME} ${SHOSTNAME}.${DOMAIN_NAME}"
+    fi
+
+    gen-rweb-hosts
+    gen-ldap-ip-name
+    gen-name-ip-hosts
+
+    echo
+    echo "# End /etc/hosts"
+}
+
+gen-squid-cache-buffer()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    local buffer_sz=${1}
+    local cpu_architecture=${2}
+
+    if test $[${buffer_sz} * 1024] -lt ${MAX_OBJECT_MEMORY_SZ} ; then
+	echo "cache_mem 0 MB"
+	return 0
+    fi
+
+    if test ${buffer_sz} -le 4095 ; then
+	echo "cache_mem ${buffer_sz} MB"
+	return 0
+    fi
+
+    case ${cpu_architecture} in
+	x86_64)
+	    echo "cache_mem ${buffer_sz} MB"
+	    ;;
+	*)
+	    echo "cache_mem 4095 MB"
+	    ;;
+    esac
+}
+
+gen-squid-cache-global()
+{
+    if test ${PERSISTENT_CACHE} == True -a ${CACHE_MODE} == True ; then
+
+	local squid_cache_memory_sz
+
+	((squid_cache_memory_sz = CACHE_IO_MEMORY_SZ + SQUID_INITIAL_PROCESS_SZ + TOTAL_IN_MEMORY_CACHED_OBJECT_SZ))
+
+	echo "memory_pools on"
+	echo "minimum_object_size ${CACHE_MIN_OBJECT_SZ} KB"
+	echo "maximum_object_size ${CACHE_MAX_OBJECT_SZ} KB"
+
+	if test ${PROXY2_MODE} == True ; then
+	    local acl
+	    for acl in ${ACL_RWEB_SITES}
+	    do
+		echo "cache deny ${acl}"
+	    done
+	fi
+
+	echo "quick_abort_min ${STORE_AVERAGE_OBJECT_SZ} KB"
+	echo "quick_abort_max ${STORE_AVERAGE_OBJECT_SZ} KB"
+	echo "store_avg_object_size ${STORE_AVERAGE_OBJECT_SZ} KB"
+	echo "memory_pools_limit ${squid_cache_memory_sz} MB"
+
+	local cache_buffer_sz=$(get-proxy1-cache-buffer-sz ${FREE_MEMORY_SZ} ${PROXY_PROXY2_RATIO_PCT})
+	gen-squid-cache-buffer ${cache_buffer_sz} ${CPU_ARCHITECTURE}
+    else
+	echo "memory_pools off"
+	echo "cache deny all"
+	gen-squid-cache-buffer 0 ${CPU_ARCHITECTURE}
+    fi
+}
+
+gen-squid-no-cache-dir()
+{
+    cat squid.conf-constant
+    gen-squid-acl
+    gen-squid-general
+    gen-squid-request-headers
+    gen-squid-reply-headers
+    gen-squid-access
+    cat squid.conf-tuned
+    gen-squid-cache-global
+}
+
+gen-squid-cache-dir()
+{
+    test ${PERSISTENT_CACHE} == True -a ${CACHE_MODE} == True || return 0
+
+    local tag program dir sz rest
+    local i=0 limits
+
+    if test ${CACHE_BIG_OBJECT} == True ; then
+	local min_sz=$[${CACHE_MIN_OBJECT_SZ} * 1024]
+	local max_sz=$[${CACHE_MAX_OBJECT_SZ} * 1024]
+
+	local big_min_sz=$[${CACHE_BIG_MIN_OBJECT_SZ} * 1024]
+	local big_max_sz=$[${CACHE_BIG_MAX_OBJECT_SZ} * 1024]
+	test ${big_max_sz} -le $[${PROXY_CACHE_UNIT_SZ} * 1024] || big_max_sz=$[${PROXY_CACHE_UNIT_SZ} * 1024]
+    fi
+
+    while read tag program dir sz rest
+    do
+	test ${tag} == cache_dir || continue
+
+	if test ${CACHE_BIG_OBJECT} == True ; then
+	    if test ${i} -eq 0 ; then
+		limits=" min-size=${big_min_sz} max-size=${big_max_sz}"
+	    else
+		limits=" min-size=${min_sz} max-size=${max_sz}"
+	    fi
+	    ((i++))
+	fi
+
+	((adapted_sz = (HDD_CACHE_USABLE_PCT * sz) / 100))
+	test ${adapted_sz} -le 0 || echo ${tag} ${program} ${dir} ${adapted_sz} ${rest}${limits}
+    done < squid.conf-cache-tuned
+}
+
+gen-squid-conf()
+{
+    cat squid.conf-no-cache-dir.new
+    cat squid.conf-cache-dir.new
+}
+
+gen-suspend-squid-conf()
+{
+    cat squid.conf.new | grep -v url_rewrite_program
+    echo "url_rewrite_program /bin/squidGuard -c /etc/squidGuard.conf -P"
+}
+
+update-proxy-av-whitelist-domainname()
+{
+    test -n "${1}" || return 1
+    local context=${1}
+
+    if test "${AV_WHITELIST_DOMAINNAME_LIST}" != "${CURRENT_AV_WHITELIST_DOMAINNAME_LIST}" ; then
+	local name
+	for name in ${AV_WHITELIST_DOMAINNAME_LIST}
+	do
+	    echo ".${name}"
+	done > ${PROXY_DOMAIN_LIST_DIR}/${AV_WHITELIST_DOMAIN_FILENAME}
+    fi
+
+    test -n "${AV_WHITELIST_DOMAINNAME_LIST}" || echo -n > ${PROXY_DOMAIN_LIST_DIR}/${AV_WHITELIST_DOMAIN_FILENAME}
+}
+
+update-proxy-av-whitelist()
+{
+    update-proxy-av-whitelist-domainname "${@}"
+}
+
+gen-sysconfig-squid()
+{
+    case ${APL_ROLE} in
+	gateway)
+	    if test ${PERSISTENT_CACHE} == True -a ${CACHE_MODE} == True ; then
+		echo "export SQUID_DUMP_CACHE=on"
+	    else
+		echo "export SQUID_DUMP_CACHE=off"
+	    fi
+	    cat sysconfig.squid-tuned
+	    ;;
+	manager)
+	    ;;
+	*)
+	    ;;
+    esac
+}
+
+LIB_APL_PROXY=Yes

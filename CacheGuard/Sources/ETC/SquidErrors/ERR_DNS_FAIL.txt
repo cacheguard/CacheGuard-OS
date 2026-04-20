@@ -1,0 +1,3 @@
+Name resolution failed
+The system cannot associate the domain name <code><strong>%H</strong></code> to an IP address
+Check if the given domain name is valid

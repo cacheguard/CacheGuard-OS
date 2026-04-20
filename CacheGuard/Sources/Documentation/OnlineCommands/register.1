@@ -1,0 +1,41 @@
+Manage the appliance S/N and license key registration
+.SH SYNOPSIS
+
+[1] \fBregister\fR [\fBappliance\fR (\fBnew\fR \fI<email>\fR [\fI<otp>\fR]) | (\fBold\fR [\fI<otp>\fR])]
+
+[2] \fBregister\fR [\fBlicense\fR \fI<license-key>\fR]
+
+[3] \fBregister\fR [\fBembedded\fR [(\fBbevypn\fR) [\fI<license-key>\fR]]]
+
+[4] \fBregister\fR [\fBclear\fR]
+
+
+.SH DESCRIPTION
+The appliance registration process associates an appliance to a S/N (Serial Number) that uniquely identifies that appliance. The registering is free and allows you to purchase optional services and/or activate commercial installations. Note that a S/N is bound to the first MAC address of an appliance. Hence your MAC address should not be modified after having registered your appliance.
+
+Without any arguments, the \fBregister\fR command shows the appliance registration/subscription state and gives you useful information about the appliance registration/subscription. As many commands, to take effect, the register command requires that you apply it by using the \fBapply\fR command. 
+
+The first [1] usage form allows you to register an appliance in order to get its unique S/N. If you register an appliance for the first time, use the keywords \fBappliance new\fR followed by a registration email address and a registration OTP (One Time Password). To get a registration OTP please go to the menu option \fI[GENERAL] > [Main Settings] > [Registration & Subscription]\fR of the Web GUI, select "First Registration" and click on the "Get OTP" button. Alternatively you can get the registration URL by using the \fBregister\fR command without any arguments. You must provide a valid and active email address to properly register the appliance. Otherwise the registration fails. In case where no OTP is specified, you will be prompted to enter the OTP in hidden mode.
+
+If the appliance has been previously registered and for any reason (an OS reinstallation for instance) its S/N is no longer locally assigned to it, you can recover its S/N by re-registering it. To recover the S/N of an already registered appliance, use the keywords \fBappliance old\fR followed by a re-registration OTP. To get a re-registration OTP, please go to the menu option \fI[GENERAL] > [Main Settings] > [Registration]\fR of the Web GUI, select "Recover S/N" and click on the "Get OTP" button. Alternatively you can get the re-registration URL by using \fBregister\fR command without any arguments. Please note that during the re-registration process the previously used registration email address is asked and the OTP is sent to that email. In case where no OTP is specified, you will be prompted to enter the OTP in hidden mode.
+
+Please note that to register, the appliance should be connected to the internet and have access to the registration services (https://appliance.cacheguard.net and https://os.cacheguard.net) during the whole registration process.
+
+For commercial installations, the registration and subscription is mandatory. After having registered and appliance and subscribed for a given period of time, a license key is assigned to the appliance. The license key is used to activate a subscription on an appliance for the first time. Following the initial subscription period, a subscription renewal is required to continue to use the appliance. In case where the renewal in time is omitted, the appliance enters into a suspended mode. In suspended mode, Web traffic via the Web gateway (forwarding Web proxy) is blocked and the system configuration is locked (can no longer be modified). To reactivate a suspended appliance, you should proceed with its subscription renewal. After getting the renewal confirmation, the appliance is automatically reactivated during the night following the renewal confirmation date. The reactivation can also be manually done by re-registering the appliance license key (see the second usage form below). To avoid any service interruption, it is highly recommended to renew a subscription before its expiry date.
+
+The second [2] usage form allows you to activate a subscription on an appliance using a license key. To activate a subscription use the keywords \fBlicense\fR followed by the license key.
+
+The third [3] usage form allows you to register license keys for embedded applications. Embedded applications are applications that are built on top of a CacheGuard appliance and run on the appliance itself. You can activate an embedded application using the \fBembedded\fR command but when you activate it for the first time, you need a license key that you should register using the \fBregister\fR command. To register a license key for an embedded application, use the \fBembedded\fR keyword followed by the embedded application reference and its activation license key.
+
+The fourth [4] usage form allows you to deregister an already registered appliance. You may need to deregister an appliance in case where you need to replace its first hardware NIC (Network Interface Card) and then need to get a new S/N for it. Please note that a S/N and a license key are valid on a unique machine only. Refer to the CacheGuard-OS License Agreement for further information (see the \fBlicense\fR command). Deregistering an appliance also deregister all registered embedded applications. To deregister an appliance, use the keyword \fBclear\fR.
+
+.SH MAC ADDRESS AND VIRTUAL MACHINES
+A hardware NIC is identified by a MAC address that is universally unique and guarantees a successful appliance registration. If you install the OS on a VM (Virtual Machine), you should ensure that its first NIC is unique at least in your environment. If the chosen MAC address is already registered for a another appliance, the registration fails. In this case, we suggest that you modify your VM's MAC address and try to register it again.
+
+.SH SEE ALSO
+.B apply
+(1)
+.B embedded
+(1)
+.B system
+(1)

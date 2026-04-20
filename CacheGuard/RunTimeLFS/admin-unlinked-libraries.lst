@@ -1,0 +1,5 @@
+usr/lib/libnss_compat*.so*
+usr/lib/libnss_files*.so*
+usr/lib/libnss_dns*.so*
+usr/lib/sudo/sudoers.so
+usr/local/lib/libclamunrar*.so.*

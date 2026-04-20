@@ -1,0 +1,12 @@
+		sleep 3
+		MSG_IDS=`ipcs -q | tail --lines=+4 | grep squid | awk '{print $2}'`
+		for msg in ${MSG_IDS}
+		do
+			ipcrm msg ${msg}
+		done
+
+		SHM_IDS=`ipcs -m | tail --lines=+4 | grep squid | awk '{print $2}'`
+		for shm in ${SHM_IDS}
+		do
+			ipcrm shm ${shm}
+		done

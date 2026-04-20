@@ -1,0 +1,92 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       InitScript
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+source /lib/lsb/init-functions
+
+CACHEGUARD_DIR=/etc/sysconfig/cacheguard
+source ${CACHEGUARD_DIR}/constant
+source ${LOCAL_DIR}/lib/apl_functions
+
+SERV="Hardware"
+
+hardware-setup()
+{
+    local manufacturer_name=$(dmidecode -q --string system-manufacturer 2> /dev/null | egrep -v -e "^#")
+    local product_name=$(dmidecode -q --string system-product-name 2> /dev/null | egrep -v -e "^#")
+
+    test "${manufacturer_name}" != "Default string" || manufacturer_name="${COMMERCIAL_NAME}"
+    test "${product_name}" != "Default string" || product_name="${COMMERCIAL_MODEL}"
+
+    local cpu_nb=$(get-cpu-nb)
+    local model_name=$(grep '^model name' /proc/cpuinfo | head -1) ; model_name=${model_name/model name*: /}
+    local cache_size=$(grep '^cache size' /proc/cpuinfo | head -1) ; cache_size=${cache_size/cache size*: /}
+    local cpu_info="${model_name}"
+    test ${cpu_nb} -le 1 || cpu_info="${cpu_info}, ${cpu_nb} Cores"
+    test -z "${cache_size}" || cpu_info="${cpu_info}, ${cache_size} Cache"
+
+    local new_ram_sz=$(get-memory-sz)
+
+    echo ${manufacturer_name} > ${HARD_DIR}/hw-manufacturer-name
+    echo ${product_name} > ${HARD_DIR}/hw-product-name
+    echo ${cpu_info} > ${HARD_DIR}/hw-cpu
+
+    if test -s ${HARD_DIR}/hw-ram ; then
+	local old_ram_sz=$(cat ${HARD_DIR}/hw-ram 2> /dev/null)
+	if test "${old_ram_sz}" != "${new_ram_sz}" ; then
+	    echo ${new_ram_sz} > ${HARD_DIR}/hw-ram
+	    RAM_MODIFIED=yes
+	fi
+    else
+	echo ${new_ram_sz} > ${HARD_DIR}/hw-ram
+    fi
+}
+
+hardware-gen-install-date()
+{
+    test ! -s ${HARD_DIR}/${INSTALL_DATE} || return 0
+
+    date +"%s" > ${HARD_DIR}/${INSTALL_DATE} 2> /dev/null && \
+	chattr +i ${HARD_DIR}/${INSTALL_DATE} 2> /dev/null && \
+        echo -n "0" > ${HARD_DIR}/${VARIATION_DATE} 2> /dev/null && \
+	chmod 644 ${HARD_DIR}/${VARIATION_DATE} && \
+	chown ${ADMIN_NAME}:${GROUP_NAME} ${HARD_DIR}/${VARIATION_DATE}
+    return ${?}
+}
+
+case "${1}" in
+    start)
+	log_info_msg "Starting ${SERV}..."
+
+	hardware-setup &&
+	    hardware-gen-install-date
+
+	RETVAL=${?}
+	evaluate_retval
+	exit ${RETVAL}
+	;;
+    *)
+	echo "Usage: ${0} start"
+	exit 1
+	;;
+esac

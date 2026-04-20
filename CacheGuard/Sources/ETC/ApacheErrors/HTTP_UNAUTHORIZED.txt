@@ -1,0 +1,5 @@
+401
+Authentication required
+This Web Gateway could not verify that you are authorized to access this URL
+You either supplied the wrong credentials (e.g., bad password)
+Or your browser doesn't understand how to supply the credentials required

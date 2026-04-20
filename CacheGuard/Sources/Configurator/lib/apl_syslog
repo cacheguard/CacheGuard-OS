@@ -1,0 +1,366 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       Configurator
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+set-syslog-parameters()
+{
+    if test  "${GUARD_LOG_MODE}" == True ; then
+	export RLOGGER_IS_ACTIVE=True
+    else
+	export RLOGGER_IS_ACTIVE=False
+    fi
+
+    if test -n "${SYSLOG_SERVER_LIST}" ; then
+	export REMOTE_SYSLOG_MODE=True
+    else
+	export REMOTE_SYSLOG_MODE=False
+    fi
+
+    if test  "${CURRENT_GUARD_LOG_MODE}" == True ; then
+	export CURRENT_RLOGGER_IS_ACTIVE=True
+    else
+	export CURRENT_RLOGGER_IS_ACTIVE=False
+    fi
+
+    if test -n "${CURRENT_SYSLOG_SERVER_LIST}" ; then
+	export CURRENT_REMOTE_SYSLOG_MODE=True
+    else
+	export CURRENT_REMOTE_SYSLOG_MODE=False
+    fi
+}
+
+gen-rsyslog-conf-local-rainer-script()
+{
+    test -n "${1}" || return 1
+    local file=${1}
+
+    cat << EOF
+action(
+type="omfile"
+file="${file}"
+template="CG_FileFormat"
+action.resumeRetryCount="3"
+)
+EOF
+}
+
+gen-rsyslog-conf-forward-legacy()
+{
+    test -n "${1}" || return 1
+    local priority=${1}
+
+    local elt range i=0
+    local protocol server port
+    local tcp
+
+
+    for elt in ${SYSLOG_SERVER_LIST}
+    do
+	range=$[${i} % 3]
+	case ${range} in
+	    0)
+		protocol=${elt}
+		;;
+	    1)
+		server=${elt}
+		;;
+	    2)
+		port=${elt}
+		case ${protocol} in
+		    udp|tcp)
+			unset tcp
+			case ${protocol} in
+			    tcp)
+				tcp='@'
+				;;
+			    udp)
+				;;
+			    *)
+				return 255
+				;;
+			esac
+			echo "${priority} ${tcp}@${server}:${port}"	
+			;;
+		    tls)
+			cat << EOF
+${priority} action(
+type="omfwd"
+protocol="tcp"
+target="${server}"
+port="${port}"
+StreamDriver.Name="ossl"
+gnutlsPriorityString="MinProtocol=TLSv1.3"
+StreamDriver.PrioritizeSAN="on"
+StreamDriverMode="1"
+StreamDriver.PermitExpiredCerts="off"
+StreamDriverAuthMode="x509/name"
+StreamDriverPermittedPeers="${server}"
+)
+EOF
+			
+			;;
+		    *)
+			return 255
+			;;
+		esac
+		;;
+	    *)
+		return 255
+		;;
+	esac
+	((i++))
+    done
+}
+
+gen-rsyslog-conf-forward-rainer-script()
+{
+    local elt range i=0
+    local protocol server port
+
+    for elt in ${SYSLOG_SERVER_LIST}
+    do
+	range=$[${i} % 3]
+	case ${range} in
+	    0)
+		protocol=${elt}
+		;;
+	    1)
+		server=${elt}
+		;;
+	    2)
+		port=${elt}
+		cat << EOF
+action(
+type="omfwd"
+target="${server}"
+port="${port}"
+EOF
+		case ${protocol} in
+		    tcp|udp)
+			echo "protocol=\"${protocol}\""
+			;;
+		    tls)
+			cat << EOF
+protocol="tcp"
+StreamDriver.Name="ossl"
+gnutlsPriorityString="MinProtocol=TLSv1.3"
+StreamDriver.PrioritizeSAN="on"
+StreamDriverMode="1"
+StreamDriver.PermitExpiredCerts="off"
+StreamDriverAuthMode="x509/name"
+StreamDriverPermittedPeers="${server}"
+EOF
+			;;
+		    *)
+			return 255
+			;;
+		esac
+		echo ")"
+		;;
+	    *)
+		return 255
+		;;
+	esac
+	((i++))
+    done
+}
+
+gen-rsyslog-conf()
+{
+    local syslog_ca
+
+    if test -n "${SYSLOG_CA}" ; then
+	syslog_ca=${SYSLOG_CA}
+    else
+	syslog_ca=${SYSTEM_CA_ID}
+    fi
+
+    cat rsyslog.conf-constant
+
+    cat << EOF
+
+global(
+DefaultNetstreamDriverCAFile="${SSL_LOCAL_CA_DIR}/${syslog_ca}.certificate"
+)
+
+EOF
+
+    if test ${LOG_TYPE_FIREWALL/:*} == True ; then
+	cat << EOF
+
+if \$msg contains '${FW_LOG_TAG}:' then {
+EOF
+	gen-rsyslog-conf-local-rainer-script ${WEB_LOG_DIR}/${FIREWALL_LOG}
+	test ${LOG_TYPE_FIREWALL/*:} == False || gen-rsyslog-conf-forward-rainer-script
+	cat << EOF
+stop
+}
+EOF
+    fi
+
+    cat << EOF
+
+kern.* /var/log/kern.log;CG_FileFormat
+EOF
+
+    if test ${LOG_TYPE_ANTIVIRUS_SERVER/:*} == True ; then
+	cat << EOF
+
+if \$programname == 'clamd' then {
+if \$msg contains ' FOUND' then {
+if \$msg contains 'stream(' then {
+EOF
+	gen-rsyslog-conf-local-rainer-script ${WEB_LOG_DIR}/${ANTI_VIRUS_SERVER_LOG}
+	test ${LOG_TYPE_ANTIVIRUS_SERVER/*:} == False || gen-rsyslog-conf-forward-rainer-script
+	cat << EOF
+stop
+}}}
+EOF
+    fi
+
+    if test ${LOG_TYPE_ANTIVIRUS/:*} == True ; then
+	cat << EOF
+
+if \$programname == 'antivirus' then {
+EOF
+	gen-rsyslog-conf-local-rainer-script ${WEB_LOG_DIR}/${ANTI_VIRUS_LOG}
+	test ${LOG_TYPE_ANTIVIRUS/*:} == False || gen-rsyslog-conf-forward-rainer-script
+	cat << EOF
+stop
+}
+EOF
+    fi
+
+    if test ${LOG_TYPE_WAF/:*} == True ; then
+	cat << EOF
+
+if \$programname == 'httpd' then {
+if \$msg contains ' ModSecurity: ' then {
+EOF
+	gen-rsyslog-conf-local-rainer-script ${WEB_LOG_DIR}/${WAF_LOG}
+	test ${LOG_TYPE_WAF/*:} == False || gen-rsyslog-conf-forward-rainer-script
+	cat << EOF
+stop
+}}
+
+local4.* -${WEB_LOG_DIR}/${WEB_SERVER_LOG};CG_FileFormat
+EOF
+    fi
+
+    if test ${LOG_TYPE_WEB/:*} == True ; then
+	cat << EOF
+
+local5.* -${WEB_LOG_DIR}/${WEB_LOG};CG_FileFormat
+EOF
+	test ${LOG_TYPE_WEB/*:} == False || gen-rsyslog-conf-forward-legacy 'local5.*'
+    fi
+
+    if test ${LOG_TYPE_RWEB/:*} == True ; then
+	cat << EOF
+
+local6.* -${WEB_LOG_DIR}/${RWEB_LOG};CG_FileFormat
+EOF
+	test ${LOG_TYPE_RWEB/*:} == False || gen-rsyslog-conf-forward-legacy 'local6.*'
+    fi
+
+    cat << EOF
+
+if \$programname == 'vpnipsec' then {
+EOF
+    gen-rsyslog-conf-local-rainer-script ${WEB_LOG_DIR}/${VPN_IPSEC_LOG}
+    test -z "${SYSLOG_SERVER_LIST}" || gen-rsyslog-conf-forward-rainer-script
+    cat << EOF
+stop
+}
+
+if \$programname == 'login' then {
+if \$msg contains ' invalid password for ' then {
+EOF
+    gen-rsyslog-conf-local-rainer-script /var/log/auth.log
+    test -z "${SYSLOG_SERVER_LIST}" || gen-rsyslog-conf-forward-rainer-script
+    cat << EOF
+stop
+}}
+
+if \$programname == 'sshd' then {
+if \$msg contains ' Failed password for ' then {
+EOF
+    gen-rsyslog-conf-local-rainer-script /var/log/auth.log
+    test -z "${SYSLOG_SERVER_LIST}" || gen-rsyslog-conf-forward-rainer-script
+    cat << EOF
+stop
+}}
+
+auth,authpriv.* -/var/log/auth.log;CG_FileFormat
+EOF
+
+    echo
+    echo "# End /etc/rsyslog.conf"
+}
+
+gen-sysconfig-rlogger()
+{
+    local elt range i=0
+    local protocol server port
+    local syslog_servers
+
+    if test ${GUARD_LOG_MODE} == True ; then
+	echo "GUARD_LOG='yes'"
+	if test ${LOG_TYPE_GUARD/*:} == True ; then
+	    echo "GUARD_RLOG='yes'"
+	else
+	    echo "GUARD_RLOG='no'"
+	fi
+    else
+	echo "GUARD_LOG='no'"
+	echo "GUARD_RLOG='no'"
+    fi
+
+    test -z "${SYSLOG_CA}" || echo "SYSLOG_CA='${SYSLOG_CA}'"
+
+    for elt in ${SYSLOG_SERVER_LIST}
+    do
+	range=$[${i} % 3]
+	case ${range} in
+	    0)
+		protocol=${elt}
+		;;
+	    1)
+		server=${elt}
+		;;
+	    2)
+		port=${elt}
+		syslog_servers="${syslog_servers} ${protocol}:${server}:${port}"
+		;;
+	    *)
+		return 1
+		;;
+	esac
+	((i++))
+    done
+    syslog_servers="${syslog_servers:1}"
+
+    echo "SYSLOG_SERVERS=\"${syslog_servers}\""
+}
+
+LIB_APL_SYSLOG=Yes

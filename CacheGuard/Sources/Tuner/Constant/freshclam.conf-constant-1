@@ -1,0 +1,13 @@
+Checks 24
+UpdateLogFile /var/log/freshclam.log
+PidFile /var/run/clamav/freshclam.pid
+LogVerbose no
+LogSyslog no
+LogFacility LOG_LOCAL6
+MaxAttempts 3
+ScriptedUpdates yes
+CompressLocalDatabase no
+ConnectTimeout 5
+ReceiveTimeout 3600
+DatabaseMirror database.clamav.net
+TestDatabases yes

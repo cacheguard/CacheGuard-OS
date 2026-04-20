@@ -1,0 +1,17 @@
+Perform LDAP actions
+.SH SYNOPSIS
+
+[1] \fBldap\fR \fBsearch\fR \fB<filter>\fR
+
+.SH DESCRIPTION
+You can use this command to search users or other objects on LDAP servers configured for the authentication (see the command \fBauthenticate\fR). You can use this command to find relevant information about users in order to configure the authentication and/or LDAP filters used for the URL guarding. To use this command the LDAP authentication should be activated (see the command \fBmode\fR).
+
+A mandatory LDAP filter should be specified with this command. Because an LDAP filter contains one or more equal characters, it must be enclosed in (simple or double) quotation marks to avoid being interpreted by the shell. For instance the filter '\fIobjectClass=user\fR' display the list of all users.
+
+.SH SEE ALSO
+.B authenticate
+(1)
+.B guard
+(1)
+.B mode
+(1)

@@ -1,0 +1,114 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       InitScript
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+source /lib/lsb/init-functions
+
+CACHEGUARD_DIR=/etc/sysconfig/cacheguard
+source ${CACHEGUARD_DIR}/constant
+source ${APPLIANCE_DIR}/etc/role
+
+PROG="mdadm"
+FPROG=/sbin/${PROG}
+MDADM_CONF=/etc/${PROG}.conf
+MDADM_DEV=md1
+
+[ ! -f /etc/sysconfig/${PROG} ] || source /etc/sysconfig/${PROG}
+[ -x ${FPROG} ] || exit 0
+[ -f ${MDADM_CONF} ] || exit 0
+[ -b /dev/${MDADM_DEV} ] || exit 0
+
+RETVAL=0
+SERV="RAID Monitor"
+
+raid-action()
+{
+    test -n "${1}" || return 11
+    action=${1}
+
+    local file_action=/sys/block/${MDADM_DEV}/md/sync_action
+    test -w ${file_action} || return 13
+
+    case ${action} in
+	check)
+	    ;;
+	repair)
+	    ;;
+	*)
+	    return 15
+	    ;;
+    esac
+
+    echo ${action} > ${file_action}
+}
+
+case "${1}" in
+    start)
+	# Start daemons.
+	if [ -n "$(pidof ${PROG})" ]; then
+	    echo $"${PROG}: already running"
+	    exit 1
+	fi
+	log_info_msg "Starting ${SERV}... "
+	mkdir -p /run/${PROG}
+	start_daemon ${FPROG} --monitor --daemonise --config ${MDADM_CONF} ${MDADM_OPTS} /dev/${MDADM_DEV} > /dev/null 2>&1
+	RETVAL=${?}
+	[ ${RETVAL} -eq 0 ] && touch /var/lock/${PROG}
+	evaluate_retval
+	exit ${RETVAL}
+	;;
+
+    stop)
+	# Stop daemons.
+	log_info_msg "Stopping ${SERV}... "
+	killproc ${FPROG}
+	RETVAL=${?}
+	usleep 300000
+	rm -f /var/run/${PROG}/${PROG}.pid
+	[ ${RETVAL} -eq 0 ] && rm -f /var/lock/${PROG}
+	evaluate_retval
+	exit ${RETVAL}
+	;;
+
+    restart)
+	${0} stop
+	${0} start
+	;;
+
+    check|repair)
+	log_info_msg "Checking the ${SERV}... "
+	raid-action ${1}
+	RETVAL=${?}
+	[ ${RETVAL} -eq 0 ]
+	evaluate_retval
+	exit ${RETVAL}
+	;;
+
+    status)
+	statusproc ${PROG}
+	;;
+    *)
+	echo "Usage: ${0} {start|stop|restart|check|status}"
+	exit 1
+	;;
+esac

@@ -1,0 +1,745 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       Commands
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+__complete-firewall()
+{
+    test -n "${COMP_CWORD-1}" || return 1
+
+    case ${COMP_CWORD} in
+	1)
+	    case ${COMP_WORDS[1]} in
+		d|'do'|dos)
+		    COMPREPLY=(dos)
+		    ;;
+		e|ex|ext|exte|exter|extern|externa|external)
+		    COMPREPLY=(external)
+		    ;;
+		a)
+		    COMPREPLY=('' antivirus auxiliary)
+		    ;;
+		an|ant|anti|antiv|antivi|antivir|antiviru|antivirus)
+		    COMPREPLY=(antivirus)
+		    ;;
+		au|aux|auxi|auxil|auxili|auxilia|auxiliar|auxiliary)
+		    COMPREPLY=(auxiliary)
+		    ;;
+		w|we|web)
+		    COMPREPLY=(web)
+		    ;;
+		r|rw|rwe|rweb)
+		    COMPREPLY=(rweb)
+		    ;;
+		f|'fi'|fil|file)
+		    COMPREPLY=(file)
+		    ;;
+		p|pe|pee|peer)
+		    COMPREPLY=(peer)
+		    ;;
+		a|ad|ad|adm|admi|admin)
+		    COMPREPLY=(admin)
+		    ;;
+		m|mo|mon)
+		    COMPREPLY=(mon)
+		    ;;
+		v|vp|vpn|vpni|vpnip|vpnips|vpnipse|vpnipsec)
+		    COMPREPLY=(vpnipsec)
+		    ;;
+		'')
+		    COMPREPLY=('' '<RET>' dos external auxiliary web rweb antivirus file peer mon admin vpnipsec)
+		    ;;
+		*)
+		    COMPREPLY=()
+		    ;;
+	    esac
+	    ;;
+	2)
+	    case ${COMP_WORDS[1]} in
+		dos)
+		    case ${COMP_WORDS[2]} in
+			p|pi|pip)
+			    COMPREPLY=('' piptcp pipweb piprweb pipdns pipocsp)
+			    ;;
+			pipt|piptc|piptcp)
+			    COMPREPLY=(piptcp)
+			    ;;
+			pipr|piprw|piprwe|piprweb)
+			    COMPREPLY=(piprweb)
+			    ;;
+			pipw|pipwe|pipweb)
+			    COMPREPLY=(pipweb)
+			    ;;
+			pipd|pipdn|pipdns)
+			    COMPREPLY=(pipdns)
+			    ;;
+			pipo|pipoc|pipocs|pipocsp)
+			    COMPREPLY=(pipocsp)
+			    ;;
+			t|tc|tcp|tcpf|tcpfl|tcpflo|tcpfloo|tcpflood)
+			    COMPREPLY=(tcpflood)
+			    ;;
+			u|ud|udp|udpf|udpfl|udpflo|udpfloo|udpflood)
+			    COMPREPLY=(udpflood)
+			    ;;
+			w|we|web|webf|webfl|webflo|webfloo|webflood)
+			    COMPREPLY=(webflood)
+			    ;;
+			r|rw|rwe|rweb|rwebf|rwebfl|rwebflo|rwebfloo|rwebflood)
+			    COMPREPLY=(rwebflood)
+			    ;;
+			'')
+			    COMPREPLY=('' '<RET>' piptcp pipweb piprweb pipdns pipocsp tcpflood udpflood webflood rwebflood)
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		external|auxiliary|web|rweb|antivirus|file|peer|mon|admin|vpnipsec)
+		    case ${COMP_WORDS[2]} in
+			a|ad|add)
+			    COMPREPLY=(add)
+			    ;;
+			d|de|del)
+			    COMPREPLY=(del)
+			    ;;
+			r|ra|raz)
+			    COMPREPLY=(raz)
+			    ;;
+			o)
+			    COMPREPLY=('' on off)
+			    ;;
+			of|off)
+			    COMPREPLY=(off)
+			    ;;
+			on)
+			    COMPREPLY=(on)
+			    ;;
+			i|"in"|ins|inse|inser|insert|insert:)
+			    COMPREPLY=(insert:)
+			    ;;
+			m|mo|mov|move|move:)
+			    COMPREPLY=(move:)
+			    ;;
+			'')
+			    COMPREPLY=('' '<RET>' add 'add:<rule-name>' 'insert:<rule-name>' 'move:<position>' 'move:(-|+)<rule-name>' del raz on off)
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		*)
+		    COMPREPLY=()
+		    ;;
+	    esac
+	    ;;
+	3)
+	    case ${COMP_WORDS[1]} in
+		dos)
+		    case ${COMP_WORDS[2]} in
+			piptcp|pipweb|piprweb|pipdns|pipocsp|tcpflood|udpflood|webflood|rwebflood)
+			    case ${COMP_WORDS[3]} in
+				d|de|def|defa|defau|defaul|default)
+				    COMPREPLY=(default)
+				    ;;
+				s|se|set)
+				    COMPREPLY=(set)
+				    ;;
+				'')
+				    COMPREPLY=('' '<RET>' default set)
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		external|auxiliary|web|rweb|antivirus|file|peer|mon|admin|vpnipsec)
+		    if test ${COMP_WORDS[2]} == add -o \
+			${COMP_WORDS[2]} == del -o \
+			${COMP_WORDS[2]} == on -o \
+			${COMP_WORDS[2]} == off -o \
+			${COMP_WORDS[2]:0:4} == "add:" -o \
+			${COMP_WORDS[2]:0:5} == "move:" -o \
+			${COMP_WORDS[2]:0:7} == "insert:" ; then
+
+			COMPREPLY=('' '<rule-name>')
+		    else
+			COMPREPLY=()
+		    fi
+		    ;;
+		*)
+		    COMPREPLY=()
+		    ;;
+	    esac
+	    ;;
+	4)
+	    case ${COMP_WORDS[1]} in
+		dos)
+		    case ${COMP_WORDS[3]} in
+			set)
+			    case ${COMP_WORDS[2]} in
+				piptcp|pipweb|piprweb|pipdns|pipocsp)
+				    COMPREPLY=('' '<max-limit>')
+				    ;;
+				tcpflood|udpflood|webflood|rwebflood)
+				    COMPREPLY=('' '<limit-per-second>')
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		external|auxiliary|web|rweb|antivirus|file|peer|mon|admin|vpnipsec)
+		    if test ${COMP_WORDS[2]} == add -o \
+			    ${COMP_WORDS[2]:0:4} == "add:" -o \
+			    ${COMP_WORDS[2]:0:7} == "insert:" ; then
+
+			case ${COMP_WORDS[4]} in
+			    a|al|all|allo|allow)
+				COMPREPLY=(allow)
+				;;
+			    d|de|den|deny)
+				COMPREPLY=(deny)
+				;;
+			    '')
+				COMPREPLY=('' allow deny)
+				;;
+			    *)
+				COMPREPLY=()
+				;;
+			esac
+		    else
+			COMPREPLY=()
+		    fi
+		    ;;
+		*)
+		    COMPREPLY=()
+		    ;;
+	    esac
+	    ;;
+	5)
+	    case ${COMP_WORDS[1]} in
+		dos)
+		    case ${COMP_WORDS[2]} in
+			tcpflood|udpflood|webflood|rwebflood)
+			    case ${COMP_WORDS[3]} in
+				set)
+				    COMPREPLY=('' '<RET>' '<limit-burst>')
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		external|auxiliary|web|rweb|antivirus|file|peer|mon|admin|vpnipsec)
+		    if test ${COMP_WORDS[2]} == add -o \
+			${COMP_WORDS[2]:0:4} == "add:" -o \
+			${COMP_WORDS[2]:0:7} == "insert:" ; then
+			case ${COMP_WORDS[4]} in
+			    allow|deny)
+				case ${COMP_WORDS[5]} in
+				    a)
+					COMPREPLY=(ah any)
+					;;
+				    a|ah)
+					COMPREPLY=(ah)
+					;;
+				    a|an|any)
+					COMPREPLY=(any)
+					;;
+				    e)
+					COMPREPLY=(esp etherip)
+					;;
+				    e|es|esp)
+					COMPREPLY=(esp)
+					;;
+				    e|et|eth|ethe|ether|etheri|etherip)
+					COMPREPLY=(etherip)
+					;;
+				    f)
+					COMPREPLY=(ftp_passive ftp_active fc)
+					;;
+				    ft|ftp|ftp_)
+					COMPREPLY=(ftp_passive ftp_active ftp_trivial)
+					;;
+				    ftp_p|ftp_pa|ftp_pas|ftp_pass|ftp_passi|ftp_passiv|ftp_passive)
+					COMPREPLY=(ftp_passive)
+					;;
+				    ftp_a|ftp_ac|ftp_act|ftp_acti|ftp_activ|ftp_active)
+					COMPREPLY=(ftp_active)
+					;;
+				    ftp_t|ftp_tr|ftp_tri|ftp_triv|ftp_trivi|ftp_trivia|ftp_trivial)
+					COMPREPLY=(ftp_trivial)
+					;;
+				    "fc")
+					COMPREPLY=("fc")
+					;;
+				    g|gr|gre)
+					COMPREPLY=(gre)
+					;;
+				    i)
+					COMPREPLY=(icmp igmp ipv6)
+					;;
+				    ic|icm|icmp)
+					COMPREPLY=(icmp)
+					;;
+				    ig|igm|igmp)
+					COMPREPLY=(igmp)
+					;;
+				    ip|ipv|ipv6)
+					COMPREPLY=(ipv6)
+					;;
+				    m|mt|mtp)
+					COMPREPLY=(mtp)
+					;;
+				    o|os|osp|ospf|ospfi|ospfig|ospfigp)
+					COMPREPLY=(ospfigp)
+					;;
+				    s|si|sip)
+					COMPREPLY=(sip)
+					;;
+				    t)
+					COMPREPLY=(tcp tlsp)
+					;;
+				    tc|tcp)
+					COMPREPLY=(tcp)
+					;;
+				    tl|tls|tlsp)
+					COMPREPLY=(tlsp)
+					;;
+				    u|ud|udp)
+					COMPREPLY=(udp)
+					;;
+				    v)
+					COMPREPLY=(visa vrrp)
+					;;
+				    v|vi|vis|visa)
+					COMPREPLY=(visa)
+					;;
+				    v|vr|vrr|vrrp)
+					COMPREPLY=(vrrp)
+					;;
+				    '')
+					COMPREPLY=('' '<RET>' any ah esp etherip fc gre icmp ipv6 igmp mtp ospfigp tcp tlsp udp visa ftp_passive ftp_active ftp_trivial sip)
+					;;
+				    *)
+					COMPREPLY=()
+					;;
+				esac
+				;;
+			    *)
+				COMPREPLY=()
+				;;
+			esac
+		    else
+			COMPREPLY=()
+		    fi
+		    ;;
+		*)
+		    COMPREPLY=()
+		    ;;
+	    esac
+	    ;;
+	6)
+	    case ${COMP_WORDS[1]} in
+		external|auxiliary|web|rweb|antivirus|file|peer|mon|admin|vpnipsec)
+		    if test ${COMP_WORDS[2]} == add -o \
+			${COMP_WORDS[2]:0:4} == "add:" -o \
+			${COMP_WORDS[2]:0:7} == "insert:" ; then
+			case ${COMP_WORDS[4]} in
+			    allow|deny)
+				case ${COMP_WORDS[5]} in
+				    any|ah|esp|etherip|"fc"|gre|icmp|ipv6|igmp|mtp|ospfigp|tcp|tlsp|udp|visa|ftp_passive|ftp_active|ftp_trivial|sip)
+					case ${COMP_WORDS[6]} in
+					    a|an|any)
+						COMPREPLY=(any)
+						;;
+					    '')
+						COMPREPLY=('' '<RET>' '<src-ip[/<mask-prefix>]>' any)
+						;;
+					    *)
+						COMPREPLY=()
+						;;
+					esac
+					;;
+				    *)
+					COMPREPLY=()
+					;;
+				esac
+				;;
+			    *)
+				COMPREPLY=()
+				;;
+			esac
+		    else
+			COMPREPLY=()
+		    fi
+		    ;;
+		*)
+		    COMPREPLY=()
+		    ;;
+	    esac
+	    ;;
+	7)
+	    case ${COMP_WORDS[1]} in
+		external|auxiliary|web|rweb|antivirus|file|peer|mon|admin|vpnipsec)
+		    if test ${COMP_WORDS[2]} == add -o \
+			${COMP_WORDS[2]:0:4} == "add:" -o \
+			${COMP_WORDS[2]:0:7} == "insert:" ; then
+			case ${COMP_WORDS[4]} in
+			    allow|deny)
+				case ${COMP_WORDS[5]} in
+				    any|ah|esp|etherip|"fc"|gre|icmp|ipv6|igmp|mtp|ospfigp|tcp|tlsp|udp|visa|ftp_passive|ftp_active|ftp_trivial|sip)
+					case ${COMP_WORDS[7]} in
+					    a)
+						COMPREPLY=('' antivirus any auxiliary)
+						;;
+					    an|any)
+						COMPREPLY=(any)
+						;;
+					    au|aux|auxi|auxil|auxili|auxilia|auxiliar|auxiliary)
+						COMPREPLY=(auxiliary)
+						;;
+					    an|ant|anti|antiv|antivi|antivir|antiviru|antivirus)
+						COMPREPLY=(antivirus)
+						;;
+					    e|ex|ext|exte|exter|extern|externa|external)
+						COMPREPLY=(external)
+						;;
+					    w|we|web)
+						COMPREPLY=(web)
+						;;
+					    r|rw|rwe|rweb)
+						COMPREPLY=(rweb)
+						;;
+					    f|"fi"|fil|file)
+						COMPREPLY=(file)
+						;;
+					    p|pe|pee|peer)
+						COMPREPLY=(peer)
+						;;
+					    a|ad|ad|adm|admi|admin)
+						COMPREPLY=(admin)
+						;;
+					    m|mo|mon)
+						COMPREPLY=(mon)
+						;;
+					    v|vp|vpn|vpni|vpnip|vpnips|vpnipse|vpnipsec)
+						COMPREPLY=(vpnipsec)
+						;;
+					    '')
+						COMPREPLY=('' '<RET>' any external auxiliary web rweb antivirus file peer mon admin vpnipsec)
+						;;
+					    *)
+						COMPREPLY=()
+						;;
+					esac
+					;;
+				    *)
+					COMPREPLY=()
+					;;
+				esac
+				;;
+			    *)
+				COMPREPLY=()
+				;;
+			esac
+		    else
+			COMPREPLY=()
+		    fi
+		    ;;
+		*)
+		    COMPREPLY=()
+		    ;;
+	    esac
+	    ;;
+	8)
+	    case ${COMP_WORDS[1]} in
+		external|auxiliary|web|rweb|antivirus|file|peer|mon|admin|vpnipsec)
+		    if test ${COMP_WORDS[2]} == add -o \
+			${COMP_WORDS[2]:0:4} == "add:" -o \
+			${COMP_WORDS[2]:0:7} == "insert:" ; then
+			case ${COMP_WORDS[4]} in
+			    allow|deny)
+				case ${COMP_WORDS[5]} in
+				    any|ah|esp|etherip|"fc"|gre|icmp|ipv6|igmp|mtp|ospfigp|tcp|tlsp|udp|visa|ftp_passive|ftp_active|ftp_trivial|sip)
+					case ${COMP_WORDS[7]} in
+					    any|external|auxiliary|web|rweb|antivirus|file|peer|mon|admin|vpnipsec)
+						case ${COMP_WORDS[8]} in
+						    a|an|any)
+							COMPREPLY=(any)
+							;;
+						    '')
+							COMPREPLY=('' '<RET>' '<dst-ip[/<mask-prefix>]>' any)
+							;;
+						    *)
+							COMPREPLY=()
+							;;
+						esac
+						;;
+					    *)
+						COMPREPLY=()
+						;;
+					esac
+					;;
+				    *)
+					COMPREPLY=()
+					;;
+				esac
+				;;
+			    *)
+				COMPREPLY=()
+				;;
+			esac
+		    else
+			COMPREPLY=()
+		    fi
+		    ;;
+		*)
+		    COMPREPLY=()
+		    ;;
+	    esac
+	    ;;
+	9)
+	    case ${COMP_WORDS[1]} in
+		external|auxiliary|web|rweb|antivirus|file|peer|mon|admin|vpnipsec)
+		    if test ${COMP_WORDS[2]} == add -o \
+			${COMP_WORDS[2]:0:4} == "add:" -o \
+			${COMP_WORDS[2]:0:7} == "insert:" ; then
+			case ${COMP_WORDS[4]} in
+			    allow|deny)
+				case ${COMP_WORDS[5]} in
+				    any|ah|esp|etherip|"fc"|gre|icmp|ipv6|igmp|mtp|ospfigp|tcp|tlsp|udp|visa|ftp_passive|ftp_active|ftp_trivial|sip)
+					case ${COMP_WORDS[7]} in
+					    any|external|auxiliary|web|rweb|antivirus|file|peer|mon|admin|vpnipsec)
+						case ${COMP_WORDS[9]} in
+						    a|an|any)
+							COMPREPLY=(any)
+							;;
+						    '')
+							case ${COMP_WORDS[5]} in
+							    tcp|udp|ftp_passive|ftp_active|ftp_trivial|sip)
+								COMPREPLY=('' '<RET>' '<dst-port>' any)
+								;;
+							    any|ah|esp|etherip|"fc"|gre|icmp|ipv6|igmp|mtp|ospfigp|tlsp|visa)
+								COMPREPLY=('' '<RET>' any)
+								;;
+							    *)
+								COMPREPLY=()
+								;;
+							esac
+							;;
+						    *)
+							COMPREPLY=()
+							;;
+						esac
+						;;
+					    *)
+						COMPREPLY=()
+						;;
+					esac
+					;;
+				    *)
+					COMPREPLY=()
+					;;
+				esac
+				;;
+			    *)
+				COMPREPLY=()
+				;;
+			esac
+		    else
+			COMPREPLY=()
+		    fi
+		    ;;
+		*)
+		    COMPREPLY=()
+		    ;;
+	    esac
+	    ;;
+	10)
+	    case ${COMP_WORDS[1]} in
+		external|auxiliary|web|rweb|antivirus|file|peer|mon|admin|vpnipsec)
+		    if test ${COMP_WORDS[2]} == add -o \
+			${COMP_WORDS[2]:0:4} == "add:" -o \
+			${COMP_WORDS[2]:0:7} == "insert:" ; then
+			case ${COMP_WORDS[4]} in
+			    allow)
+				case ${COMP_WORDS[5]} in
+				    any|ah|esp|etherip|"fc"|gre|icmp|ipv6|igmp|mtp|ospfigp|tcp|tlsp|udp|visa|ftp_passive|ftp_active|ftp_trivial|sip)
+					case ${COMP_WORDS[7]} in
+					    any|external|auxiliary|web|rweb|antivirus|file|peer|mon|admin|vpnipsec)
+						case ${COMP_WORDS[10]} in
+						    n|ni|nil)
+							COMPREPLY=(nil)
+							;;
+						    '')
+							COMPREPLY=('' '<RET>' '<src-nat>' nil)
+							;;
+						    *)
+							COMPREPLY=()
+							;;
+						esac
+						;;
+					    *)
+						COMPREPLY=()
+						;;
+					esac
+					;;
+				    *)
+					COMPREPLY=()
+					;;
+				esac
+				;;
+			    *)
+				COMPREPLY=()
+				;;
+			esac
+		    else
+			COMPREPLY=()
+		    fi
+		    ;;
+		*)
+		    COMPREPLY=()
+		    ;;
+	    esac
+	    ;;
+	11)
+	    case ${COMP_WORDS[1]} in
+		external|auxiliary|web|rweb|antivirus|file|peer|mon|admin|vpnipsec)
+		    if test ${COMP_WORDS[2]} == add -o \
+			${COMP_WORDS[2]:0:4} == "add:" -o \
+			${COMP_WORDS[2]:0:7} == "insert:" ; then
+			case ${COMP_WORDS[4]} in
+			    allow)
+				case ${COMP_WORDS[5]} in
+				    any|ah|esp|etherip|"fc"|gre|icmp|ipv6|igmp|mtp|ospfigp|tcp|tlsp|udp|visa|ftp_passive|ftp_active|ftp_trivial|sip)
+					case ${COMP_WORDS[7]} in
+					    any|external|auxiliary|web|rweb|antivirus|file|peer|mon|admin|vpnipsec)
+						case ${COMP_WORDS[11]} in
+						    '')
+							COMPREPLY=('' '<RET>' '<dst-nat>')
+							;;
+						    *)
+							COMPREPLY=()
+							;;
+						esac
+						;;
+					    *)
+						COMPREPLY=()
+						;;
+					esac
+					;;
+				    *)
+					COMPREPLY=()
+					;;
+				esac
+				;;
+			    *)
+				COMPREPLY=()
+				;;
+			esac
+		    else
+			COMPREPLY=()
+		    fi
+		    ;;
+		*)
+		    COMPREPLY=()
+		    ;;
+	    esac
+	    ;;
+	12)
+	    case ${COMP_WORDS[1]} in
+		external|auxiliary|web|rweb|antivirus|file|peer|mon|admin|vpnipsec)
+		    if test ${COMP_WORDS[2]} == add -o \
+			${COMP_WORDS[2]:0:4} == "add:" -o \
+			${COMP_WORDS[2]:0:7} == "insert:" ; then
+			case ${COMP_WORDS[4]} in
+			    allow)
+				case ${COMP_WORDS[5]} in
+				    any|ah|esp|etherip|"fc"|gre|icmp|ipv6|igmp|mtp|ospfigp|tcp|tlsp|udp|visa|ftp_passive|ftp_active|ftp_trivial|sip)
+					case ${COMP_WORDS[7]} in
+					    any|external|auxiliary|web|rweb|antivirus|file|peer|mon|admin|vpnipsec)
+						case ${COMP_WORDS[12]} in
+						    '')
+							case ${COMP_WORDS[5]} in
+							    tcp|udp|ftp_passive|ftp_active|ftp_trivial|sip)
+								COMPREPLY=('' '<RET>' '<dst-pat>')
+								;;
+							    any|ah|esp|etherip|"fc"|gre|icmp|ipv6|igmp|mtp|ospfigp|tlsp|visa)
+								COMPREPLY=()
+								;;
+							    *)
+								COMPREPLY=()
+								;;
+							esac
+							;;
+						    *)
+							COMPREPLY=()
+							;;
+						esac
+						;;
+					    *)
+						COMPREPLY=()
+						;;
+					esac
+					;;
+				    *)
+					COMPREPLY=()
+					;;
+				esac
+				;;
+			    *)
+				COMPREPLY=()
+				;;
+			esac
+		    else
+			COMPREPLY=()
+		    fi
+		    ;;
+		*)
+		    COMPREPLY=()
+		    ;;
+	    esac
+	    ;;
+	*)
+	    COMPREPLY=()
+	    ;;
+    esac
+}

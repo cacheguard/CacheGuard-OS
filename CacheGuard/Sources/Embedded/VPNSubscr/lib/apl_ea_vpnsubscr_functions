@@ -1,0 +1,422 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       VPN Subscription
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+set-setup-ip()
+{
+    test -n "${1}" || return 1
+    address=${1}
+
+    test -f ${EMBEDDED_VPNSUBSCR_DB_FILE} || return 11
+
+    sqlite3 ${EMBEDDED_VPNSUBSCR_DB_FILE} << EOFSQL
+UPDATE setup SET ip = '${address}' WHERE id = 0;
+EOFSQL
+}
+
+get-setup-ip()
+{
+    test -f ${EMBEDDED_VPNSUBSCR_DB_FILE} || return 11
+
+    sqlite3 ${EMBEDDED_VPNSUBSCR_DB_FILE} << EOFSQL
+SELECT ip FROM setup WHERE id = 0;
+EOFSQL
+}
+
+set-setup-vpn-address()
+{
+    test -n "${1}" || return 1
+    address=${1}
+
+    test -f ${EMBEDDED_VPNSUBSCR_DB_FILE} || return 11
+
+    sqlite3 ${EMBEDDED_VPNSUBSCR_DB_FILE} << EOFSQL
+UPDATE setup SET vpn_address = '${address}' WHERE id = 0;
+EOFSQL
+}
+
+get-setup-vpn-address()
+{
+    test -f ${EMBEDDED_VPNSUBSCR_DB_FILE} || return 11
+
+    sqlite3 ${EMBEDDED_VPNSUBSCR_DB_FILE} << EOFSQL
+SELECT vpn_address FROM setup WHERE id = 0;
+EOFSQL
+}
+
+get-setup-service()
+{
+    test -f ${EMBEDDED_VPNSUBSCR_DB_FILE} || return 11
+
+    sqlite3 ${EMBEDDED_VPNSUBSCR_DB_FILE} << EOFSQL
+SELECT service FROM setup WHERE id = 0;
+EOFSQL
+}
+
+get-setup()
+{
+    test -f ${EMBEDDED_VPNSUBSCR_DB_FILE} || return 11
+
+    sqlite3 ${EMBEDDED_VPNSUBSCR_DB_FILE} << EOFSQL
+SELECT service_name, previous_service_name, domain_name, timezone, vpn_address, service FROM setup WHERE id = 0;
+EOFSQL
+}
+
+set-setup-service()
+{
+    test -n "${1}" || return 1
+    state=${1}
+
+    test -f ${EMBEDDED_VPNSUBSCR_DB_FILE} || return 11
+
+    sqlite3 ${EMBEDDED_VPNSUBSCR_DB_FILE} << EOFSQL
+UPDATE setup SET service = '${state}' WHERE id = 0;
+EOFSQL
+}
+
+reset-setup-service()
+{
+    test -n "${1}" || return 1
+    service_name=${1}
+
+    test -f ${EMBEDDED_VPNSUBSCR_DB_FILE} || return 11
+
+    sqlite3 ${EMBEDDED_VPNSUBSCR_DB_FILE} << EOFSQL
+UPDATE setup SET previous_service_name = '${service_name}' WHERE id = 0;
+EOFSQL
+}
+
+get-email()
+{
+    test -f ${EMBEDDED_VPNSUBSCR_DB_FILE} || return 11
+
+    sqlite3 ${EMBEDDED_VPNSUBSCR_DB_FILE} << EOFSQL
+SELECT first_name, last_name, email_address, server, port, account, password, service FROM email WHERE id = 0;
+EOFSQL
+}
+
+get-email-service()
+{
+    test -f ${EMBEDDED_VPNSUBSCR_DB_FILE} || return 11
+
+    sqlite3 ${EMBEDDED_VPNSUBSCR_DB_FILE} << EOFSQL
+SELECT service FROM email WHERE id = 0;
+EOFSQL
+}
+
+set-email-service()
+{
+    test -n "${1}" || return 1
+    state=${1}
+
+    test -f ${EMBEDDED_VPNSUBSCR_DB_FILE} || return 11
+
+    sqlite3 ${EMBEDDED_VPNSUBSCR_DB_FILE} << EOFSQL
+UPDATE email SET service = '${state}' WHERE id = 0;
+EOFSQL
+}
+
+get-service-modified-subscribers()
+{
+    test -f ${EMBEDDED_VPNSUBSCR_DB_FILE} || return 11
+
+    sqlite3 ${EMBEDDED_VPNSUBSCR_DB_FILE} << EOFSQL
+SELECT username, email_address, first_name, last_name, phone, device, service FROM subscriber WHERE service <> ${VPNSUBSCR_SUBSCRIBER_STATE_CANCELLED} AND service <> ${VPNSUBSCR_SUBSCRIBER_STATE_ACTIVATED} AND service <> ${VPNSUBSCR_SUBSCRIBER_STATE_SUSPENDED};
+EOFSQL
+}
+
+get-email-modified-subscribers()
+{
+    test -f ${EMBEDDED_VPNSUBSCR_DB_FILE} || return 11
+
+    sqlite3 ${EMBEDDED_VPNSUBSCR_DB_FILE} << EOFSQL
+SELECT username, email_address, first_name, last_name, device, alive_date FROM subscriber WHERE service <> ${VPNSUBSCR_SUBSCRIBER_STATE_CANCELLED} AND email_address <> previous_email_address;
+EOFSQL
+}
+
+get-subscribers()
+{
+    test -f ${EMBEDDED_VPNSUBSCR_DB_FILE} || return 11
+
+    sqlite3 ${EMBEDDED_VPNSUBSCR_DB_FILE} << EOFSQL
+SELECT username, email_address, first_name, last_name, phone, device, service FROM subscriber;
+EOFSQL
+}
+
+reset-active-subscribers()
+{
+    test -f ${EMBEDDED_VPNSUBSCR_DB_FILE} || return 11
+
+    sqlite3 ${EMBEDDED_VPNSUBSCR_DB_FILE} << EOFSQL
+UPDATE subscriber SET service = '${VPNSUBSCR_SUBSCRIBER_STATE_RESET}', alive_date = 0 WHERE service < ${VPNSUBSCR_SUBSCRIBER_STATE_RESET};
+EOFSQL
+}
+
+delete-obsolete-subscribers()
+{
+    test -f ${EMBEDDED_VPNSUBSCR_DB_FILE} || return 11
+
+    sqlite3 ${EMBEDDED_VPNSUBSCR_DB_FILE} << EOFSQL
+DELETE from subscriber WHERE service > ${VPNSUBSCR_SUBSCRIBER_STATE_RESET};
+EOFSQL
+
+}
+
+activate-subscriber()
+{
+    test -f ${EMBEDDED_VPNSUBSCR_DB_FILE} || return 11
+
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    local username=${1}
+    local email=${2}
+    local tls_password=${3}
+
+    sqlite3 ${EMBEDDED_VPNSUBSCR_DB_FILE} << EOFSQL
+UPDATE subscriber SET email_address = '${email}', previous_email_address = '${email}', tls_password = '${tls_password}', service = '${VPNSUBSCR_SUBSCRIBER_STATE_ACTIVATED}' WHERE username = '${username}';
+EOFSQL
+}
+
+set-subscriber-service-state()
+{
+    test -f ${EMBEDDED_VPNSUBSCR_DB_FILE} || return 11
+
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    local username=${1}
+    local service=${2}
+
+    sqlite3 ${EMBEDDED_VPNSUBSCR_DB_FILE} << EOFSQL
+UPDATE subscriber SET service = '${service}' WHERE username = '${username}';
+EOFSQL
+}
+
+set-subscriber-operation-status()
+{
+    test -f ${EMBEDDED_VPNSUBSCR_DB_FILE} || return 11
+
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    local username=${1}
+    local status=${2}
+
+    sqlite3 ${EMBEDDED_VPNSUBSCR_DB_FILE} << EOFSQL
+UPDATE subscriber SET operation_status = '${status}' WHERE username = '${username}';
+EOFSQL
+}
+
+cancel-subscriber()
+{
+    test -f ${EMBEDDED_VPNSUBSCR_DB_FILE} || return 11
+
+    test -n "${1}" || return 1
+    local username=${1}
+
+    sqlite3 ${EMBEDDED_VPNSUBSCR_DB_FILE} << EOFSQL
+UPDATE subscriber SET service = '${VPNSUBSCR_SUBSCRIBER_STATE_CANCELLED}', tls_password = '' WHERE username = '${username}';
+EOFSQL
+}
+
+confirm-subscriber-email()
+{
+    test -f ${EMBEDDED_VPNSUBSCR_DB_FILE} || return 11
+
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    local username=${1}
+    local email=${2}
+
+    sqlite3 ${EMBEDDED_VPNSUBSCR_DB_FILE} << EOFSQL
+UPDATE subscriber SET previous_email_address = '${email}' WHERE username = '${username}';
+EOFSQL
+}
+
+update-subscriber-alive-date()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    local username=${1}
+    local date=${2}
+
+    test -f ${EMBEDDED_VPNSUBSCR_DB_FILE} || return 11
+
+    sqlite3 ${EMBEDDED_VPNSUBSCR_DB_FILE} << EOFSQL
+UPDATE subscriber SET alive_date = '${date}' WHERE username = '${username}';
+EOFSQL
+}
+
+vpnsubscr-log-error()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    local code=${1}
+    local message=${2}
+
+    local script_name=$(file-basename ${0})
+    local date=$(date +"%Y/%m/%d %T")
+    logger -p daemon.alert -t ${script_name} -- "error ${code}: ${message}"
+
+    echo "${date} - Error ${code}: ${message}" >> ${VPNSUBSCR_LOG_FILE}
+}
+
+vpnsubscr-reset-log-file()
+{
+    rm -f ${VPNSUBSCR_LOG_FILE}
+}
+
+get-error-text()
+{
+    test -n "${1}" || return 1
+    local error_file=${1}
+
+    local error=$(cat ${error_file} 2> /dev/null)
+    rm -f ${error_file}
+    echo "${error}"
+}
+
+vpnsubscr-lock-script()
+{
+    local script_name=$(file-basename ${0})
+
+    if test -f /var/lock/${script_name}.lock ; then
+        local ret=101
+        vpnsubscr-log-error ${ret} "the script is already running (and is locked)."
+        exit ${ret}
+    fi
+
+    touch /var/lock/${script_name}.lock
+}
+
+vpnsubscr-unlock-script()
+{
+    local script_name=$(file-basename ${0})
+
+    rm -f /var/lock/${script_name}.lock
+}
+
+get-cg-device()
+{
+    test -n "${1}" || return 1
+    local device=${1}
+
+    case ${device} in
+	${VPNSUBSCR_DEVICE_ANDROID})
+	    device=android
+	    ;;
+	${VPNSUBSCR_DEVICE_APPLE})
+	    device=apple
+	    ;;
+	${VPNSUBSCR_DEVICE_LINUX})
+	    device=linux
+	    ;;
+	${VPNSUBSCR_DEVICE_WINDOWS})
+	    device=windows
+	    ;;
+	*)
+	    device=unknown
+	    ;;
+    esac
+
+    echo ${device}
+}
+
+get-to()
+{
+    test -n "${1}" || return 1
+    local email=${1}
+    local first=${2}
+    local last=${3}
+
+    local name
+
+    if test -z "${last}" ; then
+	if test -z "${first}" ; then
+	    to=${email}
+	else
+	    to="${first} <${email}>"
+	fi
+    else
+	if test -z "${first}" ; then
+	    to="${last} <${email}>"
+	else
+	    to="${first} ${last} <${email}>"
+	fi
+    fi
+
+    echo ${to}
+}
+
+get-name()
+{
+    local first=${1}
+    local last=${2}
+
+    local name
+
+    if test -z "${last}" ; then
+	if test -n "${first}" ; then
+	    name=${first}
+	fi
+    else
+	if test -z "${first}" ; then
+	    name=${last}
+	else
+	    name="${first} ${last}"
+	fi
+    fi
+
+    echo ${name}
+}
+
+get-administrator-name()
+{
+    local first=${1}
+    local last=${2}
+
+    local name=$(get-name "${first}" "${last}")
+    test -n "${name}" || name="Your Administrator"
+
+    echo ${name}
+}
+
+get-profile-filename()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    test -n "${3}" || return 3
+    local username=${1}
+    local device=${2}
+    local service_name=${3}
+
+    local extension=$(get-vpnipsec-profile-extension ${device})
+
+    echo "${username}_${service_name// /-}.${extension}"
+}
+
+get-instructions-filename()
+{
+    test -n "${1}" || return 1
+    local username=${1}
+
+    echo ${username}.instructions
+}

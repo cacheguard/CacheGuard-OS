@@ -1,0 +1,767 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       Commands
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+source functions
+
+display-antivirus-log()
+{
+    local status date_update
+    local date_s=$(date +"%s")
+    local date_h=$(get-date-from-epoch-seconds ${date_s})
+
+    echo-begin-show
+
+    case ${APL_ROLE} in
+	gateway)
+	    update-report health-av || return 104
+	    if test -s ${AV_AUTO_UPDATE_FILE} ; then
+		status=OK
+		date_update=$(cat ${AV_AUTO_UPDATE_FILE} 2> /dev/null)
+		date_update=$(get-date-from-epoch-seconds ${date_update})
+		display-log-line 0 ${date_h} Antivirus updated at ${date_update}[${status}]
+	    else
+		status=KO
+		display-log-line 0 ${date_h} Antivirus updating[${status}]
+	    fi
+	    ;;
+	manager)
+	    ;;
+	*)
+	    ;;
+    esac
+
+    if is-av-extended-enabled cur ; then
+	if test -s ${AV_VAR_DIR}/${AV_EXTENDED_LAST_UPDATE_FILENAME} ; then
+
+	    date_update=$(cat ${AV_VAR_DIR}/${AV_EXTENDED_LAST_UPDATE_FILENAME} 2> /dev/null)
+	    if av-extended-is-auto-updated-in-time ${date_s} ${date_update} ; then
+		status=OK
+	    else
+		status=KO
+	    fi
+	    date_update=$(get-date-from-epoch-seconds ${date_update})
+
+	    display-log-line 0 ${date_h} Extended Antivirus updated at ${date_update}[${status}]
+
+	    if test ${APL_ROLE} == manager ; then
+		if test -s ${HOME}/${MANAGER_GATEWAY_INDEX} ; then
+
+		    local uuid domain id ip
+		    local push_status push_date error_txt
+
+		    while read uuid domain id ip
+		    do
+			test -n "${ip}" || continue
+			test -s ${AV_VAR_DIR}/${id}.${MPUSHED_STATUS} || continue
+			read push_status push_date < ${AV_VAR_DIR}/${id}.${MPUSHED_STATUS}
+			push_date=$(get-date-from-epoch-seconds ${push_date})
+
+			if test ${push_status} -eq 0 ; then
+			    status=OK
+			    unset error_txt
+			else
+			    status=KO
+			    error_txt=" (${push_status})"
+			fi
+			display-log-line 0 ${date_h} "Pushing Extended Antivirus to '${id}' at ${push_date}${error_txt}[${status}]"
+		    done < ${HOME}/${MANAGER_GATEWAY_INDEX}
+		fi
+	    fi
+	else
+	    status=KO
+	    display-log-line 0 ${date_h} Extended Antivirus updating[${status}]
+	fi
+    fi
+
+    echo-end-show
+}
+
+show-antivirus-auto()
+{
+    local country
+
+    echo-command-form "antivirus auto"
+    echo-mark-cur
+    country=$(get-country-name ${CURRENT_AV_COUNTRY_CODE})
+    echo-value "${CURRENT_AV_COUNTRY_CODE^^} (${country})" ${AV_COL}
+    if test "${CURRENT_AV_COUNTRY_CODE}" != "${AV_COUNTRY_CODE}" ; then
+	echo-command-form "antivirus auto"
+	echo-mark-new
+	country=$(get-country-name ${AV_COUNTRY_CODE})
+	echo-value "${AV_COUNTRY_CODE^^} (${country})" ${AV_COL}
+    fi
+}
+
+show-antivirus-maxobject()
+{
+    local max_file=${CURRENT_AV_MAX_OBJECT_SZ}
+
+    echo-command-form "antivirus maxobject"
+    echo-mark-cur
+    echo-value "${max_file}KB" ${AV_COL}
+    if test "${CURRENT_AV_MAX_OBJECT_SZ}" != "${AV_MAX_OBJECT_SZ}" ; then
+	max_file=${AV_MAX_OBJECT_SZ}
+	echo-command-form "antivirus maxobject"
+	echo-mark-new
+	echo-value "${max_file}KB" ${AV_COL}
+    fi
+}
+
+show-antivirus-pua()
+{
+    echo-command-form "antivirus pua"
+    local val=$(external-form ${CURRENT_AV_PUA})
+    echo-mark-cur
+    echo-value "${val}" ${AV_COL}
+
+    if test "${CURRENT_AV_PUA}" != "${AV_PUA}" ; then
+	echo-command-form "antivirus pua"
+	echo-mark-new
+	val=$(external-form ${AV_PUA})
+	echo-value "${val}" ${AV_COL}
+    fi
+}
+
+show-antivirus-topology-internal()
+{
+    echo-command-form "antivirus topology internal"
+    local val=$(external-form ${CURRENT_AV_INTERNAL})
+    echo-mark-cur
+    echo-value "${val}" ${AV_COL}
+
+    if test "${CURRENT_AV_INTERNAL}" != "${AV_INTERNAL}" ; then
+	echo-command-form "antivirus topology internal"
+	echo-mark-new
+	val=$(external-form ${AV_INTERNAL})
+	echo-value "${val}" ${AV_COL}
+    fi
+}
+
+show-antivirus-topology-external()
+{
+    echo-command-form "antivirus topology external"
+    local val=$(external-form ${CURRENT_AV_EXTERNAL})
+    echo-mark-cur
+    echo-value "${val}" ${AV_COL}
+
+    if test "${CURRENT_AV_EXTERNAL}" != "${AV_EXTERNAL}" ; then
+	echo-command-form "antivirus topology external"
+	echo-mark-new
+	val=$(external-form ${AV_EXTERNAL})
+	echo-value "${val}" ${AV_COL}
+    fi
+}
+
+show-antivirus-topology-auxiliary()
+{
+    echo-command-form "antivirus topology auxiliary"
+    local val=$(external-form ${CURRENT_AV_AUXILIARY})
+    echo-mark-cur
+    echo-value "${val}" ${AV_COL}
+
+    if test "${CURRENT_AV_AUXILIARY}" != "${AV_AUXILIARY}" ; then
+	echo-command-form "antivirus topology auxiliary"
+	echo-mark-new
+	val=$(external-form ${AV_AUXILIARY})
+	echo-value "${val}" ${AV_COL}
+    fi
+}
+
+show-antivirus-topology-vpnipsec()
+{
+    echo-command-form "antivirus topology vpnipsec"
+    local val=$(external-form ${CURRENT_AV_VPN_IPSEC})
+    echo-mark-cur
+    echo-value "${val}" ${AV_COL}
+
+    if test "${CURRENT_AV_VPN_IPSEC}" != "${AV_VPN_IPSEC}" ; then
+	echo-command-form "antivirus topology vpnipsec"
+	echo-mark-new
+	val=$(external-form ${AV_VPN_IPSEC})
+	echo-value "${val}" ${AV_COL}
+    fi
+}
+
+show-antivirus-topology()
+{
+    case "${1}" in
+	internal)
+	    show-antivirus-topology-internal
+	    ;;
+	external)
+	    show-antivirus-topology-external
+	    ;;
+	auxiliary)
+	    show-antivirus-topology-auxiliary
+	    ;;
+	vpnipsec)
+	    show-antivirus-topology-vpnipsec
+	    ;;
+	"")
+	    show-antivirus-topology-internal
+	    show-antivirus-topology-external
+	    show-antivirus-topology-auxiliary
+	    show-antivirus-topology-vpnipsec
+	    ;;
+	*)
+	    error 255
+	    ;;
+    esac
+}
+
+show-antivirus-extended-url()
+{
+    echo-command-form "antivirus extended url"
+    echo-mark-cur
+    echo-value "${CURRENT_AV_EXTENDED_URL}" ${AV_COL}
+    if test "${CURRENT_AV_EXTENDED_URL}" != "${AV_EXTENDED_URL}" ; then
+	echo-command-form "antivirus extended url"
+	echo-mark-new
+	echo-value "${AV_EXTENDED_URL}" ${AV_COL}
+    fi
+
+}
+
+show-antivirus-extended-method()
+{
+    echo-command-form "antivirus extended method"
+    echo-mark-cur
+    echo-value "${CURRENT_AV_EXTENDED_METHOD}" ${AV_COL}
+
+    if test "${CURRENT_AV_EXTENDED_METHOD}" != "${AV_EXTENDED_METHOD}" ; then
+	echo-command-form "antivirus extended method"
+	echo-mark-new
+	echo-value "${AV_EXTENDED_METHOD}" ${AV_COL}
+    fi
+}
+
+show-antivirus-extended()
+{
+    case "${1}" in
+	url)
+	    show-antivirus-extended-url
+	    ;;
+	method)
+	    show-antivirus-extended-method
+	    ;;
+	"")
+	    show-antivirus-extended-url
+	    show-antivirus-extended-method
+	    ;;
+	*)
+	    ;;
+    esac
+}
+
+show-antivirus()
+{
+    echo-begin-show
+    case "${1}" in
+	extended)
+	    show-antivirus-extended ${2}
+	    ;;
+	auto)
+	    show-antivirus-${1}
+	    ;;
+	maxobject|pua)
+	    show-antivirus-${1}
+	    ;;
+
+	topology)
+	    show-antivirus-topology ${2}
+	    ;;
+	"")
+	    show-antivirus-auto
+	    show-antivirus-extended
+
+	    if contextual-command-is-allowed ; then
+		show-antivirus-maxobject
+		show-antivirus-pua
+		show-antivirus-topology
+	    fi
+	    ;;
+	*)
+	    ;;
+    esac
+    echo-end-show
+}
+
+
+display-av-create-log()
+{
+    supervisor-action "update-av-regular-downloaded-sz"
+    ! is-av-extended-enabled cur || supervisor-action "update-av-extended-create-downloaded-sz"
+
+    test ${TERM} != ${WADMIN_TERM} || return 0
+    display-log ${AV_CREATE_LOG}
+}
+
+display-av-update-log()
+{
+    case ${APL_ROLE} in
+	gateway)
+	    test ${CURRENT_AV_MODE} == True || return 0
+	    ;;
+	manager)
+	    is-av-extended-enabled cur || return 0
+	    ;;
+	*)
+	    ;;
+    esac
+
+    test ${TERM} != ${WADMIN_TERM} || return 0
+
+    case ${APL_ROLE} in
+	gateway)
+	    echo-begin-show
+	    display-raw-log ${AV_UPDATE_LOG}
+	    echo-end-show
+	    ;;
+	manager)
+	    echo-begin-show
+	    display-raw-log ${AV_UPDATE_LOG}
+	    echo-end-show
+	    ;;
+	*)
+	    ;;
+    esac
+}
+
+load-whitelist-signature()
+{
+    local pt=${1}
+    local ip=${2}
+    local fn=${3}
+    test -n "${pt}" || return 1
+    test -n "${ip}" || return 1
+    test -n "${fn}" || return 1
+
+    check-file-protocol ${pt} || return 63
+    check-ip-name ${ip} || return 113
+    check-file-ip ${ip} || return 27
+    check-filename ${fn} || return 19
+
+    local wl_file=${TMP_DIR}/work.${LOADED}.${AV_WHITELIST_SIG}
+
+    load-files ${pt} ${ip} "${fn} ${wl_file}"
+    local ret=${?}
+
+    if test ${ret} -eq 0  ; then
+	if test -f ${wl_file} ; then
+
+	    local wl_file_sz=$(file-size ${wl_file})
+	    if test ${wl_file_sz} -gt ${AV_WHITELIST_SIG_SZ} ; then
+		rm -f ${wl_file}
+		return 227
+	    fi
+
+	    if ! check-ascii-file ${wl_file} ; then
+		rm -f ${wl_file}
+		return 226
+	    fi
+
+	    clamscan --quiet --database="${wl_file}" ${APPLIANCE_DIR}/etc/.av-test.txt > /dev/null 2>&1
+	    if test ${?} -ne 0 ; then
+		rm -f ${wl_file}
+		return 226
+	    fi
+
+	    load-whitelist-signature-commit
+	    NEWENV=1
+	else
+	    return 104
+	fi
+    else
+	rm -f ${wl_file}
+	return ${ret}
+    fi
+}
+
+manage-whitelist-signature()
+{
+    test -n "${1}" || return 1
+    local op=${1}
+
+    user-has-admin-rights || return 31
+
+    local ret
+
+    case ${op} in
+	load)
+	    shift
+	    load-whitelist-signature "${@}" ; ret=${?}
+	    if test ${ret} -eq 0 ; then
+		rm -f ${TMP_DIR}/${AV_WHITELIST_SIG}.2del
+		NEWENV=1
+	    fi
+	    return ${ret}
+	    ;;
+	clear)
+	    touch ${TMP_DIR}/${AV_WHITELIST_SIG}.2del &&
+		rm -f ${TMP_DIR}/${LOADED}.${AV_WHITELIST_SIG}
+	    NEWENV=1
+	    ;;
+	*)
+	    return 1
+	    ;;
+    esac
+}
+
+show-whitelist-domainname1()
+{
+    local whitelist=${2}
+
+    echo-command-form "antivirus whitelist domainname"
+    if test "${1}" == "new" ; then
+	echo-mark-new
+    else
+	echo-mark-cur
+    fi
+    
+    if test -z "${whitelist}" ; then
+	echo-value-null ${AV_COL}
+    else
+	local name i=0
+
+	for name in ${whitelist}
+	do
+	    test ${i} -eq 0 || echo-blank-command
+	    echo-value "${name}" ${AV_COL}
+	    ((i++))
+	done
+    fi
+}
+
+show-whitelist-domainname()
+{
+    echo-begin-show
+    show-whitelist-domainname1 'current' "${CURRENT_AV_WHITELIST_DOMAINNAME_LIST}"
+    test "${CURRENT_AV_WHITELIST_DOMAINNAME_LIST}" == "${AV_WHITELIST_DOMAINNAME_LIST}" || show-whitelist-domainname1 'new' "${AV_WHITELIST_DOMAINNAME_LIST}"
+    echo-end-show
+}
+
+manage-whitelist-domainname()
+{
+    if test -z "${1}" ; then show-whitelist-domainname ; return 0 ; fi
+    user-has-admin-rights || return 31
+
+    local action=${1}
+
+    case ${action} in
+	add|del)
+	    if test "${action}" == "add" ; then
+		local len=$(length-list "${AV_WHITELIST_DOMAINNAME_LIST}")
+		test ${len} -lt ${MAX_AV_WHITELIST_DOMAINNAME_NB} || return 90
+	    fi
+
+	    test -n "${2}" || return 1
+	    local name=${2}
+	    check-domainname ${name} || return 16
+
+	    case ${action} in
+		del)
+		    export AV_WHITELIST_DOMAINNAME_LIST=$(remove-record-from-list 1 1 "${name}" "${AV_WHITELIST_DOMAINNAME_LIST}")
+		    ;;
+		add)
+		    export AV_WHITELIST_DOMAINNAME_LIST=$(insert-record-in-slist 1 1 "${name}" "${AV_WHITELIST_DOMAINNAME_LIST}")
+		    ;;
+		*)
+		    return 255
+		    ;;
+	    esac
+	    SAVENV=1
+	    ;;
+	raz)
+	    export AV_WHITELIST_DOMAINNAME_LIST=''
+	    SAVENV=1
+	    ;;
+	*)
+	    return 1
+	    ;;
+    esac
+}
+
+check-av-extended-modifier()
+{
+    local modifier=${1}
+
+    case ${modifier} in
+	url|method)
+	    return 0
+	    ;;
+	*)
+	    return 1
+	    ;;
+    esac
+}
+
+check-av-extended-method()
+{
+    local method=${1}   
+
+    if test ${method} == push ; then
+	if test ${APL_ROLE} == manager ; then
+	    if is-in-manager-conf-context ; then
+		return 0
+	    else
+		return 214
+	    fi
+	else
+	    return 0
+	fi
+    fi
+
+    case "${1}" in
+	load|vload)
+	    return 0
+	    ;;
+	*)
+	    return 245
+	    ;;
+    esac
+}
+
+run()
+{
+    case "${ARGS[1]}" in
+	report)
+	    display-antivirus-log
+	    return 0
+	    ;;
+	whitelist)
+	    case ${ARGS[2]} in
+		signature)
+		    is-in-top-level-context || return 231
+		    ;;
+		domainname)
+		    contextual-command-is-allowed || return 207
+		    ;;
+		*)
+		    return 1
+		    ;;
+	    esac
+	    ;;
+	create|update)
+	    case ${APL_ROLE} in
+		manager)
+		    is-in-top-level-context || return 231
+		    ;;
+		gateway)
+		    ;;
+		*)
+		    ;;
+	    esac
+	    ;;
+	auto|extended)
+	    ;;
+	topology|maxobject|pua)
+	    contextual-command-is-allowed || return 207
+	    ;;
+	'')
+	    ;;
+	*)
+	    return 1
+	    ;;
+    esac
+
+    if test -z "${ARGS[1]}" ; then
+	show-antivirus
+	return 0
+    fi
+    
+    local key=${ARGS[1]}
+    
+    case ${key} in
+	auto)
+	    if test -z "${ARGS[2]}" ; then
+		show-antivirus auto
+		return 0
+	    else
+		local code=${ARGS[2]}
+		code=${code,,}
+		check-country-code ${code} || return 99
+		export AV_COUNTRY_CODE=${code}
+		SAVENV=1
+	    fi
+	    ;;
+	maxobject)
+	    if test -z "${ARGS[2]}" ; then
+		show-antivirus maxobject
+		return 0
+	    else
+		local max_file=${ARGS[2]}
+		check-digit ${max_file} || return 190
+		test ${max_file} -ge ${AV_MAX_FILE_MIN} -a ${max_file} -le ${AV_MAX_FILE_MAX} || return 109
+		export AV_MAX_OBJECT_SZ="${max_file}"
+		SAVENV=1
+	    fi
+	    ;;
+	extended)
+	    if test -z "${ARGS[2]}" ; then
+		show-antivirus extended
+		return 0
+	    else
+		local key=${ARGS[2]}
+		check-av-extended-modifier ${key} || return 1
+		
+		if test -z "${ARGS[3]}" ; then
+		    show-antivirus extended ${key}
+		else
+		    local value=${ARGS[3]}
+		    case ${key} in
+			url)
+			    local url=${value}
+			    check-url "${url}" file || return 21
+			    local protocol=${url/:*}
+			    check-file-protocol ${protocol} || return 63
+			    export AV_EXTENDED_URL=${url}
+			    SAVENV=1
+			    ;;
+			method)
+			    check-av-extended-method ${value} || return ${?}
+			    export AV_EXTENDED_METHOD=${value}
+			    SAVENV=1
+			    ;;
+			*)
+			    return 1
+			    ;;
+		    esac
+		fi
+	    fi
+	    ;;
+	pua)
+	    if test -z "${ARGS[2]}" ; then
+		show-antivirus pua
+		return 0
+	    else
+		local val=${ARGS[2]}
+		check-boolean ${val} || return 18
+		local bool=$(internal-form ${val})
+		export AV_PUA=${bool}
+		SAVENV=1
+	    fi
+	    ;;
+	topology)
+	    if test -z "${ARGS[2]}" ; then
+		show-antivirus topology
+		return 0
+	    else
+		local interface=${ARGS[2]}
+		check-interface ${interface} || return 43
+
+		if test -z "${ARGS[3]}" ; then
+		    show-antivirus topology ${interface}
+		    return 0
+		else
+		    local val=${ARGS[3]}
+		    check-boolean ${val} || return 18
+		    local bool=$(internal-form ${val})
+
+		    case ${interface} in
+			internal)
+			    export AV_INTERNAL="${bool}"
+			    ;;
+			external)
+			    export AV_EXTERNAL="${bool}"
+			    ;;
+			auxiliary)
+			    export AV_AUXILIARY="${bool}"
+			    ;;
+			vpnipsec)
+			    export AV_VPN_IPSEC="${bool}"
+			    ;;			    
+			*)
+			    error 255
+			    ;;
+		    esac
+		    SAVENV=1
+		fi
+	    fi
+	    ;;
+	create|update)
+	    case "${ARGS[2]}" in
+		''|force)
+		    user-has-admin-rights || return 31
+		    check-lock || return 123
+		    test "${ARGS[2]}" == force || request-confirmation
+		    
+		    if test ${APL_ROLE} == gateway -a ${CURRENT_AV_EXTENDED_METHOD} == push ; then
+			if is-av-extended-enabled cur ; then
+			    case ${key} in
+				update)
+				    local warning=9
+				    ;;
+				create)
+				    local warning=10
+				    ;;
+			    esac
+			    warning ${warning}
+			fi
+		    fi
+
+		    test -z "${ARGS[3]}" || test ${ARGS[3]} == wait || return 1
+
+		    case ${key} in
+			update)
+			    supervisor-action "av-update" inform ${ARGS[3]}
+			    ;;
+			create)
+			    supervisor-action "av-create" inform ${ARGS[3]}
+			    ;;
+		    esac
+		    test ${?} -eq 0 || return 104
+		    return 0
+		    ;;
+		report)
+		    display-av-${key}-log || return ${?}
+		    return 0
+		    ;;
+		*)
+		    return 1
+		    ;;
+	    esac
+	    ;;
+	whitelist)
+	    case "${ARGS[2]}" in
+		signature)
+		    shift-args ; shift-args
+		    manage-whitelist-signature ${ALLARGS}
+		    ;;
+		domainname)
+		    shift-args ; shift-args
+		    manage-whitelist-domainname ${ALLARGS}
+		    ;;
+		*)
+		    return 1
+		    ;;
+	    esac
+	    ;;
+	*)
+	    return 1
+	    ;;
+    esac
+}
+
+AV_COL=37
+main "${@}"

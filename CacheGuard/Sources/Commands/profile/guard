@@ -1,0 +1,529 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       Commands
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+__complete-guard()
+{
+    test -n "${COMP_CWORD-1}" || return 1
+
+    case ${COMP_CWORD} in
+	1)
+	    case ${COMP_WORDS[1]} in
+		f|fi|fil|filt|filte|filter)
+		    COMPREPLY=(filter)
+		    ;;
+		p|po|pol|poli|polic|policy)
+		    COMPREPLY=(policy)
+		    ;;
+		r|ru|rul|rule)
+		    COMPREPLY=(rule)
+		    ;;
+		i|ip)
+		    COMPREPLY=(ip)
+		    ;;
+		'')
+		    COMPREPLY=('' filter policy rule ip '<RET>')
+		    ;;
+		*)
+		    COMPREPLY=()
+		    ;;
+	    esac
+	    ;;
+	2)
+	    case ${COMP_WORDS[1]} in
+		ip)
+		    case ${COMP_WORDS[2]} in
+			o)
+			    COMPREPLY=('' on off)
+			    ;;
+			of|off)
+			    COMPREPLY=(off)
+			    ;;
+			on)
+			    COMPREPLY=(on)
+			    ;;
+			'')
+			    COMPREPLY=('' '<RET>' on off)
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		filter)
+		    case ${COMP_WORDS[2]} in
+			i|ip)
+			    COMPREPLY=(ip)
+			    ;;
+			t|ti|tim|"time")
+			    COMPREPLY=("time")
+			    ;;
+			l|ld|lda|ldap)
+			    COMPREPLY=(ldap)
+			    ;;
+			'')
+			    COMPREPLY=('' '<RET>' ip "time" ldap)
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		policy)
+		    case ${COMP_WORDS[2]} in
+			a|ad|add)
+			    COMPREPLY=(add)
+			    ;;
+			d|de|del)
+			    COMPREPLY=(del)
+			    ;;
+			r|ra|raz)
+			    COMPREPLY=(raz)
+			    ;;
+			'')
+			    COMPREPLY=('' '<RET>' add del raz)
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		rule)
+		    case ${COMP_WORDS[2]} in
+			a|ad|add)
+			    COMPREPLY=(add)
+			    ;;
+			u|up|upd|upda|updat|update)
+			    COMPREPLY=(update)
+			    ;;
+			d|de|del)
+			    COMPREPLY=(del)
+			    ;;
+			r|ra|raz)
+			    COMPREPLY=(raz)
+			    ;;
+			i|"in"|ins|inse|inser|insert|insert:)
+			    COMPREPLY=(insert:)
+			    ;;
+			m|mo|mov|move|move:)
+			    COMPREPLY=(move:)
+			    ;;
+			'')
+			    COMPREPLY=('' '<RET>' add update 'add:<policy-name>' 'insert:<policy-name>' 'move:<position>' 'move:(-|+)<policy-name>' del raz)
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		*)
+		    COMPREPLY=()
+		    ;;
+	    esac
+	    ;;
+	3)
+	    case ${COMP_WORDS[1]} in
+		filter)
+		    case ${COMP_WORDS[2]} in
+			ip|"time"|ldap)
+			    case ${COMP_WORDS[3]} in
+				a|ad|add)
+				    COMPREPLY=(add)
+				    ;;
+				d|de|del)
+				    COMPREPLY=(del)
+				    ;;
+				r|ra|raz)
+				    COMPREPLY=(raz)
+				    ;;
+				'')
+				    COMPREPLY=('' '<RET>' add del raz)
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		policy)
+		    case ${COMP_WORDS[2]} in
+			add|del)
+			    COMPREPLY=('' '<RET>' '<policy-name>')
+			    ;;
+			raz)
+			    COMPREPLY=()
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		rule)
+		    if test ${COMP_WORDS[2]} == add -o \
+			${COMP_WORDS[2]} == update -o \
+			${COMP_WORDS[2]} == del -o \
+			${COMP_WORDS[2]:0:4} == "add:" -o \
+			${COMP_WORDS[2]:0:5} == "move:" -o \
+			${COMP_WORDS[2]:0:7} == "insert:" ; then
+
+			case ${COMP_WORDS[3]} in
+			    d|de|def|defa|defau|defaul|default)
+				COMPREPLY=(default)
+				;;
+			    *)
+				COMPREPLY=('' '<RET>' '<policy-name>' default)
+				;;
+			esac
+		    elif test ${COMP_WORDS[2]} == raz ; then
+			COMPREPLY=()
+		    else
+			COMPREPLY=()
+		    fi
+		    ;;
+		*)
+		    COMPREPLY=()
+		    ;;
+	    esac
+	    ;;
+	4)
+	    case ${COMP_WORDS[1]} in
+		filter)
+		    case ${COMP_WORDS[2]} in
+			ip|"time"|ldap)
+			    case ${COMP_WORDS[3]} in
+				add|del)
+				    COMPREPLY=('' '<filter-name>')
+				    ;;
+				raz)
+				    COMPREPLY=()
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		policy)
+		    # Managed later
+		    ;;
+		rule)
+		    if test ${COMP_WORDS[2]} == add -o \
+			${COMP_WORDS[2]} == update -o \
+			${COMP_WORDS[2]:0:4} == "add:" -o \
+			${COMP_WORDS[2]:0:7} == "insert:" ; then
+
+			case ${COMP_WORDS[4]} in
+			    a|al|all|allo|allow)
+				COMPREPLY=(allow)
+				;;
+			    d|de|den|deny)
+				COMPREPLY=(deny)
+				;;
+			    '')
+				COMPREPLY=('' allow deny)
+				;;
+			    *)
+				COMPREPLY=()
+				;;
+			esac
+		    else
+			COMPREPLY=()
+		    fi
+		    ;;
+		*)
+		    COMPREPLY=()
+		    ;;
+	    esac
+	    ;;
+	5)
+	    case ${COMP_WORDS[1]} in
+		filter)
+		    case ${COMP_WORDS[2]} in
+			ip)
+			    case ${COMP_WORDS[3]} in
+				add)
+				    case ${COMP_WORDS[5]} in
+					r|ra|ran|rang|range)
+					    COMPREPLY=(range)
+					    ;;
+					n|ne|net|netw|netwo|networ|network)
+					    COMPREPLY=(network)
+					    ;;
+					'')
+					    COMPREPLY=('' range network)
+					    ;;
+					*)
+					    COMPREPLY=()
+					    ;;
+				    esac
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			"time")
+			    case ${COMP_WORDS[3]} in
+				add)
+				    case ${COMP_WORDS[5]} in
+					s|sl|slo|slot)
+					    COMPREPLY=(slot)
+					    ;;
+					d|da|dat|date)
+					    COMPREPLY=(date)
+					    ;;
+					f|fr|fra|fram|frame)
+					    COMPREPLY=(frame)
+					    ;;
+					'')
+					    COMPREPLY=('' slot date frame)
+					    ;;
+					*)
+					    COMPREPLY=()
+					    ;;
+				    esac
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			ldap)
+			    case ${COMP_WORDS[3]} in
+				add)
+				    COMPREPLY=('' "'<base-dn>'")
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		rule)
+		    if test ${COMP_WORDS[2]} == add -o \
+			${COMP_WORDS[2]} == update -o \
+			${COMP_WORDS[2]:0:4} == "add:" -o \
+			${COMP_WORDS[2]:0:7} == "insert:" ; then
+
+			case ${COMP_WORDS[4]} in
+			    allow|deny)
+				# Managed later
+				;;
+			    *)
+				COMPREPLY=()
+				;;
+			esac
+		    else
+			COMPREPLY=()
+		    fi
+		    ;;
+		*)
+		    COMPREPLY=()
+		    ;;
+	    esac
+	    ;;
+	6)
+	    case ${COMP_WORDS[1]} in
+		filter)
+		    case ${COMP_WORDS[2]} in
+			ip)
+			    case ${COMP_WORDS[3]} in
+				add)
+				    case ${COMP_WORDS[5]} in
+					range)
+					    COMPREPLY=('' '<lowest-ip>')
+					    ;;
+					network)
+					    COMPREPLY=('' '<network-ip>')
+					    ;;
+					*)
+					    COMPREPLY=()
+					    ;;
+				    esac
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			"time")
+			    case ${COMP_WORDS[3]} in
+				add)
+				    case ${COMP_WORDS[5]} in
+					slot)
+					    COMPREPLY=('' '<[w-]hh:mm-hh:mm>')
+					    ;;
+					date)
+					    COMPREPLY=('' '<[yyyy]/[mm]/[dd][-hh:mm-hh:mm]>')
+					    ;;
+					frame)
+					    COMPREPLY=('' '<yyyy/mm/dd-yyyy/mm/dd>')
+					    ;;
+					*)
+					    COMPREPLY=()
+					    ;;
+				    esac
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			ldap)
+			    case ${COMP_WORDS[3]} in
+				add)
+				    COMPREPLY=('' '<login-attr>')
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		*)
+		    COMPREPLY=()
+		    ;;
+	    esac
+	    ;;
+	7)
+	    case ${COMP_WORDS[1]} in
+		filter)
+		    case ${COMP_WORDS[2]} in
+			ip)
+			    case ${COMP_WORDS[3]} in
+				add)
+				    case ${COMP_WORDS[5]} in
+					range)
+					    COMPREPLY=('' '<RET>' '<highest-ip>')
+					    ;;
+					network)
+					    COMPREPLY=('' '<RET>' '<network-mask>')
+					    ;;
+					*)
+					    COMPREPLY=()
+					    ;;
+				    esac
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			ldap)
+			    case ${COMP_WORDS[3]} in
+				add)
+				    COMPREPLY=('' "'<ldap-filter>'")
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		*)
+		    COMPREPLY=()
+		    ;;
+	    esac
+	    ;;	    
+	*)
+	    COMPREPLY=()
+	    ;;
+    esac
+
+    test ${COMP_CWORD} -ge 4 || return 0
+
+    if test ${COMP_WORDS[1]} == policy -a ${COMP_WORDS[2]} == add ; then
+	__comp_cword=$[${COMP_CWORD} - 4]
+	__range=$[${__comp_cword} % 2]
+	case ${__range} in
+	    0)
+		case ${COMP_WORDS[${COMP_CWORD}]} in
+		    i|ip)
+			COMPREPLY=(ip)
+			;;
+		    t|ti|tim|"time")
+			COMPREPLY=("time")
+			;;
+		    l|ld|lda|ldap)
+			COMPREPLY=(ldap)
+			;;
+		    '')
+			COMPREPLY=('' '<RET>' ip "time" ldap)
+			;;
+		    *)
+			COMPREPLY=()
+			;;
+		esac
+		;;
+	    1)
+		case ${COMP_WORDS[$[${COMP_CWORD}] - 1]} in
+		    ip|"time"|ldap)
+			COMPREPLY=('' '<filter-name>')
+			;;
+		    *)
+			COMPREPLY=()
+			;;
+		esac
+		;;
+	    *)
+		;;
+	esac
+	return 0
+    fi
+
+    test ${COMP_CWORD} -ge 5 || return 0
+
+    if test ${COMP_WORDS[1]} == rule ; then
+	if test ${COMP_WORDS[2]} == add -o \
+	    ${COMP_WORDS[2]:0:4} == "add:" -o \
+	    ${COMP_WORDS[2]:0:7} == "insert:" ; then
+	    case ${COMP_WORDS[4]} in
+		allow|deny)
+		    COMPREPLY=('' '<RET>' '<urllist-name>')
+		    ;;
+		*)
+		    ;;
+	    esac
+	fi
+    fi
+}

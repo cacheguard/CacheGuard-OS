@@ -1,0 +1,728 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       Shared
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+is-serial-terminal()
+{
+    test "${TERMINAL:0:4}" == "ttyS"
+}
+
+get-azure-storage-modules()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    test -n "${3}" || return 3
+    local arch=${1}
+    local system=${2}
+    local stderr=${3}
+
+    test ${arch} == x86_64 || return 0
+
+    case ${CLOUD_NAME} in
+	azure)
+	    ;;
+	*)
+	    return 0
+	    ;;
+    esac
+
+    local insmod module modules
+    local tmp_azure_file=/tmp/azure.${$}
+    rm -f ${tmp_azure_file}
+
+    modprobe --config=/dev/null --set-version=${system} --show-depends nvme > ${tmp_azure_file}
+
+    while read insmod module
+    do
+	modules="${modules} ${module}"
+    done < ${tmp_azure_file}
+
+    rm -f ${tmp_azure_file}
+
+    echo ${modules:1}
+}
+
+get-aws-storage-modules()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    test -n "${3}" || return 3
+    local arch=${1}
+    local system=${2}
+    local stderr=${3}
+
+    test ${arch} == x86_64 || return 0
+
+    case ${CLOUD_NAME} in
+	aws)
+	    ;;
+	*)
+	    return 0
+	    ;;
+    esac
+
+    local insmod module modules
+    local tmp_aws_file=/tmp/aws.${$}
+    rm -f ${tmp_aws_file}
+
+    modprobe --config=/dev/null --set-version=${system} --show-depends nvme > ${tmp_aws_file}
+    echo "insmod /lib/modules/${system}/kernel/drivers/block/xen-blkfront.ko.xz" >> ${tmp_aws_file}
+
+    while read insmod module
+    do
+	modules="${modules} ${module}"
+    done < ${tmp_aws_file}
+
+    rm -f ${tmp_aws_file}
+
+    echo ${modules:1}
+}
+
+find-hid-modules()
+{
+    test -n "${1}" || return 1
+    local system=${1}
+
+    ! is-serial-terminal || return 0
+    get-depend-modules ${system} xhci_pci xhci_hcd ehci_pci uhci_hcd ohci_hcd hid_generic usbhid
+}
+
+find-raid-modules()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    local system=${1}
+    local raid_level=${2}
+
+    test -n "${raid_level}" || return 0
+
+    local module
+
+    case ${raid_level} in
+	0)
+	    module="raid0"
+	    ;;
+	1)
+	    module="raid1"
+	    ;;
+	5|6)
+	    module="raid456"
+	    ;;
+	10)
+	    module="raid10"
+	    ;;
+	*)
+	    ;;
+    esac
+
+    get-depend-modules ${system} ${module}
+}
+
+find-devices()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    test -n "${3}" || return 3
+    local stderr=${1}
+    local prefix=${2}
+    local gen_variable=${3}
+
+    test -n "${STORAGE_FILE}" || STORAGE_FILE=${prefix}.storage
+    test -n "${NETWORK_FILE}" || NETWORK_FILE=${prefix}.network
+
+    local pci_file=${prefix}.pci
+    local hyperv_net_file=${prefix}.hyperv.network
+
+    local network_infos storage_infos
+    local slot class vendor device rest networks
+    local info mac vendor_txt device_txt
+    local dummy usb_bus usb_dev usb_id
+    local unregistered_net
+    local storage_counter=0 network_counter=0 i
+
+    declare -a network_infos storage_infos
+
+    # The PCI Part
+
+    lspci -nmm > /tmp/${pci_file} 2>> ${stderr}
+
+    while read slot class vendor device rest
+    do
+	info=$(lspci -mms ${slot})
+	info=${info#* }
+	info=${info#\"*\" }
+	vendor_txt=${info:1}
+	vendor_txt=${vendor_txt%%\" *}
+	info=${info#\"*\" }
+	device_txt=${info:1}
+	device_txt=${device_txt%%\" *}
+
+	vendor_txt=${vendor_txt/ Corporation}
+	device_txt=${device_txt/ Ethernet}
+	device_txt=${device_txt/ Controller}
+
+	case ${class:1:2} in
+	    01)
+		# Class 01xx: Mass storage controllers
+		storage_infos[${storage_counter}]="${vendor_txt} ${device_txt}"
+		((storage_counter++))
+		;;
+	    02)
+		# Class 02xx: Network controllers
+		unregistered_net=$(ls -1 /sys/bus/pci/devices/*${slot}/net/ 2> /dev/null)
+		if test -z "${unregistered_net}" ; then
+		    unregistered_net=$(ls -1 /sys/bus/pci_express/devices/*${slot}/net/ 2> /dev/null)
+		    if test -z "${unregistered_net}" ; then
+			unregistered_net=$(ls -1 /sys/bus/pci/devices/*${slot}/virtio*/net/ 2> /dev/null)
+		    fi
+		fi
+	        test -n "${unregistered_net}" || continue
+
+	        mac=$(cat /sys/class/net/${unregistered_net}/address 2> /dev/null)
+		test -n "${mac}" || mac="00:00:00:00:00:00"
+
+		network_infos[${network_counter}]="${mac} ${vendor_txt} ${device_txt}"
+		networks="${networks} eth${network_counter}"
+		((network_counter++))
+		;;
+	    0c)
+		# Class 0cxx: USB controllers
+		;;
+	    *)
+		;;
+	esac
+    done < /tmp/${pci_file}
+
+    # The Hyper-V Part
+
+    local hyperv_device_dir=/sys/bus/vmbus/devices
+
+    if test -d ${hyperv_device_dir} ; then
+
+	gunzip --stdout /usr/share/pci.ids.gz > /tmp/pci.ids
+	local slink tlink eth
+
+	ls -1 ${hyperv_device_dir} > /tmp/${hyperv_net_file}.0
+
+	while read slink
+	do
+	    test -n "${slink}" || continue
+	    tlink=$(readlink ${hyperv_device_dir}/${slink} 2> ${stderr})
+	    test -n "${tlink}" || continue
+
+	    eth=$(ls -1d ${hyperv_device_dir}/${tlink}/net/eth* 2> ${stderr} | head -1)
+	    test -n "${eth}" || continue
+
+	    eth=$(file-basename ${eth})
+
+	    echo ${eth} ${hyperv_device_dir}/${tlink}
+	done < /tmp/${hyperv_net_file}.0 > /tmp/${hyperv_net_file}.1
+
+	sort /tmp/${hyperv_net_file}.1 > /tmp/${hyperv_net_file}
+
+	while read eth tlink
+	do
+	    test -d ${tlink}/net/${eth} || continue
+	    test -f ${tlink}/net/${eth}/address || continue
+	    mac=$(cat ${tlink}/net/${eth}/address 2> ${stderr})
+	    test -n "${mac}" || continue
+
+	    vendor=$(cat ${tlink}/vendor 2> ${stderr})
+	    vendor=${vendor/0x}
+	    test -n "${vendor}" || continue
+	    vendor_txt=$(egrep "^${vendor} " /tmp/pci.ids 2> ${stderr})
+	    echo ${vendor_txt} > /tmp/vnet.${$}
+	    read vendor vendor_txt < /tmp/vnet.${$}
+	    rm /tmp/vnet.${$}
+	    test -n "${vendor_txt}" || continue
+
+	    network_infos[${network_counter}]="${mac} ${vendor_txt} Virtual Network Adapter"
+	    networks="${networks} eth${network_counter}"
+	    ((network_counter++))
+	done < /tmp/${hyperv_net_file}
+
+	rm -f /tmp/pci.ids
+    else
+	echo > /tmp/${hyperv_net_file}
+    fi
+
+    # The USB Part
+
+    local unregistered_usbnet all_unregistered_usbnet eth
+    local usb_bus_port usb_bus_devnum
+    local dummy usb_bus usb_dev usb_id product_info
+
+    local usbnet all_usbnet=$(find /sys/bus/usb/devices/usb*/ -type d -name net 2> ${stderr})
+    for usbnet in ${all_usbnet}
+    do
+	eth=$(file-basename ${usbnet})
+	test ${eth:0:3} != eth || continue
+	unregistered_usbnet=$(ls -1 ${usbnet} 2> ${stderr})
+
+	test -n "${unregistered_usbnet}" || continue
+	all_unregistered_usbnet="${all_unregistered_usbnet} ${unregistered_usbnet}"
+    done
+    all_unregistered_usbnet=${all_unregistered_usbnet:1}
+
+    for unregistered_usbnet in ${all_unregistered_usbnet}
+    do
+	usb_bus_port=$(readlink /sys/class/net/${unregistered_usbnet} 2> ${stderr})
+	test -n "${usb_bus_port}" || continue
+	usb_bus_port=${usb_bus_port/*\/usb/usb}
+	usb_bus_port=${usb_bus_port/\/net*}
+	usb_bus_port=${usb_bus_port%/*}
+	test -d /sys/bus/usb/devices/${usb_bus_port} || continue
+	usb_bus_devnum=$(udevadm info --query=name --path=/sys/bus/usb/devices/${usb_bus_port} 2> ${stderr})
+	usb_bus_devnum=${usb_bus_devnum/bus\/usb\/}
+	usb_bus_devnum=${usb_bus_devnum/\//:}
+	lsusb -s ${usb_bus_devnum} 2> ${stderr} > /tmp/${prefix}.usb-net
+	read dummy usb_bus dummy usb_dev dummy usb_id product_info < /tmp/${prefix}.usb-net
+	rm -f /tmp/${prefix}.usb-net
+
+	mac=$(cat /sys/class/net/${unregistered_usbnet}/address 2> ${stderr})
+	test -n "${mac}" || continue
+	network_infos[${network_counter}]="${mac}  USB ${product_info}"
+	networks="${networks} eth${network_counter}"
+	((network_counter++))
+    done
+
+    networks=${networks:1}
+
+    export STORAGE_NB=${storage_counter}
+    export NETWORK_NB=${network_counter}
+    export NETWORKS=${networks}
+
+    if test ${gen_variable} == yes ; then
+	echo ${network_counter} > /tmp/VARIABLE_NETWORK_NB
+	echo ${storage_counter} > /tmp/VARIABLE_STORAGE_NB
+	echo ${networks} > /tmp/VARIABLE_NETWORKS
+    fi
+
+    for ((i=0 ; i<${STORAGE_NB} ; i++))
+    do
+	echo "${storage_infos[${i}]}"
+    done > /tmp/${STORAGE_FILE}
+
+    for ((i=0 ; i<${NETWORK_NB} ; i++))
+    do
+      echo "eth${i} ${network_infos[${i}]}"
+    done > /tmp/${NETWORK_FILE}
+}
+
+get-depend-modules()
+{
+    test -n "${1}" || return 1
+    local system=${1}
+    shift
+    local modules=${@}
+
+    local depend_modules_file=/tmp/depend-modules.${$}
+    local insmod module modules
+
+    for module in ${modules}
+    do
+	modprobe --config=/dev/null --set-version=${system} --show-depends ${module} 2> /dev/null
+    done > ${depend_modules_file}
+
+    unset modules
+
+    while read insmod module
+    do
+	! member "${modules}" "${module}" || continue
+        modules="${modules} ${module}"
+    done < ${depend_modules_file}
+
+    rm -f ${depend_modules_file}
+
+    echo ${modules:1}
+}
+
+find-modules()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    local system=${1}
+    local prefix=${2}
+    shift ; shift
+    local exceptions=${@}
+
+    local exception exception_module len
+    local module modules uniq_modules
+    
+    find /sys/devices -name "modalias" -exec cat "{}" \; > /tmp/${prefix}.module-name
+
+    while read module
+    do
+	modules="${modules} $(get-depend-modules ${system} ${module})"
+    done < /tmp/${prefix}.module-name
+    modules=${modules:1}
+
+    uniq_modules=$(uniq-elt ${modules})
+
+    for module in ${uniq_modules}
+    do
+	if test -n "${exceptions}" ; then
+	    for exception in ${exceptions}
+	    do
+		exception_module="/lib/modules/${system}/kernel/${exception}/"
+		len=${#exception_module}
+		test "${module:0:${len}}" != "${exception_module}" || break
+	    done
+	    test "${module:0:${len}}" == "${exception_module}" || echo "${module}"
+	else
+	    echo "${module}"
+	fi
+    done > /tmp/${prefix}.module-alias
+}
+
+load-modules()
+{
+    test -n "${1}" || return 1
+    local prefix=${1}
+
+    local module
+    local usb_base="/lib/modules/${SYSTEM}/kernel/drivers/net/usb/"
+    local usb_base_len=${#usb_base}
+
+    while read module
+    do
+	test -n "${module}" || continue
+	test ${module:0:1} != '#' || continue
+
+	test "${module:0:${usb_base_len}}" != "${usb_base}" || continue
+	modprobe --quiet $(file-basename ${module} .ko.xz) >> /tmp/${LOG_FILE} 2>&1
+    done < /tmp/${prefix}.module-alias
+
+    while read module
+    do
+	test "${module:0:${usb_base_len}}" == "${usb_base}" || continue
+	modprobe --quiet $(file-basename ${module} .ko.xz) >> /tmp/${LOG_FILE} 2>&1
+    done < /tmp/${prefix}.module-alias
+}
+
+get-base-module-names()
+{
+    test -n "${1}" || return 1
+    local modules=${1}
+
+    local module base_module base_modules
+
+    for module in ${modules}
+    do
+	base_module=$(file-basename ${module} .ko.xz)
+	base_modules="${base_modules} ${base_module}"
+    done
+
+    echo ${base_modules:1}
+}
+
+clean-device-tmp-files()
+{
+    test -n "${1}" || return 1
+    local prefix=${1}
+
+    rm -f \
+       /tmp/${prefix}.module-name \
+       /tmp/${prefix}.module-alias
+
+}
+
+find-network-modules()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    local prefix=${1}
+    local stderr=${2}
+
+    test -f /tmp/${prefix}.module-alias || return 11
+
+    local module base_module modules
+    local usb_modules other_modules
+
+    local pattern="drivers/net"
+    local usb_pattern="${pattern}/usb"
+
+    grep "${pattern}" /tmp/${prefix}.module-alias > /tmp/${prefix}.module-alias-net 2>> ${stderr}
+
+    usb_modules=$(grep "${usb_pattern}" /tmp/${prefix}.module-alias-net 2>> ${stderr})
+    other_modules=$(grep --invert-match "${usb_pattern}" /tmp/${prefix}.module-alias-net 2>> ${stderr})
+
+    for module in \
+	${other_modules} \
+	${usb_modules}
+    do
+	base_module=$(file-basename ${module} .ko.xz)
+	test ${base_module} != usbnet || continue
+	test ${base_module} != fjes || continue
+
+	modules="${modules} ${module}"
+    done
+
+    modules=${modules:1}
+    echo "${modules}"
+}
+
+find-storage-modules()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    test -n "${3}" || return 3
+    local system=${1}
+    local prefix=${2}
+    local stderr=${3}
+
+    local module modules
+    local all_modules uniq_modules
+
+    local storage_modules=$(grep --extended-regexp "drivers/scsi|drivers/message|drivers/ata|drivers/nvme|drivers/block" /tmp/${prefix}.module-alias 2>> ${stderr})
+
+    for module in ${storage_modules}
+    do
+	modules=$(get-depend-modules ${system} $(file-basename ${module} .ko.xz))
+	all_modules="${all_modules} ${modules}"
+
+	if test \
+	       ${module} == /lib/modules/${system}/kernel/drivers/scsi/virtio_scsi.ko.xz -o \
+	       ${module} == /lib/modules/${system}/kernel/drivers/block/virtio_blk.ko.xz ; then
+
+	    modules=$(get-depend-modules ${system} virtio_pci)
+	    all_modules="${all_modules} ${modules}"
+	fi
+    done
+
+    grep --silent drivers/hv/hv_vmbus.ko.xz /tmp/${prefix}.module-alias > /dev/null
+
+    if test ${?} -eq 0 ; then
+	modules=$(get-depend-modules ${system} hv_storvsc)
+	all_modules="${all_modules} ${modules}"
+    fi
+
+    uniq_modules=$(uniq-elt ${all_modules:1})
+
+    echo ${uniq_modules}
+}
+
+set-network-drivers()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    local prefix=${1}
+    local stderr=${2}
+
+    local network_modules=$(find-network-modules ${prefix} ${stderr})
+    export NETWORK_MODULES=${network_modules}
+}
+
+set-storage-drivers()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    local prefix=${1}
+    local stderr=${2}
+
+    local storage_modules=$(find-storage-modules ${SYSTEM} ${prefix} ${stderr})
+    export STORAGE_MODULES=${storage_modules}
+}
+
+set-hid-drivers()
+{
+    local hid_modules=$(find-hid-modules ${SYSTEM})
+    export HID_MODULES=${hid_modules}
+}
+
+gen-network-modules()
+{
+    local module modules=$(get-base-module-names "${NETWORK_MODULES}")
+
+    for module in ${modules}
+    do
+	echo ${module}
+    done
+}
+
+reload-network-modules()
+{
+    local timeout=${1}
+
+    test -n "${NETWORK_MODULES}" || return 0
+
+    local modules=$(get-base-module-names "${NETWORK_MODULES}") module
+    local inverted_modules=$(get-inverted-list "${modules}")
+    test -n "${timeout}" || timeout=500000
+
+    rmmod ${inverted_modules} > /dev/null 2>&1
+    usleep ${timeout}
+
+    for module in ${modules}
+    do
+	modprobe --quiet ${module} > /dev/null 2>&1
+    done
+}
+
+update-udev-network-rules()
+{
+    test -n "${1}" || return 1
+    local prefix=${1}
+
+    local net_file=/tmp/${prefix}.network
+    test -f ${net_file} || return 11
+
+    local eth mac info
+
+    while read eth mac info
+    do
+        echo "SUBSYSTEM==\"net\", ACTION==\"add\", DRIVERS==\"?*\", ATTR{address}==\"${mac}\", ATTR{dev_id}==\"0x0\", ATTR{type}==\"1\", KERNEL==\"eth*\", NAME=\"${eth}\""
+    done < ${net_file} > /tmp/${prefix}.network.rules
+
+    cp -f /tmp/${prefix}.network.rules ${UDEV_RULES_DIR}/${UDEV_NETWORK_RULES_FILE_NAME}
+}
+
+mac-address-is-unchanged()
+{
+    test -n "${1}" || return 1
+    local prefix=${1}
+
+    local subsystem action drivers attr_address attr_dev_id attr_type kernel name
+    local registered_macs detected_macs
+    local eth mac info
+    local ret
+
+    if test -f ${UDEV_RULES_DIR}/${UDEV_NETWORK_RULES_FILE_NAME} ; then
+	while read subsystem action drivers attr_address attr_dev_id attr_type kernel name
+	do
+	    test -n "${subsystem}" || continue
+	    test ${subsystem:0:1} != '#' || continue
+	    attr_address=${attr_address/ATTR\{address\}==\"}
+	    attr_address=${attr_address/\",}
+	    registered_macs="${registered_macs} ${attr_address}"
+	done < ${UDEV_RULES_DIR}/${UDEV_NETWORK_RULES_FILE_NAME}
+	registered_macs="${registered_macs:1}"
+    fi
+
+    local net_file=/tmp/${prefix}.network
+
+    if test -f ${net_file} ; then
+	while read eth mac info
+	do
+	    detected_macs="${detected_macs} ${mac}"
+	done < ${net_file}
+	detected_macs="${detected_macs:1}"
+    fi
+
+    unordered-list-equal "${registered_macs}" "${detected_macs}"
+}
+
+mac-address-is-changed()
+{
+    ! mac-address-is-unchanged "${@}"
+}
+
+gen-initrd-modules-script()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    test -n "${3}" || return 3
+    local operation=${1}
+    local root_dir=${2}
+    local initrd_dir=${3}
+    local files=${4}
+
+    echo -e '#!/bin/ash\n'
+
+    test -d ${root_dir} || return 11
+    test -d ${initrd_dir} || return 13
+
+    test ${root_dir} != / || unset ${root_dir}
+
+    local file basename module options error=11
+
+    for file in ${files}
+    do
+	basename=$(file-basename ${file} .ko.xz)
+
+	case ${operation} in
+	    load)
+		command=insmod
+		module=/lib/modules/${basename}.ko.xz
+		;;
+	    unload)
+		command=rmmod
+		module=${basename}
+		;;
+	    *)
+		continue
+		;;
+	esac
+
+	case ${basename} in
+	    raid0)
+		case ${operation} in
+		    load)
+			options=' default_layout=2'
+			;;
+		    unload)
+			unset options
+			;;
+		    *)
+			;;
+		esac
+
+		echo "${command} ${module}${options} || exit ${error}"
+		;;
+
+	    xen-blkfront)
+		echo "test ! -f /sys/hypervisor/uuid || ${command} ${module} || exit ${error}"
+		;;
+	    *)
+		echo "${command} ${module} || exit ${error}"
+		;;
+	esac
+		
+	cp -a ${root_dir}${file} ${initrd_dir}/lib/modules
+
+	((error += 2))
+    done
+}
+
+gen-initrd-load-modules-script()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    local root_dir=${1}
+    local initrd_dir=${2}
+    local files=${3}
+
+    gen-initrd-modules-script load ${root_dir} ${initrd_dir} "${files}"
+}
+
+gen-initrd-unload-modules-script()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    local root_dir=${1}
+    local initrd_dir=${2}
+    local files=${3}
+
+    local inverted_files=$(get-inverted-list "${files}")
+    gen-initrd-modules-script unload ${root_dir} ${initrd_dir} "${inverted_files}"
+}

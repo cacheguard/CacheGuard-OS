@@ -1,0 +1,2972 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       Configurator
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+is-multi-default-gateways()
+{
+    test -n "${1}" || return 1
+    local state=${1}
+
+    case ${state} in
+	new)
+	    local gateway_weights=${DEFAULT_NOSTANDBY_GATEWAY_WEIGHTS}
+	    ;;
+	cur)
+	    local gateway_weights=${CURRENT_DEFAULT_NOSTANDBY_GATEWAY_WEIGHTS}
+	    ;;
+	*)
+	    return 1
+	    ;;
+    esac
+
+    test -n "${gateway_weights}" || return 11
+    ! mono-elt ${gateway_weights} || return 13
+
+    return 0
+}
+
+is-multi-external-gateways()
+{
+    test -n "${1}" || return 1
+    local state=${1}
+
+    case ${state} in
+	new)
+	    local gateway_weights=${EXTERNAL_GATEWAY_WEIGHTS}
+	    ;;
+	cur)
+	    local gateway_weights=${CURRENT_EXTERNAL_GATEWAY_WEIGHTS}
+	    ;;
+	*)
+	    return 1
+	    ;;
+    esac
+
+    test -n "${gateway_weights}" || return 11
+    ! mono-elt ${gateway_weights} || return 13
+
+    return 0
+}
+
+is-multi-gateways()
+{
+    test -n "${1}" || return 1
+    local state=${1}
+
+    ! is-multi-default-gateways ${state} || return 0
+    ! is-multi-external-gateways ${state} || return 0
+
+    return 11
+}
+
+nic-is-in-use()
+{
+    test -n "${1}" || return 1
+    local nic=${1}
+
+    case ${nic} in
+	bond0)
+	    is-bond-dev "${BOND_INTERNALS}" || return 10
+	    return 0
+	    ;;
+
+	bond1)
+	    is-bond-dev "${BOND_EXTERNALS}" || return 11
+	    return 0
+	    ;;
+
+	bond2)
+	    is-bond-dev "${BOND_AUXILIARIES}" || return 12
+	    return 0
+	    ;;
+	*)
+	    ;;
+    esac
+
+    test ${nic} != "${BOND_INTERNALS}" || return 0
+    test ${nic} != "${BOND_EXTERNALS}" || return 0
+    test ${nic} != "${BOND_AUXILIARIES}" || return 0
+
+    return 21
+}
+
+nic-exist()
+{
+    test -n "${1}" || return 1
+    local nic=${1}
+
+    test "${nic:0:4}" != bond || return 0
+    test "${nic:0:3}" != ifb || return 0
+
+    member "${NETWORK_DEVICES}" ${nic} || return 11
+}
+
+gen-network-interfaces-file()
+{
+    local nic
+    local eth bond
+    local veth vbond
+    local peths pbonds
+    local network_path=/etc/sysconfig/ifconfig.
+    local network_path_len=${#network_path}
+
+    local eths=$(ls -1 \
+	${network_path}eth[0-9] \
+	${network_path}eth[0-9][0-9] \
+	2> /dev/null)
+
+    local bonds=$(ls -1 \
+	${network_path}bond[0-9] \
+	${network_path}bond[0-9][0-9] \
+	2> /dev/null)
+
+    local veths=$(ls -1 \
+	${network_path}eth[0-9].[0-9] \
+	${network_path}eth[0-9].[0-9][0-9] \
+	${network_path}eth[0-9].[0-9][0-9][0-9] \
+	${network_path}eth[0-9].[0-9][0-9][0-9][0-9] \
+	\
+	${network_path}eth[0-9][0-9].[0-9] \
+	${network_path}eth[0-9][0-9].[0-9][0-9] \
+	${network_path}eth[0-9][0-9].[0-9][0-9][0-9] \
+	${network_path}eth[0-9][0-9].[0-9][0-9][0-9][0-9] \
+	2> /dev/null)
+
+    local vbonds=$(ls -1 \
+	${network_path}bond[0-9].[0-9] \
+	${network_path}bond[0-9].[0-9][0-9] \
+	${network_path}bond[0-9].[0-9][0-9][0-9] \
+	${network_path}bond[0-9].[0-9][0-9][0-9][0-9] \
+	\
+	${network_path}bond[0-9][0-9].[0-9] \
+	${network_path}bond[0-9][0-9].[0-9][0-9] \
+	${network_path}bond[0-9][0-9].[0-9][0-9][0-9] \
+	${network_path}bond[0-9][0-9].[0-9][0-9][0-9][0-9] \
+	2> /dev/null)
+
+    for veth in ${veths}
+    do
+	nic=${veth:${network_path_len}}
+	nic=${nic/\.*}
+	member "${peths}" "${nic}" || peths="${peths} ${nic}"
+    done
+    peths="${peths:1}"
+
+    for vbond in ${vbonds}
+    do
+	nic=${vbond:${network_path_len}}
+	nic=${nic/\.*}
+	member "${pbonds}" "${nic}" || pbonds="${pbonds} ${nic}"
+    done
+    pbonds="${pbonds:1}"
+
+    for eth in ${eths}
+    do
+	nic=${eth:${network_path_len}}
+	peths="${peths} ${nic}"
+    done
+    test "${peths:0:1}" != ' ' || peths=${peths:1}
+
+    for bond in ${bonds}
+    do
+	nic=${bond:${network_path_len}}
+	member "${pbonds}" "${nic}" || pbonds="${pbonds} ${nic}"
+    done
+    test "${pbonds:0:1}" != ' ' || pbonds=${pbonds:1}
+
+    echo ${peths} ${pbonds} > ${RUN_DIR}/${NETWORK_INTERFACES_FILENAME}
+}
+
+clean-network-statistics()
+{
+    local statistics=$(ls -1 ${RUN_DIR}/${NETWORK_STATISTICS_FILENAME}.* 2> /dev/null)
+    local len=$[${#NETWORK_STATISTICS_FILENAME} + 1] 
+    local statistic nic
+
+    for statistic in ${statistics}
+    do
+	nic=$(file-basename ${statistic})
+	nic=${nic:${len}}
+
+	nic-is-in-use ${nic} || rm -f ${statistic}
+    done
+}
+
+reset-network-statistics()
+{
+    local nic nics
+
+    test -f ${RUN_DIR}/${NETWORK_INTERFACES_FILENAME} || return 11
+    nics=$(cat ${RUN_DIR}/${NETWORK_INTERFACES_FILENAME} 2> /dev/null)
+    
+    for nic in ${nics}
+    do
+	echo -n > ${RUN_DIR}/${NETWORK_STATISTICS_FILENAME}.${nic}
+    done
+}
+
+get-mac-dev()
+{
+    local in_mac=${1}
+    
+    if test -z "${in_mac}" ; then
+	echo -n "unknown"
+	return 11
+    fi
+
+    local eth mac
+    local eths=$(ls -1d /sys/class/net/eth* 2> /dev/null)
+    
+    for eth in ${eths}
+    do
+	mac=$(cat ${eth}/address 2> /dev/null)
+	if test "${mac}" == "${in_mac}" ; then
+	    eth=$(file-basename ${eth})
+	    echo -n ${eth}
+	    return 0
+	fi
+    done
+    
+    echo -n "unknown"
+    return 13   
+}
+
+get-net-dev()
+{
+    test -n "${1}" || return 1
+    dev=${1}
+
+    case "${dev}" in
+	any)
+	    echo 'any'
+	    ;;
+	external)
+	    echo ${IF_EXTERNAL}
+	    ;;
+	internal)
+	    echo ${IF_INTERNAL}
+	    ;;
+	web)
+	    echo ${IF_WEB}
+	    ;;
+	rweb)
+	    echo ${IF_RWEB}
+	    ;;
+	antivirus)
+	    echo ${IF_AV}
+	    ;;
+	admin)
+	    echo ${IF_ADMIN}
+	    ;;
+	mon)
+	    echo ${IF_MON}
+	    ;;
+	file)
+	    echo ${IF_FILE}
+	    ;;
+	peer)
+	    echo ${IF_PEER}
+	    ;;
+	auxiliary)
+	    echo ${IF_AUXILIARY}
+	    ;;
+	vpnipsec)
+	    echo 'ipsec'
+	    ;;
+	*)
+	    return 11
+	    ;;
+    esac
+
+    return 0
+}
+
+set-rweb-ip()
+{
+    test -n "${1}" || return 1
+    local state=${1}
+
+    local rweb_site_list ip_external_ip vrrp_external_ip_list
+    local https_ip_list https_ip_tls_list http_ip_list ip_list
+    local alias_ip_list
+    local http_name_list http_name_ip_list https_name_ip_list
+    local rweb_site_ip_list
+
+    local rweb_http=False
+    local rweb_https=False
+
+    case ${state} in
+	new)
+	    rweb_site_list=${_RWEB_SITE_LIST}
+	    ip_external_ip=${IP_EXTERNAL_IP}
+	    vrrp_external_ip_list=${VRRP_EXTERNAL_IP_LIST}
+	    ;;
+	cur)
+	    rweb_site_list=${CURRENT_RWEB_SITE_LIST}
+	    ip_external_ip=${CURRENT_IP_EXTERNAL_IP}
+	    vrrp_external_ip_list=${CURRENT_VRRP_EXTERNAL_IP_LIST}
+	    ;;
+	*)
+	    return 1
+	    ;;
+    esac
+
+    local elt i=0 range
+    local name protocol ip tls
+
+    for elt in ${rweb_site_list}
+    do
+	range=$[${i} % 5]
+	case ${range} in
+	    0)
+		name=${elt}
+		;;
+	    1)
+		protocol=${elt}
+		;;
+	    2)
+		ip=${elt}
+		;;
+	    3)
+		tls=${elt}
+		;;
+	    4)
+		! check-expr-ip ${name} || rweb_site_ip_list="${rweb_site_ip_list} ${name}"
+
+		if test ${ip_external_ip} != ${ip} && ! member "${alias_ip_list}" ${ip} ; then
+		    if test ${HA_MODE} == True ; then
+			member "${vrrp_external_ip_list}" ${ip} || alias_ip_list="${alias_ip_list} ${ip}"
+		    else
+			alias_ip_list="${alias_ip_list} ${ip}"
+		    fi
+		fi
+
+		member "${ip_list}" ${ip} || ip_list="${ip_list} ${ip}"
+
+		case ${protocol} in
+		    https)
+			member "${https_ip_list}" ${ip} || https_ip_list="${https_ip_list} ${ip}"
+			member "${https_ip_tls_list}" ${ip}:${tls} || https_ip_tls_list="${https_ip_tls_list} ${ip}:${tls}"
+
+			if ! member "${http_name_list}" ${name} ; then
+			    http_name_list="${http_name_list} ${name}"
+			    https_name_ip_list="${https_name_ip_list} ${name} ${ip}"
+			fi
+
+			rweb_https=True
+			;;
+
+		    http)
+			member "${http_ip_list}" ${ip} || http_ip_list="${http_ip_list} ${ip}"
+			if ! member "${http_name_list}" ${name} ; then
+			    http_name_list="${http_name_list} ${name}"
+			    http_name_ip_list="${http_name_ip_list} ${name} ${ip}"
+			fi
+			rweb_http=True
+			;;
+		    *)
+			;;
+		esac
+		;;
+	    *)
+		return 1
+		;;
+	esac
+	((i++))
+    done
+
+    http_name_list=${http_name_list:1}
+    http_name_ip_list=${http_name_ip_list:1}
+    https_name_ip_list=${https_name_ip_list:1}
+    https_ip_list=${https_ip_list:1}
+    https_ip_tls_list=${https_ip_tls_list:1}
+    http_ip_list=${http_ip_list:1}
+    ip_list=${ip_list:1}
+    alias_ip_list=${alias_ip_list:1}
+    rweb_site_ip_list=${rweb_site_ip_list:1}
+
+    case ${state} in
+	new)
+	    export RWEB_HTTPS_MODE=${rweb_https}
+	    export RWEB_HTTP_MODE=${rweb_http}
+
+	    export RWEB_HTTP_NAME_IP_LIST=${http_name_ip_list}
+	    export RWEB_HTTPS_NAME_IP_LIST=${https_name_ip_list}
+	    export RWEB_HTTPS_IP_LIST=${https_ip_list}
+	    export RWEB_HTTPS_IP_TLS_LIST=${https_ip_tls_list}
+	    export RWEB_HTTP_IP_LIST=${http_ip_list}
+	    export RWEB_IP_LIST=${ip_list}
+	    export ALIAS_IP_EXTERNAL_LIST=${alias_ip_list}
+	    export RWEB_SITE_IP_LIST=${rweb_site_ip_list}
+	    ;;
+	cur)
+	    export CURRENT_RWEB_HTTPS_MODE=${rweb_https}
+	    export CURRENT_RWEB_HTTP_MODE=${rweb_http}
+
+	    export CURRENT_RWEB_HTTP_NAME_IP_LIST=${http_name_ip_list}
+	    export CURRENT_RWEB_HTTPS_NAME_IP_LIST=${https_name_ip_list}
+	    export CURRENT_RWEB_HTTPS_IP_LIST=${https_ip_list}
+	    export CURRENT_RWEB_HTTPS_IP_TLS_LIST=${https_ip_tls_list}
+	    export CURRENT_RWEB_HTTP_IP_LIST=${http_ip_list}
+	    export CURRENT_RWEB_IP_LIST=${ip_list}
+	    export CURRENT_ALIAS_IP_EXTERNAL_LIST=${alias_ip_list}
+	    export CURRENT_RWEB_SITE_IP_LIST=${rweb_site_ip_list}
+	    ;;
+	*)
+	    return 1
+	    ;;
+    esac
+}
+
+set-admin-access-list-parameters()
+{
+    local elt i=0 range
+    local if ip mk qos px
+
+    local access_if_ip_px_admin_list
+    local access_if_ip_mk_admin_list
+
+    for elt in ${ACCESS_ADMIN_LIST}
+    do
+	range=$[${i} % 4]
+	case ${range} in
+	    0)
+		if=${elt}
+		;;
+	    1)
+		ip=${elt}
+		;;
+	    2)
+		mk=${elt}
+		;;
+	    3)
+		case ${if} in
+		    internal)
+			if test ${ADMIN_INTERNAL} == False ; then
+			    ((i++))
+			    continue
+			fi
+		        ;;
+		    external)
+			if test ${ADMIN_EXTERNAL} == False ; then
+			    ((i++))
+			    continue
+			fi
+			;;
+		    auxiliary)
+			if test -z "${IF_AUXILIARY}" -o ${IP_AUXILIARY_IP} == 0.0.0.0 -o ${ADMIN_AUXILIARY} == False ; then
+			    ((i++))
+			    continue
+			fi
+			;;
+		    vpnipsec)
+			if test ${VPN_IPSEC_MODE} == False -o ${ADMIN_VPN_IPSEC} == False ; then
+			    ((i++))
+			    continue
+			fi
+			;;
+		    *)
+			;;
+		esac
+
+		qos=${elt}
+		px=$(ipcalc -s ${ip} ${mk} -p)
+		px=${px/PREFIX=/}
+		access_if_ip_px_admin_list="${access_if_ip_px_admin_list} ${if} ${ip} ${px} ${qos}"
+		access_if_ip_mk_admin_list="${access_if_ip_mk_admin_list} ${if} ${ip} ${mk} ${qos}"
+		;;
+	    *)
+		return 1
+		;;
+	esac
+	((i++))
+    done
+
+    ACCESS_IF_IP_PX_ADMIN_LIST="${access_if_ip_px_admin_list:1}"
+    ACCESS_IF_IP_MK_ADMIN_LIST="${access_if_ip_mk_admin_list:1}"
+}
+
+set-web-access-list-parameters()
+{
+    local elt i=0 range
+    local interface ip mk qos px
+
+    local access_if_ip_px_web_list
+    local access_if_ip_mk_web_list
+
+    for elt in ${ACCESS_WEB_LIST}
+    do
+	range=$[${i} % 4]
+	case ${range} in
+	    0)
+		interface=${elt}
+		;;
+	    1)
+		ip=${elt}
+		;;
+	    2)
+		mk=${elt}
+		;;
+	    3)
+		qos=${elt}
+
+		case ${interface} in
+		    internal|admin|rweb|web|antivirus|file|mon)
+			;;
+		    auxiliary)
+			if test -z "${IF_AUXILIARY}" -o ${IP_AUXILIARY_IP} == 0.0.0.0 ; then
+			    ((i++))
+			    continue
+			fi
+			;;
+		    vpnipsec)
+			if test ${VPN_IPSEC_MODE} == False ; then
+			    ((i++))
+			    continue
+			fi
+			;;
+		    *)
+			;;
+		esac
+
+		px=$(ipcalc -s ${ip} ${mk} -p)
+		px=${px/PREFIX=/}
+		access_if_ip_px_web_list="${access_if_ip_px_web_list} ${interface} ${ip} ${px} ${qos}"
+		access_if_ip_mk_web_list="${access_if_ip_mk_web_list} ${interface} ${ip} ${mk} ${qos}"
+		;;
+	    *)
+		return 1
+		;;
+	esac
+	((i++))
+    done
+
+    ACCESS_IF_IP_PX_WEB_LIST="${access_if_ip_px_web_list:1}"
+    ACCESS_IF_IP_MK_WEB_LIST="${access_if_ip_mk_web_list:1}"
+}
+
+set-tweb-access-list-parameters()
+{
+    local elt i=0 range
+    local ip mk qos px
+
+    local transparent_if_ip_px_list
+    local transparent_if_ip_mk_list
+
+    for elt in ${TRANSPARENT_WEB_LIST}
+    do
+	range=$[${i} % 4]
+	case ${range} in
+	    0)
+		if=${elt}
+		;;
+	    1)
+		ip=${elt}
+		;;
+	    2)
+		mk=${elt}
+		;;
+	    3)
+		case ${if} in
+		    internal)
+			if test ${AV_INTERNAL} == False ; then
+			    ((i++))
+			    continue
+			fi
+			;;
+
+		    external)
+		    	if test ${AV_EXTERNAL} == False ; then
+			    ((i++))
+			    continue
+			fi
+			;;
+
+		    auxiliary)
+			if test -z "${IF_AUXILIARY}" -o ${IP_AUXILIARY_IP} == 0.0.0.0 -o ${AV_AUXILIARY} == False ; then
+			    ((i++))
+			    continue
+			fi
+			;;
+		    vpnipsec)
+			if test ${VPN_IPSEC_MODE} == False -a ${AV_VPN_IPSEC} == False ; then
+			    ((i++))
+			    continue
+			fi
+			;;
+		    *)
+			;;
+		esac
+
+		qos=${elt}
+		px=$(ipcalc -s ${ip} ${mk} -p)
+		px=${px/PREFIX=/}
+		transparent_if_ip_px_list="${transparent_if_ip_px_list} ${if} ${ip} ${px} ${qos}"
+		transparent_if_ip_mk_list="${transparent_if_ip_mk_list} ${if} ${ip} ${mk} ${qos}"
+		;;
+	    *)
+		return 1
+		;;
+	esac
+	((i++))
+    done
+
+    TRANSPARENT_IF_IP_PX_LIST="${transparent_if_ip_px_list:1}"
+    TRANSPARENT_IF_IP_MK_LIST="${transparent_if_ip_mk_list:1}"
+}
+
+set-av-access-list-parameters()
+{
+    local elt i=0 range
+    local if ip mk qos px
+
+    local access_if_ip_px_av_list
+    local access_if_ip_mk_av_list
+
+    for elt in ${ACCESS_AV_LIST}
+    do
+	range=$[${i} % 4]
+	case ${range} in
+	    0)
+		if=${elt}
+		;;
+	    1)
+		ip=${elt}
+		;;
+	    2)
+		mk=${elt}
+		;;
+	    3)
+		case ${if} in
+		    internal|external)
+			;;
+		    auxiliary)
+			if test -z "${IF_AUXILIARY}" -o ${IP_AUXILIARY_IP} == 0.0.0.0 ; then
+			    ((i++))
+			    continue
+			fi
+			;;
+		    vpnipsec)
+			if test ${VPN_IPSEC_MODE} == False ; then
+			    ((i++))
+			    continue
+			fi
+			;;
+		    *)
+			;;
+		esac
+
+		qos=${elt}
+		px=$(ipcalc -s ${ip} ${mk} -p)
+		px=${px/PREFIX=/}
+		access_if_ip_px_av_list="${access_if_ip_px_av_list} ${if} ${ip} ${px} ${qos}"
+		access_if_ip_mk_av_list="${access_if_ip_mk_av_list} ${if} ${ip} ${mk} ${qos}"
+		;;
+	    *)
+		return 1
+		;;
+	esac
+	((i++))
+    done
+
+    ACCESS_IF_IP_PX_AV_LIST="${access_if_ip_px_av_list:1}"
+    ACCESS_IF_IP_MK_AV_LIST="${access_if_ip_mk_av_list:1}"
+}
+
+get-qos-rweb-hosts()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    local in_ip=${1}
+    local in_port=${2}
+
+    local elt i=0 range
+    local ip port qos
+
+    for elt in ${ACCESS_RWEB_LIST}
+    do
+	range=$[${i} % 4]
+	case ${range} in
+	    0)
+		;;
+	    1)
+		ip=${elt}
+		;;
+	    2)
+		port=${elt}
+		;;
+	    3)
+		qos=${elt}
+
+		if test ${ip} == ${in_ip} -a ${port} == ${in_port} ; then
+		    echo ${qos}
+		    return 0
+		fi
+		;;
+	    *)
+		return 255
+		;;
+	esac
+	((i++))
+    done
+
+    return 11
+}
+
+replace-access-rweb-list-elt()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    test -n "${3}" || return 3
+    local in_ip=${1}
+    local in_port=${2}
+    local in_qos=${3}
+
+    local elt i=0 range
+    local dev ip port qos
+    local out_list
+
+    for elt in ${ACCESS_RWEB_LIST}
+    do
+	range=$[${i} % 4]
+	case ${range} in
+	    0)
+		dev=${elt}
+		;;
+	    1)
+		ip=${elt}
+		;;
+	    2)
+		port=${elt}
+		;;
+	    3)
+		qos=${elt}
+
+		if test ${ip} == ${in_ip} -a ${port} == ${in_port} ; then
+		    out_list="${out_list} ${dev} ${ip} ${port} ${in_qos}"
+		else
+		    out_list="${out_list} ${dev} ${ip} ${port} ${qos}"
+		fi
+		;;
+	    *)
+		return 255
+		;;
+	esac
+	((i++))
+    done
+
+    echo "${out_list:1}"
+}
+
+set-rweb-access-list-parameters()
+{
+    local elt range i=0
+    local hosts host
+    local name dev ip port qos qos1 qos2
+
+    unset ACCESS_RWEB_LIST
+
+    for elt in ${_RWEB_SITE_HOSTS_LIST}
+    do
+	range=$[${i} % 2]
+	case ${range} in
+	    0)
+		name=${elt}
+		;;
+	    1)
+		hosts=${elt}
+		hosts=$(colon2space ${hosts})
+		for host in ${hosts}
+		do
+		    host=${host//_/ }
+
+		    ip=$(get-nth-arg 3 ${host})
+		    port=$(get-nth-arg 4 ${host})
+
+		    dev=$(get-nth-arg 1 ${host})
+		    qos1=$(get-nth-arg 6 ${host})
+
+		    qos2=$(get-qos-rweb-hosts ${ip} ${port})
+
+		    if test ${?} -eq 0 ; then
+			if test ${qos1} != ${qos2} ; then
+			    qos=$(max-value ${qos1} ${qos2})
+			    ACCESS_RWEB_LIST=$(replace-access-rweb-list-elt ${ip} ${port} ${qos})
+			fi
+		    else
+			ACCESS_RWEB_LIST="${ACCESS_RWEB_LIST} ${dev} ${ip} ${port} ${qos1}"
+		    fi
+		done
+		;;
+	    *)
+		return 1
+		;;
+	esac
+	((i++))
+    done
+    ACCESS_RWEB_LIST="${ACCESS_RWEB_LIST:1}"
+}
+
+set-access-list-parameters()
+{
+    set-admin-access-list-parameters
+    set-web-access-list-parameters
+    set-tweb-access-list-parameters
+    set-av-access-list-parameters
+}
+
+set-network-if-parameters()
+{
+    local master
+    local if_internal_num if_external_num
+
+    case ${APL_ROLE} in
+	gateway)
+	    if_internal_num=${IF_INTERNAL_NUM}
+	    if_external_num=${IF_EXTERNAL_NUM}
+	    ;;
+	manager)
+	    if_internal_num=0
+	    if_external_num=0
+	    ;;
+	*)
+	    ;;
+    esac
+
+    master=${BOND_INTERNALS/ *}
+    if test "${BOND_INTERNALS}" == "${master}" ; then
+	export BOND_INTERNAL_MODE=False
+	export IF_INTERNAL=${master}
+	test -n "${IF_INTERNAL}" || IF_INTERNAL=eth${if_internal_num}
+    else
+	export BOND_INTERNAL_MODE=True
+	export IF_INTERNAL=bond${if_internal_num}
+    fi
+
+    master=${CURRENT_BOND_INTERNALS/ *}
+    if test "${CURRENT_BOND_INTERNALS}" == "${master}" ; then
+	export CURRENT_BOND_INTERNAL_MODE=False
+	export CURRENT_IF_INTERNAL=${master}
+	test -n "${CURRENT_IF_INTERNAL}" || CURRENT_IF_INTERNAL=eth${if_internal_num}
+    else
+	export CURRENT_BOND_INTERNAL_MODE=True
+	export CURRENT_IF_INTERNAL=bond${if_internal_num}
+    fi
+
+    master=${BOND_EXTERNALS/ *}
+    if test "${BOND_EXTERNALS}" == "${master}" ; then
+	export BOND_EXTERNAL_MODE=False
+	export IF_EXTERNAL=${master}
+	test -n "${IF_EXTERNAL}" || IF_EXTERNAL=eth${if_external_num}
+    else
+	export BOND_EXTERNAL_MODE=True
+	export IF_EXTERNAL=bond${if_external_num}
+    fi
+
+    master=${CURRENT_BOND_EXTERNALS/ *}
+    if test "${CURRENT_BOND_EXTERNALS}" == "${master}" ; then
+	export CURRENT_BOND_EXTERNAL_MODE=False
+	export CURRENT_IF_EXTERNAL=${master}
+	test -n "${CURRENT_IF_EXTERNAL}" || CURRENT_IF_EXTERNAL=eth${if_external_num}
+    else
+	export CURRENT_BOND_EXTERNAL_MODE=True
+	export CURRENT_IF_EXTERNAL=bond${if_external_num}
+    fi
+
+    if test -n "${BOND_AUXILIARIES}" ; then
+	master=${BOND_AUXILIARIES/ *}
+	if test "${BOND_AUXILIARIES}" == "${master}" ; then
+	    export BOND_AUXILIARY_MODE=False
+	    export IF_AUXILIARY=${master}
+	else
+	    export BOND_AUXILIARY_MODE=True
+	    export IF_AUXILIARY=bond${IF_AUXILIARY_NUM}
+	fi
+    else
+	export BOND_AUXILIARY_MODE=False
+	unset IF_AUXILIARY
+    fi
+
+    if test -n "${CURRENT_BOND_AUXILIARIES}" ; then
+	master=${CURRENT_BOND_AUXILIARIES/ *}
+	if test "${CURRENT_BOND_AUXILIARIES}" == "${master}" ; then
+	    export CURRENT_BOND_AUXILIARY_MODE=False
+	    export CURRENT_IF_AUXILIARY=${master}
+	else
+	    export CURRENT_BOND_AUXILIARY_MODE=True
+	    export CURRENT_IF_AUXILIARY=bond${IF_AUXILIARY_NUM}
+	fi
+    else
+	export CURRENT_BOND_AUXILIARY_MODE=False
+	unset CURRENT_IF_AUXILIARY
+    fi
+
+    if test ${BOND_INTERNAL_MODE} == True -o ${BOND_EXTERNAL_MODE} == True -o ${BOND_AUXILIARY_MODE} == True ; then
+	export BOND_MODE=True
+    else
+	export BOND_MODE=False
+    fi
+
+    if test ${CURRENT_BOND_INTERNAL_MODE} == True -o ${CURRENT_BOND_EXTERNAL_MODE} == True -o ${CURRENT_BOND_AUXILIARY_MODE} == True ; then
+	export CURRENT_BOND_MODE=True
+    else
+	export CURRENT_BOND_MODE=False
+    fi
+
+    if test ${VLAN_MODE} == False ; then
+	
+	export IF_WEB=${IF_INTERNAL}
+	export IF_RWEB=${IF_INTERNAL}
+	export IF_AV=${IF_INTERNAL}
+	export IF_PEER=${IF_INTERNAL}
+	export IF_ADMIN=${IF_INTERNAL}
+	export IF_FILE=${IF_INTERNAL}
+	export IF_MON=${IF_INTERNAL}
+
+	export CURRENT_IF_WEB=${CURRENT_IF_INTERNAL}
+	export CURRENT_IF_RWEB=${CURRENT_IF_INTERNAL}
+    else
+	export VLAN_WEB=$(get-vlan-tag web new)
+	export VLAN_RWEB=$(get-vlan-tag rweb new)
+	export VLAN_AV=$(get-vlan-tag antivirus new)
+	export VLAN_PEER=$(get-vlan-tag peer new)
+	export VLAN_ADMIN=$(get-vlan-tag admin new)
+	export VLAN_FILE=$(get-vlan-tag file new)
+	export VLAN_MON=$(get-vlan-tag mon new)
+
+	export IF_WEB=${IF_INTERNAL}.${VLAN_WEB}
+	export IF_RWEB=${IF_INTERNAL}.${VLAN_RWEB}
+	export IF_AV=${IF_INTERNAL}.${VLAN_AV}
+	export IF_PEER=${IF_INTERNAL}.${VLAN_PEER}
+	export IF_ADMIN=${IF_INTERNAL}.${VLAN_ADMIN}
+	export IF_FILE=${IF_INTERNAL}.${VLAN_FILE}
+	export IF_MON=${IF_INTERNAL}.${VLAN_MON}
+
+	export CURRENT_VLAN_WEB=$(get-vlan-tag web cur)
+	export CURRENT_VLAN_RWEB=$(get-vlan-tag rweb cur)
+	export CURRENT_VLAN_AV=$(get-vlan-tag antivirus cur)
+	export CURRENT_VLAN_PEER=$(get-vlan-tag peer cur)
+	export CURRENT_VLAN_ADMIN=$(get-vlan-tag admin cur)
+	export CURRENT_VLAN_FILE=$(get-vlan-tag file cur)
+	export CURRENT_VLAN_MON=$(get-vlan-tag mon cur)
+
+	export CURRENT_IF_WEB=${CURRENT_IF_INTERNAL}.${CURRENT_VLAN_WEB}
+	export CURRENT_IF_RWEB=${CURRENT_IF_INTERNAL}.${CURRENT_VLAN_RWEB}
+	export CURRENT_IF_AV=${CURRENT_IF_INTERNAL}.${CURRENT_VLAN_AV}
+	export CURRENT_IF_PEER=${CURRENT_IF_INTERNAL}.${CURRENT_VLAN_PEER}
+	export CURRENT_IF_ADMIN=${CURRENT_IF_INTERNAL}.${CURRENT_VLAN_ADMIN}
+	export CURRENT_IF_FILE=${CURRENT_IF_INTERNAL}.${CURRENT_VLAN_FILE}
+	export CURRENT_IF_MON=${CURRENT_IF_INTERNAL}.${CURRENT_VLAN_MON}
+    fi
+
+    # QOS IFs
+
+    export IFB_INTERNAL_INGRESS=0
+    export IFB_EXTERNAL_INGRESS=1
+    export IFB_AUXILIARY_INGRESS=2
+    export IFB_INTERNAL_EGRESS=3
+
+    export IF_QOS_INTERNAL_INGRESS=ifb${IFB_INTERNAL_INGRESS}
+    export IF_QOS_EXTERNAL_INGRESS=ifb${IFB_EXTERNAL_INGRESS}
+    export CURRENT_IF_QOS_INTERNAL_INGRESS=ifb${IFB_INTERNAL_INGRESS}
+    export CURRENT_IF_QOS_EXTERNAL_INGRESS=ifb${IFB_EXTERNAL_INGRESS}
+
+    test -z "${IF_AUXILIARY}" || export IF_QOS_AUXILIARY_INGRESS=ifb${IFB_AUXILIARY_INGRESS}	    
+    test -z "${CURRENT_IF_AUXILIARY}" || export CURRENT_IF_QOS_AUXILIARY_INGRESS=ifb${IFB_AUXILIARY_INGRESS}
+
+    if test ${VLAN_MODE} == True ; then
+	export IF_QOS_INTERNAL_EGRESS=ifb${IFB_INTERNAL_EGRESS}
+    else
+	export IF_QOS_INTERNAL_EGRESS=${IF_INTERNAL}
+    fi
+
+    if test ${CURRENT_VLAN_MODE} == True ; then
+	export CURRENT_IF_QOS_INTERNAL_EGRESS=ifb${IFB_INTERNAL_EGRESS}
+    else
+	export CURRENT_IF_QOS_INTERNAL_EGRESS=${CURRENT_IF_INTERNAL}
+    fi
+
+    export IF_QOS_EXTERNAL_EGRESS=${IF_EXTERNAL}
+    export IF_QOS_AUXILIARY_EGRESS=${IF_AUXILIARY}
+    export CURRENT_IF_QOS_EXTERNAL_EGRESS=${CURRENT_IF_EXTERNAL}
+    export CURRENT_IF_QOS_AUXILIARY_EGRESS=${CURRENT_IF_AUXILIARY}
+}
+
+get-broadcast-address()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    local ip=${1}
+    local mk=${2}
+
+    if test ${ip} == '0.0.0.0' -a ${mk} == '0.0.0.0' ; then
+	echo '0.0.0.0'
+    else
+	local bd=$(ipcalc -s ${ip} ${mk} -b)
+	bd=${bd/BROADCAST=}
+	echo ${bd}
+    fi
+}
+
+set-network-ip-native-parameters()
+{
+    export IP_EXTERNAL_NET=$(ipcalc -s ${IP_EXTERNAL_IP} ${IP_EXTERNAL_MASK} -n) ; IP_EXTERNAL_NET=${IP_EXTERNAL_NET/NETWORK=}
+    export IP_EXTERNAL_PRF=$(ipcalc -s ${IP_EXTERNAL_IP} ${IP_EXTERNAL_MASK} -p) ; IP_EXTERNAL_PRF=${IP_EXTERNAL_PRF/PREFIX=}
+    export IP_EXTERNAL_BRD=$(get-broadcast-address ${IP_EXTERNAL_IP} ${IP_EXTERNAL_MASK})
+
+    export CURRENT_IP_EXTERNAL_NET=$(ipcalc -s ${CURRENT_IP_EXTERNAL_IP} ${CURRENT_IP_EXTERNAL_MASK} -n) ; CURRENT_IP_EXTERNAL_NET=${CURRENT_IP_EXTERNAL_NET/NETWORK=}
+    export CURRENT_IP_EXTERNAL_PRF=$(ipcalc -s ${CURRENT_IP_EXTERNAL_IP} ${CURRENT_IP_EXTERNAL_MASK} -p) ; CURRENT_IP_EXTERNAL_PRF=${CURRENT_IP_EXTERNAL_PRF/PREFIX=}
+    export CURRENT_IP_EXTERNAL_BRD=$(get-broadcast-address ${CURRENT_IP_EXTERNAL_IP} ${CURRENT_IP_EXTERNAL_MASK})
+
+    export IP_AUXILIARY_NET=$(ipcalc -s ${IP_AUXILIARY_IP} ${IP_AUXILIARY_MASK} -n) ; IP_AUXILIARY_NET=${IP_AUXILIARY_NET/NETWORK=}
+    export IP_AUXILIARY_PRF=$(ipcalc -s ${IP_AUXILIARY_IP} ${IP_AUXILIARY_MASK} -p) ; IP_AUXILIARY_PRF=${IP_AUXILIARY_PRF/PREFIX=}
+    export IP_AUXILIARY_BRD=$(get-broadcast-address ${IP_AUXILIARY_IP} ${IP_AUXILIARY_MASK})
+
+    export CURRENT_IP_AUXILIARY_NET=$(ipcalc -s ${CURRENT_IP_AUXILIARY_IP} ${CURRENT_IP_AUXILIARY_MASK} -n) ; CURRENT_IP_AUXILIARY_NET=${CURRENT_IP_AUXILIARY_NET/NETWORK=}
+    export CURRENT_IP_AUXILIARY_PRF=$(ipcalc -s ${CURRENT_IP_AUXILIARY_IP} ${CURRENT_IP_AUXILIARY_MASK} -p) ; CURRENT_IP_AUXILIARY_PRF=${CURRENT_IP_AUXILIARY_PRF/PREFIX=}
+    export CURRENT_IP_AUXILIARY_BRD=$(get-broadcast-address ${CURRENT_IP_AUXILIARY_IP} ${CURRENT_IP_AUXILIARY_MASK})
+}
+
+set-network-ip-vlan-parameters()
+{
+    local dev i=0
+    local ip_local_ip_list
+
+    if test ${VLAN_MODE} == False ; then
+
+	ip_local_ip_list="${IP_INTERNAL_IP} ${IP_EXTERNAL_IP} ${IP_AUXILIARY_IP}"
+
+	network=$(ipcalc -s ${ip} ${netmask} -n) ; network=${network/NETWORK=}
+	prefix=$(ipcalc -s ${ip} ${netmask} -p) ; prefix=${prefix/PREFIX=}
+	broadcast=$(ipcalc -s ${ip} ${netmask} -b) ; broadcast=${broadcast/BROADCAST=}
+
+	export IP_INTERNAL_NET=$(ipcalc -s ${IP_INTERNAL_IP} ${IP_INTERNAL_MASK} -n) ; IP_INTERNAL_NET=${IP_INTERNAL_NET/NETWORK=}
+	export IP_INTERNAL_PRF=$(ipcalc -s ${IP_INTERNAL_IP} ${IP_INTERNAL_MASK} -p) ; IP_INTERNAL_PRF=${IP_INTERNAL_PRF/PREFIX=}
+	export IP_INTERNAL_BRD=$(get-broadcast-address ${IP_INTERNAL_IP} ${IP_INTERNAL_MASK})
+
+	export CURRENT_IP_INTERNAL_NET=$(ipcalc -s ${CURRENT_IP_INTERNAL_IP} ${CURRENT_IP_INTERNAL_MASK} -n) ; CURRENT_IP_INTERNAL_NET=${CURRENT_IP_INTERNAL_NET/NETWORK=}
+	export CURRENT_IP_INTERNAL_PRF=$(ipcalc -s ${CURRENT_IP_INTERNAL_IP} ${CURRENT_IP_INTERNAL_MASK} -p) ; CURRENT_IP_INTERNAL_PRF=${CURRENT_IP_INTERNAL_PRF/PREFIX=}
+	export CURRENT_IP_INTERNAL_BRD=$(get-broadcast-address ${CURRENT_IP_INTERNAL_IP} ${CURRENT_IP_INTERNAL_MASK})
+
+	export IP_WEB_IP=${IP_INTERNAL_IP}
+	export IP_RWEB_IP=${IP_INTERNAL_IP}
+	export IP_AV_IP=${IP_INTERNAL_IP}
+	export IP_PEER_IP=${IP_INTERNAL_IP}
+	export IP_ADMIN_IP=${IP_INTERNAL_IP}
+	export IP_FILE_IP=${IP_INTERNAL_IP}
+	export IP_MON_IP=${IP_INTERNAL_IP}
+
+	export IP_WEB_MASK=${IP_INTERNAL_MASK}
+	export IP_RWEB_MASK=${IP_INTERNAL_MASK}
+	export IP_AV_MASK=${IP_INTERNAL_MASK}
+	export IP_PEER_MASK=${IP_INTERNAL_MASK}
+	export IP_ADMIN_MASK=${IP_INTERNAL_MASK}
+	export IP_FILE_MASK=${IP_INTERNAL_MASK}
+	export IP_MON_MASK=${IP_INTERNAL_MASK}
+
+	export IP_WEB_NET=${IP_INTERNAL_NET}
+	export IP_WEB_PRF=${IP_INTERNAL_PRF}
+	export IP_WEB_BRD=${IP_INTERNAL_BRD}
+
+	export IP_RWEB_NET=${IP_INTERNAL_NET}
+	export IP_RWEB_PRF=${IP_INTERNAL_PRF}
+	export IP_RWEB_BRD=${IP_INTERNAL_BRD}
+
+	export IP_AV_NET=${IP_INTERNAL_NET}
+	export IP_AV_PRF=${IP_INTERNAL_PRF}
+	export IP_AV_BRD=${IP_INTERNAL_BRD}
+
+	export CURRENT_IP_WEB_IP=${CURRENT_IP_INTERNAL_IP}
+	export CURRENT_IP_RWEB_IP=${CURRENT_IP_INTERNAL_IP}
+	export CURRENT_IP_AV_IP=${CURRENT_IP_INTERNAL_IP}
+	export CURRENT_IP_PEER_IP=${CURRENT_IP_INTERNAL_IP}
+	export CURRENT_IP_ADMIN_IP=${CURRENT_IP_INTERNAL_IP}
+	export CURRENT_IP_FILE_IP=${CURRENT_IP_INTERNAL_IP}
+	export CURRENT_IP_MON_IP=${CURRENT_IP_INTERNAL_IP}
+
+	export CURRENT_IP_WEB_MASK=${CURRENT_IP_INTERNAL_MASK}
+	export CURRENT_IP_RWEB_MASK=${CURRENT_IP_INTERNAL_MASK}
+	export CURRENT_IP_AV_MASK=${CURRENT_IP_INTERNAL_MASK}
+	export CURRENT_IP_PEER_MASK=${CURRENT_IP_INTERNAL_MASK}
+	export CURRENT_IP_ADMIN_MASK=${CURRENT_IP_INTERNAL_MASK}
+	export CURRENT_IP_FILE_MASK=${CURRENT_IP_INTERNAL_MASK}
+	export CURRENT_IP_MON_MASK=${CURRENT_IP_INTERNAL_MASK}
+    else
+	local ip_netmask ip netmask netwrok broadcast prefix
+
+	set-ip-prefix-broadcast-etc
+
+	ip_local_ip_list="${IP_VLAN_LOCAL_IP_LIST} ${IP_EXTERNAL_IP} ${IP_AUXILIARY_IP}"
+
+	ip_netmask=$(get-vlan-ip-netmask ${VLAN_WEB} new)
+	ip=${ip_netmask/ *}
+	netmask=${ip_netmask/* }
+	network=$(ipcalc -s ${ip} ${netmask} -n) ; network=${network/NETWORK=}
+	prefix=$(ipcalc -s ${ip} ${netmask} -p) ; prefix=${prefix/PREFIX=}
+	broadcast=$(get-broadcast-address ${ip} ${netmask})
+	export IP_WEB_IP=${ip}
+	export IP_WEB_MASK=${netmask}
+	export IP_WEB_NET=${network}
+	export IP_WEB_PRF=${prefix}
+	export IP_WEB_BRD=${broadcast}
+
+	ip_netmask=$(get-vlan-ip-netmask ${VLAN_RWEB} new)
+	ip=${ip_netmask/ *}
+	netmask=${ip_netmask/* }
+	network=$(ipcalc -s ${ip} ${netmask} -n) ; network=${network/NETWORK=}
+	prefix=$(ipcalc -s ${ip} ${netmask} -p) ; prefix=${prefix/PREFIX=}
+	broadcast=$(get-broadcast-address ${ip} ${netmask})
+	export IP_RWEB_IP=${ip}
+	export IP_RWEB_MASK=${netmask}
+	export IP_RWEB_NET=${network}
+	export IP_RWEB_PRF=${prefix}
+	export IP_RWEB_BRD=${broadcast}
+
+	ip_netmask=$(get-vlan-ip-netmask ${VLAN_AV} new)
+	ip=${ip_netmask/ *}
+	netmask=${ip_netmask/* }
+	network=$(ipcalc -s ${ip} ${netmask} -n) ; network=${network/NETWORK=}
+	prefix=$(ipcalc -s ${ip} ${netmask} -p) ; prefix=${prefix/PREFIX=}
+	broadcast=$(get-broadcast-address ${ip} ${netmask})
+	export IP_AV_IP=${ip}
+	export IP_AV_MASK=${netmask}
+	export IP_AV_NET=${network}
+	export IP_AV_PRF=${prefix}
+	export IP_AV_BRD=${broadcast}
+
+	ip_netmask=$(get-vlan-ip-netmask ${VLAN_PEER} new)
+	ip=${ip_netmask/ *}
+	netmask=${ip_netmask/* }
+	network=$(ipcalc -s ${ip} ${netmask} -n) ; network=${network/NETWORK=}
+	prefix=$(ipcalc -s ${ip} ${netmask} -p) ; prefix=${prefix/PREFIX=}
+	broadcast=$(get-broadcast-address ${ip} ${netmask})
+	export IP_PEER_IP=${ip}
+	export IP_PEER_MASK=${netmask}
+	export IP_PEER_NET=${network}
+	export IP_PEER_PRF=${prefix}
+	export IP_PEER_BRD=${broadcast}
+
+	ip_netmask=$(get-vlan-ip-netmask ${VLAN_ADMIN} new)
+	ip=${ip_netmask/ *}
+	netmask=${ip_netmask/* }
+	network=$(ipcalc -s ${ip} ${netmask} -n) ; network=${network/NETWORK=}
+	prefix=$(ipcalc -s ${ip} ${netmask} -p) ; prefix=${prefix/PREFIX=}
+	broadcast=$(get-broadcast-address ${ip} ${netmask})
+	export IP_ADMIN_IP=${ip}
+	export IP_ADMIN_MASK=${netmask}
+	export IP_ADMIN_NET=${network}
+	export IP_ADMIN_PRF=${prefix}
+	export IP_ADMIN_BRD=${broadcast}
+
+	ip_netmask=$(get-vlan-ip-netmask ${VLAN_FILE} new)
+	ip=${ip_netmask/ *}
+	netmask=${ip_netmask/* }
+	network=$(ipcalc -s ${ip} ${netmask} -n) ; network=${network/NETWORK=}
+	prefix=$(ipcalc -s ${ip} ${netmask} -p) ; prefix=${prefix/PREFIX=}
+	broadcast=$(get-broadcast-address ${ip} ${netmask})
+	export IP_FILE_IP=${ip}
+	export IP_FILE_MASK=${netmask}
+	export IP_FILE_NET=${network}
+	export IP_FILE_PRF=${prefix}
+	export IP_FILE_BRD=${broadcast}
+
+	ip_netmask=$(get-vlan-ip-netmask ${VLAN_MON} new)
+	ip=${ip_netmask/ *}
+	netmask=${ip_netmask/* }
+	network=$(ipcalc -s ${ip} ${netmask} -n) ; network=${network/NETWORK=}
+	prefix=$(ipcalc -s ${ip} ${netmask} -p) ; prefix=${prefix/PREFIX=}
+	broadcast=$(get-broadcast-address ${ip} ${netmask})
+	export IP_MON_IP=${ip}
+	export IP_MON_MASK=${netmask}
+	export IP_MON_NET=${network}
+	export IP_MON_PRF=${prefix}
+	export IP_MON_BRD=${broadcast}
+
+	ip_netmask=$(get-vlan-ip-netmask ${CURRENT_VLAN_WEB} cur)
+	ip=${ip_netmask/ *}
+	netmask=${ip_netmask/* }
+	network=$(ipcalc -s ${ip} ${netmask} -n) ; network=${network/NETWORK=}
+	prefix=$(ipcalc -s ${ip} ${netmask} -p) ; prefix=${prefix/PREFIX=}
+	broadcast=$(get-broadcast-address ${ip} ${netmask})
+	export CURRENT_IP_WEB_IP=${ip}
+	export CURRENT_IP_WEB_MASK=${netmask}
+	export CURRENT_IP_WEB_NET=${network}
+	export CURRENT_IP_WEB_PRF=${prefix}
+	export CURRENT_IP_WEB_BRD=${broadcast}
+
+	ip_netmask=$(get-vlan-ip-netmask ${CURRENT_VLAN_RWEB} cur)
+	ip=${ip_netmask/ *}
+	netmask=${ip_netmask/* }
+	network=$(ipcalc -s ${ip} ${netmask} -n) ; network=${network/NETWORK=}
+	prefix=$(ipcalc -s ${ip} ${netmask} -p) ; prefix=${prefix/PREFIX=}
+	broadcast=$(get-broadcast-address ${ip} ${netmask})
+	export CURRENT_IP_RWEB_IP=${ip}
+	export CURRENT_IP_RWEB_MASK=${netmask}
+	export CURRENT_IP_RWEB_NET=${network}
+	export CURRENT_IP_RWEB_PRF=${prefix}
+	export CURRENT_IP_RWEB_BRD=${broadcast}
+
+	ip_netmask=$(get-vlan-ip-netmask ${CURRENT_VLAN_AV} cur)
+	ip=${ip_netmask/ *}
+	netmask=${ip_netmask/* }
+	network=$(ipcalc -s ${ip} ${netmask} -n) ; network=${network/NETWORK=}
+	prefix=$(ipcalc -s ${ip} ${netmask} -p) ; prefix=${prefix/PREFIX=}
+	broadcast=$(get-broadcast-address ${ip} ${netmask})
+	export CURRENT_IP_AV_IP=${ip}
+	export CURRENT_IP_AV_MASK=${netmask}
+	export CURRENT_IP_AV_NET=${network}
+	export CURRENT_IP_AV_PRF=${prefix}
+	export CURRENT_IP_AV_BRD=${broadcast}
+
+	ip_netmask=$(get-vlan-ip-netmask ${CURRENT_VLAN_PEER} cur)
+	ip=${ip_netmask/ *}
+	netmask=${ip_netmask/* }
+	network=$(ipcalc -s ${ip} ${netmask} -n) ; network=${network/NETWORK=}
+	prefix=$(ipcalc -s ${ip} ${netmask} -p) ; prefix=${prefix/PREFIX=}
+	broadcast=$(get-broadcast-address ${ip} ${netmask})
+	export CURRENT_IP_PEER_IP=${ip}
+	export CURRENT_IP_PEER_MASK=${netmask}
+	export CURRENT_IP_PEER_NET=${network}
+	export CURRENT_IP_PEER_PRF=${prefix}
+	export CURRENT_IP_PEER_BRD=${broadcast}
+
+	ip_netmask=$(get-vlan-ip-netmask ${CURRENT_VLAN_ADMIN} cur)
+	ip=${ip_netmask/ *}
+	netmask=${ip_netmask/* }
+	network=$(ipcalc -s ${ip} ${netmask} -n) ; network=${network/NETWORK=}
+	prefix=$(ipcalc -s ${ip} ${netmask} -p) ; prefix=${prefix/PREFIX=}
+	broadcast=$(get-broadcast-address ${ip} ${netmask})
+	export CURRENT_IP_ADMIN_IP=${ip}
+	export CURRENT_IP_ADMIN_MASK=${netmask}
+	export CURRENT_IP_ADMIN_NET=${network}
+	export CURRENT_IP_ADMIN_PRF=${prefix}
+	export CURRENT_IP_ADMIN_BRD=${broadcast}
+
+	ip_netmask=$(get-vlan-ip-netmask ${CURRENT_VLAN_FILE} cur)
+	ip=${ip_netmask/ *}
+	netmask=${ip_netmask/* }
+	network=$(ipcalc -s ${ip} ${netmask} -n) ; network=${network/NETWORK=}
+	prefix=$(ipcalc -s ${ip} ${netmask} -p) ; prefix=${prefix/PREFIX=}
+	broadcast=$(get-broadcast-address ${ip} ${netmask})
+	export CURRENT_IP_FILE_IP=${ip}
+	export CURRENT_IP_FILE_MASK=${netmask}
+	export CURRENT_IP_FILE_NET=${network}
+	export CURRENT_IP_FILE_PRF=${prefix}
+	export CURRENT_IP_FILE_BRD=${broadcast}
+
+	ip_netmask=$(get-vlan-ip-netmask ${CURRENT_VLAN_MON} cur)
+	ip=${ip_netmask/ *}
+	netmask=${ip_netmask/* }
+	network=$(ipcalc -s ${ip} ${netmask} -n) ; network=${network/NETWORK=}
+	prefix=$(ipcalc -s ${ip} ${netmask} -p) ; prefix=${prefix/PREFIX=}
+	broadcast=$(get-broadcast-address ${ip} ${netmask})
+	export CURRENT_IP_MON_IP=${ip}
+	export CURRENT_IP_MON_MASK=${netmask}
+	export CURRENT_IP_MON_NET=${network}
+	export CURRENT_IP_MON_PRF=${prefix}
+	export CURRENT_IP_MON_BRD=${broadcast}
+    fi
+
+    IP_LOCAL_IP_LIST=${ip_local_ip_list}
+}
+
+set-network-ip-parameters()
+{
+    set-network-ip-native-parameters
+    set-network-ip-vlan-parameters
+
+    if test ${HA_MODE} == True ; then ARP_IGNORE=1 ; else ARP_IGNORE=0 ; fi
+
+    export MULTICAST_NET=224.0.0.0/240.0.0.0
+    export ALL_HOSTS_MULTICAST_IP=224.0.0.1
+    export ALL_ROUTERS_MULTICAST_IP=224.0.0.2
+    export VRRP_MULTICAST_IP=224.0.0.18
+    export IGMP_MULTICAST_IP=224.0.0.22
+    export LVS_MULTICAST_IP=224.0.0.81
+    export VRRP_ADVERT_INTERVAL=2
+
+    set-vrrp-ip new
+    set-vrrp-ip cur
+
+    set-rweb-ip new
+    set-rweb-ip cur
+}
+
+set-ports-nb()
+{
+    export FTP_DATA_PORTS=20,989,1024:65535
+    export FTP_PORT=21
+    export FTPS_PORT=990
+    export SSH_PORT=22
+    export DOMAIN_PORT=53
+    export BOOTPS_PORT=67
+    export BOOTPC_PORT=68
+    export TFTP_PORT=69
+    export SIP_PORT=5060
+    export SFTP_PORT=22
+    export WWW_PORT=80
+    export KERBEROS_PORT=88
+    export NTP_PORT=123
+    export SNMP_PORT=161
+    export SNMP_TRAP_PORT=162
+    export LDAP_PORT=389
+    export HTTPS_PORT=443
+    export KPASSWD_PORT=464
+    export SNMP_TLS_PORT=10161
+    export SNMP_TLS_TRAP_PORT=10162
+    export WEB_PORTS="${WWW_PORT},${HTTPS_PORT}"
+    export SAFE_PORTS="1024:49151"
+    export CLOUD_AZURE_PORT="32526"
+    export CLOUD_AZURE_PORTS="${WEB_PORTS},${CLOUD_AZURE_PORT}"
+    export EMAIL_PORT=25
+}
+
+set-net-constant()
+{
+    set-ports-nb
+}
+
+set-network-parameters()
+{
+    set-network-if-parameters
+    set-network-ip-parameters
+    set-net-constant
+}
+
+set-gateway-weights()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 0
+    local version=${1}
+    local routes=${2}
+
+    local ip mk gw_wt_pg_list gw_wt_pg
+    local default_gw_wt_list default_nostandby_gw_wt_list external_gw_wt_list gw_wt gw wt
+    local i=0 elt range
+
+    for elt in ${routes}
+    do
+	range=$[${i} % 3]
+	case ${range} in
+	    0)
+		ip=${elt}
+		;;
+	    1)
+		mk=${elt}
+		;;
+	    2)
+		gw_wt_pg_list=${elt//:/ }
+
+		if test ${ip} == "0.0.0.0" -a ${mk} == "0.0.0.0" ; then
+		    for gw_wt_pg in ${gw_wt_pg_list}
+		    do
+			gw_wt=${gw_wt_pg%\/*}
+			gw_wt=${gw_wt/\//:}
+			wt=${gw_wt/*:}
+			default_gw_wt_list="${default_gw_wt_list} ${gw_wt}"
+			test ${wt} == 0 || default_nostandby_gw_wt_list="${default_nostandby_gw_wt_list} ${gw_wt}"
+		    done
+		fi
+
+		for gw_wt_pg in ${gw_wt_pg_list}
+		do
+		    gw_wt=${gw_wt_pg%\/*}
+		    gw_wt=${gw_wt/\//:}
+		    gw=${gw_wt/:*}
+		    wt=${gw_wt/*:}
+		    if test ${wt} != 0 ; then
+			if ip-is-included ${gw} ${IP_EXTERNAL_NET} ${IP_EXTERNAL_BRD} ${IP_EXTERNAL_MASK}; then
+			    external_gw_wt_list="${external_gw_wt_list} ${gw_wt}"
+			fi
+		    fi
+		done
+		;;
+	    *)
+		return 1
+		;;
+	esac
+	((i++))
+    done
+
+    default_gw_wt_list=${default_gw_wt_list:1}
+    default_nostandby_gw_wt_list=$(uniq-elt ${default_nostandby_gw_wt_list:1})
+    external_gw_wt_list=$(uniq-elt ${external_gw_wt_list:1})
+
+    case ${version} in
+	cur)
+	    CURRENT_DEFAULT_GATEWAY_WEIGHTS=${default_gw_wt_list}
+	    CURRENT_DEFAULT_NOSTANDBY_GATEWAY_WEIGHTS=${default_nostandby_gw_wt_list}
+	    CURRENT_EXTERNAL_GATEWAY_WEIGHTS=${external_gw_wt_list}
+	    ;;
+	new)
+	    DEFAULT_GATEWAY_WEIGHTS=${default_gw_wt_list}
+	    DEFAULT_NOSTANDBY_GATEWAY_WEIGHTS=${default_nostandby_gw_wt_list}
+	    EXTERNAL_GATEWAY_WEIGHTS=${external_gw_wt_list}
+	    ;;
+	*)
+	    ;;
+    esac
+}
+
+set-network-routes-parameters()
+{
+    export CURRENT_IP_ROUTE_GW_WT_PG_LIST=$(get-multi-gateways-route-list "${CURRENT_IP_ROUTE_LIST}")
+    export IP_ROUTE_GW_WT_PG_LIST=$(get-multi-gateways-route-list "${IP_ROUTE_LIST}")
+
+    export EXTERNAL_ROUTE_TABLE_PNAME=external
+    export STICKY_DEFAULT_ROUTE_TABLE_PNAME=sdefault
+
+    export ROUTE_INIT_TABLE=101
+
+    set-gateway-weights cur "${CURRENT_IP_ROUTE_GW_WT_PG_LIST}"
+    set-gateway-weights new "${IP_ROUTE_GW_WT_PG_LIST}"
+
+    if is-multi-default-gateways new -o is-multi-external-gateways new ; then
+	PATH_CHECK_INTERVAL=3000000
+    else
+	PATH_CHECK_INTERVAL=20000000
+    fi
+
+    PATH_IS_ACTIVE=True
+    CURRENT_PATH_IS_ACTIVE=True
+}
+
+gen-modprobe-bonding-conf()
+{
+    local options="mode=active-backup miimon=300 use_carrier=1"
+    local bonds
+
+    case ${APL_ROLE} in
+	gateway)
+	    bonds=3
+	    ;;
+	manager)
+	    bonds=1
+	    ;;
+	*)
+	    ;;
+    esac
+
+    echo "options bonding max_bonds=${bonds} ${options}"
+
+    if test ${BOND_INTERNAL_MODE} == True ; then
+	echo "alias ${IF_INTERNAL} bonding"
+	echo "options ${IF_INTERNAL} -o ${IF_INTERNAL} ${options}"
+    fi
+
+    if test ${BOND_EXTERNAL_MODE} == True ; then
+	echo "alias ${IF_EXTERNAL} bonding"
+	echo "options ${IF_EXTERNAL} -o ${IF_EXTERNAL} ${options}"
+    fi
+
+    if test ${BOND_AUXILIARY_MODE} == True ; then
+	echo "alias ${IF_AUXILIARY} bonding"
+	echo "options ${IF_AUXILIARY} -o ${IF_AUXILIARY} ${options}"
+    fi
+}
+
+get-alias-dev-id()
+{
+    test -n "${1}" || return 1
+    local dev=${1}
+
+    alias_id=${dev/*:}
+    test "${alias_id}" != "${dev}" || return 0
+
+    echo "${alias_id}"
+    return 0
+}
+
+get-connected-if()
+{
+    test -n "${1}" || return 1
+    local ip=${1}
+
+    if ip-is-included ${ip} ${IP_EXTERNAL_NET} ${IP_EXTERNAL_BRD} ${IP_EXTERNAL_MASK} ; then
+	echo ${IF_EXTERNAL}
+    elif ip-is-included ${ip} ${IP_AUXILIARY_NET} ${IP_AUXILIARY_BRD} ${IP_AUXILIARY_MASK} ; then
+	echo ${IF_AUXILIARY}
+    else
+	
+	if test ${VLAN_MODE} == False ; then
+	    echo ${IF_INTERNAL}
+	else
+	    if ip-is-included ${ip} ${IP_WEB_NET} ${IP_WEB_BRD} ${IP_WEB_MASK} ; then
+		echo ${IF_WEB}
+	    elif ip-is-included ${ip} ${IP_RWEB_NET} ${IP_RWEB_BRD} ${IP_RWEB_MASK}; then
+		echo ${IF_RWEB}
+	    elif ip-is-included ${ip} ${IP_AV_NET} ${IP_AV_BRD} ${IP_AV_MASK} ; then
+		echo ${IF_AV}
+	    elif ip-is-included ${ip} ${IP_PEER_NET} ${IP_PEER_BRD} ${IP_PEER_MASK} ; then
+		echo ${IF_PEER}
+	    elif ip-is-included ${ip} ${IP_FILE_NET} ${IP_FILE_BRD} ${IP_FILE_MASK} ; then
+		echo ${IF_FILE}
+	    elif ip-is-included ${ip} ${IP_ADMIN_NET} ${IP_ADMIN_BRD} ${IP_ADMIN_MASK} ; then
+		echo ${IF_ADMIN}
+	    elif ip-is-included ${ip} ${IP_MON_NET} ${IP_MON_BRD} ${IP_MON_MASK} ; then
+		echo ${IF_MON}
+	    else
+		echo ${IF_WEB}
+	    fi
+	fi
+    fi
+}
+
+set-ip-prefix-broadcast-etc()
+{
+    local vlan ip netmask prefix network broadcast
+    local i=0 elt range
+
+    local vlan_ip_mask_prefix_network_broadcast_list
+    local ip_vlan_local_ip_list
+
+    for elt in ${IP_VLAN_LIST}
+    do
+	range=$[${i} % 3]
+	case ${range} in
+	    0)
+		vlan=${elt}
+		;;
+	    1)
+		ip=${elt}
+		ip_vlan_local_ip_list="${ip_vlan_local_ip_list} ${ip}"
+		;;
+	    2)
+		netmask=${elt}
+		prefix=$(ipcalc -s ${ip} ${netmask} -p) ; prefix=${prefix/PREFIX=}
+		network=$(ipcalc -s ${ip} ${netmask} -n) ; network=${network/NETWORK=}
+		broadcast=$(get-broadcast-address ${ip} ${netmask})
+
+		vlan_ip_mask_prefix_network_broadcast_list="${vlan_ip_mask_prefix_network_broadcast_list} ${vlan} ${ip} ${netmask} ${prefix} ${network} ${broadcast}"
+		;;
+	    *)
+		return 1
+		;;
+	esac
+	((i++))
+    done
+
+    vlan_ip_mask_prefix_network_broadcast_list=${vlan_ip_mask_prefix_network_broadcast_list:1}
+    ip_vlan_local_ip_list=${ip_vlan_local_ip_list:1}
+
+    VLAN_IP_MASK_PREFIX_NETWORK_BROADCAST_list=${vlan_ip_mask_prefix_network_broadcast_list}
+    IP_VLAN_LOCAL_IP_LIST=${ip_vlan_local_ip_list}
+}
+
+gen-network()
+{
+    echo "HOSTNAME=${SHOSTNAME}"
+}
+
+gen-rweb-hosts()
+{
+    test ${RWEB_MODE} == True || return 0
+
+    local elt i=0 range
+    local name ip
+
+    for elt in ${RWEB_HTTP_NAME_IP_LIST} ${RWEB_HTTPS_NAME_IP_LIST}
+    do
+	range=$[${i} % 2]
+	case ${range} in
+	    0)
+		name=${elt}
+		;;
+	    1)
+		ip=${elt}
+		check-expr-ip ${name} || echo "${ip} ${name}"
+		;;
+	    *)
+		return 1
+		;;
+	esac
+	((i++))
+    done
+}
+
+gen-name-ip-hosts()
+{
+    local ip name
+    local elt range i=0
+
+    for elt in ${IP_NAME_IP_LIST}
+    do
+	range=$[${i} %2]
+	case ${range} in
+	    0)
+		name=${elt}
+		;;
+	    1)
+		ip=${elt}
+		echo "${ip} ${name}"
+		;;
+	    *)
+		return 255
+		;;
+	esac
+	((i++))
+    done
+}
+
+get-ip-from-ip-name-list()
+{
+    test -n "${1}" || return 1
+    local in_name=${1}
+
+    local ip name
+    local elt range i=0
+
+    for elt in ${IP_NAME_IP_LIST}
+    do
+	range=$[${i} %2]
+	case ${range} in
+	    0)
+		name=${elt}
+		;;
+	    1)
+		ip=${elt}
+
+		if test ${name} == ${in_name} ; then
+		    echo ${ip}
+		    return 0
+		fi
+		;;
+	    *)
+		return 255
+		;;
+	esac
+	((i++))
+    done
+
+    return 11
+}
+
+gen-hosts()
+{
+    local ip nb
+
+    echo "# Begin /etc/hosts"
+    echo
+    echo "127.0.0.1 localhost.localdomain localhost"
+
+    if test ${WEB_MODE} == True ; then
+	echo "${IP_WEB_IP} ${SHOSTNAME} ${SHOSTNAME}.${DOMAIN_NAME}"
+    else
+    	echo "${IP_RWEB_IP} ${SHOSTNAME} ${SHOSTNAME}.${DOMAIN_NAME}"
+    fi
+    
+    echo "${IP_EXTERNAL_IP} external-side.gateway"
+
+    if test ${VLAN_MODE} == True; then
+	echo "${IP_WEB_IP} web-side.gateway"
+	echo "${IP_RWEB_IP} rweb-side.gateway"
+	echo "${IP_AV_IP} antivirus-side.gateway"
+	echo "${IP_PEER_IP} peer-side.gateway"
+	echo "${IP_ADMIN_IP} admin-side.gateway"
+	echo "${IP_FILE_IP} file-side.gateway"
+	echo "${IP_MON_IP} mon-side.gateway"
+    else
+	echo "${IP_INTERNAL_IP} internal-side.gateway"
+    fi
+    
+    if test ${HA_MODE} == True ; then
+	nb=1
+	for ip in ${VRRP_EXTERNAL_IP_LIST}
+	do
+	    echo "${ip} vip${nb}-external-side.gateway"
+	    ((nb++))
+	done
+	
+	if test ${VLAN_MODE} == True; then
+	    if test ${WEB_MODE} == True ; then
+		nb=1
+		for ip in ${VRRP_WEB_IP_LIST}
+		do
+		    echo "${ip} vip${nb}-web-side.gateway"
+		    ((nb++))
+		done
+	    fi
+	    if test ${RWEB_MODE} == True ; then
+		nb=1
+		for ip in ${VRRP_RWEB_IP_LIST}
+		do
+		    echo "${ip} vip${nb}-rweb-side.gateway"
+		    ((nb++))
+		done
+	    fi
+	    if test ${AV_MODE} == True ; then
+		nb=1
+		for ip in ${VRRP_AV_IP_LIST}
+		do
+		    echo "${ip} vip${nb}-antivirus-side.gateway"
+		    ((nb++))
+		done
+	    fi
+	else
+	    nb=1
+	    for ip in ${VRRP_WEB_IP_LIST}
+	    do
+		echo "${ip} vip${nb}-internal-side.gateway"
+		((nb++))
+	    done
+	fi
+    fi
+
+    if test ${OCSP_MODE} == True ; then
+	check-expr-ip ${OCSP_HOST} || echo 127.0.0.1 ${OCSP_HOST}
+    fi
+
+    gen-rweb-hosts
+    gen-name-ip-hosts
+
+    echo
+    echo "# End /etc/hosts"
+}
+
+gen-resolv-conf()
+{
+    local dns
+    echo -e "search ${DOMAIN_NAME}"
+    echo -e "domainname ${DOMAIN_NAME}"
+    for dns in ${NAME_SERVER_LIST}
+    do
+	echo -e "nameserver ${dns}"
+    done
+}
+
+gen-network-interface-conf()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 1
+    local master=${1}
+    local bonding=${2}
+    local ip=${3}
+    local broadcast=${4}
+    local prefix=${5}
+    local arp=${6}
+    local gw=${7}
+
+    local services
+
+    local device=${master/\.*} vlan
+    local alias_id=$(get-alias-dev-id "${master}")
+
+    test ${master} == ${device} || vlan=${master/*\.}
+
+    echo "ONBOOT=yes"
+    echo "IFACE=${master/:*}"
+
+    test -z "${arp}" || echo "ARP_IGNORE=${arp}"
+
+    if test -n "${vlan}" ; then
+	echo "VIRTINT=yes"
+	echo "VLAN_ID=${vlan}"
+	services="link-802-1q"
+    fi
+
+    if test -z "${alias_id}" ; then
+	if test "${device}" != "${bonding}" ; then
+	    echo "BONDING=\"${bonding}\""
+	    if test -z "${services}" ; then
+		services="link-802-3ad"
+	    else
+		services="link-802-3ad ${services}"
+	    fi
+	fi
+    fi
+
+    if test -n "${ip}" -a -n "${prefix}" -a -n "${broadcast}" ; then
+	echo "IP=${ip}"
+	echo "PREFIX=${prefix}"
+	echo "BROADCAST=${broadcast}"
+
+	test -z "${gw}" || echo "GATEWAY=${gw}"
+
+	if test -z "${services}" ; then
+	    services="ipv4-static"
+	else
+	    services="${services} ipv4-static"
+	fi
+    fi
+
+    echo "SERVICE='${services}'"
+}
+
+gen-network-interface()
+{
+    test -n "${1}" || return 1
+    if_type=${1}
+
+    local master bonding ip prefix broadcast arp
+
+    case ${if_type} in
+	auxiliary)
+	    master=${IF_AUXILIARY}
+	    bonding="${BOND_AUXILIARIES}"
+	    ip=${IP_AUXILIARY_IP}
+	    prefix=${IP_AUXILIARY_PRF}
+	    broadcast=${IP_AUXILIARY_BRD}
+	    arp=0
+	    ;;
+	external)
+	    master=${IF_EXTERNAL}
+	    bonding="${BOND_EXTERNALS}"
+	    ip=${IP_EXTERNAL_IP}
+	    prefix=${IP_EXTERNAL_PRF}
+	    broadcast=${IP_EXTERNAL_BRD}
+	    arp=0
+	    ;;
+	internal)
+	    master=${IF_INTERNAL}
+	    bonding="${BOND_INTERNALS}"
+	    ip=${IP_INTERNAL_IP}
+	    prefix=${IP_INTERNAL_PRF}
+	    broadcast=${IP_INTERNAL_BRD}
+	    arp=${ARP_IGNORE}
+	    ;;
+	*)
+	    return 1
+	    ;;
+    esac
+    gen-network-interface-conf ${master} "${bonding}" ${ip} ${broadcast} ${prefix} ${arp}
+}
+
+gen-loopback-conf()
+{
+    test ${HA_MODE} == True || return 0
+
+    local ip nb=1
+    local ips
+
+    if test ${WEB_MODE} == True ; then
+	for ip in ${VRRP_WEB_IP_LIST}
+	do
+	    ips="${ips} ${ip}"
+	    echo "${ip}/32 lo:${nb}"
+	    ((nb++))
+	done
+    fi
+    test "${ips:0:1}" != ' ' || ips=${ips:1}
+   
+    if test ${RWEB_MODE} == True ; then
+	for ip in ${VRRP_EXTERNAL_IP_LIST}
+	do
+	    ! member "${ips}" ${ip} || continue
+	    ips="${ips} ${ip}"
+	    echo "${ip}/32 lo:${nb}"
+	    ((nb++))
+	done
+    fi
+    test "${ips:0:1}" != ' ' || ips=${ips:1}
+
+    if test ${AV_MODE} == True ; then
+
+	local flag
+
+	test ${AV_INTERNAL} == False  || flag='yes'
+	test ${VPN_IPSEC_MODE} == False -a ${AV_VPN_IPSEC} == False || flag='yes'
+
+	if test ${VLAN_MODE} == True -a -n "${flag}" ; then
+	    for ip in ${VRRP_AV_IP_LIST}
+	    do
+		! member "${ips}" ${ip} || continue
+		ips="${ips} ${ip}"
+		echo "${ip}/32 lo:${nb}"
+		((nb++))
+	    done
+	fi
+	test "${ips:0:1}" != ' ' || ips=${ips:1}
+
+	if test -n "${IF_AUXILIARY}" -a ${IP_AUXILIARY_IP} != 0.0.0.0 -a ${AV_AUXILIARY} == True ; then
+	    for ip in ${VRRP_AUXILIARY_IP_LIST}
+	    do
+		! member "${ips}" ${ip} || continue
+		ips="${ips} ${ip}"
+		echo "${ip}/32 lo:${nb}"
+		((nb++))
+	    done
+	fi
+	test "${ips:0:1}" != ' ' || ips=${ips:1}
+    fi
+}
+
+set-hostname()
+{
+    local mode=${1}
+    if test "${mode}" != force ; then
+	test "${CURRENT_SHOSTNAME}" != "${SHOSTNAME}" -o \
+	    "${STATE_CFG_SHOSTNAME}" == modified || return 0
+    fi
+
+    STATE_CFG_SHOSTNAME=modified
+
+    log "Modifying the hostname"
+    hostname ${SHOSTNAME}
+    log-result ${?}
+}
+
+set-ip-forwarding()
+{
+    test "${CURRENT_ROUTER_MODE}" != "${ROUTER_MODE}" -o \
+	"${STATE_CFG_ROUTER_MODE}" == modified || return 0
+
+    STATE_CFG_ROUTER_MODE=modified
+
+    local val message
+    if test "${ROUTER_MODE}" == "True" ; then
+	val=1
+	message=Enabling
+    else
+	val=0
+	message=Disabling
+    fi
+    log "${message} the IP forwarding"
+    sysctl -q -w "net.ipv4.ip_forward=${val}" 2> /dev/null
+    log-result ${?}
+}
+
+set-arp-ignore-1()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    test -n "${3}" || return 3
+    test -n "${4}" || return 4
+    local dev=${1}
+    local ip=${2}
+    local mask=${3}
+    local val=${4}
+
+    test -f /proc/sys/net/ipv4/conf/${dev}/arp_ignore || return 11
+    test ${ip} != 0.0.0.0 -a ${mask} != 0.0.0.0 || return 13
+
+    if test ${VLAN_MODE} == True ; then
+	echo ${val} > /proc/sys/net/ipv4/conf/${dev}/arp_ignore
+    else
+	sysctl -q -w "net.ipv4.conf.${dev}.arp_ignore=${val}" 2> /dev/null
+    fi
+}
+
+set-arp-ignore()
+{
+    local val ; if test "${HA_MODE}" == "True" ; then val=1 ; else val=0 ; fi
+
+    set-arp-ignore-1 ${IF_EXTERNAL} ${IP_EXTERNAL_IP} ${IP_EXTERNAL_MASK} ${val}
+    set-arp-ignore-1 ${IF_WEB} ${IP_WEB_IP} ${IP_WEB_MASK} ${val}
+    set-arp-ignore-1 ${IF_AV} ${IP_AV_IP} ${IP_AV_MASK} ${val}
+    test -z "${IF_AUXILIARY}" -o ${IP_AUXILIARY_IP} == 0.0.0.0 || set-arp-ignore-1 ${IF_AUXILIARY} ${IP_AUXILIARY_IP} ${IP_AUXILIARY_MASK} ${val}
+}
+
+check-admin-ip-modified()
+{
+    test ${IP_ADMIN_IP} != ${CURRENT_IP_ADMIN_IP} -o \
+	${IP_ADMIN_MASK} != ${CURRENT_IP_ADMIN_MASK}
+}
+
+check-snmp-ip-modified()
+{
+    test ${IP_MON_IP} != ${CURRENT_IP_MON_IP} -o \
+	${IP_MON_MASK} != ${CURRENT_IP_MON_MASK}
+}
+
+check-file-ip-modified()
+{
+    test ${IP_FILE_IP} != ${CURRENT_IP_FILE_IP} -o \
+	${IP_FILE_MASK} != ${CURRENT_IP_FILE_MASK}
+}
+
+check-web-ip-modified()
+{
+    test ${IP_WEB_IP} != ${CURRENT_IP_WEB_IP} -o \
+	${IP_WEB_MASK} != ${CURRENT_IP_WEB_MASK}
+}
+
+check-av-ip-modified()
+{
+    test ${IP_AV_IP} != ${CURRENT_IP_AV_IP} -o \
+	${IP_AV_MASK} != ${CURRENT_IP_AV_MASK}
+}
+
+check-rweb-ip-modified()
+{
+    test ${IP_RWEB_IP} != ${CURRENT_IP_RWEB_IP} -o \
+	${IP_RWEB_MASK} != ${CURRENT_IP_RWEB_MASK}
+}
+
+check-peer-ip-modified()
+{
+    test ${IP_PEER_IP} != ${CURRENT_IP_PEER_IP} -o \
+	${IP_PEER_MASK} != ${CURRENT_IP_PEER_MASK}
+}
+
+check-extern-ip-modified()
+{
+    test ${IP_EXTERNAL_IP} != ${CURRENT_IP_EXTERNAL_IP} -o \
+	${IP_EXTERNAL_MASK} != ${CURRENT_IP_EXTERNAL_MASK}
+}
+
+check-ip-modified()
+{
+    check-admin-ip-modified || check-snmp-ip-modified || check-file-ip-modified || \
+	check-web-ip-modified || check-av-ip-modified || check-rweb-ip-modified || check-peer-ip-modified || check-extern-ip-modified
+}
+
+check-route-modified()
+{
+    test "${IP_ROUTE_LIST}" != "${CURRENT_IP_ROUTE_LIST}"
+}
+
+check-vrrp-modified()
+{
+    test "${VRRP_EXTERNAL_LIST}" == "${CURRENT_VRRP_EXTERNAL_LIST}" || return 0
+    test "${VRRP_AUXILIARY_LIST}" == "${CURRENT_VRRP_AUXILIARY_LIST}" || return 0
+
+    if test ${VLAN_MODE} == False ; then
+	test "${VRRP_INTERNAL_LIST}" == "${CURRENT_VRRP_INTERNAL_LIST}" || return 0
+       else
+	   test "${VRRP_WEB_LIST}" == "${CURRENT_VRRP_WEB_LIST}" || return 0
+	   test "${VRRP_RWEB_LIST}" == "${CURRENT_VRRP_RWEB_LIST}" || return 0
+	   test "${VRRP_AV_LIST}" == "${CURRENT_VRRP_AV_LIST}" || return 0
+    fi
+    return 1
+}
+
+check-l3-network-modified()
+{
+    check-ip-modified || check-route-modified || check-vrrp-modified
+}
+
+check-vlan-modified()
+{
+    test ${VLAN_MODE} != ${CURRENT_VLAN_MODE} || \
+	test ${VLAN_MODE} == False || \
+	test "${VLAN_FLOW_LIST}" != "${CURRENT_VLAN_FLOW_LIST}"
+}
+
+check-bonding-modified()
+{
+    test "${BOND_EXTERNALS}" != "${CURRENT_BOND_EXTERNALS}" || \
+	test "${BOND_INTERNALS}" != "${CURRENT_BOND_INTERNALS}"
+}
+
+check-l2-network-modified()
+{
+    check-vlan-modified || check-bonding-modified
+}
+
+check-network-modified()
+{
+    check-l2-network-modified || check-l3-network-modified
+}
+
+safe-generate-network-ip()
+{
+    cd ${CONF_DIR}
+
+    if test -n "${IF_AUXILIARY}" ; then
+	gen-network-interface auxiliary  > ifconfig.${IF_AUXILIARY}.work
+	mv -f ifconfig.${IF_AUXILIARY}.work ifconfig.${IF_AUXILIARY}.new
+    fi
+
+    case ${CLOUD_NAME} in
+	aws|azure)
+	    case ${APL_ROLE} in
+		gateway)
+		    gen-network-interface-conf ${IF_EXTERNAL} "${BOND_EXTERNALS}" 0.0.0.0 0.0.0.0 0 0 > ifconfig.${IF_EXTERNAL}.work
+		    mv -f ifconfig.${IF_EXTERNAL}.work ifconfig.${IF_EXTERNAL}.new
+
+		    if test ${VLAN_MODE} == False ; then
+			gen-network-interface-conf ${IF_INTERNAL} "${BOND_INTERNALS}" 0.0.0.0 0.0.0.0 0 0 > ifconfig.${IF_INTERNAL}.work
+			mv -f ifconfig.${IF_INTERNAL}.work ifconfig.${IF_INTERNAL}.new
+		    fi
+		    ;;
+		manager)
+		    gen-network-interface-conf ${IF_INTERNAL} "${BOND_INTERNALS}" 0.0.0.0 0.0.0.0 0 0 > ifconfig.${IF_INTERNAL}.work
+		    mv -f ifconfig.${IF_INTERNAL}.work ifconfig.${IF_INTERNAL}.new
+		    ;;
+		*)
+		    ;;
+	    esac
+	    ;;
+	"")
+	    if test ${APL_ROLE} == 'gateway' ; then
+		gen-network-interface external > ifconfig.${IF_EXTERNAL}.work
+		mv -f ifconfig.${IF_EXTERNAL}.work ifconfig.${IF_EXTERNAL}.new
+	    fi
+
+	    if test ${VLAN_MODE} == False ; then
+		gen-network-interface internal > ifconfig.${IF_INTERNAL}.work
+		mv -f ifconfig.${IF_INTERNAL}.work ifconfig.${IF_INTERNAL}.new
+	    fi
+	    ;;
+	*)
+	    ;;
+    esac
+
+    test ${APL_ROLE} == gateway -a ${VLAN_MODE} == True || return 0
+
+    local elt i=0 range vlan ip netmask broadcast prefix
+
+    if test ${IF_INTERNAL} != "${BOND_INTERNALS}" ; then
+	gen-network-interface-conf ${IF_INTERNAL} "${BOND_INTERNALS}" "" "" "" ${ARP_IGNORE} > ifconfig.${IF_INTERNAL}.work
+	mv -f ifconfig.${IF_INTERNAL}.work ifconfig.${IF_INTERNAL}.new
+    fi
+
+    for elt in ${IP_VLAN_LIST}
+    do
+	range=$[${i} % 3]
+	case ${range} in
+	    0)
+		vlan=${elt}
+		;;
+	    1)
+		ip=${elt}
+		;;
+	    2)
+		netmask=${elt}
+
+		broadcast=$(get-broadcast-address ${ip} ${netmask})
+		prefix=$(ipcalc -s ${ip} ${netmask} -p) ; prefix=${prefix/PREFIX=}
+		    
+		gen-network-interface-conf ${IF_INTERNAL}.${vlan} "${IF_INTERNAL}" \
+					   ${ip} ${broadcast} ${prefix} ${ARP_IGNORE} > ifconfig.${IF_INTERNAL}.${vlan}.work
+		mv -f ifconfig.${IF_INTERNAL}.${vlan}.work ifconfig.${IF_INTERNAL}.${vlan}.new
+		;;
+	esac
+	((i++))
+    done
+}
+
+safe-generate-network-alias-ip()
+{
+    test ${RWEB_MODE} == True || return 0
+
+    case ${CLOUD_NAME} in
+	aws|azure)
+	    return 0
+	    ;;
+	*)
+	    ;;
+    esac
+
+    local ip i=0
+
+    cd ${CONF_DIR}
+
+    for ip in ${ALIAS_IP_EXTERNAL_LIST}
+    do
+	gen-network-interface-conf ${IF_EXTERNAL}:${i} "${BOND_EXTERNALS}" ${ip} ${IP_EXTERNAL_BRD} ${IP_EXTERNAL_PRF} > ifconfig.${IF_EXTERNAL}:${i}.work
+	mv -f ifconfig.${IF_EXTERNAL}:${i}.work ifconfig.${IF_EXTERNAL}:${i}.new
+	((i++))
+    done
+}
+
+gen-network-static-route-conf()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    test -n "${3}" || return 3
+    local ip=${1}
+    local mk=${2}
+    local gw_wt_pg_list=${3}
+    local table=${4}
+
+    local rtype device
+
+    if test ${gw_wt_pg_list:0:5} == local ; then
+	rtype="local-default"
+    else
+	if test ${ip} == "0.0.0.0" -a ${mk} == "0.0.0.0" ; then
+	    rtype="default"
+	else
+	    rtype="network"
+	fi
+    fi
+
+    echo "ONBOOT=yes"
+    echo "SERVICE=ipv4-static-route"
+    echo "TYPE=${rtype}"
+    test -z "${table}" || echo "TABLE=${table}"
+
+    if test ${gw_wt_pg_list:0:5} = local ; then
+	device=${gw_wt_pg_list:6}
+	echo "IFACE=${device}"
+	return 0
+    fi
+
+    local first_gw_wt_pg first_gw
+
+    first_gw_wt_pg=${gw_wt_pg_list/:*}
+    first_gw=${first_gw_wt_pg/\/*}
+    device=$(get-connected-if ${first_gw})
+
+    echo "IFACE=${device}"
+
+    if test ${rtype} == network ; then
+	echo "IP=${ip}"
+	local prefix=$(ipcalc -s ${ip} ${mk} -p)
+	prefix=${prefix/PREFIX=}
+	echo "PREFIX=${prefix}"
+    fi
+
+    if test "${first_gw_wt_pg}" == "${gw_wt_pg_list}" ; then
+	local wt_pg=${first_gw_wt_pg#*\/}
+	local pinged=${wt_pg/*\/}
+	! member "${IP_LOCAL_IP_LIST}" ${pinged} || unset pinged
+	echo "PINGED=${pinged}"
+	echo "STATIC_GATEWAY=${first_gw}"
+    else
+	gw_wt_pg_list=${gw_wt_pg_list//:/ }
+	gw_wt_pg_list=${gw_wt_pg_list//\// }
+	echo "STATIC_GATEWAYS=\"${gw_wt_pg_list}\""
+    fi
+}
+
+safe-generate-network-static-route-tproxy()
+{
+    test ${TPROXY_MODE} == True || return 0
+
+    gen-network-static-route-conf 0.0.0.0 0.0.0.0 local:${IF_WEB} ${TRANSPARENT_ROUTE_TABLE_NAME} > ifconfig.route${ROUTE_NB}.work
+    mv -f ifconfig.route${ROUTE_NB}.work ifconfig.route${ROUTE_NB}.new
+    ((ROUTE_NB++))
+}
+
+safe-generate-network-static-route-ipsec()
+{
+    test ${IKE_IS_ACTIVE} == True || return 0
+
+    local i elt range
+    local ipsec_type remote_subnets
+    local access_found
+    local remote_subnet_list remote_subnet remote_networks
+    local ip mk
+    local via_local_ip
+
+    if test ${VLAN_MODE} == False ; then
+	via_local_ip=${IP_INTERNAL_IP}
+    else
+	if test -z "${VPN_IPSEC_NETWORK_LIST}" ; then
+	    via_local_ip=${IP_WEB_IP}
+	else
+	    local bd vip vips
+	    local local_subnet_list local_subnet
+
+	    vips=$(uniq-elt ${IP_WEB_IP} ${IP_RWEB_IP} ${IP_AV_IP} ${IP_PEER_IP} ${IP_ADMIN_IP} ${IP_FILE_IP} ${IP_MON_IP})
+
+	    i=0
+	    for elt in ${VPN_IPSEC_NETWORK_LIST}
+	    do
+		range=$[${i} % 4]
+		case ${range} in
+		    0)
+			ipsec_type=${elt}
+			;;
+		    
+		    1)
+			;;
+		    2)
+			local_subnet_list=${elt}
+			;;
+		    3)
+			if test ${VPN_IPSEC_ACCESS_MODE} == True ; then
+			    if test ${ipsec_type} != 'access' ; then
+				((i++))
+				continue
+			    fi
+			else
+			    if test ${ipsec_type} != 'site' ; then
+				((i++))
+				continue
+			    fi
+			fi
+
+			if test ${local_subnet_list} == 'nil' ; then
+			    via_local_ip=${IP_WEB_IP}
+			    break
+			else
+			    local_subnet_list=${local_subnet_list//,/ }
+			    for local_subnet in ${local_subnet_list}
+			    do
+				ip=${local_subnet/\/*}
+				mk=${local_subnet/*\/}
+				bd=$(get-broadcast-address ${ip} ${mk})
+
+				for vip in ${vips}
+				do
+				    if ip-is-included ${vip} ${ip} ${bd} ${mk} ; then
+					via_local_ip=${vip}
+					break 3
+				    fi
+				done
+			    done
+			fi
+			;;
+		    *)
+			return 1
+			;;
+		esac
+		((i++))
+	    done
+
+	    test -n "${via_local_ip}" || via_local_ip=${IP_WEB_IP}
+	fi
+    fi
+
+    if test -z "${VPN_IPSEC_NETWORK_LIST}" ; then
+	if test ${VPN_IPSEC_ACCESS_MODE} == True ; then
+	    gen-network-static-route-conf ${VPN_IPSEC_REMOTE_ACCESS_DEFAULT_NETWORK} ${VPN_IPSEC_REMOTE_ACCESS_DEFAULT_NETMASK} ${via_local_ip} > ifconfig.route${ROUTE_NB}.work
+	    mv -f ifconfig.route${ROUTE_NB}.work ifconfig.route${ROUTE_NB}.new
+	    ((ROUTE_NB++))
+	fi
+    else
+	i=0
+	for elt in ${VPN_IPSEC_NETWORK_LIST}
+	do
+	    range=$[${i} % 4]
+	    case ${range} in
+		0)
+		    ipsec_type=${elt}
+		    ;;
+		1|2)
+		    ;;
+		3)
+		    if test ${VPN_IPSEC_ACCESS_MODE} == True ; then
+			if test ${ipsec_type} == 'access' ; then
+			    access_found='yes'
+			else
+			    ((i++))
+			    continue
+			fi
+		    else
+			if test ${ipsec_type} != 'site' ; then
+			    ((i++))
+			    continue
+			fi
+		    fi
+
+		    remote_subnets=${elt}
+
+		    if test ${remote_subnets} == 'nil' ; then
+			if test ${ipsec_type} == 'access' ; then
+			    remote_subnet_list="${VPN_IPSEC_REMOTE_ACCESS_DEFAULT_NETWORK}/${VPN_IPSEC_REMOTE_ACCESS_DEFAULT_NETMASK}"
+			else
+			    unset remote_subnet_list
+			fi
+		    else
+			remote_subnet_list=${remote_subnets//,/ }
+		    fi
+
+		    for remote_subnet in ${remote_subnet_list}
+		    do
+			! member "${remote_networks}" ${remote_subnet} || continue
+			remote_networks="${remote_networks} ${remote_subnet}"
+			ip=${remote_subnet/\/*}
+			mk=${remote_subnet/*\/}
+			gen-network-static-route-conf ${ip} ${mk} ${via_local_ip} > ifconfig.route${ROUTE_NB}.work
+			mv -f ifconfig.route${ROUTE_NB}.work ifconfig.route${ROUTE_NB}.new
+			((ROUTE_NB++))
+		    done
+		    ;;
+		*)
+		    return 1
+		    ;;
+	    esac
+	    ((i++))
+	done
+
+	if test ${VPN_IPSEC_ACCESS_MODE} == True -a -z "${access_found}" ; then
+	    gen-network-static-route-conf ${VPN_IPSEC_REMOTE_ACCESS_DEFAULT_NETWORK} ${VPN_IPSEC_REMOTE_ACCESS_DEFAULT_NETMASK} ${via_local_ip} > ifconfig.route${ROUTE_NB}.work
+	    mv -f ifconfig.route${ROUTE_NB}.work ifconfig.route${ROUTE_NB}.new
+	    ((ROUTE_NB++))
+	fi
+    fi
+}
+
+safe-generate-network-static-route-multi-gateways()
+{
+    ROUTE_TABLE=${ROUTE_INIT_TABLE}
+    local gw_wt gw table_nb=1
+
+    if is-multi-external-gateways new ; then
+	for gw_wt in ${EXTERNAL_GATEWAY_WEIGHTS}
+	do
+	    gw=${gw_wt/:*}
+	    gen-network-static-route-conf 0.0.0.0 0.0.0.0 ${gw} ${EXTERNAL_ROUTE_TABLE_PNAME}${table_nb} > ifconfig.route${ROUTE_NB}.work
+	    mv -f ifconfig.route${ROUTE_NB}.work ifconfig.route${ROUTE_NB}.new
+	    ((ROUTE_NB++))
+	    ((ROUTE_TABLE++))
+	    ((table_nb++))
+	done
+    fi
+
+    if is-multi-default-gateways new ; then
+	table_nb=1
+	for gw_wt in ${DEFAULT_NOSTANDBY_GATEWAY_WEIGHTS}
+	do
+	    gw=${gw_wt/:*}
+	    gen-network-static-route-conf 0.0.0.0 0.0.0.0 ${gw} ${STICKY_DEFAULT_ROUTE_TABLE_PNAME}${table_nb} > ifconfig.route${ROUTE_NB}.work
+	    mv -f ifconfig.route${ROUTE_NB}.work ifconfig.route${ROUTE_NB}.new
+	    ((ROUTE_NB++))
+	    ((ROUTE_TABLE++))
+	    ((table_nb++))
+	done
+    fi
+}
+
+safe-generate-network-static-route-regular()
+{
+    local i=0 elt range
+    local ip mk gw_wt_pg_list
+
+    for elt in ${IP_ROUTE_GW_WT_PG_LIST}
+    do
+	range=$[${i} % 3]
+	case ${range} in
+	    0)
+		ip=${elt}
+		;;
+	    1)
+		mk=${elt}
+		;;
+	    2)
+		gw_wt_pg_list=${elt}
+
+		if test ${ip} == '0.0.0.0' -a ${mk} == '0.0.0.0' ; then
+		    case ${CLOUD_NAME} in
+			aws|azure)
+			    ((i++))
+			    continue
+			    ;;
+			*)
+			;;
+		    esac
+		fi
+
+		gen-network-static-route-conf ${ip} ${mk} ${gw_wt_pg_list} > ifconfig.route${ROUTE_NB}.work
+		mv -f ifconfig.route${ROUTE_NB}.work ifconfig.route${ROUTE_NB}.new
+		((ROUTE_NB++))
+		;;
+	    *)
+		return 1
+		;;
+	esac
+	((i++))
+    done
+}
+
+safe-generate-network-static-route()
+{
+    cd ${CONF_DIR}
+
+    ROUTE_NB=0
+
+    safe-generate-network-static-route-tproxy
+    # safe-generate-network-static-route-ipsec
+    safe-generate-network-static-route-multi-gateways
+    safe-generate-network-static-route-regular
+}
+
+gen-network-route-rule()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    test -n "${3}" || return 3
+    local gw=${1}
+    local mark=${2}
+    local table=${3}
+
+    local fwmark=${mark}
+    let "fwmark <<= ${ROUTE_MARK_SHIFT}"
+    fwmark=$(printf "0x%x" ${fwmark} 2> /dev/null)
+
+    echo "ONBOOT=yes"
+    echo "SERVICE=ip-rule"
+    echo "TYPE=fwmark"
+    echo "FWMARK=${fwmark}/${ROUTE_MARK_MASK}"
+    echo "PRIORITY=${ROUTE_PRIORITY}"
+    echo "TABLE=${table}"
+
+    ((ROUTE_PRIORITY++))
+    ((ROUTE_TABLE++))
+}
+
+gen-network-transparent-route-rule()
+{
+    echo "ONBOOT=yes"
+    echo "SERVICE=ip-rule"
+    echo "TYPE=fwmark"
+    echo "FWMARK=${ROUTE_TPROXY_MARK}/${ROUTE_TPROXY_MARK_MASK}"
+    echo "PRIORITY=${TRANSPARENT_ROUTE_PRIORITY}"
+    echo "TABLE=${TRANSPARENT_ROUTE_TABLE_NAME}"
+}
+
+safe-generate-network-route-rule()
+{
+    local rule_nb=0
+
+    echo "# mangle_type gateway_ip gateway_weight table_prefix_name table_prefix_range mangle_mark" > ${IPTABLES_RUNTIME_MANGLE_INDEX}.work
+
+    cd ${CONF_DIR}
+
+    if test ${TPROXY_MODE} == True ; then
+	gen-network-transparent-route-rule > ifconfig.rule${rule_nb}.work
+	mv -f ifconfig.rule${rule_nb}.work ifconfig.rule${rule_nb}.new
+	((rule_nb++))
+    fi
+
+    local mark=${ROUTE_INIT_MARK}
+
+    ROUTE_TABLE=${ROUTE_INIT_TABLE}
+    ROUTE_PRIORITY=${ROUTE_INIT_PRIORITY}
+
+    local gw_wt gw wt table_nb
+
+    if is-multi-external-gateways new ; then
+	table_nb=1
+	for gw_wt in ${EXTERNAL_GATEWAY_WEIGHTS}
+	do
+	    gw=${gw_wt/:*}
+	    wt=${gw_wt/*:}
+	    gen-network-route-rule ${gw} ${mark} ${EXTERNAL_ROUTE_TABLE_PNAME}${table_nb} > ifconfig.rule${rule_nb}.work
+	    mv -f ifconfig.rule${rule_nb}.work ifconfig.rule${rule_nb}.new
+	    echo route ${gw} ${wt} ${EXTERNAL_ROUTE_TABLE_PNAME} ${table_nb} ${mark} >> ${IPTABLES_RUNTIME_MANGLE_INDEX}.work
+	    ((mark++))
+	    ((rule_nb++))
+	    ((table_nb++))
+	done
+	gws=${gws:1}
+    fi
+
+    if is-multi-default-gateways new ; then
+	table_nb=1
+	for gw_wt in ${DEFAULT_NOSTANDBY_GATEWAY_WEIGHTS}
+	do
+	    gw=${gw_wt/:*}
+	    wt=${gw_wt/*:}
+	    gen-network-route-rule ${gw} ${mark} ${STICKY_DEFAULT_ROUTE_TABLE_PNAME}${table_nb} > ifconfig.rule${rule_nb}.work
+	    mv -f ifconfig.rule${rule_nb}.work ifconfig.rule${rule_nb}.new
+	    echo route ${gw} ${wt} ${STICKY_DEFAULT_ROUTE_TABLE_PNAME} ${table_nb} ${mark} >> ${IPTABLES_RUNTIME_MANGLE_INDEX}.work
+	    ((mark++))
+	    ((rule_nb++))
+	    ((table_nb++))
+	done
+    fi
+
+    mv -f ${IPTABLES_RUNTIME_MANGLE_INDEX}.work ${IPTABLES_RUNTIME_MANGLE_INDEX}.new
+}
+
+backup-ifconfig-files()
+{
+    local net nets
+
+    cd ${CONF_DIR}
+
+    nets=$(ls -1 ifconfig.* 2> /dev/null)
+
+    for net in ${nets}
+    do
+	cp -f ${net} ${net}.old
+    done
+}
+
+safe-generate-network-conf()
+{
+    cd ${CONF_DIR}
+
+    backup-ifconfig-files
+    safe-generate-network-ip
+    safe-generate-network-alias-ip
+    safe-generate-network-static-route
+    safe-generate-network-route-rule
+}
+
+clean-current-network-devices()
+{
+    local net nets len cur
+
+    cd ${CONF_DIR}
+    
+    nets=$(ls -1 ifconfig.* 2> /dev/null)
+
+    for net in ${nets}
+    do
+	len=${#net}
+	test ${net:$[${len} - 4]:4} == ".old" || continue
+	cur=${net/\.old}
+	rm -f ${net} ${cur}
+	rm -f /etc/sysconfig/${cur}
+    done
+}
+
+copy-network-device-from()
+{
+    test -n "${1}" || return 1
+    local from=${1}
+
+    cd ${CONF_DIR}
+    local nets net base
+
+    nets=$(ls -1 ifconfig.*.${from} 2> /dev/null)
+    for net in ${nets}
+    do
+	base=$(file-basename ${net} .${from})
+	mv -f ${net} ${base}
+	ln -sf ${CONF_DIR}/${base} /etc/sysconfig/${base}
+    done
+}
+
+update-link-mac()
+{
+    local eth mac info
+    local new_mac
+    
+    while read eth mac info
+    do
+	new_mac=$(get-real-mac-address ${eth})
+	test ${?} -eq 0 || break
+	echo ${eth} ${new_mac} ${info}
+    done < ${HARD_DIR}/hw-links > ${HARD_DIR}/hw-links.new
+    if test ${?} -eq 0 ; then
+	mv -f ${HARD_DIR}/hw-links.new ${HARD_DIR}/hw-links
+    else
+	rm -f ${HARD_DIR}/hw-links.new
+    fi
+}
+
+set-net-names-list()
+{
+    local elt range i=0
+    local interface ip port protocol
+
+    local access_file_if_ip_list access_file_if_dn_list access_file_used_if_list
+    local access_mon_if_ip_list access_mon_if_dn_list
+    local syslog_server_ip_list syslog_server_dn_list
+    local snmp_trap_server_ip_list snmp_trap_server_dn_list
+    local kerberos_server_ip_list kerberos_server_dn_list
+    local host_ip
+
+    for elt in ${ACCESS_FILE_LIST}
+    do
+	range=$[${i} % 4]
+	case ${range} in
+	    0)
+		interface=${elt}
+		;;
+	    1)
+		ip=${elt}
+		;;
+	    2)
+		;;
+	    3)
+		case ${interface} in
+		    internal)
+			if test ${ADMIN_INTERNAL} == True ; then
+			    member "${access_file_used_if_list}" ${interface} || access_file_used_if_list="${access_file_used_if_list} ${interface}"
+			fi
+			;;
+		    external)
+			if test ${ADMIN_EXTERNAL} == True ; then
+			    member "${access_file_used_if_list}" ${interface} || access_file_used_if_list="${access_file_used_if_list} ${interface}"
+			fi
+			;;
+		    auxiliary)
+			if test -n "${IF_AUXILIARY}" -a ${IP_AUXILIARY_IP} != 0.0.0.0 -a ${ADMIN_AUXILIARY} == True ; then
+			    member "${access_file_used_if_list}" ${interface} || access_file_used_if_list="${access_file_used_if_list} ${interface}"
+			fi
+			;;
+		    vpnipsec)
+			if test ${VPN_IPSEC_MODE} == True -a ${ADMIN_VPN_IPSEC} == True ; then
+			    member "${access_file_used_if_list}" ${interface} || access_file_used_if_list="${access_file_used_if_list} ${interface}"
+			fi
+			;;
+		    *)
+			continue
+			;;
+		esac
+
+		if check-expr-ip ${ip} ; then
+		    access_file_if_ip_list="${access_file_if_ip_list} ${interface}:${ip}"
+		else
+		    host_ip=$(get-ip-from-ip-name-list ${ip})
+		    if test ${?} -eq 0 ; then
+			access_file_if_ip_list="${access_file_if_ip_list} ${interface}:${host_ip}"
+		    else
+			access_file_if_dn_list="${access_file_if_dn_list} ${interface}:${ip}"
+		    fi
+		fi
+		;;
+	    *)
+		return 1
+		;;
+	esac
+	((i++))
+    done
+
+    i=0
+    for elt in ${ACCESS_MON_LIST}
+    do
+	range=$[${i} % 4]
+	case ${range} in
+	    0)
+		interface=${elt}
+		;;
+	    1)
+		ip=${elt}
+		;;
+	    2)
+		;;
+	    3)
+		case ${interface} in
+		    internal)
+			if test ${ADMIN_INTERNAL} == False ; then
+			    ((i++))
+			    continue
+			fi
+		        ;;
+		    external)
+			if test ${ADMIN_EXTERNAL} == False ; then
+			    ((i++))
+			    continue
+			fi
+			;;
+		    auxiliary)
+			if test -z "${IF_AUXILIARY}" -o ${IP_AUXILIARY_IP} == 0.0.0.0 -o ${ADMIN_AUXILIARY} == False ; then
+			    ((i++))
+			    continue
+			fi
+			;;
+		    vpnipsec)
+			if test ${VPN_IPSEC_MODE} == False -o ${ADMIN_VPN_IPSEC} == False ; then
+			    ((i++))
+			    continue
+			fi
+			;;
+		    *)
+			;;
+		esac
+
+		if check-expr-ip ${ip} ; then
+		    access_mon_if_ip_list="${access_mon_if_ip_list} ${interface}:${ip}"
+		else
+		    host_ip=$(get-ip-from-ip-name-list ${ip})
+		    if test ${?} -eq 0 ; then
+			access_mon_if_ip_list="${access_mon_if_ip_list} ${interface}:${host_ip}"
+		    else
+			access_mon_if_dn_list="${access_mon_if_dn_list} ${interface}:${ip}"
+		    fi
+		fi
+		;;
+	    *)
+		return 1
+		;;
+	esac
+	((i++))
+    done
+
+    i=0
+    for elt in ${SYSLOG_SERVER_LIST}
+    do
+	range=$[${i} % 3]
+	case ${range} in
+	    0)
+		protocol=${elt}
+		case ${protocol} in
+		    tls)
+			protocol='tcp'
+			;;
+		    *)
+			;;
+		esac
+		;;
+	    1)
+		ip=${elt}
+		;;
+	    2)
+		port=${elt}
+		if check-expr-ip ${ip} ; then
+		    syslog_server_ip_list="${syslog_server_ip_list} ${protocol} ${ip} ${port}"
+		else
+		    host_ip=$(get-ip-from-ip-name-list ${ip})
+		    if test ${?} -eq 0 ; then
+			syslog_server_ip_list="${syslog_server_ip_list} ${protocol} ${host_ip} ${port}"
+		    else
+			syslog_server_dn_list="${syslog_server_dn_list} ${protocol} ${ip} ${port}"
+		    fi
+		fi
+		;;
+	    *)
+		return 255
+		;;
+	esac
+	((i++))
+    done
+
+    i=0
+    for elt in ${SNMP_TRAP_SERVER_LIST}
+    do
+	range=$[${i} % 8]
+	case ${range} in
+	    0|3|4|5|6)
+		;;
+	    1)
+		ip=${elt}
+		;;
+	    2)
+		port=${elt}
+		;;
+	    7)
+		if check-expr-ip ${ip} ; then
+		    snmp_trap_server_ip_list="${snmp_trap_server_ip_list} ${ip}:${port}"
+		else
+		    host_ip=$(get-ip-from-ip-name-list ${ip})
+		    if test ${?} -eq 0 ; then
+			snmp_trap_server_ip_list="${snmp_trap_server_ip_list} ${host_ip}:${port}"
+		    else
+			snmp_trap_server_dn_list="${snmp_trap_server_dn_list} ${ip}:${port}"
+		    fi
+		fi
+		;;
+	    *)
+		return 1
+		;;
+	esac
+	((i++))
+    done
+
+    for ip in ${KERBEROS_SERVER_LIST}
+    do
+	if check-expr-ip ${ip} ; then
+	    kerberos_server_ip_list="${kerberos_server_ip_list} ${ip}"
+	else
+	    host_ip=$(get-ip-from-ip-name-list ${ip})
+	    if test ${?} -eq 0 ; then
+		kerberos_server_ip_list="${kerberos_server_ip_list} ${host_ip}"
+	    else
+		kerberos_server_dn_list="${kerberos_server_dn_list} ${ip}"
+	    fi
+	fi
+    done
+
+    ACCESS_FILE_USED_IF_LIST=${access_file_used_if_list:1}
+    ACCESS_FILE_IF_IP_LIST=${access_file_if_ip_list:1}
+    ACCESS_FILE_IF_DN_LIST=${access_file_if_dn_list:1}
+
+    ACCESS_MON_IF_IP_LIST=${access_mon_if_ip_list:1}
+    ACCESS_MON_IF_DN_LIST=${access_mon_if_dn_list:1}
+
+    SYSLOG_SERVER_IP_LIST=${syslog_server_ip_list:1}
+    SYSLOG_SERVER_DN_LIST=${syslog_server_dn_list:1}
+
+    SNMP_TRAP_SERVER_IP_LIST=${snmp_trap_server_ip_list:1}
+    SNMP_TRAP_SERVER_DN_LIST=${snmp_trap_server_dn_list:1}
+
+    KERBEROS_SERVER_IP_LIST=${kerberos_server_ip_list:1}
+    KERBEROS_SERVER_DN_LIST=${kerberos_server_dn_list:1}
+}
+
+gen-route-table-names()
+{
+    local table=${ROUTE_INIT_TABLE}
+    local gw_wt nb=1
+
+    cat rt_tables-constant
+
+    test ${TPROXY_MODE} == False || echo ${TPROXY_ROUTE_TABLE_NB} ${TPROXY_ROUTE_TABLE_NAME}
+    echo ${TRANSPARENT_ROUTE_TABLE_NB} ${TRANSPARENT_ROUTE_TABLE_NAME}
+
+    for gw_wt in ${EXTERNAL_GATEWAY_WEIGHTS}
+    do
+	echo ${table} ${EXTERNAL_ROUTE_TABLE_PNAME}${nb}
+	((table++))
+	((nb++))
+    done
+
+    nb=1
+    for gw_wt in ${DEFAULT_NOSTANDBY_GATEWAY_WEIGHTS}
+    do
+	echo ${table} ${STICKY_DEFAULT_ROUTE_TABLE_PNAME}${nb}
+	((table++))
+	((nb++))
+    done
+}
+
+get-lan-address-of()
+{
+    test -n "${1}" || return 1
+    local ip=${1}
+
+    local elt i range
+    local ip mask px net brd
+
+    if test ${VLAN_MODE} == False ; then
+	if ip-is-included ${ip} ${IP_INTERNAL_NET} ${IP_INTERNAL_BRD} ${IP_INTERNAL_MASK} ; then
+	    echo "${IP_INTERNAL_NET}/${IP_INTERNAL_PRF}"
+	    return 0
+	fi
+    else
+	i=0
+	for elt in ${VLAN_IP_MASK_PREFIX_NETWORK_BROADCAST_LIST}
+	do
+	    range=$[${i} % 6]
+	    case ${range} in
+		0|1)
+		    ;;
+		2)
+		    mask=${elt}
+		    ;;
+		3)
+		    px=${elt}
+		    ;;
+		4)
+		    net=${elt}
+		    ;;
+		5)
+		    brd=${elt}
+		    if ip-is-included ${ip} ${net} ${brd} ${mask} ; then
+			echo "${net}/${px}"
+			return 0
+		    fi
+		    ;;
+		*)
+		    return 1
+		    ;;
+	    esac
+	    ((i++))
+	done
+    fi
+
+    if test -n "${IF_AUXILIARY}" -a ${IP_AUXILIARY_IP} != 0.0.0.0 ; then
+	if ip-is-included ${ip} ${IP_AUXILIARY_NET} ${IP_AUXILIARY_BRD} ${IP_AUXILIARY_MASK} ; then
+	    echo "${IP_AUXILIARY_NET}/${IP_AUXILIARY_PRF}"
+	    return 0
+	fi
+    fi
+
+    return 1
+}
+
+gen-sysconfig-path()
+{
+    echo "INTERVAL=${PATH_CHECK_INTERVAL}"
+}
+
+LIB_APL_NET=Yes

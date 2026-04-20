@@ -1,0 +1,99 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       Scripts
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+CACHEGUARD_DIR=/etc/sysconfig/cacheguard
+source ${CACHEGUARD_DIR}/constant
+source ${HARD_DIR}/cloud.conf
+source ${LOCAL_DIR}/lib/apl_common
+
+update-cloud-ip-validity()
+{
+    local tmp_file=/tmp/cloud-ip.${$}
+    local state ret
+
+    case ${CLOUD_NAME} in
+	azure)
+	    url=${AZURE_NETWORK_IP_URL}
+	    ;;
+	aws)
+	    url=${AWS_NETWORK_IP_URL}
+	    ;;
+	*)
+	    touch ${CLOUD_NETWORK_IP_FILE}
+	    return 101
+	    ;;
+    esac
+
+    unset https_proxy
+    unset HTTPS_PROXY
+
+    curl \
+	--disable --fail --silent -4 \
+	--no-show-error --stderr /dev/null \
+	--location \
+	--url ${url} > ${tmp_file}
+
+    ret=${?}
+
+    if test ${ret} -ne 0 ; then
+	rm -f ${tmp_file}
+	return ${ret}
+    fi
+
+    test ! -f ${CLOUD_NETWORK_IP_FILE} || mv -f ${CLOUD_NETWORK_IP_FILE} ${CLOUD_NETWORK_IP_FILE}.old
+    mv -f ${tmp_file} ${CLOUD_NETWORK_IP_FILE}
+
+    if is-valid-cloud-ip ; then
+	state=yes
+    else
+	state=no
+    fi
+
+    test "${CLOUD_VALID_IP}" != ${state} || return 0
+
+    sed -i \
+	-e "s/CLOUD_VALID_IP=.*/CLOUD_VALID_IP=${state}/" \
+	${HARD_DIR}/cloud.conf
+
+    case ${state} in
+	yes)
+	    return 200
+	    ;;
+	no)
+	    return 201
+	    ;;
+	*)
+	    return 0
+	    ;;
+    esac
+}
+
+main()
+{
+    update-cloud-ip-validity
+}
+
+# Main()
+
+main

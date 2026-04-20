@@ -1,0 +1,813 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       Commands
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+get-manager-context-reference()
+{
+    if test "${TERM}" == "${WADMIN_TERM}" ; then
+	test -n "${MANAGER_CONTEXT_ENV}" || return 11
+	echo ${MANAGER_CONTEXT_ENV}
+    else
+	test -s ${HOME}/${MANAGER_CONF_CONTEXT_FILE} || return 13
+	context_id=$(cat ${HOME}/${MANAGER_CONF_CONTEXT_FILE} 2> /dev/null)
+    fi
+    echo ${context_id}
+}
+
+is-in-manager-conf-context1()
+{
+    test -n "${MANAGER_CONTEXT_ENV}" || return 11
+    test -n "${1}" || return 0
+    local in_context=${1}
+    local context=${MANAGER_CONTEXT_ENV/ *}
+    test ${in_context} == ${context}
+}
+
+is-in-manager-conf-context()
+{
+    if test "${TERM}" == "${WADMIN_TERM}" ; then
+	is-in-manager-conf-context1 ${@}
+    else
+	! is-in-manager-conf-context1 ${@} || return 0
+	test -s ${HOME}/${MANAGER_CONF_CONTEXT_FILE} || return 101
+	test -n "${1}" || return 0
+	local in_context=${1}
+	local context_id=$(cat ${HOME}/${MANAGER_CONF_CONTEXT_FILE} 2> /dev/null)
+	local context=${context_id/ *}
+	test ${in_context} == ${context}
+    fi
+}
+
+is-in-manager-exec-context()
+{
+    test "${TERM}" != "${WADMIN_TERM}" || return 11
+    test -f ${HOME}/${MANAGER_EXEC_CONTEXT_FILE}
+}
+
+manager-context-is-edited()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    local in_context=${1}
+    local in_id=${2}
+
+    if test -s ${HOME}/${MANAGER_CONF_CONTEXT_FILE} ; then
+	local context_id=$(cat ${HOME}/${MANAGER_CONF_CONTEXT_FILE} 2> /dev/null)
+	test "${context_id}" != "${in_context} ${in_id}" || return 0
+    fi
+
+    test "${MANAGER_CONTEXT_ENV}" != "${in_context} ${in_id}" || return 0
+
+    return 11
+}
+
+manager-context-exist()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    local context=${1}
+    local id=${2}
+
+    local dir=$(get-manager-context-rdir ${context})
+    test -d ${dir}/${id}
+}
+
+cli-enter-manager-conf-context()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    local context=${1}
+    local name=${2}
+
+    echo ${context} ${name} > ${HOME}/${MANAGER_CONF_CONTEXT_FILE}
+}
+
+cli-is-in-contextual-role()
+{
+    test ${APL_ROLE} != gateway || return 11
+    test -s ${HOME}/${MANAGER_CONF_CONTEXT_FILE}
+}
+
+cli-is-in-template-context()
+{
+    local role=$(get-contextual-role)
+
+    local state
+
+    case ${role} in
+	gateway)
+	    if cli-is-in-contextual-role ; then
+		local context_id=$(cat ${HOME}/${MANAGER_CONF_CONTEXT_FILE} 2> /dev/null)
+		local context_base=${context_id/ *}
+		test "${context_base}" == template || state=no
+	    else
+		state=no
+	    fi
+	    ;;
+	manager)
+	    state=no
+	    ;;
+	*)
+	    ;;
+    esac
+
+    test -z "${state}"
+}
+
+cli-end-manager-conf-context()
+{
+    rm -f ${HOME}/${MANAGER_CONF_CONTEXT_FILE}
+}
+
+
+end-manager-exec-context()
+{
+    rm -f \
+       ${HOME}/${MANAGER_EXEC_CONTEXT_FILE} \
+       ${HOME}/${MANAGER_EXEC_COMMANDS_FILE}
+}
+
+contextual-command-is-allowed()
+{
+    case ${APL_ROLE} in
+	gateway)
+	    return 0
+	    ;;
+	manager)
+	    is-in-manager-conf-context ${1}
+	    ;;
+	*)
+	    return 11
+	    ;;
+    esac	
+}
+
+is-in-top-level-context()
+{
+    case ${APL_ROLE} in
+	gateway)
+	    return 0
+	    ;;
+	manager)
+	    ! is-in-manager-conf-context
+	    ;;
+	*)
+	    return 11
+	    ;;
+    esac
+}
+
+get-contextual-role()
+{
+    local system
+
+    case ${APL_ROLE} in
+	gateway)
+	    system=${APL_ROLE}
+	    ;;
+	manager)
+	    if is-in-manager-conf-context ; then
+		system=gateway
+	    else
+		system=${APL_ROLE}
+	    fi
+	    ;;
+	*)
+	    system=${APL_ROLE}
+	    ;;
+    esac
+
+    echo ${system}
+}
+
+get-contextual-users-nb()
+{
+    local users_nb
+
+    case ${APL_ROLE} in
+	gateway)
+	    users_nb=${USERS_NB}
+	    ;;
+	manager)
+	    local context_reference=$(get-manager-context-reference)
+	    local context_base=${context_reference/ *}
+
+	    case ${context_base} in
+		template)
+		    users_nb=${MANAGER_TOTAL_USERS_NB}
+		    ;;
+		gateway)
+		    users_nb=${USERS_NB}
+		    ;;
+		*)
+		    users_nb=0
+		    ;;
+	    esac
+	    ;;
+	*)
+	    users_nb=0
+	    ;;
+    esac
+
+    echo ${users_nb}
+}
+
+get-contextual-rweb-nb()
+{
+    local rweb_nb
+
+    case ${APL_ROLE} in
+	gateway)
+	    rweb_nb=${RWEB_NB}
+	    ;;
+	manager)
+	    local context_reference=$(get-manager-context-reference)
+	    local context_base=${context_reference/ *}
+
+	    case ${context_base} in
+		template)
+		    rweb_nb=${MANAGER_TOTAL_RWEB_NB}
+		    ;;
+		gateway)
+		    rweb_nb=${RWEB_NB}
+		    ;;
+		*)
+		    rweb_nb=0
+		    ;;
+	    esac
+	    ;;
+	*)
+	    rweb_nb=0
+	    ;;
+    esac
+
+    echo ${rweb_nb}
+}
+
+init-env-variables()
+{
+    case ${APL_ROLE} in
+	gateway)
+	    USERENV_DIR=${ROOT_DIR}${ADMIN_DIR}/${ENV_RDIR}
+	    USERENV_FILE_FACTORY=${ROOT_DIR}/save/${ENV_FACTORY_NAME}.${APL_ROLE}
+	    USERENV_FILE_FACTORY_CURRENT=${ROOT_DIR}/save/${ENV_CURRENT_FACTORY_NAME}.${APL_ROLE}
+	    CONFIGURATION_DB_FILE_FACTORY=${ROOT_DIR}/save/${CONFIGURATION_FACTORY_DB_NAME}.${APL_ROLE}
+	    CONFIGURATION_DB_FILE_FACTORY_CURRENT=${ROOT_DIR}/save/${CONFIGURATION_CURRENT_FACTORY_DB_NAME}.${APL_ROLE}
+	    ;;
+	manager)
+	    local context_base=${1}
+	    local context_leaf=${2}
+	    local in_context
+
+	    if test -n "${context_base}" -a -n "${context_leaf}" ; then
+		in_context=yes
+	    else
+		if is-in-manager-conf-context ; then
+		    local context_reference=$(get-manager-context-reference)
+		    context_base=${context_reference/ *}
+		    context_leaf=${context_reference/* }
+		    in_context=yes
+		fi
+	    fi
+
+	    if test -n "${in_context}" ; then
+
+		local context_dir=$(get-manager-context-rdir ${context_base})
+		local env_rdir=${context_dir}/${context_leaf}
+		USERENV_DIR=${ROOT_DIR}${ADMIN_DIR}/${env_rdir}
+		test -d ${USERENV_DIR} || return 218
+
+		local tmp_dir=$(get-manager-context-tmp-dir ${context_base})
+		tmp_dir=${ROOT_DIR}${tmp_dir}
+		mkdir -p ${tmp_dir}/${context_leaf}
+
+		USERENV_FILE_FACTORY=${ROOT_DIR}/save/${ENV_FACTORY_NAME}.gateway
+		USERENV_FILE_FACTORY_CURRENT=${ROOT_DIR}/save/${ENV_CURRENT_FACTORY_NAME}.gateway
+		CONFIGURATION_DB_FILE_FACTORY=${ROOT_DIR}/save/${CONFIGURATION_FACTORY_DB_NAME}.gateway
+		CONFIGURATION_DB_FILE_FACTORY_CURRENT=${ROOT_DIR}/save/${CONFIGURATION_CURRENT_FACTORY_DB_NAME}.gateway
+
+		TMP_DIR=${tmp_dir}/${context_leaf}
+
+		SSL_DIR=${ADMIN_DIR}/${env_rdir}/${SSL_RDIR}
+		SSL_CA_DIR=${ADMIN_DIR}/${env_rdir}/${SSL_CA_RDIR}
+		SSL_LOCAL_CA_DIR=${ADMIN_DIR}/${env_rdir}/${SSL_LOCAL_CA_RDIR}
+		SSL_SERVER_DIR=${ADMIN_DIR}/${env_rdir}/${SSL_SERVER_RDIR}
+		SSL_CLIENT_DIR=${ADMIN_DIR}/${env_rdir}/${SSL_CLIENT_RDIR}
+		SSL_CTL_DIR=${ADMIN_DIR}/${env_rdir}/${SSL_CTL_RDIR}
+		SSL_SNMP_DIR=${ADMIN_DIR}/${env_rdir}/${SSL_SNMP_RDIR}
+
+		URLLIST_DIR=${ADMIN_DIR}/${env_rdir}/${URLLIST_RDIR}
+		WAF_DIR=${ADMIN_DIR}/${env_rdir}/${WAF_RDIR}
+		VPN_IPSEC_DIR=${ADMIN_DIR}/${env_rdir}/${VPN_IPSEC_RDIR}
+		SSH_PUBLIC_KEY_DIR=${ADMIN_DIR}/${env_rdir}/${SSH_PUBLIC_KEY_RDIR}
+
+		case ${context_base} in
+		    template)
+			;;
+		    gateway)
+			HARD_DIR=${ADMIN_DIR}/${env_rdir}/${HARD_DIR_NAME}
+			;;
+		    *)
+			return 255
+			;;
+		esac
+	    else
+		USERENV_DIR=${ROOT_DIR}${ADMIN_DIR}/${ENV_RDIR}
+		USERENV_FILE_FACTORY=${ROOT_DIR}/save/${ENV_FACTORY_NAME}.${APL_ROLE}
+		USERENV_FILE_FACTORY_CURRENT=${ROOT_DIR}/save/${ENV_CURRENT_FACTORY_NAME}.${APL_ROLE}
+		CONFIGURATION_DB_FILE_FACTORY=${ROOT_DIR}/save/${CONFIGURATION_FACTORY_DB_NAME}.${APL_ROLE}
+		CONFIGURATION_DB_FILE_FACTORY_CURRENT=${ROOT_DIR}/save/${CONFIGURATION_CURRENT_FACTORY_DB_NAME}.${APL_ROLE}
+	    fi
+	    ;;
+	*)
+	    return 255
+	    ;;
+    esac
+
+    USERENV_FILE=${USERENV_DIR}/${ENV_NAME}
+    USERENV_FILE_CURRENT=${USERENV_DIR}/${ENV_CURRENT_NAME}
+    USERENV_FILE_CANCEL=${USERENV_DIR}/${ENV_CANCEL_NAME}
+
+    CONFIGURATION_DB_FILE=${USERENV_DIR}/${CONFIGURATION_DB_NAME}
+    CONFIGURATION_DB_FILE_CURRENT=${USERENV_DIR}/${CONFIGURATION_CURRENT_DB_NAME}
+
+    source ${ROOT_DIR}${HARD_DIR}/model.conf
+    source ${ROOT_DIR}${APPLIANCE_DIR}/lib/errors-tab
+}
+
+get-manager-context-apply-log-dir()
+{
+    echo ${USERENV_DIR}/var/log
+}
+
+enter-manager-exec-context()
+{
+    test -n "${1}" || return 1
+    local context=${1}
+
+    case ${context} in
+	template)
+	    local id=${2}
+	    if test -n "${id}" ; then
+		echo ${context} nil nil ${id} > ${HOME}/${MANAGER_EXEC_CONTEXT_FILE}
+	    else
+		echo ${context} > ${HOME}/${MANAGER_EXEC_CONTEXT_FILE}
+	    fi
+
+	    ;;
+	gateway)
+	    test -n "${2}" || return 2
+	    local place=${2}
+	    local domain=${3}
+	    local id=${4}
+	    local ip=${5}
+
+	    if test -n "${id}" ; then
+		if test -n "${ip}" ; then
+		    echo ${context} ${place} ${domain} ${id} ${ip} > ${HOME}/${MANAGER_EXEC_CONTEXT_FILE}
+		else
+		    echo ${context} ${place} ${domain} ${id} > ${HOME}/${MANAGER_EXEC_CONTEXT_FILE}
+		fi
+	    elif test -n "${domain}" ; then
+		echo ${context} ${place} ${domain} > ${HOME}/${MANAGER_EXEC_CONTEXT_FILE}
+	    else
+		echo ${context} ${place} > ${HOME}/${MANAGER_EXEC_CONTEXT_FILE}
+	    fi
+	    ;;
+	*)
+	    return 255
+	    ;;
+    esac
+}
+
+generate-env-file-from-current()
+{
+    test -n "${1}" || return 1
+    local current_env=${1}
+
+    test -f ${current_env} || return 11
+
+    local export assertion
+    local current_var var val
+
+    while read export assertion
+    do
+	test -n "${assertion}" || continue
+
+	current_var=${assertion/=*/}
+	var=${current_var/CURRENT_/}
+	val=${assertion#*=}
+
+	echo "export ${var}=${val}"
+    done < ${current_env}
+}
+
+generate-current-env-file-from-env()
+{
+    test -n "${1}" || return 1
+    local env=${1}
+
+    test -f ${env} || return 11
+
+    local export assertion
+    local current_var var val
+
+    while read export assertion
+    do
+	test -n "${assertion}" || continue
+
+	var=${assertion/=*/}
+	current_var=CURRENT_${var}
+	val=${assertion#*=}
+
+	echo "export ${current_var}=${val}"
+    done < ${env}
+}
+
+get-lock-local-file()
+{
+    test -n "${1}" || return 1
+    local file=${1}
+
+    local base=${file/${ROOT_DIR}${ADMIN_DIR}}
+    local lock=${base/\./}
+    local lock=${lock//\//.}
+
+    echo env${lock}
+}
+
+lock-local-file()
+{
+    test -n "${1}" || return 1
+    local file=${1}
+
+    local lock=$(get-lock-local-file ${file})
+    touch ${ROOT_DIR}${ADMIN_LOCK_DIR}/${lock} > /dev/null 2>&1
+}
+
+unlock-local-file()
+{
+    test -n "${1}" || return 1
+    local file=${1}
+
+    local lock=$(get-lock-local-file ${file})
+    rm -f ${ROOT_DIR}${ADMIN_LOCK_DIR}/${lock} > /dev/null 2>&1
+}
+
+is-locked-local-file()
+{
+    test -n "${1}" || return 1
+    local file=${1}
+
+    local lock=$(get-lock-local-file ${file})
+
+    test -f ${ROOT_DIR}${ADMIN_LOCK_DIR}/${lock}
+}
+
+is-locked-global-file()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 1
+    local user=${1}
+    local file=${2}
+
+    local base=$(file-basename ${file})
+    test -f ${ROOT_DIR}${ADMIN_LOCK_DIR}/${user}.${base}
+}
+
+read-lock-local-file()
+{
+    test -n "${1}" || return 1
+    local file=${1}
+
+    rm -f ${USERENV_FILE}.old
+
+    lock-local-file ${file}
+    source ${file}
+    unlock-local-file ${file}
+}
+
+copy-lock-local-file()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 1
+    local file1=${1}
+    local file2=${2}
+
+    lock-local-file ${file1}
+    lock-local-file ${file2}
+
+    cp -f ${file1} ${file2}
+    local ret=${?}
+
+    unlock-local-file ${file1}
+    unlock-local-file ${file2}
+	
+    return ${ret}
+}
+
+backup-env()
+{
+    copy-lock-local-file ${USERENV_FILE} ${USERENV_FILE}.old
+}
+
+clean-backup-env()
+{
+    rm -f ${USERENV_FILE}.old
+}
+
+restore-env()
+{
+    # Must be executed in a non interruptible process (trap "" INT...)
+
+    if test -f ${USERENV_FILE}.old ; then
+
+	lock-local-file ${USERENV_FILE}
+	lock-local-file ${USERENV_FILE}.old
+
+	cp -f ${USERENV_FILE}.old ${USERENV_FILE}
+    fi
+
+    unlock-local-file ${USERENV_FILE}
+    unlock-local-file ${USERENV_FILE}.old
+}
+
+clean-env()
+{
+    restore-env
+    clean-backup-env
+}
+
+factory-env()
+{
+    backup-env || return 11
+    lock-local-file ${USERENV_FILE}
+    cp -f ${USERENV_FILE_FACTORY} ${USERENV_FILE} || return 13
+
+    local waf_files_size=${WAF_FILES_SIZE}
+
+    sed -i \
+	-e "s@WAF_FILES_SIZE='.*'@WAF_FILES_SIZE='${waf_files_size}'@" \
+	${USERENV_FILE}
+
+    case ${APL_ROLE} in
+	manager)
+	    sed -i \
+		-e "s@BOND_INTERNALS='.*'@BOND_INTERNALS='${DEFAULT_MANAGER_BOND_INTERNALS}'@" \
+		-e "s@BOND_EXTERNALS='.*'@BOND_EXTERNALS='${DEFAULT_MANAGER_BOND_EXTERNALS}'@" \
+		-e "s@ROUTER_MODE='.*'@ROUTER_MODE='False'@" \
+		-e "s@SNAT_MODE='.*'@SNAT_MODE='False'@" \
+		-e "s@DNS_MODE='.*'@DNS_MODE='False'@" \
+		-e "s@FIREWALL_MODE='.*'@FIREWALL_MODE='False'@" \
+		-e "s@WEB_MODE='.*'@WEB_MODE='False'@" \
+		-e "s@TRANSPARENT_MODE='.*'@TRANSPARENT_MODE='False'@" \
+		-e "s@ACCESS_ADMIN_LIST='.*'@ACCESS_ADMIN_LIST='internal 0.0.0.0 0.0.0.0 100'@" \
+		${USERENV_FILE}
+	    ;;
+	gateway)
+	    sed -i \
+		-e "s@ACCESS_ADMIN_LIST='.*'@ACCESS_ADMIN_LIST='internal 0.0.0.0 0.0.0.0 100 external 0.0.0.0 0.0.0.0 100'@" \
+		${USERENV_FILE}
+	    ;;
+	*)
+	    ;;
+    esac
+
+    case ${CLOUD_NAME} in
+	aws|azure)
+	    if test \
+		   -n "${CLOUD_NETWORK_MAIN_IP}" -a \
+		   -n "${CLOUD_NETWORK_MAIN_MASK}" -a \
+		   -n "${CLOUD_NETWORK_MAIN_GATEWAY}" ; then
+
+		case ${APL_ROLE} in
+		    gateway)
+			if test \
+			       -n "${CLOUD_NETWORK_SECOND_IP}" -a \
+			       -n "${CLOUD_NETWORK_SECOND_MASK}" ; then
+			    sed -i \
+				-e "s@IP_EXTERNAL_IP='.*'@IP_EXTERNAL_IP='${CLOUD_NETWORK_MAIN_IP}'@" \
+				-e "s@IP_EXTERNAL_MASK='.*'@IP_EXTERNAL_MASK='${CLOUD_NETWORK_MAIN_MASK}'@" \
+				-e "s@IP_INTERNAL_IP='.*'@IP_INTERNAL_IP='${CLOUD_NETWORK_SECOND_IP}'@" \
+				-e "s@IP_INTERNAL_MASK='.*'@IP_INTERNAL_MASK='${CLOUD_NETWORK_SECOND_MASK}'@" \
+				-e "s@IP_ROUTE_LIST=''@IP_ROUTE_LIST='0.0.0.0 0.0.0.0 ${CLOUD_NETWORK_MAIN_GATEWAY} 50 ${CLOUD_NETWORK_MAIN_GATEWAY}'@" \
+				${USERENV_FILE}
+			fi
+			;;
+		    manager)
+			sed -i \
+			    -e "s@IP_INTERNAL_IP='.*'@IP_INTERNAL_IP='${CLOUD_NETWORK_MAIN_IP}'@" \
+			    -e "s@IP_INTERNAL_MASK='.*'@IP_INTERNAL_MASK='${CLOUD_NETWORK_MAIN_MASK}'@" \
+			    -e "s@IP_ROUTE_LIST=''@IP_ROUTE_LIST='0.0.0.0 0.0.0.0 ${CLOUD_NETWORK_MAIN_GATEWAY} 50 ${CLOUD_NETWORK_MAIN_GATEWAY}'@" \
+			    ${USERENV_FILE}
+			;;
+		    *)
+			;;
+		esac
+	    fi
+	    ;;
+	*)
+	    ;;
+    esac
+
+    clean-backup-env
+    unlock-local-file ${USERENV_FILE}
+}
+
+cancel-env()
+{
+    backup-env || return 11
+    lock-local-file ${USERENV_FILE}
+    cp -f ${USERENV_FILE_CANCEL} ${USERENV_FILE}
+    clean-backup-env
+    unlock-local-file ${USERENV_FILE} || return 13
+}
+
+is-locked-local-env()
+{
+    is-locked-local-file ${USERENV_FILE} || is-locked-local-file ${USERENV_FILE}.old
+}
+
+is-locked-global-env()
+{
+    is-locked-global-file ${ADMIN_NAME} ${USERENV_FILE}.super || \
+	is-locked-global-file '*' ${USERENV_FILE_CURRENT}.super || \
+	is-locked-global-file '*' ${USERENV_FILE_CANCEL}.super
+}
+
+is-locked-env()
+{
+    is-locked-local-env || is-locked-global-env
+}
+
+gen-userenv2()
+{
+    local var
+
+    for var in ${USERENV_VARS}
+    do
+	echo -n "export ${var}='"
+	eval eval 'echo -n \$"${var}"'
+	echo "'"
+    done || return 1
+
+    return 0
+}
+
+gen-userenv1()
+{
+    gen-userenv2 || return 1
+
+    echo -n "export USERENV_VARS='"
+    eval eval 'echo -n "${USERENV_VARS}"'
+    echo "'"
+}
+
+gen-userenv()
+{
+    ! is-locked-env || return 1
+    backup-env || return 1
+    lock-local-file ${USERENV_FILE}
+    gen-userenv1 > ${USERENV_FILE}
+    clean-backup-env
+    unlock-local-file ${USERENV_FILE}
+    return 0
+}
+
+backup-configuration-db()
+{
+    copy-lock-local-file ${CONFIGURATION_DB_FILE} ${CONFIGURATION_DB_FILE}.old
+}
+
+clean-backup-configuration-db()
+{
+    rm -f ${CONFIGURATION_DB_FILE}.old
+}
+
+cancel-configuration-db()
+{
+    backup-configuration-db || return 11
+    lock-local-file ${CONFIGURATION_DB_FILE}
+    cp -f ${CONFIGURATION_DB_FILE_CURRENT} ${CONFIGURATION_DB_FILE}
+    clean-backup-configuration-db
+    unlock-local-file ${CONFIGURATION_DB_FILE} || return 13
+
+}
+
+factory-configuration-db()
+{
+    backup-configuration-db || return 11
+    lock-local-file ${CONFIGURATION_DB_FILE}    
+    cp -f ${CONFIGURATION_DB_FILE_FACTORY} ${CONFIGURATION_DB_FILE} || return 13
+    clean-backup-configuration-db
+    unlock-local-file ${CONFIGURATION_DB_FILE}
+}
+
+restore-configuration-db()
+{
+    # Must be executed in a non interruptible process (trap "" INT...)
+
+    if test -f ${CONFIGURATION_DB_FILE}.old ; then
+
+	lock-local-file ${CONFIGURATION_DB_FILE}
+	lock-local-file ${CONFIGURATION_DB_FILE}.old
+
+	cp -f ${CONFIGURATION_DB_FILE}.old ${CONFIGURATION_DB_FILE}
+    fi
+
+    unlock-local-file ${CONFIGURATION_DB_FILE}
+    unlock-local-file ${CONFIGURATION_DB_FILE}.old
+}
+
+clean-configuration-db()
+{
+    restore-configuration-db
+    clean-backup-configuration-db
+}
+
+is-locked-local-configuration-db()
+{
+    is-locked-local-file ${CONFIGURATION_DB_FILE} || is-locked-local-file ${CONFIGURATION_DB_FILE}.old
+}
+
+is-locked-global-configuration-db()
+{
+    is-locked-global-file ${ADMIN_NAME} ${CONFIGURATION_DB_FILE}.super || \
+	is-locked-global-file '*' ${CONFIGURATION_DB_FILE_CURRENT}.super
+}
+
+is-locked-configuration-db()
+{
+    is-locked-local-configuration-db || is-locked-global-configuration-db
+}
+
+init-env()
+{
+    init-env-variables "${@}" || return ${?}
+    test -d ${ROOT_DIR}${HOME} || return 104
+    ! is-locked-env || return 105
+    ! is-locked-configuration-db || return 105
+
+    read-lock-local-file ${USERENV_FILE}
+    source ${USERENV_FILE_CURRENT}
+}
+
+user-has-admin-rights()
+{
+    test ${USER} == ${ADMIN_NAME}
+}
+
+save-env()
+{
+    test -z "${TRANSACTION}" || return 0
+    test ${SAVENV} -eq 1 || return 0
+    user-has-admin-rights || return 31
+    gen-userenv || error 105
+}
+
+commit-env()
+{
+    save-env || error ${?}
+    test ${SAVENV} -ne 0 -o ${NEWENV} -ne 0 -o ${FILEENV} -ne 0 || return 0
+    update-modification-state
+}
+
+run-command-in-context()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    local context=${1}
+    local id=${2}
+    local com=${3}
+
+    local com
+
+    if test -n "${com}" ; then
+	MANAGER_CONTEXT_ENV="${context} ${id}" __BATCH_MODE=yes ${com}
+    else
+	while read com
+	do
+	    MANAGER_CONTEXT_ENV="${context} ${id}" __BATCH_MODE=yes ${com}
+	done < ${HOME}/${MANAGER_EXEC_COMMANDS_FILE}
+    fi
+}

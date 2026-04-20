@@ -1,0 +1,49 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       Scripts
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+CACHEGUARD_DIR=/etc/sysconfig/cacheguard
+source ${CACHEGUARD_DIR}/constant
+source ${APPLIANCE_DIR}/etc/role
+source ${ABASE_DIR}/${ENV_RDIR}/${ENV_CURRENT_NAME}
+
+alert-login()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    test -n "${3}" || return 3
+    local state=${1}
+    local interface=${2}
+    local remote_ip=${3}
+
+    local message="${state^} login attempt from ${remote_ip} via the ${interface^} interface"
+    logger -p auth.alert -t apl_alert_login -- "${message}"
+    ${LOCAL_DIR}/bin/apl_rlogger "${message}"
+
+    test "${CURRENT_ADMIN_SNMP}" == True || return 0
+    ${LOCAL_DIR}/bin/apl_snmp_trap 25 "${state}" "${interface}" "${remote_ip}" "${message}" > /dev/null 2>&1
+}
+
+# Main()
+
+alert-login "${@}"

@@ -1,0 +1,96 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       Scripts
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+source /usr/local/lib/apl_functions
+
+test ! -f ${LOCK_DIR}/apl_logrotate || exit 99
+touch ${LOCK_DIR}/apl_logrotate
+
+reset-logrotate-log()
+{
+    echo -n > ${LOG_ROTATE_LOG}
+    chmod 640 ${LOG_ROTATE_LOG}
+    chown ${ADMIN_NAME}:${GROUP_NAME} ${LOG_ROTATE_LOG}
+}
+
+logrotate-log()
+{
+    test -n "${1}" || return 1
+    local message=${1}
+
+    local date=$(date +"%Y/%m/%d-%T")
+    echo -n "0 ${date} ${message}" >> ${LOG_ROTATE_LOG}
+}
+
+logrotate-log-abort()
+{
+    echo >> ${LOG_ROTATE_LOG}
+}
+
+logrotate-log-ret()
+{
+    test -n "${1}" || return 1
+    local err_code=${1}
+    if test ${err_code} -eq 0 ; then
+	echo "[OK]" >> ${LOG_ROTATE_LOG}
+    else
+	echo "[KO]" >> ${LOG_ROTATE_LOG}
+    fi
+}
+
+clean-exit()
+{
+    trap "" USR1 INT QUIT TERM
+
+    local code=${1}
+    wait
+    rm -f ${LOCK_DIR}/apl_logrotate
+    logrotate-log-abort
+    logrotate-log "Aborting the Log Rotation operation"
+    logrotate-log-ret ${?}
+    exit ${code}
+}
+
+do-log-rotate()
+{
+    reset-logrotate-log
+    logrotate-log "Beginig Log Rotation"
+    logrotate-log-ret ${?}
+    logrotate-log "Log Rotation in progress"
+    logrotate -f /etc/logrotate-daily.conf
+    logrotate-log-ret ${?}
+    logrotate-log "Ending Log Rotation"
+    logrotate-log-ret ${?}
+    rm -f ${LOCK_DIR}/apl_logrotate
+}
+
+main()
+{
+    trap "clean-exit 100" USR1 INT QUIT TERM
+    do-log-rotate "${@}"
+}
+
+# Main()
+
+main "${@}"

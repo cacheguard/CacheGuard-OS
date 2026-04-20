@@ -1,0 +1,24 @@
+Manage the High Availability
+.SH SYNOPSIS
+
+[1] \fBha\fR [[\fBfailover\fR | \fBactive\fR] [\fBforce\fR]]
+
+.SH DESCRIPTION
+
+Without any arguments, this command displays the state of an appliance in HA mode. Possible states are as follows:
+
+* \fBactive\fR: the system is running as an active master or backup appliance.
+
+* \fBfailover\fR: the system has been put manually in this state or has failed for some reasons. Possible reasons are varied: hardware failures, network connectivity, software bugs...
+
+To put manually the system in failover mode, use the keyword \fBfailover\fR. To make an attempt to reactivate an HA system which is in failover mode use the keyword \fBactive\fR. Without the optional argument \fBforce\fR the user is invited to confirm the action. The optional argument \fBforce\fR allows you to bypass this confirmation.
+
+Pleas note that the \fBapply\fR command may activate a system in a failover state.
+
+.SH SEE ALSO
+.B apply
+(1)
+.B mode
+(1)
+.B vrrp
+(1)

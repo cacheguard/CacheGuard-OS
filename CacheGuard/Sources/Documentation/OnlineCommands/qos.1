@@ -1,0 +1,125 @@
+Manage the network QoS (Quality of Service)
+.SH SYNOPSIS
+
+[1] \fBqos [bandwidth\fR [(\fBinternal\fR | \fBexternal\fR | \fBauxiliary\fR) [[(\fBingress\fR | \fBegress\fR)] \fI<bandwidth>\fR]]]
+
+[2] \fBqos [shape\fR [(\fBweb\fR | \fBantivirus\fR | \fBfile\fR | \fBdefault\fR) [(\fBinternal\fR | \fBexternal\fR | \fBauxiliary\fR) [(\fBingress\fR | \fBegress\fR) [\fI<qos>\fR]]]]]
+
+[3] \fBqos [shape\fR [\fBtweb\fR [(\fBinternal\fR | \fBauxiliary\fR) [(\fBingress\fR | \fBegress\fR) [\fI<qos>\fR]]]]]
+
+[4] \fBqos [shape\fR [\fBrweb\fR [(\fBinternal\fR | \fBexternal\fR) [(\fBingress\fR | \fBegress\fR) [\fI<qos>\fR]]]]]
+
+[(] \fBqos [shape\fR [\fBpeer\fR \fBinternal\fR [(\fBingress\fR | \fBegress\fR) [\fI<qos>\fR]]]]
+
+[6] \fBqos [shape\fR [\fBvpnipsec\fR [\fBexternal\fR [(\fBingress\fR | \fBegress\fR) [\fI<qos>\fR]]]]]
+
+[7] \fBqos [shape\fR [\fBrouter\fR [((\fBadd\fR | \fBadd:\fR\fI<rule-name>\fR | \fBinsert:\fR\fI<rule-name>\fR) \fI<rule-name>\fR (\fBinternal\fR | \fBexternal\fR | \fBauxiliary\fR) \fI<protocol>\fR \fI<src-ip>\fR[/\fI<mask-prefix>\fR] \fI<src-port>\fR \fI<ingress-qos>\fR \fI<dst-ip>\fR[/\fI<mask-prefix>\fR] \fI<dst-port>\fR \fI<egress-qos>\fR [\fI<dscp>\fR]) | (\fBdel\fR \fI<rule-name>\fR) | \fBraz\fR]]]
+
+[8] \fBqos [shape\fR [\fBrouter\fR [\fBmove:(\fB-\fR|\fB+\fR)\fI<rule-name>\fR \fI<rule-name>\fR | \fBmove:\fI<position>\fR]]]
+
+[9] \fBqos [borrow\fR [(\fBinternal\fR | \fBexternal\fR | \fBauxiliary\fR) [(\fBingress\fR | \fBegress\fR) [\fBon\fR | \fBoff\fR]]]]
+
+[10] \fBqos [report\fR [(\fBall\fR | \fBadmin\fR | \fBgateway\fR | \fBetc\fR) | (\fBweb\fR | \fBtweb\fR | \fBrweb\fR | \fBpeer\fR | \fBantivirus\fR | \fBfile\fR | \fBrouter\fR | \fBdefault\fR)] [\fBdiff\fR]]
+
+.SH DESCRIPTION
+
+The QoS (Quality of Service) controller allows you to manage the network bandwidth used by different types of traffic exchanged with or via to the appliance. The bandwidth management is done using different technologies such as prioritising, shaping and scheduling the network traffic. All those technologies combined together allows you to protect your business critical traffic from being penalized by other traffic in your networks. To this end, network traffic are classified by category and each category or class is configured to receive the adequate network bandwith. The QoS controller is deactivated by default. To activate it use the command \fBmode\fR.
+
+The QoS configuration is done at different levels. To begin with, the overall incoming (\fBingress\fR) and outgoing (\fBegress\fR) bandwidth limits should be configured for each logical network interface. The bandwidth limits are normally set according to the maximum supported bandwidth by connected networks. The network traffic can then be shaped to limit the bandwidth usage for each class of traffic. In addition, concurrent traffic in the same class are placed in multiple queues that are scheduled to equitably receive and transmit data. This way extensive usages by some clients (users or machines) in a class do not penalise others.
+
+We distinguish the following traffic categories and classes:
+
+\(bu Management traffic used to administrate and monitor the appliance itself: unlike other class of traffic, management traffic is not shaped but is directly queued and managed with the highest level of priority. This means that as long as there data in the management queue, no other traffic is treated. This QoS policy ensure that the appliance is always reachable and can be monitored and administrated even in case where the network is overloaded. The QoS can't be modified for management traffic. The following traffic are classified as management traffic: SSH, Web GUI, SNMP and SysLog. Management traffic is placed in a class named \fBadmin\fR.
+
+\(bu Technical low level and basic service traffic destined to orinitiated from the appliance: ARP, DHCP, ICMP, VRRP, NTP, OCSP and LDAP traffic are all placed in this category with a limited bandwidth that is automatically configured by the system. The \fBetc\fR designate this class of traffic.
+
+\(bu Technical traffic exchanged with the appliance itself: 2 classes of traffic are in this category which are \fBfile\fR and \fBpeer\fR. The class \fBfile\fR designates file exchange traffic such as URL blacklists downloads and backup traffic. The class \fBpeer\fR refers to traffic with shared or HA peer appliances via the internal network interface (see the command \fBpeer\fR to manage peer appliances).
+
+\(bu Web traffic treated by the appliance before being routed. We distinguish 3 classes of Web traffic: \fBweb\fR, \fBtweb\fR and \fBrweb\fR traffic: \fBweb\fR stands for Web traffic exchanged with clients using the appliance as an explicit forwarding proxy ; \fBtweb\fR stands for Web traffic transparently intercepted by the forwarding proxy ; \fBrweb\fR stands for Web traffic exchnaged between clients and Web servers via the appliance implemented as a reverse proxy. Web traffic includes HTTP on port 80, HTTPS on port 443 and DOMAIN (for name resolutions) on port 53.
+
+\(bu Traffic exchanged between the appliance used as an antivirus service and clients like an MTA (Mail Transfer Agent). This class of traffic is named \fBantivirus\fR.
+
+\(bu Traffic exchanged in IPsec VPN tunnels established between the appliance via its external interface and remotre peers. The class named \fBvpnipsec\fR designates this traffic. ESP, ISAKMP and IPsec NAT transversal (ESP encapsulation with UDP) traffic are placed in this category.
+
+\(bu Traffic that are just routed via the appliance without being intercepted or inspected. This class of traffic is only allowed when the router mode is activated (see the command \fBmode\fR to activate the router mode).
+
+\(bu Any other traffic which is not classified in one of the above traffic types is classified in a class called \fBdefault\fR.
+
+The \fBqos\fR command uses the terms \fBingress\fR and \fBegress\fR respectively for incoming traffic and outgoing traffic from a logical network interface. The \fI<qos>\fR value represents the shaping to apply to a traffic. It may be a percentage of the total bandwidth limit configured for a logical network interface or a bandwidth value expressed in kbps (kilo bit per second). If the \fI<qos>\fR value ends with the character '%' it is considered as a percentage (integer between 1 and 100). Otherwise it is considered as a kbps value. If you use percentages, real used values are always calculated to get values in kbps. In other words, values given in percentages are not dynamic and are not calculated whenever bandwidths are modified in runtime.
+
+Please note that there is always a gap between the perceived bandwidth at an application level and the defined \fI<qos>\fR value. This gap is due to protocol headers and other technical data in the traffic. In practice perceived bandwidths are from 6% to 9% less than specified \fI<qos>\fR values.
+
+The first [1] usage form allows you to define the total bandwidth limit for each logical network interface for incoming and outgoing traffic. All bandwidths are given in kbps.
+
+The second to sixth [2][3][4][5][6] forms allow you to shape the traffic destined to the appliance itself and allocate different bandwidths to different types of traffic. Having defined global QoS with this command, a customisation is possible network by network with other commands like \fBaccess\fR, \fBtransparent\fR, \fBrweb\fR and \fBpeer\fR. Traffic shaping is subject to the following classification rules:
+
+  \(bu If a network is declared to have \fBweb\fR (forwarding) access and \fBtransparent\fR access at the same time, the QoS defined for the transparent access (using the \fBtransparent\fR command) has a higher priority than the QoS defined for the \fBweb\fR access (using the \fBaccess web\fR command).
+
+  \(bu Incoming IPsec VPN traffic via the external network interface pass twice in the QoS controller: first as an encrypted \fBvpnipsec\fR traffic type and then as an unencrypted and classified as other traffic types (\fBweb\fR, \fBfile\fR, ...).
+
+  \(bu Reverse websites traffic (see the \fBrweb\fR command) requested by clients using the appliance as an explicit proxy are shaped as being \fBweb\fR traffic (and not  \fBrweb\fR traffic).
+
+The seventh [7] usage form allows you to configure the appliance to shape routed traffic (not destined to the appliance itself). The traffic shaping for routed traffic is configured with QoS rules. A QoS rule is associated to a logical network interface and specifies the part of the total bandwidth to reserve according to the used protocol, the source and destination of a traffic. Logical network interfaces to which a QoS rule can be associated are: \fBinternal\fR, \fBexternal\fRand \fBauxiliary\fR. You may notice that it's not possible to associate a QoS rule to the \fBvpnipsec\fR virtual network interface as the traffic shaping of encrypted egress traffic is not supported by the system. However, as a routed traffic via an IPsec VPN tunnel ends up to pass via a logical network interface, you can manage its shaping with a QoS rule associated to that  logical network interface.
+
+A traffic rule is uniquely identified by rule a name (\fI<rule-name>\fR). A valid rule name should begin with an alpha character and may contains alpha numeric characters as well as the characters "_" and "-". To add a QoS rule at the end of all rules, use the keyword \fBadd\fR. To add a rule after a given rule, use the keyword \fBadd:\fR  followed by the rule name after which the new rule should be inserted. To insert a rule before a given rule, use the keyword \fBinsert:\fR followed by the rule name before which the new rule is to be inserted.
+
+Source and destination of a traffic are identified by their respective IP address and port. The keyword \fBany\fR can be used to specify an undefined protocol, IP address or port number. The default \fI<mask-prefix>\fR is 32 (to specify a single remote machine). Supported protocols are:
+
+  \(bu \fBtcp\fR (Transmission Control Protocol)
+
+  \(bu \fBudp\fR (User Datagram Protocol).
+
+The \fI<ingress-qos>\fR specifies the shaping for forth traffic (from source to destination) that come in from the given network interface while the \fI<egress-qos>\fR specifies the shaping for back traffic (from destination to source) that go out from the given network interface.
+
+Please note that the following convention should be considered when defining QoS rules:
+
+  \(bu An ingress (incoming) traffic comes from the source and goes to the destination while the related egress (outgoing) traffic comes from the destination and goes to the source (in the opposite sense).
+
+  \(bu As NAT in firewall rules operate after IP packets come into the appliance, QoS rules are applied to non NATed IPs for incoming traffic. For IP packets that go out from the appliance, the NAT is already done. Hence QoS rules are applied to NATed IPs.
+
+Please note that when all \fI<qos>\fR values are expressed as percentages, there is no obligation to have a total of 100% even if this is a recommended configuration when no shaping rules are defined for routed traffic. When a \fI<qos>\fR is expressed as a kbps value, it should be less than or equal to the defined bandwidth limit for the given logical network interface. The command \fBapply\fR verifies the integrity of \fI<qos>\fR values configured here.
+
+Finally when defining QoS rules for routed traffic, you have the possibility to set a DSCP value for IP packets. DSCP stands for Differentiated Services Code Point and is a 6-bits value in the IP header. If your appliance is connected to a network that supports the classification of traffic based on the DSCP filed you can set this value. Please note that the DSCP field is meaningful only if all network devices between the source and destination take it into consideration. For instance the DSCP field is meaningful in an MPLS network while it is useless on the internet. A valid DSCP value is an integer between 0 and 63.
+
+The eighth [8] usage form allows you to move a rule from one position to another in the list of shaping rules for routed traffic. To move a rule before or after another denoted rule use the keyword \fBmove:\fR followed by the sign \fB-\fR (for before) or \fB+\fR (for after), the rule name of the denoted rule and the rule name of the rule to move. Please note that white spaces are not allowed between the keyword \fBmove:\fR, the signs \fB-\fR or \fB+\fR and the rule name of the denoted rule. To move a rule to an absolute position use the \fBmove:\fR followed by the position number and the rule name of the rule to move (the first position is the position number 1). Please note that white spaces are not allowed between the keyword \fBmove:\fR and the position number.
+
+In a concurrent environment the \fI<qos>\fR limit may be configured to be surpassed when the load of other networks is under their configured \fI<qos>\fR limits. This mechanism is called borrowing (a traffic type borrows its available bandwidth to other traffic types). The ninth [9] usage form allows you to activated or deactivated the borrowing mechanism. Deactivating the borrowing allows you to affect strict bandwidth to a traffic type while its activation allows you to share the available bandwidth more flexibly.
+
+The tenth [10] usage form allows you to display a report on the network traffic (in kilobit) managed by the QoS controller since the last QoS configuration modification. This can help you to test your QoS configuration and validate that the bandwidth is managed as expected. If a traffic type is specified, the report covers only that type of traffic. If the optional \fBdiff\fR keyword is specified, the differential network traffic (in kilobit) since the last report display is displayed (instead of the network traffic since the last QoS configuration modification).
+
+Traffic types that can be specified with this usage form are as follows:
+
+\(bu \fBall\fR: the total traffic exchanged by the appliance (includes traffic destined to or initiated from the appliance as well as traffic routed via the appliance).
+
+\(bu \fBadmin\fR: administration and monitoring traffic destined to or initiated from the appliance itself.
+
+\(bu \fBgateway\fR: all traffic destined to or initiated from the appliance itself except administration and monitoring traffic.
+
+\(bu \fBetc\fR: technical low level and basic service traffic destined to or initiated from the appliance itself.
+
+\(bu \fBweb\fR, \fBtweb\fR, \fBrweb\fR, \fBpeer\fR, \fBantivirus\fR, \fBfile\fR, \fBrouter\fR, \fBdefault\fR : these are traffic types that can be shaped (descriptions are given above in the \fBqos shape\fR usage form).
+
+.SH LIMITATIONS
+The QoS controller classifies the network traffic according to the used protocol (TCP or UDP), the source/destination IP address and the source/destination port. In certain circumstances, the appliance may not shape the traffic as requested because of an ambiguity in the configuration. For instance if an external FTP server and an antivirus client (such as an MTA) share the same IP address, the traffic can be classified as antivirus traffic as well as file traffic. The reason is that both FTP and antivirus traffic use dynamic ports, thus creating ambiguity.
+
+When the \fBvlan\fR mode is activated (see the \fBmode\fR and \fBvlan\fR commands), the DSCP is only set for the \fBweb\fR VLAN.
+
+.SH SEE ALSO
+.B access
+(1)
+.B firewall
+(1)
+.B apply
+(1)
+.B mode
+(1)
+.B peer
+(1)
+.B port
+(1)
+.B rweb
+(1)
+.B transparent
+(1)
+.B vlan
+(1)

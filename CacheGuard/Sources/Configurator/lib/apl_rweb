@@ -1,0 +1,844 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       Configurator
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+set-embedded-rweb-parameters()
+{
+    if test \
+	   ${EMBEDDED_VPNSUBSCR_MODE} == True -a \
+	   -n "${EMBEDDED_VPNSUBSCR_RWEB_SITE_NAME}" -a \
+	   -n "${EMBEDDED_VPNSUBSCR_RWEB_TLS_ID}" ; then
+	EMBEDDED_VPNSUBSCR_IS_ACTIVE=True
+    else
+	EMBEDDED_VPNSUBSCR_IS_ACTIVE=False
+    fi
+
+    if test \
+	   ${CURRENT_EMBEDDED_VPNSUBSCR_MODE} == True -a \
+	   -n "${CURRENT_EMBEDDED_VPNSUBSCR_RWEB_SITE_NAME}" -a \
+	   -n "${CURRENT_EMBEDDED_VPNSUBSCR_RWEB_TLS_ID}" ; then
+	CURRENT_EMBEDDED_VPNSUBSCR_IS_ACTIVE=True
+    else
+	CURRENT_EMBEDDED_VPNSUBSCR_IS_ACTIVE=False
+    fi
+
+    if test ${EMBEDDED_VPNSUBSCR_IS_ACTIVE} == False ; then
+	_RWEB_SITE_LIST=${RWEB_SITE_LIST}
+	_RWEB_SITE_HOSTS_LIST=${RWEB_SITE_HOSTS_LIST}
+	_RWEB_SITE_BALANCER_LIST=${RWEB_SITE_BALANCER_LIST}
+	_WAF_RWEB_GENERIC=${WAF_RWEB_GENERIC}
+	_WAF_RWEB_AUDIT_LIST=${WAF_RWEB_AUDIT_LIST}
+	_WAF_RWEB_BYPASS_RULE_LIST=${WAF_RWEB_BYPASS_RULE_LIST}
+	_RWEB_SITE_DENYURL_LIST=${RWEB_SITE_DENYURL_LIST}
+	return 0
+    fi
+
+    source ${LOCAL_DIR}/lib/apl_ea_vpnsubscr.env
+    local waf_bypass
+
+    local rweb_site_vpnsubscr="${EMBEDDED_VPNSUBSCR_RWEB_SITE_NAME} http ${IP_EXTERNAL_IP} nil 100 ${EMBEDDED_VPNSUBSCR_RWEB_SITE_NAME} https ${IP_EXTERNAL_IP} ${EMBEDDED_VPNSUBSCR_RWEB_TLS_ID} 100"
+    local rweb_host_vpnsubscr="${EMBEDDED_VPNSUBSCR_RWEB_SITE_NAME} rweb_http_${EMBEDDED_APPLICATION_IP}_${EMBEDDED_VPNSUBSCR_PORT}_50_100"
+    local rweb_balancer="${EMBEDDED_VPNSUBSCR_RWEB_SITE_NAME} robin nosticky nil nil"
+    local waf_names="lfi:1 rfi:1 rce:1 php:1 nodejs:0 xss:1 sqli:1 sf:1 java:0 dlsql:1 dljava:0 dlphp:1 dliis:0"
+    ! check-expr-ip ${EMBEDDED_VPNSUBSCR_RWEB_SITE_NAME} || waf_bypass="${EMBEDDED_VPNSUBSCR_RWEB_SITE_NAME} 920350"
+    local waf_denyurl="${EMBEDDED_VPNSUBSCR_RWEB_SITE_NAME} https://${EMBEDDED_VPNSUBSCR_RWEB_SITE_NAME}/blocked.html"
+
+    local waf_rweb waf_bins name_bin bin
+
+    for name_bin in ${waf_names}
+    do
+	bin=${name_bin/*:}
+	waf_bins=${waf_bins}${bin}
+    done
+    waf_rweb="${EMBEDDED_VPNSUBSCR_RWEB_SITE_NAME} ${waf_bins}"
+
+    if test -z "${RWEB_SITE_LIST}" ; then
+	_RWEB_SITE_LIST=${rweb_site_vpnsubscr}
+    else
+	_RWEB_SITE_LIST="${RWEB_SITE_LIST} ${rweb_site_vpnsubscr}"
+    fi
+
+    if test -z "${RWEB_SITE_HOSTS_LIST}" ; then
+	_RWEB_SITE_HOSTS_LIST=${rweb_host_vpnsubscr}
+    else
+	_RWEB_SITE_HOSTS_LIST="${RWEB_SITE_HOSTS_LIST} ${rweb_host_vpnsubscr}"
+    fi
+
+    if test -z "${RWEB_SITE_BALANCER_LIST}" ; then
+	_RWEB_SITE_BALANCER_LIST=${rweb_balancer}
+    else
+	_RWEB_SITE_BALANCER_LIST="${RWEB_SITE_BALANCER_LIST} ${rweb_balancer}"
+    fi
+
+    if test -z "${WAF_RWEB_GENERIC}" ; then
+	_WAF_RWEB_GENERIC=${waf_rweb}
+    else
+	_WAF_RWEB_GENERIC="${WAF_RWEB_GENERIC} ${waf_rweb}"
+    fi
+
+    if test -z "${RWEB_SITE_DENYURL_LIST}" ; then
+	_RWEB_SITE_DENYURL_LIST=${waf_denyurl}
+    else
+	_RWEB_SITE_DENYURL_LIST="${RWEB_SITE_DENYURL_LIST} ${waf_denyurl}"
+    fi
+
+    if test -n "${waf_bypass}" ; then
+	if test -z "${WAF_RWEB_BYPASS_RULE_LIST}" ; then
+	    _WAF_RWEB_BYPASS_RULE_LIST=${waf_bypass}
+	else
+	    _WAF_RWEB_BYPASS_RULE_LIST="${WAF_RWEB_BYPASS_RULE_LIST} ${waf_bypass}"
+	fi
+    else
+	_WAF_RWEB_BYPASS_RULE_LIST=${WAF_RWEB_BYPASS_RULE_LIST}
+    fi
+
+    if test ${VPNSUBSCR_TEST_MODE} == yes ; then
+	if test -z "${WAF_RWEB_AUDIT_LIST}" ; then
+	    _WAF_RWEB_AUDIT_LIST=${EMBEDDED_VPNSUBSCR_RWEB_SITE_NAME}
+	else
+	    _WAF_RWEB_AUDIT_LIST="${WAF_RWEB_AUDIT_LIST} ${EMBEDDED_VPNSUBSCR_RWEB_SITE_NAME}"
+	fi
+
+    else
+	_WAF_RWEB_AUDIT_LIST=${WAF_RWEB_AUDIT_LIST}
+    fi
+}
+
+tls-is-used-by-rweb()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    local in_type=${1}
+    local in_id=${2}
+
+    local elt range i=0
+    local protocol tls id
+    
+    for elt in ${_RWEB_SITE_LIST}
+    do
+	range=$[${i} % 5]
+	case ${range} in
+	    0)
+		;;
+	    1)
+		protocol=${elt}
+		;;
+	    2)
+		;;
+	    3)
+		tls=${elt}
+		;;
+	    4)
+		if test ${protocol} == https ; then
+		    case ${in_type} in
+			server)
+			    test ${tls/:*} != ${in_id} || return 0
+			    ;;
+			ca)
+			    if ! mono-elt ${tls//:/ } ; then
+				for id in ${tls#*:}
+				do
+				    test ${id} != ${in_id} || return 0
+				done
+			    fi
+			    ;;
+			*)
+			    return 255
+			    ;;
+		    esac
+		fi
+		;;
+	    *)
+		return 255
+		;;
+	esac
+	((i++))
+    done
+
+    return 1
+}
+
+gen-httpd-proxy-compress-conf()
+{
+    test ${COMPRESS_MODE} == True || return 0
+
+    echo "AddOutputFilterByType DEFLATE text/html text/plain text/xml text/css text/javascript"
+    echo "AddOutputFilterByType DEFLATE application/ecmascript application/javascript application/x-javascript application/x-protobuf application/rss+xml application/xml"
+}
+
+gen-httpd-rweb-cache-conf()
+{
+    cat httpd-proxy.conf-cache-constant
+    cat httpd-proxy.conf-cache-tuned
+
+    local size=$[${FREE_MEMORY_SZ} * (100 - ${PROXY_PROXY2_RATIO_PCT}) / 100]
+
+    local web_cache_sz=$[${RWEB_CACHE_SZ} * 1024]
+    local cache_max_object_sz=$(min-value ${web_cache_sz} ${CACHE_MAX_OBJECT_SZ})
+
+    local cache_min_object_sz=$[${CACHE_MIN_OBJECT_SZ} * 1024]
+    test ${cache_min_object_sz} -gt 0 || cache_min_object_sz=1
+
+    echo "CacheMinFileSize $[${CACHE_MIN_OBJECT_SZ} * 1024]"
+    echo "CacheMaxFileSize $[${cache_max_object_sz} * 1024]"
+}
+
+gen-httpd-rweb-from-local()
+{
+    local ip
+
+    for ip in ${RWEB_IP_LIST}
+    do
+	ip=${ip//\./\\\.}
+	echo "SetEnvIf Remote_Host \"^${ip}$\" FROM_LOCAL_PROXY"
+    done
+}
+
+gen-httpd-proxy-general-conf()
+{
+    gen-httpd-proxy-compress-conf
+
+    if test ${RWEB_HTTPS_MODE} == True -a ${RWEB_MODE} == True -a ${PROXY2_MODE} == True ; then
+	echo "AllowCONNECT ${HTTPS_PORT}"
+    fi
+
+    test ${CACHE_MODE} == False -o ${RWEB_CACHE_SZ} -le 0 || gen-httpd-rweb-cache-conf
+    test ${WAF_MODE} == False || gen-httpd-rweb-from-local
+}
+
+gen-httpd-auth-general()
+{
+    test ${AUTHENTICATE_MODE} == True -a ${AUTHENTICATE_RWEB} == True || return 11
+    test ${AUTHENTICATE_LDAP} == True -o ${AUTHENTICATE_KERBEROS} == True || return 13
+    
+    ! test-kerberos-auth-state || gen-httpd-auth-kerberos-general
+    ! test-ldap-auth-state || gen-httpd-auth-ldap-general
+
+    # To relay credential to the next proxy that uses a dumm-auth just for logging and message printing purpose
+    test "${GUARD_MODE}" == False -a "${AV_MODE}" == False || echo "SetEnv Proxy-Chain-Auth On"
+}
+
+gen-httpd-rweb-generic-vhost-conf()
+{
+    echo "ProxyRequests Off"
+}
+
+get-rweb-balancer-id-hosts()
+{
+    test -n "${1}" || return 1
+    local in_name=${1}
+
+    local i=0 elt range nb=1
+    local name hosts
+
+    for elt in ${_RWEB_SITE_HOSTS_LIST}
+    do
+	range=$[${i} % 2]
+	case ${range} in
+	    0)
+		name=${elt}
+		;;
+	    1)
+		if test ${name} != ${in_name} ; then
+		    ((i++))
+		    ((nb++))
+		    continue
+		fi
+	    
+		hosts=${elt}
+		echo "${nb} ${hosts}"
+		return 0
+		;;
+	    *)
+		return 255
+		;;
+	esac
+	((i++))
+    done
+
+    return 3
+}
+
+host-member-of-hosts()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    local in_hosts=${1}
+    local in_record=${2}
+
+    local host protocol ip port weight
+    local record
+
+    for host in ${in_hosts}
+    do
+	host=${host//_/ }
+
+	protocol=$(get-nth-arg 2 ${host})
+	ip=$(get-nth-arg 3 ${host})
+	port=$(get-nth-arg 4 ${host})
+	weight=$(get-nth-arg 5 ${host})
+
+	record=${protocol}_${ip}_${port}_${weight}
+	test ${record} != ${in_record} || return 0
+    done
+
+    return 11
+}
+
+gen-httpd-rweb-proxy-conf()
+{
+    test -n "${1}" || return 1
+    local name=${1}
+
+    local id_hosts
+
+    local balancer=$(get-site-balancer ${name} new configurator)
+    test -n "${balancer}" || return 11
+
+    id_hosts=$(get-rweb-balancer-id-hosts ${name})
+    test ${?} -eq 0 || return 13
+
+    local options="retry=60 connectiontimeout=3 disablereuse=Off keepalive=On flushpackets=Off"
+    local nb=1
+
+    local id=${id_hosts/ *}
+    local hosts=${id_hosts/* }
+    hosts=$(colon2space ${hosts})
+
+    local lb_algorithm=${balancer/ *} lb_apache_algorithm
+    local lb_sticky_mode_cookie=${balancer#* }
+    local lb_sticky=${lb_sticky_mode_cookie/ *}
+    local lb_mode_cookie=${lb_sticky_mode_cookie#* }
+    local lb_mode=${lb_mode_cookie/ *}
+    local lb_cookie=${lb_mode_cookie#* }
+
+    local host protocol ip port weight
+
+    if test "${lb_sticky}" == sticky ; then
+	if test ${lb_mode} == insert ; then
+	    local cookie_name="${lb_cookie}${id}"
+	    echo "Header add Set-Cookie '${cookie_name}=.%{BALANCER_WORKER_ROUTE}e; path=/' env=BALANCER_ROUTE_CHANGED"
+	else
+	    local cookie_name="${lb_cookie}"
+	fi
+    fi
+
+    echo "<Proxy balancer://${name}-cluster>"
+
+    for host in ${hosts}
+    do
+	host=${host//_/ }
+
+	protocol=$(get-nth-arg 2 ${host})
+	ip=$(get-nth-arg 3 ${host})
+	port=$(get-nth-arg 4 ${host})
+	weight=$(get-nth-arg 5 ${host})
+
+	if test ${protocol} == https ; then
+	    cat <<EOF
+SSLProxyEngine On
+SSLProxyCACertificateFile ${PROXY2_SSL_CA_RDIR:1}/ca-bundle+system.crt
+Sslproxyverify require
+SSLProxyVerifyDepth 5
+SSLProxyCheckPeerName On
+EOF
+	fi
+
+	echo "BalancerMember ${protocol}://${ip}:${port} route=${nb} loadfactor=${weight} ${options}"
+	((nb++))
+    done
+
+    case ${lb_algorithm} in
+	robin)
+	    lb_apache_algorithm=byrequests
+	    ;;
+	traffic)
+	    lb_apache_algorithm=bytraffic
+	    ;;
+	pending)
+	    lb_apache_algorithm=bybusyness
+	    ;;
+	*)
+	    lb_apache_algorithm=byrequests
+	    ;;
+    esac
+
+    echo "ProxySet lbmethod=${lb_apache_algorithm}"
+    echo "ProxySet timeout=3"
+    echo "ProxySet nofailover=Off"
+    echo "ProxySet failontimeout=Off"
+    echo "ProxySet forcerecovery=On"
+
+    test "${lb_sticky}" != sticky || echo "ProxySet stickysession=${cookie_name}"
+
+    gen-httpd-rweb-auth-conf ${name}
+
+    echo "Header set Server \"${PUBLIC_WEB_SERVER_NAME}\""
+    echo "</Proxy>"
+
+    if test ${WAF_MODE} == True ; then
+	local rewrite_http_errors=$(get-rewrite-http-errors-state ${name} "${WAF_RWEB_REWRITE_HTTP_ERRORS_LIST}")
+	if test ${rewrite_http_errors} == deny ; then
+	    echo "ProxyErrorOverride On"
+	    echo "ProxyPass /${ERROR_LOCATION}/ !"
+	    echo "ProxyPassReverse /${ERROR_LOCATION}/ !"
+	else
+	    echo "ProxyErrorOverride Off"
+	fi
+    else
+	echo "ProxyErrorOverride Off"
+    fi
+
+    echo "ProxyPass / balancer://${name}-cluster/"
+    echo "ProxyPassReverse / balancer://${name}-cluster/"
+}
+
+gen-httpd-rweb-audit-conf()
+{
+    test ${ADMIN_WAUDIT} == True || return 0
+
+    test -n "${1}" || return 1
+    local name=${1}
+
+    member "${_WAF_RWEB_AUDIT_LIST}" ${name} || return 0
+
+    local len=${#WEB_SERVER_DIR} ; ((len++))
+    local dir=${RWEB_AUDIT_DIR:${len}}
+
+    echo "SecAuditEngine On"
+    echo "SecAuditLogStorageDir /${dir}/${name}"
+    echo "SecAuditLog ${dir}/${name}/audit.log"
+}
+
+gen-httpd-rweb-headers-conf()
+{
+    test -n "${1}" || return 1
+    local protocol=${1}
+
+    case ${protocol} in
+	https)
+	    echo "RequestHeader merge X-Forwarded-Proto \"https"\"
+	    ;;
+	http)
+	    echo "RequestHeader merge X-Forwarded-Proto \"http"\"
+	    ;;
+	*)
+	    ;;
+    esac
+}
+
+is-multi-protocol-rweb()
+{
+    test -n "${1}" || return 1
+    local name=${1}
+
+    local protocol=$(rweb-get-protocol ${name} configurator)
+    test ${protocol} == 'both'
+}
+
+set-rweb-name-qos-list()
+{
+    test -n "${1}" || return 1
+    local env=${1}
+
+    local name protocol ip qos
+    local elt range i=0
+
+    local rweb_site_name_list
+    local rweb_ip_protocol_list
+    local rweb_qos_list
+
+    local rweb_site_list
+
+    case ${env} in
+	new)
+	    rweb_site_list=${_RWEB_SITE_LIST}
+	    ;;
+	cur)
+	    rweb_site_list=${CURRENT_RWEB_SITE_LIST}
+	    ;;
+	*)
+	    return 11
+	    ;;
+    esac
+
+    for elt in ${rweb_site_list}
+    do
+	range=$[${i} % 5]
+	case ${range} in
+	    0)
+		name=${elt}
+		;;
+	    1)
+		protocol=${elt}
+		;;
+	    2)
+		ip=${elt}
+		;;
+	    3)
+		;;
+	    4)
+		qos=${elt}
+		member "${rweb_site_name_list}" ${name} || rweb_site_name_list="${rweb_site_name_list} ${name}"
+		if ! member "${rweb_ip_protocol_list}" ${ip}:${protocol} ; then
+		    rweb_ip_protocol_list="${rweb_ip_protocol_list} ${ip}:${protocol}"
+		    rweb_qos_list="${rweb_qos_list} ${ip}:${protocol} ${qos}"
+		fi
+		;;
+	    *)
+		return 1
+		;;
+	esac
+	((i++))
+    done
+
+    case ${env} in
+	new)
+	    RWEB_SITE_NAME_LIST=${rweb_site_name_list:1}
+	    RWEB_QOS_LIST=${rweb_qos_list:1}
+	    ;;
+	cur)
+	    CURRENT_RWEB_SITE_NAME_LIST=${rweb_site_name_list:1}
+	    CURRENT_RWEB_QOS_LIST=${rweb_qos_list:1}
+	    ;;
+	*)
+	    return 13
+	    ;;
+    esac
+}
+
+set-rweb-name-qos-list-new()
+{
+    set-rweb-name-qos-list new
+}
+
+set-rweb-name-qos-list-cur()
+{
+    set-rweb-name-qos-list cur
+}
+
+set-rweb-list()
+{
+    set-rweb-name-qos-list-new
+
+    test ${RWEB_MODE} == True -a ${PROXY2_MODE} == False || return 0
+
+    local elt range i=0
+    local site_name hosts host
+    local protocol ip port weight record
+    local name names nb
+
+    local rweb_host_list
+    local rweb_host_sites_list
+
+    for elt in ${_RWEB_SITE_HOSTS_LIST}
+    do
+	range=$[${i} % 2]
+	case ${range} in
+	    0)
+		site_name=${elt}
+		;;
+	    1)
+		hosts=$(colon2space ${elt})
+		
+		for host in ${hosts}
+		do
+		    host=${host//_/ }
+
+		    protocol=$(get-nth-arg 2 ${host})
+		    ip=$(get-nth-arg 3 ${host})
+		    port=$(get-nth-arg 4 ${host})
+		    weight=$(get-nth-arg 5 ${host})
+
+		    record=${protocol}_${ip}_${port}_${weight}
+		    member "${rweb_host_list}" ${record} || rweb_host_list="${rweb_host_list} ${record}"
+		done
+		;;
+	    *)
+		return 1
+		;;
+	esac
+	((i++))
+    done
+
+    for record in ${rweb_host_list:1}
+    do
+	i=0 nb=1
+	unset names
+	for elt in ${_RWEB_SITE_HOSTS_LIST}
+	do
+	    range=$[${i} % 2]
+	    case ${range} in
+		0)
+		    name=${elt}
+		    ;;
+		1)
+		    hosts=$(colon2space ${elt})
+		    ! host-member-of-hosts "${hosts}" ${record} || names="${names} ${name},${nb}"
+		    ((nb++))
+		    ;;
+		*)
+		    return 255
+		    ;;
+	    esac
+	    ((i++))
+	done
+
+	names=$(space2colon "${names:1}")
+	rweb_host_sites_list="${rweb_host_sites_list} ${record} ${names}"
+    done
+
+    RWEB_HOST_SITES_LIST=${rweb_host_sites_list:1}
+}
+
+gen-httpd-rweb-waf-conf()
+{
+    test ${WAF_MODE} == True || return 0
+
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    local name=${1}
+    local ip=${2}
+
+    local denyurl generic
+
+    denyurl=$(rweb-get-denyurl "${name}" "${_RWEB_SITE_DENYURL_LIST}")
+    denyurl=${denyurl//\"/\\\"}
+
+    generic=$(get-generic-waf-rules ${name})
+
+    gen-waf-allow-from-local ${name} ${ip}
+    gen-waf-custom-rweb-rules ${name}
+    gen-waf-rules rweb ${name} ${generic} "${denyurl}"
+}
+
+gen-httpd-rweb-ssl-conf()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    local protocol=${1}
+    local tls=${2}
+
+    test ${protocol} == https || return 0
+
+    local ssl_rdir=${WEB_SSL_DIR/${WEB_SERVER_DIR}}
+    ssl_rdir=${ssl_rdir:1}
+
+    echo "SSLEngine On"
+    test ! -s ${WEB_SSL_DIR}/${tls}.chain || echo "SSLCertificateChainFile ${ssl_rdir}/${tls}.chain"
+    echo "SSLCertificateFile ${ssl_rdir}/${tls}.certificate"
+    echo "SSLCertificateKeyFile ${ssl_rdir}/${tls}.key"
+}
+
+gen-httpd-rweb-log-conf()
+{
+    test ${LOG_MODE} == True -a ${LOG_TYPE_RWEB/:*} == True || return 0
+    test ${RWEB_MODE} == True -a ${PROXY2_MODE} == True || return 0
+
+    test -n "${1}" || return 1
+    local protocol=${1}
+
+    local syslog='yes'
+
+    local logger="||/bin/logger --priority local6.info --tag rweb"
+
+    if test -n "${syslog}" ; then
+	echo "CustomLog \"|/bin/logger --tag rweb --priority local6.info\" ${protocol}-rweb-syslog \"expr=-z reqenv('FROM_LOCAL_PROXY') && -z reqenv('SQUID_INTERNAL')\""
+	echo "CustomLog \"|/bin/logger --tag rweb --priority local6.info\" ${protocol}-proxy-syslog \"expr=-n reqenv('FROM_LOCAL_PROXY') && -z reqenv('SQUID_INTERNAL')\""
+    else
+	echo "CustomLog var/log/${RWEB_LOG} ${protocol}-rweb \"expr=-z reqenv('FROM_LOCAL_PROXY') && -z reqenv('SQUID_INTERNAL')\""
+	echo "CustomLog var/log/${RWEB_LOG} ${protocol}-proxy \"expr=-n reqenv('FROM_LOCAL_PROXY') && -z reqenv('SQUID_INTERNAL')\""
+    fi
+}
+
+gen-httpd-rweb-auth-conf()
+{
+    test -n "${1}" || return 1
+    local name=${1}
+
+    test ${AUTHENTICATE_MODE} == True -a ${AUTHENTICATE_RWEB} == True || return 11
+    test ${AUTHENTICATE_LDAP} == True -o ${AUTHENTICATE_KERBEROS} == True || return 13
+
+    if test-kerberos-auth-state ; then
+	if is-rweb-kerberos ${name} ; then
+	    gen-httpd-rweb-auth-kerberos-conf ${name}
+	else
+	    ! test-ldap-auth-state || gen-httpd-rweb-auth-ldap-conf
+	fi
+    else
+	! test-ldap-auth-state || gen-httpd-rweb-auth-ldap-conf
+    fi
+}
+
+gen-httpd-rweb-standby()
+{
+    test -n "${1}" || return 1
+    local url=${1}
+
+    case "${url}" in
+	self)
+	    echo "DocumentRoot /${STANDBY_NAME}"
+	    echo "RewriteEngine On"
+	    echo "RewriteCond %{REQUEST_URI} !${STANDBY_NAME}.html"
+	    echo "RewriteRule (.*) ${STANDBY_NAME}.html [R=307,L]"
+	    ;;
+	*)
+	    echo "RedirectMatch temp (.*) ${url}"
+	    ;;
+    esac
+}
+
+gen-httpd-proxy-rweb-vhost-conf()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 1
+    test -n "${3}" || return 1
+    test -n "${4}" || return 1
+    test -n "${5}" || return 1
+    local name=${1}
+    local protocol=${2}
+    local tls=${3}
+    local ip=${4}
+    local port=${5}
+
+    local redirect_conf
+
+    if test ${protocol} == http ; then
+	if is-multi-protocol-rweb ${name} ; then
+	    ! is-rweb-http-redirected-to-https ${name} || redirect_conf=yes
+	fi
+    fi
+
+    if test -z "${redirect_conf}" ; then
+	echo
+	echo "<VirtualHost ${ip}:${port}>"
+	echo "ServerName ${name}:${port}"
+
+	local url=$(get-rweb-standby-url ${name} "${RWEB_SITE_STANDBY_LIST}")
+
+	if test -n "${url}" ; then
+	    gen-httpd-rweb-standby "${url}"
+	else
+	    gen-httpd-rweb-generic-vhost-conf
+	    gen-httpd-rweb-headers-conf ${protocol}
+	    gen-httpd-rweb-proxy-conf ${name}
+	    gen-httpd-rweb-audit-conf ${name}
+	    gen-httpd-rweb-waf-conf ${name} ${ip}
+	fi
+
+	gen-httpd-rweb-ssl-conf ${protocol} ${tls}
+	gen-httpd-rweb-log-conf ${protocol}
+
+	echo "</VirtualHost>"
+
+	return 0
+    fi
+
+    echo
+    echo "<VirtualHost ${ip}:80>"
+    echo "ServerName ${name}:80"
+    echo "RewriteEngine On"
+    echo "RewriteCond %{HTTPS} off"
+    echo "RewriteRule (.*) https://%{SERVER_NAME}%{REQUEST_URI} [R=307,L]"
+    echo "</VirtualHost>"
+}
+
+gen-httpd-proxy-rweb-general-conf()
+{
+    local ip
+
+    for ip in ${RWEB_HTTP_IP_LIST}
+    do
+	echo "Listen ${ip}:${WWW_PORT}"
+    done
+
+    for ip in ${RWEB_HTTPS_IP_LIST}
+    do
+	echo "Listen ${ip}:${HTTPS_PORT}"
+    done
+}
+
+gen-httpd-proxy-rweb-conf()
+{
+    if test ${RWEB_MODE} == True ; then
+	echo "ProxyPreserveHost On"
+    else
+	echo "ProxyPreserveHost Off"
+	return 0
+    fi
+
+    local elt range i=0
+    local name protocol ip tls
+    local tls_id
+
+    for elt in ${_RWEB_SITE_LIST}
+    do
+	range=$[${i} % 5]
+	case ${range} in
+	    0)
+		name=${elt}
+		;;
+	    1)
+		protocol=${elt}
+		;;
+	    2)
+		ip=${elt}
+		;;
+	    3)
+		tls=${elt}
+		;;
+	    4)
+		case ${protocol} in
+		    http)
+			gen-httpd-proxy-rweb-vhost-conf ${name} ${protocol} ${tls} ${ip} ${WWW_PORT}
+			;;
+		    https)
+			tls_id=${tls/:*}
+			if test -s ${WEB_SSL_DIR}/${tls_id}.key -a -s ${WEB_SSL_DIR}/${tls_id}.certificate ; then
+			    gen-httpd-proxy-rweb-vhost-conf ${name} ${protocol} ${tls_id} ${ip} ${HTTPS_PORT}
+			fi
+
+			;;
+		    *)
+			;;
+		esac
+		;;
+	    *)
+		return 1
+		;;
+	esac
+	((i++))
+    done
+}
+
+gen-httpd-proxy-conf()
+{
+    cat httpd-proxy.conf-tuned
+
+    gen-httpd-proxy-general-conf
+    gen-httpd-auth-general
+    gen-httpd-proxy-rweb-general-conf
+    gen-httpd-proxy-rweb-conf
+}
+
+LIB_APL_RWEB=Yes

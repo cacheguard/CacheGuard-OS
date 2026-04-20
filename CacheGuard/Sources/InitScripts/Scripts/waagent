@@ -1,0 +1,107 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       InitScript
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+source /lib/lsb/init-functions
+
+CACHEGUARD_DIR=/etc/sysconfig/cacheguard
+source ${CACHEGUARD_DIR}/constant
+source ${HARD_DIR}/cloud.conf
+
+case ${CLOUD_NAME} in
+    azure)
+	SERV="${CLOUD_NAME^} agent"
+	PROG="waagent"
+	FPROG="/usr/sbin/${PROG}"
+	CONFIG_FILE=/etc/waagent.conf
+	;;
+    *)
+	exit 0
+	;;
+esac
+
+start-waagent()
+{
+    local proc=$(ps -ef | grep "python ${FPROG}" | grep --invert-match grep 2> /dev/null)
+    if [ -n "${proc}" ]; then
+	echo $"${PROG}: already running"
+	return 11
+    fi
+
+    /etc/rc.d/init.d/sshd host-rsa-keygen || return 11
+
+    local retval
+
+    log_info_msg "Starting ${SERV}..."
+    ${FPROG} -configuration-path:${CONFIG_FILE} -start
+    retval=${?}
+
+    [ ${retval} -eq 0 ] && touch /var/lock/${PROG}
+    evaluate_retval
+
+    return ${retval}
+}
+
+stop-waagent1()
+{
+    test -s /var/run/${PROG}.pid || return 11
+    local pid=$(cat /var/run/${PROG}.pid)
+    test -n "${pid}" || return 13
+    kill ${pid} || return 15
+    rm -f /var/run/${PROG}.pid
+}
+
+stop-waagent()
+{
+    log_info_msg "Stopping ${SERV}..."
+    stop-waagent1
+    local retval=${?}
+    [ ${retval} -eq 0 ] && rm -f /var/lock/${PROG}
+    evaluate_retval
+}
+
+status-waagent()
+{
+    statusproc -p /var/run/${PROG}.pid ${PROG}
+}
+
+case "${1}" in
+    start)
+	start-waagent
+	;;
+    stop)
+	stop-waagent
+	;;
+    restart)
+	${0} stop
+	usleep 500000
+	${0} start
+	;;
+    status)
+	status-waagent
+	;;
+    *)
+	echo "Usage: ${0} {start|stop|restart|status}"
+	exit 1
+	;;
+esac

@@ -1,0 +1,71 @@
+Defaults !always_set_home, \
+	  authenticate, \
+	 !closefrom_override, \
+	  compress_io, \
+	 !exec_background, \
+	 !env_editor, \
+	  env_reset, \
+	 !fast_glob, \
+	 !fqdn, \
+	 ignore_dot, \
+	 !ignore_local_sudoers, \
+	 !insults, \
+	 !log_host, \
+	 !log_input, \
+	 !log_output, \
+	  log_year, \
+	 !long_otp_prompt, \
+	 !mail_always, \
+	 !mail_badpass, \
+	 !mail_no_host, \
+	 !mail_no_perms, \
+	 !mail_no_user, \
+	 !noexec, \
+	 !pam_session, \
+	 !pam_setcred, \
+	 !passprompt_override, \
+	 !path_info, \
+	 !preserve_groups, \
+	 !pwfeedback, \
+	 !requiretty, \
+	 !root_sudo, \
+	 !rootpw, \
+	 !runaspw, \
+	 !set_home, \
+	  set_logname, \
+	  set_utmp, \
+	 !setenv, \
+	 !shell_noargs, \
+	 !stay_setuid, \
+	 !targetpw, \
+	 tty_tickets, \
+	 !umask_override, \
+	 !utmp_runas, \
+	 !visiblepw, \
+	 closefrom = 3, \
+	 passwd_tries = 3, \
+	 loglinelen = 80, \
+	 passwd_timeout = 5, \
+	 timestamp_timeout = 5, \
+	 umask = 0022, \
+	 badpass_message = "Incorrect password", \
+	 editor = /usr/bin/vi, \
+	 iolog_dir = /var/log/sudo-io, \
+	 iolog_file = %{seq}, \
+	 mailsub = "*** Security Information for %h ***", \
+	 maxseq = 2176782336, \
+	 pam_login_service = "sudo", \
+	 pam_service = "sudo", \
+ 	 passprompt = "Password: ", \
+	 syslog_badpri = "alert", \
+	 syslog_goodpri = "notice", \
+	 sudoers_locale = "C", \
+	 lecture = "never", \	 
+	 listpw = "all", \
+	 mailerflags = "-t", \
+	 mailerpath = /bin/false, \
+	 mailto = "root", \
+	 syslog = "authpriv", \
+	 verifypw = "all", \
+    	 timestampowner = root, \
+	 runas_default = root, \

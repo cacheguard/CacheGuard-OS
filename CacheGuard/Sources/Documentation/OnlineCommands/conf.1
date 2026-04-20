@@ -1,0 +1,70 @@
+Manage the whole configuration
+.SH SYNOPSIS
+
+[1] \fBconf\fR [\fBdiff\fR]
+
+[2] \fBconf load\fR (\fBftp\fR | \fBsftp\fR | \fBtftp\fR) \fI<file-server>\fR \fI<file-path>\fR
+
+[3] \fBconf save\fR (\fBftp\fR | \fBsftp\fR| \fBtftp\fR) \fI<file-server>\fR \fI<file-path>\fR [\fBnew\fR]
+
+[4] \fBconf factoryreset\fR
+
+[5] \fBconf manager\fR (\fBtemplate\fR \fI<template-id>\fR | \fBateway\fR \fI<gateway-id>\fR) 
+
+.SH DESCRIPTION
+
+Without any argument this command displays both the running and the new (not yet applied) logical configuration. It allows you to view all parameters at once before applying (using the command \fBapply\fR). When the optional argument \fBdiff\fR is given, only the difference between the current and the new configuration is displayed. The first [1] usage form allows you to display the logical configuration.
+
+In the second [2] usage form, the \fBload\fR argument allows you to load a configuration file located on a file server. Only trusted file servers are allowed. Trusted file servers are defined with the \fBaccess\fR command. The load usage form requires three mandatory arguments. The first argument is the protocol name (\fBftp\fR, \fBsftp\fR, or \fBtftp\fR). The second argument is the name or IP address of the file server. The third argument is the configuration file name.
+
+When \fBtftp\fR is used the configuration file must exist and be accessible on the file server. The file must contain a set of valid configuration commands. Empty lines or lines beginning with the character "#" are ignored. The loading of a configuration file does not affect the running configuration. The command \fBapply\fR must be used to apply the new loaded configuration.
+
+The third [3] usage form is used to save the configuration in a file located on a trusted file server. This usage form requires the same arguments described for the load usage form. By default this command saves the running configuration (also called the current configuration). To save the new configuration (not yet applied) use the optional argument \fBnew\fR. The saved file contains a list of configuration commands that can be loaded afterwards using the \fBconf load\fR usage form. Please note that when a setting is in the form of a list, the saved setting begins by a command that erase the whole list before adding new entries to the the new created list. This rule applies to all settings that are present in the system in two versions (the running and new versions). For lists that are present in the system only in one version (ie. the running and the new are the same), no erase command is saved. For instance, this is the case for templates on a \fImanager\fR system.
+
+Also, please note that:
+
+\(bu Passwords used to connect to external services like SNMP managers or LDAP servers are always saved in an encrypted format. However as the encryption is done after the apply operation, parts of a new configuration that contain clear passwords are never saved.
+
+\(bu The fBconf\fR command saves/loads the logical configuration only and not all files related to the configuration (such as SSL certificates or the antivirus signature base). To load or save files related to the configuration you can use appropriate commands or the \fBfile\fR command to load or save all files in one operation.
+
+The fourth [4] usage form (\fBfactoryreset\fR) is used to make a factory reset of the configuration. When using this usage form, all parameters are set to their initial values. Please note that the administration passwords used to connect to the system are not part of the configuration and thus are not reset when using the \Bfactoryreset\fR argument.
+
+The fifth [5] usage form is only available on \fImanager\fR systems inside a template or gateway configuration context. This usage form allows you to quickly make a gateway configuration based on a template or another gateway configuration (the source configuration). Please note that this operation has an immediate effect on a (ie. does not require to use the \fBapply\fR command). You can refer to the \fBmanager\fR command for further information. The built configuration inherit from all source configuration except from the following settings that normally are unique:
+
+\(bu The gateway Hostname (see the \fBhostname\fR command).
+
+\(bu Internal and Auxiliary IP addresses (see the \fBip\fR command).
+
+\(bu All VRRP IPs (see the \fBvrrp\fR command).
+
+\(bu IP routes and Via Gateways (see the \fBip\fR command).
+
+\(bu Transparent Web networks (see the \fBtransparent\fR command).
+
+\(bu Access lists associated to Internal and Auxiliary interfaces (see the \fBaccess\fR command).
+
+\(bu All settings related to the embedded DHCP server (see the \fBdhcp\fR command).
+
+\(bu Firewall rules associated to Internal and Auxiliary interfaces (see the \fBfirewall\fR command).
+
+\(bu IPsec VPN authentication PSK (Pre Shared Key) (see the \fBvpnipsec\fR command).
+
+\(bu Via Gateways and local networks for IPsec VPN tunnels (see the \fBvpnipsec\fR command).
+
+\(bu Via Gateways for reverse Web sites (see the \fBrweb\fR command).
+
+\(bu Share and HA peers (see the \fBpeer\fR command).
+
+\(bu Client TLS objects.
+
+.SH SEE ALSO
+.B access
+(1)
+.B apply
+(1)
+.B file
+(1)
+.B manager
+(1)
+.B system
+(1)

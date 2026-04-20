@@ -1,0 +1,1162 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       Configurator
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+set-ipsec-parameters-site()
+{
+    test -n "${1}" || return 1
+    local state=${1}
+
+    case ${state} in
+	new)
+	    test ${VPN_IPSEC_MODE} == True -a ${VPN_IPSEC_ACCESS_MODE} == False || return 0
+	    local vpn_ipsec_site_list=${VPN_IPSEC_SITE_LIST}
+	    ;;
+	cur)
+	    test ${CURRENT_VPN_IPSEC_MODE} == True -a ${CURRENT_VPN_IPSEC_ACCESS_MODE} == False || return 0
+	    local vpn_ipsec_site_list=${CURRENT_VPN_IPSEC_SITE_LIST}
+	    ;;
+	*)
+	    return 255
+	    ;;
+    esac
+
+    local vpn_ipsec_site_ip_list vpn_ipsec_site_dn_list
+
+    local elt range i=0
+    local vpn_id remote_address remote_isakmp_port remote_natt_port
+    local to_remote_addresses ips fqdns
+    local host_ip address
+
+    for elt in ${vpn_ipsec_site_list}
+    do
+	range=$[${i} % 12]
+	case ${range} in
+	    0)
+ 		vpn_id=${elt}
+		;;
+	    1)
+		remote_address=${elt}
+		;;
+
+	    2|3|4|5|6|7|8|9)
+		;;
+	    10)
+		remote_isakmp_port=${elt}
+		;;
+	    11)
+		remote_natt_port=${elt}
+		to_remote_addresses=$(get-vpn-ipsec-tos ${vpn_id} ${state})
+		unset ips fqdns
+
+		for address in ${remote_address} ${to_remote_addresses}
+		do
+		    if check-expr-ip ${address} ; then
+			ips="${ips},${address}"
+		    else
+			host_ip=$(get-ip-from-ip-name-list ${address})
+			if test ${?} -eq 0 ; then
+			    ips="${ips},${host_ip}"
+			else
+			    fqdns="${fqdns},${address}"
+			fi
+		    fi
+		done
+
+		ips=${ips:1}
+		fqdns=${fqdns:1}
+
+		test -z "${ips}" || vpn_ipsec_site_ip_list="${vpn_ipsec_site_ip_list} ${vpn_id} ${ips} ${remote_isakmp_port} ${remote_natt_port}"
+		test -z "${fqdns}" || vpn_ipsec_site_dn_list="${vpn_ipsec_site_dn_list} ${vpn_id} ${fqdns} ${remote_isakmp_port} ${remote_natt_port}"
+		;;
+	    *)
+		return 255
+		;;
+	esac
+	((i++))
+    done
+
+    VPN_IPSEC_SITE_IP_LIST=${vpn_ipsec_site_ip_list:1}
+    VPN_IPSEC_SITE_DN_LIST=${vpn_ipsec_site_dn_list:1}
+}
+
+set-ipsec-parameters()
+{
+    local state=${1}
+    test -n "${state}" || state=new
+
+    local access_mode
+    unset IKE_IS_ACTIVE CURRENT_IKE_IS_ACTIVE
+
+    VPNIPSEC_ACCESS_DB_RESET=False
+
+    access_mode=${VPN_IPSEC_ACCESS/ *}
+    if test "${access_mode}" == 'on' ; then
+	export VPN_IPSEC_ACCESS_MODE=True
+    else
+	export VPN_IPSEC_ACCESS_MODE=False
+    fi
+
+    access_mode=${CURRENT_VPN_IPSEC_ACCESS/ *}
+    if test "${access_mode}" == 'on' ; then
+	export CURRENT_VPN_IPSEC_ACCESS_MODE=True
+    else
+	export CURRENT_VPN_IPSEC_ACCESS_MODE=False
+    fi
+
+    if test ${VPN_IPSEC_MODE} == True -a ${VPN_IPSEC_ACCESS_MODE} == False ; then
+	VPN_IPSEC_SITE_IS_ACTIVE=True
+    else
+	VPN_IPSEC_SITE_IS_ACTIVE=False
+    fi
+
+    if test ${CURRENT_VPN_IPSEC_MODE} == True -a ${CURRENT_VPN_IPSEC_ACCESS_MODE} == False ; then
+	CURRENT_VPN_IPSEC_SITE_IS_ACTIVE=True
+    else
+	CURRENT_VPN_IPSEC_SITE_IS_ACTIVE=False
+    fi
+
+    if test ${VPN_IPSEC_MODE} == False -o ${ROUTER_MODE} == False ; then
+	IKE_IS_ACTIVE=False
+    else
+	if test ${IP_EXTERNAL_IP} != "0.0.0.0" -a ${IP_WEB_IP} != "0.0.0.0" ; then
+	    if test ${VPN_IPSEC_ACCESS_MODE} == True ; then
+		export IKE_IS_ACTIVE=True
+	    else
+		if test -z "${VPN_IPSEC_SITE_LIST}" ; then
+		    export IKE_IS_ACTIVE=False
+		else
+		    export IKE_IS_ACTIVE=True
+		fi
+	    fi
+	else
+	    export IKE_IS_ACTIVE=False
+	fi
+    fi
+
+    if test ${CURRENT_VPN_IPSEC_MODE} == False -o ${CURRENT_ROUTER_MODE} == False ; then
+	CURRENT_IKE_IS_ACTIVE=False
+    else
+	if test ${CURRENT_IP_EXTERNAL_IP} != "0.0.0.0" -a ${CURRENT_IP_WEB_IP} != "0.0.0.0" ; then
+	    if test ${CURRENT_VPN_IPSEC_ACCESS_MODE} == True ; then
+		export CURRENT_IKE_IS_ACTIVE=True
+	    else
+		if test -z "${CURRENT_VPN_IPSEC_SITE_LIST}" ; then
+		    export CURRENT_IKE_IS_ACTIVE=False
+		else
+		    export CURRENT_IKE_IS_ACTIVE=True
+		fi
+	    fi
+	else
+	    export CURRENT_IKE_IS_ACTIVE=False
+	fi
+    fi
+
+    if test "${VPN_IPSEC_MODE}" != "${CURRENT_VPN_IPSEC_MODE}" -o \
+	    "${VPN_IPSEC_ACCESS_MODE}" != "${CURRENT_VPN_IPSEC_ACCESS_MODE}" ; then
+	test "${VPN_IPSEC_MODE}" == False -o ${VPN_IPSEC_ACCESS_MODE} == False || \
+	    VPNIPSEC_ACCESS_DB_RESET=True
+    fi
+
+    set-ipsec-parameters-site ${state}
+}
+
+tls-is-used-by-ipsec()
+{
+    test -n "${1}" || return 1
+    local in_tls=${1}
+
+    local tls
+
+    if test ${VPN_IPSEC_AUTHENTICATE:0:3} != 'psk' ; then
+	if test ${VPN_IPSEC_AUTHENTICATE:0:3} == 'tls' ; then
+	    tls=${VPN_IPSEC_AUTHENTICATE:4}
+
+	elif test ${VPN_IPSEC_AUTHENTICATE:0:6} == 'eaptls' ; then
+	    tls=${VPN_IPSEC_AUTHENTICATE:7}
+	fi
+	tls=${tls/:*}
+	test ${tls} != ${in_tls} || return 0
+    fi
+
+    local elt range i=0
+    local auth_type auth_key1 auth_key2
+    local subject
+    
+    local in_cert_file=$(get-tls-server-component-file ${in_tls} certificate)
+    local in_subject=$(openssl x509 -in ${in_cert_file} -text -noout 2> /dev/null | grep 'Subject: ' 2> /dev/null) ; in_subject=${in_subject/*Subject: }
+
+    for elt in ${VPN_IPSEC_SITE_LIST}
+    do
+	range=$[${i} % 12]
+	case ${range} in
+	    0|1|5|6|7|8|9|10)
+	        ;;
+	    2)
+		auth_type=${elt}
+		;;
+	    3)	
+		auth_key1=${elt}
+		;;
+	    4)
+		auth_key2=${elt}
+		;;
+	    11)
+		case ${auth_type} in
+		    tls|eaptls)
+			case ${auth_key1} in
+			    certificate)
+				tls=${auth_key2}
+				test ${tls} != ${in_tls} || return 0
+				;;
+			    *)
+				;;
+			esac
+			;;
+		    *)
+			;;
+		esac
+		;;
+	    *)
+		return 1
+		;;
+	esac
+	((i++))
+    done
+
+    return 1
+}
+
+gen-ipsec-global-conf()
+{
+    local unique
+
+    if test ${VPN_IPSEC_ACCESS_MODE} == False ; then
+	unique=yes
+    else
+	unique=keep
+    fi
+
+    cat << EOT
+config setup
+    cachecrls = no
+    strictcrlpolicy = no
+    uniqueids = ${unique}
+EOT
+}
+
+gen-ipsec-ca-conf()
+{
+    cd ${CONF_DIR}
+
+    sed \
+	-e "s@ocspuri =.*@ocspuri = http://${OCSP_HOST}:${OCSP_PORT}@" \
+	\
+	${CACHEGUARD_DIR}/ipsec.ca.conf
+}
+
+gen-ipsec-charon-conf()
+{
+    cd ${CONF_DIR}
+
+    sed \
+	-e "s/interfaces_use =.*/interfaces_use = ${IF_EXTERNAL}/" \
+	-e "s/port =.*/port = ${ISAKMP_PORT}/" \
+	-e "s/port_nat_t =.*/port_nat_t = ${NATT_PORT}/" \
+	\
+	ipsec.charon.conf-tuned
+}
+
+gen-ipsec-dhcp-conf()
+{
+    cd ${CONF_DIR}
+
+    sed \
+	-e "s/interface =.*/interface = ${IF_WEB}/" \
+	-e "s/server =.*/server = ${IP_WEB_IP}/" \
+	\
+	${CACHEGUARD_DIR}/ipsec.dhcp.conf
+}
+
+gen-ipsec-ha-conf()
+{
+    cd ${CONF_DIR}
+
+    local remote_ip=${PEER_HA_LIST/ *} ha
+
+    if test ${HA_MODE} == True ; then
+	ha='yes'
+    else
+	ha='no'
+    fi
+
+    sed \
+	-e "s/load =.*/load = ${ha}/" \
+	-e "s/local =.*/local = ${IP_MON_IP}/" \
+	-e "s/remote =.*/remote = ${remote_ip}/" \
+	\
+	${CACHEGUARD_DIR}/ipsec.ha.conf
+}
+
+gen-ipsec-whitelist-conf()
+{
+    local state
+
+    cd ${CONF_DIR}
+
+    if test ${VPN_IPSEC_ACCESS_MODE} == True ; then
+	state=yes
+    else
+	state=no
+    fi
+
+    cat << EOT
+whitelist {
+    enable = ${state}
+    load = ${state}
+}
+EOT
+}
+
+gen-ipsec-charon-logging()
+{
+    cd ${CONF_DIR}
+
+    local ike_level other_level
+
+    if test ${APPLIANCE_DEBUG_LEVEL} -eq 0 ; then
+	ike_level=0
+	other_level=-1
+    else
+	ike_level=${APPLIANCE_DEBUG_LEVEL}
+	other_level=${APPLIANCE_DEBUG_LEVEL}
+    fi
+
+    sed \
+	-e "s/ike =.*/ike = ${ike_level}/" \
+	-e "s/dmn =.*/dmn = ${other_level}/" \
+	-e "s/mgr =.*/mgr = ${other_level}/" \
+	-e "s/chd =.*/chd = ${other_level}/" \
+	-e "s/job =.*/job = ${other_level}/" \
+	-e "s/cfg =.*/cfg = ${other_level}/" \
+	-e "s/knl =.*/knl = ${other_level}/" \
+	-e "s/net =.*/net = ${other_level}/" \
+	-e "s/asn =.*/asn = ${other_level}/" \
+	-e "s/enc =.*/enc = ${other_level}/" \
+	-e "s/tls =.*/tls = ${other_level}/" \
+	-e "s/esp =.*/esp = ${other_level}/" \
+	-e "s/lib =.*/lib = ${other_level}/" \
+	-e "s/tnc =.*/tnc = ${other_level}/" \
+	-e "s/imc =.*/imc = ${other_level}/" \
+	-e "s/imv =.*/imv = ${other_level}/" \
+	-e "s/pts =.*/pts = ${other_level}/" \
+	-e "s/default =.*/default = ${other_level}/" \
+	\
+	${CACHEGUARD_DIR}/ipsec.charon-logging.conf
+}
+
+save-ipsec-psk()
+{
+    local psk_file=${VPN_IPSEC_DIR}/${IPSEC_AUTHENTICATE_PSK_FILENAME}
+    install -m 640 -o ${ADMIN_NAME} -g ${GROUP_NAME} ${psk_file} ${psk_file}.current
+}
+
+gen-ipsec-local-secrets()
+{
+    test -n "${1}" || return 1
+    local self=${1}
+
+    if test ${VPN_IPSEC_AUTHENTICATE:0:3} == 'psk' ; then
+	local psk_file=${VPN_IPSEC_DIR}/${IPSEC_AUTHENTICATE_PSK_FILENAME}
+	local secret=$(cat ${psk_file} 2> /dev/null)
+	secret=$(ROOT_DIR=${ADMIN_DIR} decrypt-password "${secret}" "${IPSEC_PASSWD}")
+	echo "${self} : PSK \"${secret}\""
+    else
+	local tls_id
+	if test ${VPN_IPSEC_AUTHENTICATE:0:3} == 'tls' ; then
+	    tls_id=${VPN_IPSEC_AUTHENTICATE:4}	
+
+	elif test ${VPN_IPSEC_AUTHENTICATE:0:6} == 'eaptls' ; then
+	    tls_id=${VPN_IPSEC_AUTHENTICATE:7}
+	fi
+	tls_id=${tls_id/:*}
+	echo "${self} : RSA ${tls_id}.key"
+    fi
+}
+
+gen-ipsec-secrets()
+{
+    cd ${CONF_DIR}
+
+    if test ${VPN_IPSEC_ACCESS_MODE} == True ; then
+	gen-ipsec-local-secrets %any
+	return 0
+    fi
+
+    local elt i=0 range
+    local ip tos
+    local vpn_id remote_address auth_type auth_key1 auth_key2 secret
+    local secret_key secret_value
+
+    if test ${HA_MODE} == False ; then
+	gen-ipsec-local-secrets ${IP_EXTERNAL_IP}
+    else
+	for ip in ${VRRP_EXTERNAL_IP_LIST}
+	do
+	    gen-ipsec-local-secrets ${ip}
+	done
+    fi
+
+    for ip in ${VPN_IPSEC_BEHIND_NAT_IP_LIST}
+    do
+	gen-ipsec-local-secrets ${ip}
+    done
+
+    for elt in ${VPN_IPSEC_SITE_LIST}
+    do
+	range=$[${i} % 12]
+	case ${range} in
+	    0)
+ 		vpn_id=${elt}
+		;;
+
+	    5|6|7|8|9|10)
+	        ;;
+	    1)
+		remote_address=${elt}
+		;;
+	    2)
+		auth_type=${elt}
+		;;
+	    3)	
+		auth_key1=${elt}
+		;;
+	    4)
+		auth_key2=${elt}
+		;;
+	    11)
+		test ${remote_address} != 0.0.0.0 || remote_address='%any'
+		case ${auth_type} in
+		    psk)
+			echo "${remote_address} : PSK \"${secret}\""
+			tos=$(get-vpn-ipsec-tos ${vpn_id} new)
+			for ip in ${tos}
+			do
+			    echo "${ip} : PSK \"${secret}\""
+			done
+			;;
+		    tls|eaptls)
+			;;
+		    *)
+			;;
+		esac
+		;;
+	    *)
+		return 1
+		;;
+	esac
+	((i++))
+    done
+}
+
+safe-generate-ipsec-connection-conf-local()
+{
+    local elt i range nb=0
+    local vlan ip px net mask gw
+    local connected_lan
+
+    cd ${CONF_DIR}
+	
+    local connections=$(ls ${IPSEC_CONNECTION_DIR_NAME}/ignore-*.conf 2> /dev/null) connection
+
+    for connection in ${connections}
+    do
+	mv -f ${connection} ${connection}.old
+    done
+
+    if test ${VLAN_MODE} == False ; then
+	if test ${IP_INTERNAL_IP} != 0.0.0.0 -a ${IP_INTERNAL_MASK} != 0.0.0.0 ; then
+	    cat << EOF > ${IPSEC_CONNECTION_DIR_NAME}/ignore-internal.conf.work
+conn ignore-internal
+    auto = route
+    left = 127.0.0.1
+    right = 127.0.0.1
+    leftsubnet = ${IP_INTERNAL_NET}/${IP_INTERNAL_PRF}
+    rightsubnet = ${IP_INTERNAL_NET}/${IP_INTERNAL_PRF}
+    authby = never
+    type = passthrough
+EOF
+	    mv -f ${IPSEC_CONNECTION_DIR_NAME}/ignore-internal.conf.work ${IPSEC_CONNECTION_DIR_NAME}/ignore-internal.conf.new
+	fi
+    else
+	i=0
+	for elt in ${VLAN_IP_MASK_PREFIX_NETWORK_BROADCAST_LIST}
+	do
+	    range=$[${i} % 6]
+	    case ${range} in
+		0)
+		    vlan=${elt}
+		    ;;
+		1)
+		    ip=${elt}
+		    ;;
+		2)
+		    ;;
+		3)
+		    px=${elt}
+		    ;;
+		4)
+		    net=${elt}
+		    ;;
+		5)
+		    if test ${ip} != 0.0.0.0 -a ${px} != 0 ; then
+			cat << EOF > ${IPSEC_CONNECTION_DIR_NAME}/ignore-vlan-${vlan}.conf.work
+conn ignore-vlan-${vlan}
+    auto = route
+    left = 127.0.0.1
+    right = 127.0.0.1
+    leftsubnet = ${net}/${px}
+    rightsubnet = ${net}/${px}
+    authby = never
+    type = passthrough
+EOF
+			mv -f ${IPSEC_CONNECTION_DIR_NAME}/ignore-vlan-${vlan}.conf.work ${IPSEC_CONNECTION_DIR_NAME}/ignore-vlan-${vlan}.conf.new
+		    fi
+		    ;;
+		*)
+		    return 1
+		    ;;
+	    esac
+	    ((i++))
+	done
+
+    fi
+
+    if test -n "${IF_AUXILIARY}" -a ${IP_AUXILIARY_IP} != 0.0.0.0 ; then
+	cat << EOF > ${IPSEC_CONNECTION_DIR_NAME}/ignore-auxiliary.conf.work
+conn ignore-auxiliary
+    auto = route
+    left = 127.0.0.1
+    right = 127.0.0.1
+    leftsubnet = ${IP_AUXILIARY_NET}/${IP_AUXILIARY_PRF}
+    rightsubnet = ${IP_AUXILIARY_NET}/${IP_AUXILIARY_PRF}
+    authby = never
+    type = passthrough
+EOF
+	mv -f ${IPSEC_CONNECTION_DIR_NAME}/ignore-auxiliary.conf.work ${IPSEC_CONNECTION_DIR_NAME}/ignore-auxiliary.conf.new
+    fi
+
+    i=0
+    for elt in ${IP_ROUTE_LIST}
+    do
+	range=$[${i} % 5]
+	case ${range} in
+	    0)
+		net=${elt}
+		;;
+	    1)
+		mask=${elt}
+		;;
+	    2)
+		gw=${elt}
+		;;
+	    3)
+		;;
+	    4)
+		px=$(ipcalc -s ${net} ${mask} -p)
+		px=${px/PREFIX=}
+		connected_lan=$(get-lan-address-of ${gw})
+
+		if test -n "${connected_lan}" ; then
+		    cat << EOF > ${IPSEC_CONNECTION_DIR_NAME}/ignore-local-${nb}.conf.work
+conn ignore-local-${nb}
+    auto = route
+    left = 127.0.0.1
+    right = 127.0.0.1
+    leftsubnet = ${connected_lan}
+    rightsubnet = ${net}/${px}
+    authby = never
+    type = passthrough
+EOF
+		    mv -f ${IPSEC_CONNECTION_DIR_NAME}/ignore-local-${nb}.conf.work ${IPSEC_CONNECTION_DIR_NAME}/ignore-local-${nb}.conf.new
+		    ((nb++))
+		fi
+		;;
+	    *)
+		return 1
+		;;
+	esac
+	((i++))
+    done
+}
+
+get-internal-vpn-integrity()
+{
+    test -n "${1}" || return 1
+    local integrity=${1}
+
+    case ${integrity} in
+	sha1)
+	    integrity=sha1_160
+	    ;;
+	*)
+	    ;;
+    esac
+
+    echo ${integrity}
+}
+
+safe-generate-ipsec-connection-conf-access()
+{
+    local elt i=0 range
+    local ike_encryption ike_integrity dh esp_encryption esp_integrity rest
+    local ipsec_type vpn_id local_ip_mk_list remote_ip_mk_list
+    local local_ip_px_list remote_ip_mk_list ip mk px
+    local operation left_auth_type left_tls left_tls_id left_used_id left_id
+    local right_auth_type eap_id
+
+    if test ${VPN_IPSEC_AUTHENTICATE:0:3} == 'psk' ; then
+	left_auth_type='psk'
+    else
+	if test ${VPN_IPSEC_AUTHENTICATE:0:3} == 'tls' ; then
+	    left_auth_type='pubkey'
+	    left_tls=${VPN_IPSEC_AUTHENTICATE:4}
+
+	elif test ${VPN_IPSEC_AUTHENTICATE:0:6} == 'eaptls' ; then
+	    left_auth_type='eap-tls'
+	    left_tls=${VPN_IPSEC_AUTHENTICATE:7}
+	fi
+	left_tls_id=${left_tls/:*}
+	left_used_id=${left_tls/*:}
+    fi
+
+    case ${VPN_IPSEC_ACCESS_AUTHENTICATE} in
+	psk)
+	    right_auth_type='psk'
+	    ;;
+	tls)
+	    right_auth_type='pubkey'
+	    ;;
+	eaptls)
+	    right_auth_type='eap-tls'
+	    eap_id='%any'
+	    ;;
+	*)
+	    right_auth_type='psk'
+	    ;;
+    esac
+
+    if test ${VPN_IPSEC_ACCESS_MODE} == False ; then
+	operation='ignore'
+    else
+	operation='start'
+    fi
+
+    for elt in ${VPN_IPSEC_NETWORK_LIST}
+    do
+	range=$[${i} % 4]
+	case ${range} in
+	    0)
+		ipsec_type=${elt}
+		;;
+	    1)
+		vpn_id=${elt}
+		;;
+	    2)
+		local_ip_mk_list=${elt}
+		;;
+	    3)
+		remote_ip_mk_list=${elt}
+
+		if test ${ipsec_type} == 'access'; then
+		    
+		    if test ${local_ip_mk_list} == 'nil' ; then
+			local_ip_px_list="${IP_WEB_NET}/${IP_WEB_PRF}"
+		    else
+			local_ip_mk_list=${local_ip_mk_list//,/ }
+			for ip_mk in ${local_ip_mk_list}
+			do
+			    ip=${ip_mk/\/*}
+			    mk=${ip_mk/*\/}
+			    px=$(ipcalc -s ${ip} ${mk} -p)
+			    px=${px/PREFIX=}
+			    local_ip_px_list="${local_ip_px_list},${ip}/${px}"
+			done
+			local_ip_px_list="${local_ip_px_list:1}"
+		    fi
+
+		    if test ${remote_ip_mk_list} == 'nil' ; then
+			remote_ip_px_list=${VPN_IPSEC_REMOTE_ACCESS_DEFAULT_NETWORK}/${VPN_IPSEC_REMOTE_ACCESS_DEFAULT_PREFIX}
+		    else
+			remote_ip_mk_list=${remote_ip_mk_list//,/ }
+			for ip_mk in ${remote_ip_mk_list}
+			do
+			    ip=${ip_mk/\/*}
+			    mk=${ip_mk/*\/}
+			    px=$(ipcalc -s ${ip} ${mk} -p)
+			    px=${px/PREFIX=}
+			    remote_ip_px_list="${remote_ip_px_list},${ip}/${px}"
+			done
+			remote_ip_px_list="${remote_ip_px_list:1}"
+		    fi
+		fi
+		;;
+	    *)
+		return 1
+		;;
+	esac
+	((i++))
+    done
+
+    test -n "${local_ip_px_list}" || local_ip_px_list="${IP_WEB_NET}/${IP_WEB_PRF}"
+    test -n "${remote_ip_px_list}" || remote_ip_px_list=${VPN_IPSEC_REMOTE_ACCESS_DEFAULT_NETWORK}/${VPN_IPSEC_REMOTE_ACCESS_DEFAULT_PREFIX}
+
+    rest=${VPN_IPSEC_ACCESS#* }
+
+    ike_encryption=${rest/ *} rest=${rest#* }
+    ike_integrity=${rest/ *} rest=${rest#* }
+    dh=${rest/ *} rest=${rest#* }
+    esp_encryption=${rest/ *} rest=${rest#* }
+    esp_integrity=${rest/ *}
+
+    ike_integrity=$(get-internal-vpn-integrity ${ike_integrity})
+    esp_integrity=$(get-internal-vpn-integrity ${esp_integrity})
+
+    cd ${CONF_DIR}
+
+    test ! -f ${IPSEC_CONNECTION_DIR_NAME}/access.conf || \
+	cp -f ${IPSEC_CONNECTION_DIR_NAME}/access.conf ${IPSEC_CONNECTION_DIR_NAME}/access.conf.old
+
+    cat << EOF > ${IPSEC_CONNECTION_DIR_NAME}/access.conf.work
+conn access
+     auto = ${operation}
+     leftauth = ${left_auth_type}
+     rightauth = ${right_auth_type}
+EOF
+    if test -n "${left_tls}" ; then
+	echo "     leftcert = ${left_tls_id}.certificate" >> ${IPSEC_CONNECTION_DIR_NAME}/access.conf.work
+	echo "     leftsendcert = always" >> ${IPSEC_CONNECTION_DIR_NAME}/access.conf.work
+	case ${left_used_id} in
+	    fqdn)
+		local names=$(get-subject-alternative-names ${left_tls_id})
+		left_id=${names/ *}
+		check-expr-ip ${left_id} || left_id="fqdn:${left_id}"
+		test -z "${left_id}" || echo "     leftid = ${left_id}" >> ${IPSEC_CONNECTION_DIR_NAME}/access.conf.work
+		;;
+	    dn)
+		local cert_file=$(get-tls-server-component-file ${left_tls_id} certificate)
+		left_id=$(get-tls-subject ${cert_file})
+		test -z "${left_id}" || echo "     leftid = \"${left_id}\"" >> ${IPSEC_CONNECTION_DIR_NAME}/access.conf.work
+		;;
+	    *)
+		;;
+	esac
+    fi
+
+    test -z "${eap_id}" || echo "     eap_identity = ${eap_id}" >> ${IPSEC_CONNECTION_DIR_NAME}/access.conf.work
+
+    cat << EOF >> ${IPSEC_CONNECTION_DIR_NAME}/access.conf.work
+     left = %any
+     right = %any
+     leftsubnet = ${local_ip_px_list}
+     rightsourceip = ${remote_ip_px_list}
+     ike = ${ike_encryption}-${ike_integrity}-${dh}!
+     esp = ${esp_encryption}-${esp_integrity}-${dh}-noesn!
+     rightdns = ${IP_WEB_IP}
+     also = _remote-access
+EOF
+    mv -f ${IPSEC_CONNECTION_DIR_NAME}/access.conf.work ${IPSEC_CONNECTION_DIR_NAME}/access.conf.new
+}
+
+get-my-ipsec-ips()
+{
+    local ips
+
+    if test ${HA_MODE} == False ; then
+	ips=${IP_EXTERNAL_IP}
+    else
+	ips=${VRRP_EXTERNAL_IP_LIST}
+    fi
+
+    test -z "${VPN_IPSEC_BEHIND_NAT_IP_LIST}" || ips="${ips} ${VPN_IPSEC_BEHIND_NAT_IP_LIST}"
+
+    echo ${ips}
+}
+
+left-is-behin-nat()
+{
+    test -n "${VPN_IPSEC_BEHIND_NAT_IP_LIST}"
+}
+
+safe-generate-ipsec-connection-conf-site()
+{
+    local operation left_auth_type left_tls left_tls_id names left_used_id left_id left_ips
+    local vpn_id1 vpn_id2 ipsec_type
+    local auth_type auth_key1 auth_key2 right_ip ike_encryption ike_integrity dh esp_encryption esp_integrity remote_isakmp_port remote_natt_port
+    local right_auth_type right_tls_cert right_tls_dn right_id local_ip_mk_list local_ip_px_list remote_ip_mk_list remote_ip_px_list ip_mk ip mk px
+    local right_role right_ips cert_file
+    local elt1 range1 i1=0
+    local elt2 i2 range2
+
+    local my_ips=$(get-my-ipsec-ips)
+
+    if test ${VPN_IPSEC_AUTHENTICATE:0:3} == 'psk' ; then
+	left_auth_type='psk'
+    else
+	if test ${VPN_IPSEC_AUTHENTICATE:0:3} == 'tls' ; then
+	    left_auth_type='pubkey'
+	    left_tls=${VPN_IPSEC_AUTHENTICATE:4}
+
+	elif test ${VPN_IPSEC_AUTHENTICATE:0:6} == 'eaptls' ; then
+	    left_auth_type='eap-tls'
+	    left_tls=${VPN_IPSEC_AUTHENTICATE:7}
+	fi
+	left_tls_id=${left_tls/:*}
+	left_used_id=${left_tls/*:}
+    fi
+
+    if test ${VPN_IPSEC_ACCESS_MODE} == True ; then
+	operation='ignore'
+    else
+	operation='route'
+    fi
+
+    cd ${CONF_DIR}
+
+    local connections=$(ls -1 ${IPSEC_CONNECTION_DIR_NAME}/site-*.conf 2> /dev/null) connection
+
+    for connection in ${connections}
+    do
+	mv -f ${connection} ${connection}.old
+    done
+
+    for elt1 in ${VPN_IPSEC_SITE_LIST}
+    do
+	range1=$[${i1} % 12]
+	case ${range1} in
+	    0)
+ 		vpn_id1=${elt1}
+		;;
+	    1)
+		right_ip=${elt1}
+
+		left_ips='%any'
+
+		if test ${right_ip} == 0.0.0.0 ; then
+		    right_ips='%any'
+		else
+		    if left-is-behin-nat ; then
+
+			right_role=$(get-vpn-ipsec-nat-role ${vpn_id1} "${VPN_IPSEC_BEHIND_NAT_ROLE_LIST}")
+
+			case ${right_role} in
+			    ''|active)
+				right_ips='%any'
+				;;
+			    passive)
+				right_ips=$(get-vpn-ipsec-all-tos ${vpn_id1} ${right_ip})
+				;;
+			    *)
+				return 255
+				;;
+			esac
+		    else
+			right_ips=$(get-vpn-ipsec-all-tos ${vpn_id1} ${right_ip})
+		    fi
+		fi
+		;;
+	    2)
+		auth_type=${elt1}
+		;;
+	    3)
+		auth_key1=${elt1}
+		;;
+	    4)
+		auth_key2=${elt1}
+		;;
+	    5)
+		ike_encryption=${elt1}
+		;;
+	    6)
+		ike_integrity=${elt1}
+		;;
+	    7)
+		dh=${elt1}
+		;;
+	    8)
+		esp_encryption=${elt1}
+		;;
+	    9)
+		esp_integrity=${elt1}
+		;;
+	    10)
+		remote_isakmp_port=${elt1}
+		;;
+	    11)
+		remote_natt_port=${elt1}
+
+		ike_integrity=$(get-internal-vpn-integrity ${ike_integrity})
+		esp_integrity=$(get-internal-vpn-integrity ${esp_integrity})
+
+		case ${auth_type} in
+		    eaptls|tls)
+			case ${auth_type} in
+			    eaptls)
+				right_auth_type='eap-tls'
+				;;
+			    tls)
+				right_auth_type='pubkey'
+				;;
+			    *)
+				;;
+			esac
+			case ${auth_key1} in
+			    certificate)
+				unset right_id
+				case ${auth_type} in
+				    eaptls)
+					unset right_tls_cert
+					cert_file=$(get-tls-server-component-file ${auth_key2} certificate)
+					right_tls_dn=$(openssl x509 -in ${cert_file} -text -noout 2> /dev/null | grep 'Subject: ' 2> /dev/null) ; right_tls_dn=${right_tls_dn/*Subject: }
+					;;
+				    tls)
+					unset right_tls_dn
+					right_tls_cert=${auth_key2}.certificate
+					;;
+				    *)
+					;;
+				esac
+				;;
+			    dn)
+				unset right_tls_cert right_id
+				right_tls_dn=$(decode-string ${auth_key2})
+				;;
+			    fqdn)
+				unset right_tls_cert right_tls_dn
+				right_id=${auth_key2}
+				;;
+			    *)
+				;;
+			esac
+			;;
+		    psk)
+			right_auth_type='psk'
+			;;
+		    *)
+			unset right_auth_type
+			;;
+		esac
+
+		i2=0
+		unset local_ip_px_list remote_ip_px_list
+
+		for elt2 in ${VPN_IPSEC_NETWORK_LIST}
+		do
+		    range2=$[${i2} % 4]
+		    case ${range2} in
+			0)
+			    ipsec_type=${elt2}
+			    ;;
+			1)
+			    vpn_id2=${elt2}
+			    ;;
+			2)
+			    local_ip_mk_list=${elt2}
+			    ;;
+			3)
+			    remote_ip_mk_list=${elt2}
+
+			    if test ${ipsec_type} == 'site' -a ${vpn_id1} == ${vpn_id2} ; then
+
+				if test ${local_ip_mk_list} == 'nil' ; then
+				    local_ip_px_list="${IP_WEB_NET}/${IP_WEB_PRF}"
+				else
+				    local_ip_mk_list=${local_ip_mk_list//,/ }
+				    for ip_mk in ${local_ip_mk_list}
+				    do
+					ip=${ip_mk/\/*}
+					mk=${ip_mk/*\/}
+					px=$(ipcalc -s ${ip} ${mk} -p)
+					px=${px/PREFIX=}
+					local_ip_px_list="${local_ip_px_list},${ip}/${px}"
+				    done
+				    local_ip_px_list="${local_ip_px_list:1}"
+				fi
+
+				if test ${remote_ip_mk_list} == 'nil' ; then
+				    unset remote_ip_px_list
+				else
+				    remote_ip_mk_list=${remote_ip_mk_list//,/ }
+				    for ip_mk in ${remote_ip_mk_list}
+				    do
+					ip=${ip_mk/\/*}
+					mk=${ip_mk/*\/}
+					px=$(ipcalc -s ${ip} ${mk} -p)
+					px=${px/PREFIX=}
+					remote_ip_px_list="${remote_ip_px_list},${ip}/${px}"
+				    done
+				    remote_ip_px_list="${remote_ip_px_list:1}"
+				fi
+			    fi
+			    ;;
+			*)
+			    return 1
+			    ;;
+		    esac
+		    ((i2++))
+		done
+
+		test -n "${local_ip_px_list}" || local_ip_px_list="${IP_WEB_NET}/${IP_WEB_PRF}"
+
+		cat << EOF > ${IPSEC_CONNECTION_DIR_NAME}/site-${vpn_id1}.conf.work
+conn site-${vpn_id1}
+     auto = ${operation}
+     left = ${left_ips}
+     right = ${right_ips}
+     leftauth = ${left_auth_type}
+     rightauth = ${right_auth_type}
+EOF
+		if test -n "${left_tls}"  ; then
+		    echo "     leftcert = ${left_tls_id}.certificate" >> ${IPSEC_CONNECTION_DIR_NAME}/site-${vpn_id1}.conf.work
+		    case ${left_used_id} in
+			fqdn)
+			    names=$(get-subject-alternative-names ${left_tls_id})
+			    left_id=${names/ *}
+			    check-expr-ip ${left_id} || left_id="fqdn:${left_id}"
+			    test -z "${left_id}" || echo "     leftid = ${left_id}" >> ${IPSEC_CONNECTION_DIR_NAME}/site-${vpn_id1}.conf.work
+			    ;;
+			dn)
+			    ;;
+			*)
+			    ;;
+		    esac
+		    echo "     leftsendcert = always" >> ${IPSEC_CONNECTION_DIR_NAME}/site-${vpn_id1}.conf.work
+		fi
+		test -z "${right_tls_cert}" || echo "     rightcert = ${right_tls_cert}" >> ${IPSEC_CONNECTION_DIR_NAME}/site-${vpn_id1}.conf.work
+		test -z "${right_tls_dn}"   || echo "     rightid = \"${right_tls_dn}\"" >> ${IPSEC_CONNECTION_DIR_NAME}/site-${vpn_id1}.conf.work
+
+		if test -n "${right_id}" ; then
+		    check-expr-ip ${right_id} || right_id="fqdn:${right_id}"
+		    echo "     rightid = ${right_id}" >> ${IPSEC_CONNECTION_DIR_NAME}/site-${vpn_id1}.conf.work
+		fi
+
+		cat << EOF >> ${IPSEC_CONNECTION_DIR_NAME}/site-${vpn_id1}.conf.work
+     rightikeport = ${remote_isakmp_port}
+     leftsubnet = ${local_ip_px_list}
+     rightsubnet = ${remote_ip_px_list}
+     ike = ${ike_encryption}-${ike_integrity}-${dh}!
+     esp = ${esp_encryption}-${esp_integrity}-${dh}-noesn!
+     also = _inter-site
+EOF
+		mv -f ${IPSEC_CONNECTION_DIR_NAME}/site-${vpn_id1}.conf.work ${IPSEC_CONNECTION_DIR_NAME}/site-${vpn_id1}.conf.new
+		;;
+	    *)
+		return 1
+		;;
+	esac
+	((i1++))
+    done
+}
+
+vpnipsec-access-access-hard-modified()
+{
+    if test -f ${VPN_IPSEC_DIR}/whitelist -a -f ${VPN_IPSEC_DIR}/whitelist.current ; then
+	! diff --brief ${VPN_IPSEC_DIR}/whitelist ${VPN_IPSEC_DIR}/whitelist.current > /dev/null
+    else
+	return 0
+    fi
+}
+
+update-ipsec-whitelist()
+{
+    test ${APL_ROLE} == 'gateway' || return 0
+   
+    vpnipsec-access-access-soft-modified || vpnipsec-access-access-hard-modified || return 0
+
+    log "Updating IPsec VPN access list"
+
+    commit-ipsec-whitelist
+    local ret=${?}
+
+    if test ${ret} -eq 0 -o ${VPN_IPSEC_MODE} == False -o ${FLAG_IKE} -ne 0 ; then
+	log-result 0
+	return 0
+    fi
+
+    ${LOCAL_DIR}/libexec/ipsec/whitelist flush 2> /dev/null
+    ret=${?}
+
+    if test -s ${VPN_IPSEC_DIR}/whitelist ; then
+	if test ${ret} -eq 0 ; then
+	    ${LOCAL_DIR}/libexec/ipsec/whitelist add-from ${VPN_IPSEC_DIR}/whitelist 2> /dev/null
+	    ret=${?}
+	fi
+    else
+	${LOCAL_DIR}/libexec/ipsec/whitelist disable 2> /dev/null
+	ret=${?}
+    fi
+
+    log-result ${ret}
+    return ${ret}
+}
+
+safe-generate-ipsec-connection-conf()
+{
+    safe-generate-ipsec-connection-conf-local
+    safe-generate-ipsec-connection-conf-access
+    safe-generate-ipsec-connection-conf-site
+}
+
+gen-sysconfig-ipsec()
+{
+    if test ${VPN_IPSEC_ACCESS_MODE} == True ; then
+	echo "IPSEC_WHITELIST=yes"
+    else
+	echo "IPSEC_WHITELIST=no"
+    fi
+}
+
+vpnipsec-do-delete-access-db()
+{
+    test -n "${1}" || return 1
+    local id=${1}
+
+    test -f ${RUN_DIR}/${VPN_IPSEC_ACCESS_DB_FILE} || return 11
+
+    sqlite3 ${RUN_DIR}/${VPN_IPSEC_ACCESS_DB_FILE} << EOFSQL 2> /dev/null
+DELETE FROM access WHERE id = '${id}.${CURRENT_DOMAIN_NAME}';
+EOFSQL
+}
+
+vpnipsec-do-reset-access-db()
+{
+    apl_create_db ${VPN_IPSEC_ACCESS_DB_SCHEMA} ${RUN_DIR}/${VPN_IPSEC_ACCESS_DB_FILE}
+}
+
+vpnipsec-reset-access-db()
+{
+    test ${VPNIPSEC_ACCESS_DB_RESET} == True || return 0
+    vpnipsec-do-reset-access-db
+}
+
+LIB_APL_IPSEC=Yes

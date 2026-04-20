@@ -1,0 +1,808 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       Commands
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+source functions
+
+display-urllist-log()
+{
+    display-log ${URLLIST_AUTO_LOG}
+}
+
+check-urllist-load-op()
+{
+    test -n "${1}" || return 1
+    local op=${1}
+
+    case ${op} in
+	create|update|auto)
+	    return 0
+	    ;;
+	*)
+	    return 1
+	    ;;
+    esac
+}
+
+check-urllist-auto-op()
+{
+    test -n "${1}" || return 1
+    local op=${1}
+
+    case ${op} in
+	create|update)
+	    return 0
+	    ;;
+	*)
+	    return 1
+	    ;;
+    esac
+}
+
+check-urllist-load-type()
+{
+    test -n "${1}" || return 1
+    local op=${1}
+
+    case ${op} in
+	load|vload)
+	    return 0
+	    ;;
+	*)
+	    return 1
+	    ;;
+    esac
+}
+
+check-urllist-period()
+{
+    test -n "${1}" || return 1
+    local type=${1}
+
+    case ${type} in
+	weekly|daily)
+	    return 0
+	    ;;
+	*)
+	    return 1
+	    ;;
+    esac
+}
+
+show-loaded-urllist-file()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 1
+    test -n "${2}" || return 1
+    local op=${1}
+    local ftype=${2}
+    local file=${3}
+
+    local str="${LOADED}.${ftype}."
+    local len=${#str}
+
+    local base_file=$(file-basename ${file} .gz)
+    local urllist_serial_days=${base_file:${len}}
+
+    local urllist_serial=${urllist_serial_days/\.DAY+*+YAD}
+    local urllist=${urllist_serial/\.*/}
+
+    local serial=${urllist_serial/*\.SER+/}
+    serial=${serial/+RES\.*/}
+
+    local days_suffix=${urllist_serial_days/*\.DAY+/}
+    days_suffix=${days_suffix/+YAD/}
+
+    local days=${days_suffix/\.*}
+    local suffix=${days_suffix/*\./}
+
+    local date=$(get-date-from-epoch-days ${days})
+
+    echo-command-form "urllist"
+    echo-value "${op}:${urllist}.${suffix} (${serial}), ${date}" 8
+}
+
+show-urllist1()
+{
+    local urllists=${2}
+
+    echo-command-form "urllist"
+    if test "${1}" == "new" ; then
+	echo-mark-new
+    else
+	echo-mark-cur
+    fi
+
+
+    if test -z "${urllists}" ; then
+	echo-value-null
+    else
+	local urllist i=0
+	for urllist in ${urllists}
+	do
+	    test ${i} -eq 0 || echo-blank-command
+	    echo-value ${urllist}
+	    ((i++))
+	done
+    fi
+}
+
+show-urllist()
+{
+    echo-begin-show
+    show-urllist1 'current' "${CURRENT_URLLIST_LIST}"
+    test "${CURRENT_URLLIST_LIST}" == "${URLLIST_LIST}" || show-urllist1 'new' "${URLLIST_LIST}"
+    echo-end-show
+}
+
+remove-urllist-from-guard-rules()
+{
+    test -n "${1}" || return 1
+    local in_urllist=${1}
+
+    test -n "${GUARD_RULE_LIST}" || return 0
+
+    local i=0 elt range
+    local name action urllists_col urllists_lst
+    local rules_out
+
+    for elt in ${GUARD_RULE_LIST}
+    do
+	range=$[${i} % 3]
+	case ${range} in
+	    0)
+		name=${elt}
+		;;
+	    1)
+		action=${elt}
+		;;
+	    2)
+		urllists_col=${elt}
+		urllists_lst=$(colon2space ${urllists_col})
+		urllists_lst=$(remove "${urllists_lst}" "${in_urllist}")
+		urllists_col=$(space2colon "${urllists_lst}")
+		rules_out="${rules_out} ${name} ${action} ${urllists_col}"
+		;;
+	    *)
+		return 1
+		;;
+	esac
+	((i++))
+    done
+    rules_out="${rules_out:1}"
+    export GUARD_RULE_LIST=${rules_out}
+}
+
+guard-rules-reset()
+{
+    local i=0 elt range
+    local name action
+    local rules_out
+
+    for elt in ${GUARD_RULE_LIST}
+    do
+      range=$[${i} % 3]
+      case ${range} in
+	  0)
+	      name=${elt}
+	      ;;
+	  1)
+	      action=${elt}
+	      ;;
+	  2)
+	      rules_out="${rules_out} ${name} ${action} self"
+	      ;;
+	  *)
+	      return 1
+	      ;;
+      esac
+      ((i++))
+    done
+    rules_out=${rules_out:1}
+    GUARD_RULE_LIST=${rules_out}
+}
+
+remove-urllist-from-sslmediate-exceptions()
+{
+    test -n "${1}" || return 1
+    local in_name=${1}
+
+    local name
+
+    for name in ${SSLMEDIATE_EXCEPTION_URLLIST_LIST}
+    do
+	test ${name} == ${in_name} || exceptions_out="${exceptions_out} ${name}"
+    done
+
+    exceptions_out="${exceptions_out:1}"
+    export SSLMEDIATE_EXCEPTION_URLLIST_LIST=${exceptions_out}
+}
+
+reset-urllist-in-sslmediate-exceptions()
+{
+    export SSLMEDIATE_EXCEPTION_URLLIST_LIST=''
+}
+
+show-urllist-auto()
+{
+    test -n "${1}" || return 1
+    local cn=${1}
+
+    local val
+    local bool load op period protocol ip fn
+
+    echo-begin-show
+    if test -f ${URLLIST_DIR}/${cn}.${URLLIST_AUTO}.current ; then	
+
+	read bool load op period protocol ip fn < ${URLLIST_DIR}/${cn}.${URLLIST_AUTO}.current
+	echo-command-form "urllist auto"
+	echo-mark-cur
+	echo-value "${cn} on ${load} ${op} ${period} ${protocol} ${ip} ${fn}"
+
+	if test -f ${URLLIST_DIR}/${cn}.${URLLIST_AUTO} ; then
+
+	    diff ${URLLIST_DIR}/${cn}.${URLLIST_AUTO}.current ${URLLIST_DIR}/${cn}.${URLLIST_AUTO} > /dev/null 2>&1
+	    if test ${?} -ne 0 ; then
+		read bool load op period protocol ip fn < ${URLLIST_DIR}/${cn}.${URLLIST_AUTO}
+		echo-command-form "urllist auto"
+		echo-mark-new
+		if test "${bool}" == on ; then
+		    echo-value "${cn} on ${load} ${op} ${period} ${protocol} ${ip} ${fn}"
+		else
+		    echo-value "${cn} off"
+		fi
+	    fi
+	fi
+    else
+	echo-command-form "urllist auto"
+	echo-mark-cur
+	echo-value "${cn} off"
+	if test -f ${URLLIST_DIR}/${cn}.${URLLIST_AUTO} ; then
+	    read bool load op period protocol ip fn < ${URLLIST_DIR}/${cn}.${URLLIST_AUTO}
+	    if test "${bool}" == on ; then
+		echo-command-form "urllist auto"
+		echo-mark-new
+		echo-value "${cn} on ${load} ${op} ${period} ${protocol} ${ip} ${fn}"
+	    fi
+	fi
+    fi
+    echo-end-show
+}
+
+echo-urllist-auto-new-value()
+{
+    if test "${TERM}" == "${WADMIN_TERM}" ; then
+	echo -n "<td></td>"
+	echo-mark-new
+	echo-value "${@}"
+    else
+	echo -n "             "
+	echo-mark-new
+	echo-value "${@}"
+    fi
+}
+
+show-urllist-auto-value()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    test -n "${3}" || return 3
+    local version=${1}
+    local cn=${2}
+    local bool=${3}
+    local load=${4}
+    local op=${5}
+    local period=${6}
+    local protocol=${7}
+    local ip=${8}
+    local fn=${9}
+
+    local col=19
+
+    if test ${version} == new ; then
+	    echo-mark-new
+    else
+	    echo-mark-cur
+    fi
+
+    if test ${bool} == off ; then
+	echo-value "${cn} off" ${col}
+    else
+	case ${protocol} in
+	    push)
+		echo-value "${cn} on ${load} ${op} ${period} ${protocol}" ${col}
+		;;
+	    *)
+		echo-value "${cn} on ${load} ${op} ${period} ${protocol} ${ip} ${fn}" ${col}
+		;;
+	esac
+    fi
+}
+
+show-all-urllist-auto()
+{
+    local cn val col=12 i=0
+    local bool load op period protocol ip fn
+
+    echo-begin-show
+    echo-command-form "urllist auto"
+
+    if test -z "${CURRENT_URLLIST_LIST}" ; then
+	echo-mark-cur
+	echo-value-null 19
+    else
+	for cn in ${CURRENT_URLLIST_LIST}
+	do
+	    test ${i} -eq 0 || echo-command-form-blank ${col}
+
+	    if test -f ${URLLIST_DIR}/${cn}.${URLLIST_AUTO}.current ; then
+		read bool load op period protocol ip fn < ${URLLIST_DIR}/${cn}.${URLLIST_AUTO}.current
+		show-urllist-auto-value cur ${cn} on ${load} ${op} ${period} ${protocol} ${ip} ${fn}
+		val=1
+	    else
+		show-urllist-auto-value cur ${cn} off
+		val=0
+	    fi
+
+	    member "${URLLIST_LIST}" "${cn}"
+	    if test ${?} -eq 0 ; then
+		if test -f ${URLLIST_DIR}/${cn}.${URLLIST_AUTO} ; then
+		    read bool load op period protocol ip fn < ${URLLIST_DIR}/${cn}.${URLLIST_AUTO}
+		    if test "${bool}" == on ; then
+			echo-command-form-blank ${col}
+			show-urllist-auto-value new ${cn} on ${load} ${op} ${period} ${protocol} ${ip} ${fn}
+		    else
+			if test ${val} -ne 0 ; then
+			    echo-command-form-blank ${col}
+			    show-urllist-auto-value new ${cn} off
+			fi
+		    fi
+		fi
+	    else
+		if test ${val} -ne 0 ; then
+		    echo-command-form-blank ${col}
+		    show-urllist-auto-value new ${cn} off
+		fi
+	    fi
+	    ((i++))
+	done
+    fi
+
+    for cn in ${URLLIST_LIST}
+    do
+	! member "${CURRENT_URLLIST_LIST}" "${cn}" || continue
+
+	echo-command-form-blank ${col}
+
+	if test -f ${URLLIST_DIR}/${cn}.${URLLIST_AUTO} ; then
+	    read bool load op period protocol ip fn < ${URLLIST_DIR}/${cn}.${URLLIST_AUTO}
+	    show-urllist-auto-value new ${cn} on ${load} ${op} ${period} ${protocol} ${ip} ${fn}
+	else
+	    show-urllist-auto-value new ${cn} off
+	fi
+    done
+
+    echo-end-show
+}
+
+manage-urllist-auto()
+{
+    if test -z "${1}" ; then
+	show-all-urllist-auto
+	return 0
+    fi
+
+    local ul=${1}
+    member "${URLLIST_LIST}" "${ul}" || return 39
+
+    if test -z "${2}" ; then
+	show-urllist-auto ${ul}
+	return 0
+    fi
+
+    local val=${2}
+    check-boolean ${val} || return 18
+
+    case ${val} in
+	off)
+	    user-has-admin-rights || return 31
+	    if test -f ${URLLIST_DIR}/${ul}.${URLLIST_AUTO}.current ; then
+		echo "off" > ${URLLIST_DIR}/${ul}.${URLLIST_AUTO}
+	    else
+		rm -f ${URLLIST_DIR}/${ul}.${URLLIST_AUTO}
+	    fi
+	    NEWENV=1
+	    ;;
+	on)
+	    test -n "${3}" || return 1
+	    local load=${3}
+	    check-urllist-load-type ${load} || return 88
+
+	    test -n "${4}" || return 1
+	    local op=${4}
+	    check-urllist-auto-op ${op} || return 87
+
+	    test -n "${5}" || return 1
+	    local period=${5}
+	    check-urllist-period ${period} || return 93
+
+	    test -n "${6}" || return 1
+	    local protocol=${6}
+
+	    local ip fn
+
+	    if test ${protocol} == push ; then
+		test ${APL_ROLE} != manager || is-in-manager-conf-context || return 214
+	    else
+		check-file-protocol ${protocol} || return 63
+		test -n "${7}" || return 1
+		ip=${7}
+		check-ip-name ${ip} || return 113
+
+		if test -z "${8}" ; then
+		    fn=${ul}
+		else
+		    fn=${8}
+		    check-filename ${fn} || return 19
+		fi
+	    fi
+
+	    local bool1 load1 op1 period1 protocol1 ip1 fn1
+
+	    user-has-admin-rights || return 31
+
+	    local apl_role=$(get-contextual-role)
+
+	    if test -f ${URLLIST_DIR}/${ul}.${URLLIST_AUTO}.current ; then
+		read bool1 load1 op1 period1 protocol1 ip1 fn1 < ${URLLIST_DIR}/${ul}.${URLLIST_AUTO}.current
+		if test "on" != "${bool1}" -o "${load}" != "${load1}" -o "${op}" != "${op1}" -o "${period}" != "${period1}" -o "${protocol}" != "${protocol1}" -o "${ip}" != "${ip1}" -o "${fn}" != "${fn1}" ; then
+		    if test ${protocol} == push ; then
+			echo "on ${load} ${op} ${period} ${protocol}" > ${URLLIST_DIR}/${ul}.${URLLIST_AUTO}
+		    else
+			echo "on ${load} ${op} ${period} ${protocol} ${ip} ${fn}" > ${URLLIST_DIR}/${ul}.${URLLIST_AUTO}
+		    fi
+		else
+		    rm -f ${URLLIST_DIR}/${ul}.${URLLIST_AUTO}
+		fi
+	    else
+		if test ${protocol} == push ; then
+		    echo "on ${load} ${op} ${period} ${protocol}" > ${URLLIST_DIR}/${ul}.${URLLIST_AUTO}
+		else
+		    echo "on ${load} ${op} ${period} ${protocol} ${ip} ${fn}" > ${URLLIST_DIR}/${ul}.${URLLIST_AUTO}
+		fi
+	    fi
+	    NEWENV=1
+	    ;;
+	*)
+	    return 255
+	    ;;
+    esac
+}
+
+run()
+{
+    if test -z "${ARGS[1]}" ; then show-urllist ; return 0 ; fi
+    local at=${ARGS[1]}
+
+    local ret
+
+    case ${at} in
+
+	report)
+	    display-urllist-log
+	    ;;
+
+	update)
+	    user-has-admin-rights || return 31
+
+	    local autos=$(ls ${URLLIST_DIR}/*.${URLLIST_AUTO}.current 2> /dev/null)
+	    if test -n "${autos}" ; then
+		check-lock || return 123
+		supervisor-action "urllist-update"
+		test ${?} -eq 0 || return 104
+		return 0
+	    else
+		local autos=$(ls ${URLLIST_DIR}/*.${URLLIST_AUTO} 2> /dev/null)
+		test -z "${autos}" || return 134
+		return 136
+	    fi
+	    ;;
+
+	add|del|clear)
+	    test -n "${ARGS[2]}" || return 1
+	    local urllist_name=${ARGS[2]}
+	    check-id-length "${urllist_name}" || return 127
+	    check-id "${urllist_name}" || return 35
+	    test "${urllist_name}" != "self" || return 32
+	    test "${urllist_name}" != "in-addr" || return 32
+	    test "${urllist_name}" != "default" || return 32
+	    user-has-admin-rights || return 31
+
+	    case ${at} in
+		add)
+		    len=$(length-list "${URLLIST_LIST}")
+		    test ${len} -lt ${MAX_URLLIST_NB} || return 90
+		    URLLIST_LIST=$(insert-record-in-slist 1 1 "${urllist_name}" "${URLLIST_LIST}")
+		    ;;
+		del)
+		    member "${URLLIST_LIST}" "${urllist_name}" || return 39
+		    URLLIST_LIST=$(remove "${URLLIST_LIST}" "${urllist_name}")
+
+		    if contextual-command-is-allowed ; then
+			remove-urllist-from-guard-rules ${urllist_name}
+			remove-urllist-from-sslmediate-exceptions ${urllist_name}
+		    fi
+
+		    rm -f ${URLLIST_DIR}/${urllist_name}.${URLLIST_AUTO}
+		    clean-urllist-tmp-files ${urllist_name}
+		    ;;
+		clear)
+		    local domains=0 urls=0 expressions=0
+
+		    if test -z "${ARGS[3]}" ; then
+			domains=1
+			urls=1
+			expressions=1
+		    else
+			local ul_type
+			for ul_type in ${ARGS[3]} ${ARGS[4]} ${ARGS[5]}
+			do
+			    case ${ul_type} in
+				domains)
+				    domains=1
+				    ;;
+				urls)
+				    urls=1
+				    ;;
+				expressions)
+				    expressions=1
+				    ;;
+				*)
+				    return 64
+				    ;;
+			    esac
+			done
+		    fi
+
+		    if test ${domains} -eq 1 ; then
+			rm -f ${TMP_DIR}/${LOADED}.${URLLIST}.*.${urllist_name}.*.domains.gz*
+			touch ${TMP_DIR}/${URLLIST_CLEAR}.${urllist_name}.domains
+		    fi
+
+		    if test ${urls} -eq 1 ; then
+			rm -f ${TMP_DIR}/${LOADED}.${URLLIST}.*.${urllist_name}.*.urls.gz*
+			touch ${TMP_DIR}/${URLLIST_CLEAR}.${urllist_name}.urls
+		    fi
+
+		    if test ${expressions} -eq 1 ; then
+			rm -f ${TMP_DIR}/${LOADED}.${URLLIST}.*.${urllist_name}.*.expressions.gz*
+			touch ${TMP_DIR}/${URLLIST_CLEAR}.${urllist_name}.expressions
+		    fi
+
+		    local files=$(ls ${TMP_DIR}/${LOADED}.${URLLIST}.*.${urllist_name}.* 2> /dev/null)
+		    test -n "${files}" || rm -f ${TMP_DIR}/${LOADED}.${URLLIST}.${urllist_name}.${PROGRESS}
+		    ;;
+		*)
+		    error 255
+		    ;;
+	    esac
+	    SAVENV=1
+	    NEWENV=1
+	    ;;
+	raz)
+	    unset URLLIST_LIST
+
+	    if contextual-command-is-allowed ; then
+		guard-rules-reset
+		urllist-auto-reset-current
+		reset-urllist-in-sslmediate-exceptions
+	    fi
+
+	    SAVENV=1
+	    ;;
+
+	load|vload)
+	    is-in-top-level-context || return 231
+	    if test -z "${ARGS[2]}" ; then
+		if test "${TERM}" == "${WADMIN_TERM}" ; then
+		    return 0
+		else
+		    local file
+		    local create_files=$(ls -1 ${TMP_DIR}/${LOADED}.${URLLIST_CREATE}.*.gz 2> /dev/null)
+		    local update_files=$(ls -1 ${TMP_DIR}/${LOADED}.${URLLIST_UPDATE}.*.gz 2> /dev/null)
+
+		    echo
+
+		    if test -z "${create_files}" -a -z "${update_files}" ; then
+			echo-command-form "urllist"
+			echo-value-null 8
+			echo
+			return 0
+		    fi
+
+		    for file in ${create_files}
+		    do
+			show-loaded-urllist-file create ${URLLIST_CREATE} ${file}
+		    done
+		    
+
+		    for file in ${update_files}
+		    do
+			show-loaded-urllist-file update ${URLLIST_UPDATE} ${file}
+		    done
+		    echo
+		    return 0
+		fi
+	    fi
+
+	    local op=${ARGS[2]}
+	    local ul=${ARGS[3]}
+	    local pt=${ARGS[4]}
+	    local ip=${ARGS[5]}
+	    local fn=${ARGS[6]}
+
+	    check-urllist-load-op "${op}" || return 87
+	    check-id "${ul}" || return 35
+	    member "${URLLIST_LIST}" "${ul}" || return 39
+
+	    test -n "${pt}" || return 1
+	    test -n "${ip}" || return 1
+	    test -n "${fn}" || return 1
+
+	    check-file-protocol ${pt} || return 63
+	    check-ip-name ${ip} || return 113
+	    check-file-ip ${ip} || return 27
+	    check-filename ${fn} || return 19
+
+	    user-has-admin-rights || return 31
+
+	    local domains=0 urls=0 expressions=0
+
+	    if test -z "${ARGS[7]}" ; then
+		domains=1
+		urls=1
+	    else
+		local ul_type
+		for ul_type in ${ARGS[7]} ${ARGS[8]} ${ARGS[9]}
+		do
+		    case ${ul_type} in
+			domains)
+			    domains=1
+			    ;;
+			urls)
+			    urls=1
+			    ;;
+			expressions)
+			    test ${op} == create || return 88
+			    expressions=1
+			    ;;
+			*)
+			    return 64
+			    ;;
+		    esac
+		done
+	    fi
+
+	    if test ${op} == auto ; then
+		NEWENV=1
+
+		if test ${domains} -eq 1 ; then
+		    urllist-auto-load ${at} ${ul} ${pt} ${ip} ${fn} ${op} ${LOADED} domains
+		    ret=${?}
+
+		    if test ${ret} -eq 0 ; then
+			rm -f ${TMP_DIR}/${URLLIST_CLEAR}.${ul}.domains
+			NEWENV=1
+		    else
+			rm -f ${TMP_DIR}/${LOADED}.${URLLIST_UPDATE}.${ul}.*.gz*
+			update-modification-state
+		    fi
+		fi
+
+		if test ${urls} -eq 1 ; then
+		    urllist-auto-load ${at} ${ul} ${pt} ${ip} ${fn} ${op} ${LOADED} urls
+		    ret=${?}
+
+		    if test ${ret} -eq 0 ; then
+			rm -f ${TMP_DIR}/${URLLIST_CLEAR}.${ul}.urls
+			NEWENV=1
+		    else
+			rm -f ${TMP_DIR}/${LOADED}.${URLLIST_UPDATE}.${ul}.*.gz*
+			update-modification-state
+		    fi
+		fi
+
+		return 0
+	    fi
+
+	    local seconds=$(date +"%s")
+	    local days=$[${seconds} / 86400]
+
+	    urllist-load ${days} ${at} ${ul} ${pt} ${ip} ${fn} ${op} ${LOADED} ${domains} ${urls} ${expressions}
+	    ret=${?}
+
+	    if test ${ret} -eq 0 ; then
+		test ${domains} -eq 0 || rm -f ${TMP_DIR}/${URLLIST_CLEAR}.${ul}.domains
+		test ${urls} -eq 0 || rm -f ${TMP_DIR}/${URLLIST_CLEAR}.${ul}.urls
+		test ${expressions} -eq 0 || rm -f ${TMP_DIR}/${URLLIST_CLEAR}.${ul}.expressions
+		NEWENV=1
+	    else
+		rm -f \
+		   ${TMP_DIR}/${LOADED}.${URLLIST}.*.${ul}.*.gz* \
+		   ${TMP_DIR}/${LOADED}.${URLLIST}.${ul}.${PROGRESS}
+		update-modification-state
+		return ${ret}
+	    fi
+
+	    test ${APL_ROLE} == 'manager' || return 0
+
+	    local create_files=$(ls -1 ${TMP_DIR}/${LOADED}.${URLLIST_CREATE}.${ul}.*.gz 2> /dev/null)
+	    local len=${#URLLIST_CREATE} ; ((len++))
+	    local file base urllist suffix
+
+	    for file in ${create_files}
+	    do
+		if check-gzip-file ${file} ; then
+		    base=$(file-basename ${file} .gz)
+		    urllist=${base:${len}}
+		    suffix=${urllist/*\.}
+		    urllist=${urllist%\.*}
+
+		    gunzip --quiet --to-stdout ${file} > ${URLLIST_VAR_DIR}/${urllist}.${suffix}.work 2> /dev/null
+		    if test ${?} -ne 0 ; then
+			rm -f \
+			   ${URLLIST_VAR_DIR}/${urllist}.${suffix}.work \
+			   ${TMP_DIR}/${LOADED}.${URLLIST}.${ul}.${PROGRESS} \
+			   ${file}*
+			return 104
+		    fi
+
+		    if check-ascii-file ${URLLIST_VAR_DIR}/${urllist}.${suffix}.work ; then
+			rm -f ${URLLIST_VAR_DIR}/${urllist}.${suffix}.work
+		    else
+			rm -f  \
+			   ${URLLIST_VAR_DIR}/${urllist}.${suffix}.work \
+			   ${TMP_DIR}/${LOADED}.${URLLIST}.${ul}.${PROGRESS} \
+			   ${file}*
+			return 226
+		    fi
+		else
+		    rm -f \
+		       ${TMP_DIR}/${LOADED}.${URLLIST}.${ul}.${PROGRESS}\
+		       ${file}*
+		    return 95
+		fi
+	    done
+	    ;;
+	auto)
+	    shift-args
+	    manage-urllist-auto ${ALLARGS}
+	    ;;
+	*)
+	    return 1
+	    ;;
+    esac
+}
+
+unset ROOT_DIR
+main "${@}"

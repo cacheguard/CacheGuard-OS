@@ -1,0 +1,15 @@
+bin/squidGuard
+bin/purge
+lib/ecap_adapter_gzip.so
+libexec/basic_ldap_auth
+libexec/diskd
+libexec/dummy_auth
+libexec/ext_ldap_group_acl
+libexec/log_file_daemon
+libexec/negotiate_kerberos_auth
+libexec/negotiate_kerberos_auth_test
+libexec/negotiate_wrapper_auth
+libexec/pinger
+libexec/security_file_certgen
+libexec/unlinkd
+sbin/squid

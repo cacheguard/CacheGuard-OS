@@ -1,0 +1,186 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       Commands
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+__complete-vrrp()
+{
+    test -n "${COMP_CWORD-1}" || return 1
+
+    case ${COMP_CWORD} in
+	1)
+	    case ${COMP_WORDS[1]} in
+		e|ex|ext|exte|exter|extern|externa|external)
+		    COMPREPLY=(external)
+		    ;;
+		i|"in"|int|inte|inter|intern|interna|internal)
+		    COMPREPLY=(internal)
+		    ;;
+		a)
+		    COMPREPLY=('' antivirus auxiliary)
+		    ;;
+		an|ant|anti|antiv|antivi|antivir|antiviru|antivirus)
+		    COMPREPLY=(antivirus)
+		    ;;
+		au|aux|auxi|auxil|auxili|auxilia|auxiliar|auxiliary)
+		    COMPREPLY=(auxiliary)
+		    ;;
+		w|we|web)
+		    COMPREPLY=(web)
+		    ;;
+		r|rw|rwe|rweb)
+		    COMPREPLY=(rweb)
+		    ;;
+		'')
+		    COMPREPLY=('' '<RET>' internal external auxiliary web rweb antivirus)
+		    ;;
+		*)
+		    COMPREPLY=()
+		    ;;
+	    esac
+	    ;;
+	2)
+	    case ${COMP_WORDS[1]} in
+		external|internal|auxiliary|web|rweb|antivirus)
+		    case ${COMP_WORDS[2]} in
+			r|ra|raz)
+			    COMPREPLY=(raz)
+			    ;;
+			a|ad|add)
+			    COMPREPLY=(add)
+			    ;;
+			d|de|del)
+			    COMPREPLY=(del)
+			    ;;
+			'')
+			    COMPREPLY=('' '<RET>' raz add del)
+			    ;;
+		    esac
+		    ;;
+		*)
+		    COMPREPLY=()
+		    ;;
+	    esac
+	    ;;
+	3)
+	    case ${COMP_WORDS[1]} in
+		external|internal|auxiliary|web|rweb|antivirus)
+		    case ${COMP_WORDS[2]} in
+			add|del)
+			    COMPREPLY=('' '<ip>')
+			    ;;
+			raz)
+			    COMPREPLY=()
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		*)
+		    COMPREPLY=()
+		    ;;
+	    esac
+	    ;;
+	4)
+	    case ${COMP_WORDS[1]} in
+		external|internal|auxiliary|web|rweb|antivirus)
+		    case ${COMP_WORDS[2]} in
+			add)
+			    case ${COMP_WORDS[4]} in
+				m|ma|mas|mast|maste|master)
+				    COMPREPLY=(master)
+				    ;;
+				b|ba|bac|back|backu|backup)
+				    COMPREPLY=(backup)
+				    ;;
+				'')
+				    COMPREPLY=('' 'master' 'backup')
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		*)
+		    COMPREPLY=()
+		    ;;
+	    esac
+	    ;;
+	5)
+	    case ${COMP_WORDS[1]} in
+		external|internal|auxiliary|web|rweb|antivirus)
+		    case ${COMP_WORDS[2]} in
+			add)
+			    case ${COMP_WORDS[4]} in
+				master|backup)
+				    COMPREPLY=('' '<RET>' '<priority>')
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		*)
+		    COMPREPLY=()
+		    ;;
+	    esac
+	    ;;
+	6)
+	    case ${COMP_WORDS[1]} in
+		external|internal|auxiliary|web|rweb|antivirus)
+		    case ${COMP_WORDS[2]} in
+			add)
+			    case ${COMP_WORDS[4]} in
+				master|backup)
+				    COMPREPLY=('' '<RET>' '<vr-id>')
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		*)
+		    COMPREPLY=()
+		    ;;
+	    esac
+	    ;;
+	*)
+	    COMPREPLY=()
+	    ;;
+    esac
+}

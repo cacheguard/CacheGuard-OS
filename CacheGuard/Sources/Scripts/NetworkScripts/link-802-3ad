@@ -1,0 +1,111 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       Scripts
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+source /lib/lsb/init-functions
+source ${IFCONFIG}
+
+if test -z "${BONDING}" ; then
+    log_failure_msg "BONDING variable missing from ${IFCONFIG}, cannot continue."
+    exit 1
+fi
+
+802-3ad-up()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    local master=${1}
+    local slaves=${2}
+
+    local dev
+
+    modprobe bonding
+
+    for dev in ${master} ${slaves}
+    do
+	ip link set ${dev} down
+    done
+
+    ip link set dev ${master} type bond mode active-backup
+
+    for dev in ${slaves}
+    do
+	ip link set dev ${dev} master ${master}
+    done
+
+    for dev in ${slaves} ${master}
+    do
+	ip link set ${dev} up
+    done
+}
+
+802-3ad-down()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    local master=${1}
+    local slaves=${2}
+
+    local dev
+
+    for dev in ${master} ${slaves}
+    do
+	ip link set ${dev} down
+    done
+
+    for dev in ${slaves}
+    do
+	ip link set dev ${dev} nomaster
+    done    
+}
+
+apply-link()
+{
+    test -n "${1}" || return 1
+    local bond=${1/\.*}
+    local action=${2}
+
+    case "${action}" in
+	up)
+	    log_info_msg "Adding '${BONDING}' to the ${bond} interface..."
+	    802-3ad-up ${bond} "${BONDING}"
+	    evaluate_retval
+	    ;;
+	
+	down)
+	    log_info_msg "Removing '${BONDING}' from the ${bond} interface..."
+	    802-3ad-down ${bond} "${BONDING}"
+	    evaluate_retval
+	    ;;
+	
+	*)
+	    echo "Usage: ${0} [interface] {up|down}"
+	    exit 1
+	    ;;
+    esac
+}
+
+
+# Main
+
+apply-link "${@}"

@@ -1,0 +1,2 @@
+Precondition Failed
+At least one precondition specified by the HTTP client in the request header has failed

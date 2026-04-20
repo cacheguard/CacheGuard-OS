@@ -1,0 +1,3472 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       Commands
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+set-generic-rule-table()
+{
+    unset WAF_GENERIC_FILTER_ID
+    unset WAF_GENERIC_FILTER_NAME
+    unset WAF_GENERIC_FILTER_FILE
+
+    WAF_GENERIC_FILTER_ID[0]="lfi"	; WAF_GENERIC_FILTER_NAME[0]="Local File Inclusion (lfi)" ;	WAF_GENERIC_FILTER_FILE[0]="REQUEST-930-APPLICATION-ATTACK-LFI"
+    WAF_GENERIC_FILTER_ID[1]="rfi"	; WAF_GENERIC_FILTER_NAME[1]="Remote File Inclusion (rfi)" ; 	WAF_GENERIC_FILTER_FILE[1]="REQUEST-931-APPLICATION-ATTACK-RFI"
+    WAF_GENERIC_FILTER_ID[2]="rce"	; WAF_GENERIC_FILTER_NAME[2]="Remote Code Execution (rce)" ; 	WAF_GENERIC_FILTER_FILE[2]="REQUEST-932-APPLICATION-ATTACK-RCE"
+    WAF_GENERIC_FILTER_ID[3]="php"	; WAF_GENERIC_FILTER_NAME[3]="PHP Application (php)" ;    	WAF_GENERIC_FILTER_FILE[3]="REQUEST-933-APPLICATION-ATTACK-PHP"
+    WAF_GENERIC_FILTER_ID[4]="nodejs"	; WAF_GENERIC_FILTER_NAME[4]="Node.js Application (nodejs)" ; 	WAF_GENERIC_FILTER_FILE[4]="REQUEST-934-APPLICATION-ATTACK-NODEJS"
+    WAF_GENERIC_FILTER_ID[5]="xss"	; WAF_GENERIC_FILTER_NAME[5]="Cross-site Scripting (xss)" ; 	WAF_GENERIC_FILTER_FILE[5]="REQUEST-941-APPLICATION-ATTACK-XSS"
+    WAF_GENERIC_FILTER_ID[6]="sqli"	; WAF_GENERIC_FILTER_NAME[6]="SQL Injection (sqli)" ; 	 	WAF_GENERIC_FILTER_FILE[6]="REQUEST-942-APPLICATION-ATTACK-SQLI"
+    WAF_GENERIC_FILTER_ID[7]="sf"	; WAF_GENERIC_FILTER_NAME[7]="Session Fixation (sf)" ;   	WAF_GENERIC_FILTER_FILE[7]="REQUEST-943-APPLICATION-ATTACK-SESSION-FIXATION"
+    WAF_GENERIC_FILTER_ID[8]="java"	; WAF_GENERIC_FILTER_NAME[8]="Java Application (java)" ; 	WAF_GENERIC_FILTER_FILE[8]="REQUEST-944-APPLICATION-ATTACK-JAVA"
+    WAF_GENERIC_FILTER_ID[9]="dlsql"	; WAF_GENERIC_FILTER_NAME[9]="SQL Data Leakage (dlsql)" ; 	WAF_GENERIC_FILTER_FILE[9]="RESPONSE-951-DATA-LEAKAGES-SQL"
+    WAF_GENERIC_FILTER_ID[10]="dljava"	; WAF_GENERIC_FILTER_NAME[10]="Java Data Leakage (dljava)" ; 	WAF_GENERIC_FILTER_FILE[10]="RESPONSE-952-DATA-LEAKAGES-JAVA"
+    WAF_GENERIC_FILTER_ID[11]="dlphp"	; WAF_GENERIC_FILTER_NAME[11]="PHP Data Leakage (dlphp)" ; 	WAF_GENERIC_FILTER_FILE[11]="RESPONSE-953-DATA-LEAKAGES-PHP"
+    WAF_GENERIC_FILTER_ID[12]="dliis"	; WAF_GENERIC_FILTER_NAME[12]="IIS Data Leakage (dliis)" ; 	WAF_GENERIC_FILTER_FILE[12]="RESPONSE-954-DATA-LEAKAGES-IIS"
+}
+
+get-dynamic-log-value()
+{
+    test -n "${1}" || return 1
+    local tag=${1}
+
+    local total_sz downloaded_sz download_pct
+    local kb_downloaded_sz sz
+
+    case ${tag} in
+	
+	${LOG_TAG_NIL})
+	    echo -n
+	    ;;
+
+	${LOG_TAG_AV_REGULAR}|${LOG_TAG_AV_EXTENDED_UPDATE}|${LOG_TAG_AV_EXTENDED_CREATE})
+
+	    case ${tag} in
+		${LOG_TAG_AV_REGULAR})
+
+		    total_sz=$(cat ${RUN_DIR}/${AV_REGULAR_DB_SZ_FILENAME} 2> /dev/null)
+		    downloaded_sz=$(cat ${RUN_DIR}/${AV_REGULAR_DB_DOWNLOADED_SZ_FILENAME} 2> /dev/null)
+		    ;;
+
+		${LOG_TAG_AV_EXTENDED_UPDATE})
+
+		    total_sz=$(cat ${RUN_DIR}/${AV_EXTENDED_DB_SZ_FILENAME} 2> /dev/null)
+		    downloaded_sz=$(cat ${RUN_DIR}/${AV_EXTENDED_DB_DOWNLOADED_SZ_FILENAME} 2> /dev/null)
+		    ;;
+
+		${LOG_TAG_AV_EXTENDED_CREATE})
+
+		    total_sz=$(cat ${RUN_DIR}/${AV_EXTENDED_PACK_SZ_FILENAME} 2> /dev/null)
+		    downloaded_sz=$(cat ${RUN_DIR}/${AV_EXTENDED_PACK_DOWNLOADED_SZ_FILENAME} 2> /dev/null)
+		    ;;
+		*)
+		    ;;
+	    esac
+
+	    test -n "${downloaded_sz}" || downloaded_sz=0
+
+	    if test ${total_sz} -gt 0 ; then
+		sz=$((downloaded_sz / 1000))
+		total_sz=$((total_sz / 1000))
+		download_pct=$((sz * 100 / total_sz))
+		test ${download_pct} -le 100 || download_pct=100
+		download_pct=" (${download_pct}%)"
+	    else
+		download_pct=" (??)"
+	    fi
+
+	    kb_downloaded_sz=$[${downloaded_sz} / 1024]
+	    kb_downloaded_sz=$(format-number ${kb_downloaded_sz})
+
+	    echo -n " [${kb_downloaded_sz}KB]${download_pct}"
+	    ;;
+
+	${LOG_TAG_SSLMEDIATE})
+
+	    local ssl_exceptions_compiled=${RUN_DIR}/${SSLMEDIATE_EXCEPTIONS_FILENAME}
+	    if test -f ${ssl_exceptions_compiled}.total -a ${ssl_exceptions_compiled}.cursor ; then
+		local total=$(cat ${ssl_exceptions_compiled}.total 2> /dev/null)
+		if test ${total} == 0 ; then
+		    cursor_pct=100
+		else
+		    local cursor_pct
+		    local cursor=$(cat ${ssl_exceptions_compiled}.cursor 2> /dev/null)
+		    if test -n "${cursor}" ; then
+			cursor_pct=$[${cursor} * 100 / ${total}]
+			cursor_pct="${cursor_pct}%"
+		    else
+			cursor_pct='??'
+		    fi
+		fi
+		echo -n " (${cursor_pct})"
+	    else
+		echo -n " (0%)"
+	    fi
+	    ;;
+
+	*)
+	    echo -n
+    esac
+}
+
+get-os-cur-version()
+{
+    local os_version=$(cat ${HARD_DIR}/os-version 2> /dev/null)
+    echo ${os_version}
+}
+
+get-os-new-version()
+{
+    local os_file=${RUN_DIR}/new-os-version
+    test -s ${os_file} || return 11
+
+    local os_version=$(cat ${os_file} 2> /dev/null)
+    echo ${os_version}
+}
+
+get-system-soft()
+{
+    local os_version=${1}
+
+    local os_name=$(cat ${HARD_DIR}/os-name)
+    test -n "${os_version}" || os_version=$(get-os-cur-version)
+
+    echo -n "${os_name}-${os_version}"
+}
+
+get-from-xml-file()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    local file=${1}
+    local key=${2}
+
+    test -s ${file} || return 11
+
+    local key_xml=$(cat ${file} | grep "<${key}>" 2> /dev/null)
+
+    local value=${key_xml/<${key}>}
+    value=${value/<\/${key}>}
+
+    test -n "${value}" || return 13
+
+    echo -n "${value}"
+    return 0
+}
+
+get-version-from-xml-file()
+{
+    test -n "${1}" || return 1
+    local file=${1}
+
+    local value ret key="version"
+    value=$(get-from-xml-file ${file} ${key}) ; ret=${?}
+    test ${ret} -eq 0 || return ${ret}
+
+    [[ "${value}" =~ ^[0-9]{0,2}[.][0-9]{0,2}[.][0-9]{0,2}$ ]] || return 21
+
+    echo -n "${value}"
+
+    return 0
+}
+
+get-os-latest-version()
+{
+    local version ret
+    local tmp_file=${TMP_DIR}/latest-version.xml.${$}
+
+    curl \
+	--disable --fail -4 --silent \
+	--connect-timeout 7 --max-time 10 \
+	--cacert ${SSL_VAR_DIR}/ca-bundle.crt \
+	--capath ${RUNTIME_ENV_DIR}/${SSL_LOCAL_CA_RDIR} \
+	--location --url ${LATEST_VERSION_URL} > ${tmp_file} 2> /dev/null
+
+    ret=${?}
+
+    if test ${ret} -ne 0 ; then
+	rm -f ${tmp_file}
+	return ${ret}
+    fi
+
+    version=$(get-version-from-xml-file ${tmp_file}) ; ret=${?}
+    rm -f ${tmp_file}
+    echo -n "${version}"
+    return ${ret}
+}
+
+get-patch-version()
+{
+    test -n "${1}" || return 1
+    local version=${1}
+
+    local version ret
+    local tmp_file=${TMP_DIR}/patch-version.xml.${$}
+
+    curl \
+	--disable --fail -4 --insecure --silent \
+	--connect-timeout 7 --max-time 10 \
+	--cacert ${SSL_VAR_DIR}/ca-bundle.crt \
+	--capath ${RUNTIME_ENV_DIR}/${SSL_LOCAL_CA_RDIR} \
+	--url ${PATCH_VERSION_URL}?version=${version} > ${tmp_file} 2> /dev/null
+
+    version=$(get-version-from-xml-file ${tmp_file}) ; ret=${?}
+    rm -f ${tmp_file}
+    echo -n "${version}"
+    return ${ret}
+}
+
+get-system-soft-check-message()
+{
+    test -n "${1}" || return 1
+    local new_os_version=${1}
+
+    local os=$(get-system-soft)
+    local new_os=$(get-system-soft ${new_os_version})
+
+    if test "${new_os}" == "${os}" ; then
+	echo -n "OS Up-to-Date"
+    else
+	echo -n "New ${new_os}"
+    fi
+}
+
+get-machine-type()
+{
+    local machine
+
+    if test -s ${HARD_DIR}/hw-apl ; then
+	local machine=$(cat ${HARD_DIR}/hw-apl 2> /dev/null)
+    else
+	local machine='OS'
+    fi
+
+    echo ${machine}
+}
+
+get-gateway-system-hard()
+{
+    local format=${1}
+
+    local model_name=$(get-machine-type)
+    local persistent_cache=$(binary-form ${PERSISTENT_CACHE})
+    local persistent_web_log=$(binary-form ${PERSISTENT_WEB_LOG})
+    local persistent_rweb_log=$(binary-form ${PERSISTENT_RWEB_LOG})
+    local web_cache_sz=$[${RWEB_CACHE_SZ} / ${RWEB_NB}]
+    local max_upload_file_sz=$[${MAX_UPLOAD_FILE_SZ} / 1024]
+
+    case "${format}" in
+	long)
+	    echo "${model_name}-US${USERS_NB}-GR${URLLIST_RECORDS_NB}-RU${RUSERS_NB}-RW${RWEB_NB}-CR${web_cache_sz}-LR${LOGROTATE_NB}-UL${max_upload_file_sz}-PC${persistent_cache}-WL${persistent_web_log}-RL${persistent_rweb_log}"
+	    ;;
+	raw)
+	    echo "${model_name} ${USERS_NB} ${URLLIST_RECORDS_NB} ${RUSERS_NB} ${RWEB_NB} ${web_cache_sz} ${LOGROTATE_NB} ${max_upload_file_sz} ${persistent_cache} ${persistent_web_log} ${persistent_rweb_log}"
+	    ;;
+	*)
+	    echo "${model_name}US${USERS_NB}GR${URLLIST_RECORDS_NB}RU${RUSERS_NB}RW${RWEB_NB}CR${web_cache_sz}LR${LOGROTATE_NB}UL${max_upload_file_sz}PC${persistent_cache}WL${persistent_web_log}RL${persistent_rweb_log}"
+    esac
+}
+
+get-manager-context-rdir()
+{
+    test -n "${1}" || return 1
+    local context=${1}
+
+    local dir
+
+    case ${context} in
+	template)
+	    dir=${MANAGER_TEMPLATE_RDIR}
+	    ;;
+	gateway)
+	    dir=${MANAGER_GATEWAY_RDIR}
+	    ;;
+	*)
+	    return 255
+	    ;;
+    esac
+
+    echo ${dir}
+}
+
+get-manager-context-tmp-dir()
+{
+    test -n "${1}" || return 1
+    local context=${1}
+
+    local dir
+
+    case ${context} in
+	template)
+	    dir=${TMP_TEMPLATE_DIR}
+	    ;;
+	gateway)
+	    dir=${TMP_GATEWAY_DIR}
+	    ;;
+	*)
+	    return 255
+	    ;;
+    esac
+
+    echo ${dir}
+}
+
+local-log-reset()
+{
+    test -n "${1}" || return 1
+    local log_file=${1}
+
+    echo -ne > ${log_file}
+}
+
+reset-manager-template-exec-report()
+{
+    rm -f \
+       ${MANAGER_TEMPLATE_EXEC_OPERATION_LOG} \
+       ${MANAGER_TEMPLATE_EXEC_OPERATION_LOG}.*
+}
+
+reset-manager-gateway-pull-report()
+{
+    local-log-reset ${MANAGER_PULL_OPERATION_LOG}
+    rm -f ${MANAGER_PULL_OPERATION_LOG}.*
+}
+
+reset-manager-gateway-push-report()
+{
+    local-log-reset ${MANAGER_PUSH_OPERATION_LOG}
+    rm -f ${MANAGER_PUSH_OPERATION_LOG}.*
+}
+
+reset-manager-gateway-local-exec-report()
+{
+    rm -f \
+       ${MANAGER_LOCAL_EXEC_OPERATION_LOG} \
+       ${MANAGER_LOCAL_EXEC_OPERATION_LOG}.*
+}
+
+reset-manager-gateway-remote-exec-report()
+{
+    rm -f \
+       ${MANAGER_REMOTE_EXEC_OPERATION_LOG} \
+       ${MANAGER_REMOTE_EXEC_OPERATION_LOG}.*
+}
+
+raz-manager-context()
+{
+    test -n "${1}" || return 1
+    local context=${1}
+
+    local rdir=$(get-manager-context-rdir ${context})
+    local tmp_dir=$(get-manager-context-tmp-dir ${context})
+
+    rm -rf ${ROOT_DIR}${rdir}/*
+    rm -rf ${tmp_dir}/*
+
+    case ${context} in
+	template)
+	    reset-manager-template-exec-report
+	    ;;
+	gateway)
+	    reset-manager-gateway-pull-report
+	    reset-manager-gateway-push-report
+	    reset-manager-gateway-local-exec-report
+	    reset-manager-gateway-remote-exec-report
+
+	    rm -f ${URLLIST_VAR_DIR}/*.${MPUSHED_STATUS}
+	    rm -f ${AV_VAR_DIR}/*.${MPUSHED_STATUS}
+	    ;;
+	*)
+	    ;;
+    esac
+}
+
+get-manager-system-hard()
+{
+    local format=${1}
+
+    local model_name=$(get-machine-type)
+
+    case "${format}" in
+	long)
+	    echo "${model_name}-GW${MANAGER_GATEWAY_NB}-TL${MANAGER_TEMPLATE_NB}-US${MANAGER_TOTAL_USERS_NB}-RW${MANAGER_TOTAL_RWEB_NB}-GR${URLLIST_RECORDS_NB}"
+	    ;;
+	raw)
+	    echo "${model_name} ${MANAGER_GATEWAY_NB} ${MANAGER_TEMPLATE_NB} ${MANAGER_TOTAL_USERS_NB} ${MANAGER_TOTAL_RWEB_NB} ${URLLIST_RECORDS_NB}"
+	    ;;
+	*)
+	    echo "${model_name}GW${MANAGER_GATEWAY_NB}TL${MANAGER_TEMPLATE_NB}US${MANAGER_TOTAL_USERS_NB}RW${MANAGER_TOTAL_RWEB_NB}GR${URLLIST_RECORDS_NB}"
+	    ;;
+    esac
+}
+
+get-system-hard()
+{
+    case ${APL_ROLE} in
+	gateway)
+	    get-gateway-system-hard ${1}
+	    ;;
+	manager)
+	    if is-in-manager-conf-context ; then
+		local context_reference=$(get-manager-context-reference)
+		local context=${context_reference/ *}
+		case ${context} in
+		    gateway)
+			get-gateway-system-hard ${1}
+			;;
+		    template)
+			get-manager-system-hard ${1}
+			;;
+		    *)
+			return 255
+			;;
+		esac
+	    else
+		get-manager-system-hard ${1}
+	    fi
+	    ;;
+	*)
+	    ;;
+    esac
+}
+
+get-system-uuid()
+{
+    local uuid=$(cat ${HARD_DIR}/apl-uuid 2> /dev/null)
+
+    echo "${uuid}"
+}
+
+get-installed-memory-sz()
+{
+    local ram=$(cat ${HARD_DIR}/hw-ram 2> /dev/null)
+
+    echo "${ram}"
+}
+
+single-rweb-host()
+{
+    test -n "${1}" || return 0
+    local list=${1}
+
+    local i=0 elt range
+    local name hosts
+
+    for elt in ${list}
+    do
+	range=$[${i} % 2]
+	case ${range} in
+	    0)
+		name=${elt}
+		;;
+	    1)
+		hosts=$(colon2space ${elt})
+		mono-elt ${hosts} || return 1
+		;;
+	    *)
+		return 255
+		;;
+	esac
+	((i++))
+    done
+
+    return 0
+}
+
+is-rweb-http-redirected-to-https()
+{
+    test -n "${1}" || return 1
+    local in_name=${1}
+
+    ! member "${RWEB_SITE_HTTPX_LIST}" ${in_name}
+}
+
+is-basic-rweb-balancer()
+{
+    test -n "${1}" || return 0
+    local list=${1}
+
+    local i=0 elt range
+    local algorithm sticky
+
+    for elt in ${list}
+    do
+	range=$[${i} % 5]
+	case ${range} in
+	    0)
+		;;
+	    1)
+		algorithm=${elt}
+		;;
+	    2)
+		sticky=${elt}
+		;;
+	    3)
+		;;
+	    4)
+		test ${algorithm} == robin || return 11
+		test ${sticky} == nosticky || return 13
+		;;
+	    *)
+		return 1
+		;;
+	esac
+	((i++))
+    done
+
+    return 0
+}
+
+set-new-proxy2-mode()
+{
+    export PROXY2_MODE=False
+
+    test ${RWEB_MODE} == True || return 0
+
+    if test "${WAF_MODE}" == True ; then
+	PROXY2_MODE=True
+	return 0
+    fi
+
+    local in_context=${1}
+
+    local rweb_site_hosts_list
+    local rweb_site_balancer_list
+
+    case ${in_context} in
+	configurator)
+	    rweb_site_hosts_list=${_RWEB_SITE_HOSTS_LIST}
+	    rweb_site_balancer_list=${_RWEB_SITE_BALANCER_LIST}
+	    ;;
+	*)
+	    rweb_site_hosts_list=${RWEB_SITE_HOSTS_LIST}
+	    rweb_site_balancer_list=${RWEB_SITE_BALANCER_LIST}
+	    ;;
+    esac
+
+    ! single-rweb-host "${rweb_site_hosts_list}" || return 0
+    is-basic-rweb-balancer "${rweb_site_balancer_list}" || PROXY2_MODE=True
+}
+
+set-new-self-ns()
+{
+    member "${NAME_SERVER_LIST}" "127.0.0.1"
+
+    if test ${?} -eq 0 -o "${DNS_MODE}" == True ; then
+	export SELF_NS=True
+    else
+	export SELF_NS=False
+    fi
+}
+
+get-cache-reference-mean-object-sz()
+{
+    local mean_object_sz ret
+
+    if test -s ${RUN_DIR}/${MEAN_OBJECT_SZ_FILENAME} ; then
+	mean_object_sz=$(cat ${RUN_DIR}/${MEAN_OBJECT_SZ_FILENAME} 2> /dev/null)
+	if check-digit ${mean_object_sz} ; then
+	    ret=0
+	else
+	    ((mean_object_sz = DEFAULT_STORE_AVERAGE_OBJECT_SZ))
+	    ret=1
+	fi
+    else
+	mean_object_sz=${DEFAULT_STORE_AVERAGE_OBJECT_SZ}
+	ret=3
+    fi
+
+    echo -n ${mean_object_sz}
+    return ${ret}
+}
+
+get-free-memory-sz()
+{
+    test -n "${1}" || return 1
+    local total_memory_sz=${1}
+
+    local cache_mode
+    local free_memory_sz=$[${total_memory_sz} - ${MIN_OS_MEMORY_SIZE}]
+
+    if test ${PERSISTENT_CACHE} == True -o ${CACHE_MODE} == True ; then
+	cache_mode=True
+    else
+	cache_mode=False
+    fi
+
+    test ${cache_mode} == False || free_memory_sz=$[${free_memory_sz} - ${CACHE_IO_MEMORY_SZ}]
+    test ${SSLMEDIATE_MODE} == False || free_memory_sz=$[${free_memory_sz} - ${SQUID_SSL_MEDIATE_MEMORY_SZ}]
+    test ${SELF_NS} == False || free_memory_sz=$[${free_memory_sz} - ${NAMED_MEMORY_SZ}]
+    test ${GUARD_MODE} == False || free_memory_sz=$[${free_memory_sz} - ${GUARD_MEMORY_SZ} - ${HTTPD_GUARD_MEMORY_SZ}]
+    test ${DHCP_MODE} == False || free_memory_sz=$[${free_memory_sz} - ${DHCPD_MEMORY_SZ}]
+    test ${AV_MODE} == False || free_memory_sz=$[${free_memory_sz} - ${CLAMAV_MEMORY_SZ}]
+    test ${OCSP_MODE} == False || free_memory_sz=$[${free_memory_sz} - ${OCSPD_MEMORY_SZ}]
+    test ${ADMIN_SNMP} == False || free_memory_sz=$[${free_memory_sz} - ${SNMPD_MEMORY_SZ}]
+
+    if test ${PROXY2_MODE} == True ; then
+	free_memory_sz=$[${free_memory_sz} - ${HTTPD_PROXY_MEMORY_SZ}]
+	test ${cache_mode} == False || free_memory_sz=$[${free_memory_sz} - ${CACHE_CLEAN_MEMORY_SZ}]
+    fi
+
+    local proxy
+
+    if test ${WEB_MODE} == True -o ${TRANSPARENT_MODE} == True ; then
+	proxy=yes
+    elif test ${RWEB_MODE} == True -a ${PROXY2_MODE} == False ; then
+	proxy=yes
+    fi
+
+    test -z "${proxy}" || free_memory_sz=$[${free_memory_sz} - ${PROXY_MEMORY_SZ}]
+
+    if test ${cache_mode} == True ; then
+	local store_average_object_sz=$(get-cache-reference-mean-object-sz) max_objects_in_cache
+
+	((max_objects_in_cache = PROXY_CACHE_SZ * 1024 / store_average_object_sz))
+	((cache_index_memory_sz = max_objects_in_cache * CACHE_INDEX_OBJECT_MEMORY_SZ / 1024 / 1024))
+
+	if test ${cache_index_memory_sz} -le ${free_memory_sz} ; then
+	    ((free_memory_sz -= cache_index_memory_sz))
+	else
+	    ((free_memory_sz = 0))
+	fi
+    fi
+
+    echo ${free_memory_sz}
+}
+
+get-registration-otp-url()
+{
+    local eth0 mac0 info0
+    local ip url ret
+    local resolve
+
+    read eth0 mac0 info0 < ${HARD_DIR}/hw-links
+    mac0=${mac0//:}
+
+    resolve=$(dig ${APPLIANCE_WEBSITE} +noall +short +timeout=1 +tries=1 2> /dev/null 2>&1)
+    ret=${?}
+
+    if test ${ret} -eq 0 ; then
+	ip=$(get-my-public-ip 5 10)
+	ret=${?}
+	test -n "${ip}" || ip='0.0.0.0'
+    else
+	ip='0.0.0.0'
+    fi
+
+    url="${REGISTER_URL}?mac0=${mac0}&ip=${ip}&mode=new"
+    echo ${url}
+    return ${ret}
+}
+
+get-subscription-url()
+{
+    local ip url ret
+
+    ip=$(get-my-public-ip 5 10)
+    ret=${?}
+    test -n "${ip}" || ip="0.0.0.0"
+
+    local version=$(get-os-cur-version)
+    local sn=$(get-system-sn)
+    local level=$(get-usage-level)
+    local role=$(get-role-code)
+    local email=${ADMINISTRATOR_EMAIL}
+
+    url="${SUBSCRIBE_URL}?version=${version}&sn=${sn}&level=${level}&role=${role}&ip=${ip}&email=${email}"
+    echo ${url}
+    return ${ret}
+}
+
+get-embedded-internal-name()
+{
+    test -n "${1}" || return 1
+    local embedded=${1}
+
+    case ${embedded} in
+	${EMBEDDED_VPNSUBSCR_CLI_NAME})
+	    embedded=${EMBEDDED_VPNSUBSCR_NAME}
+	    ;;
+	*)
+	    ;;
+    esac
+
+    echo ${embedded}
+}
+
+
+get-embedded-internal-code()
+{
+    local code
+
+    case ${1} in
+	vpnsubscr)
+	    code=${EMBEDDED_VPNSUBSCR_APP_CODE}
+	    ;;
+	*)
+	    code=${EMBEDDED_UNKNOWN_APP_CODE}
+	    ;;
+    esac
+
+    echo ${code}
+}
+
+get-purchase-embedded-url()
+{
+    test -n "${1}" || return 1
+    local embedded=${1}
+
+    local sn=$(get-system-sn)
+
+    local url="${SUBSCRIBE_URL}?sn=${sn}&pcode=${embedded}"
+    echo ${url}
+}
+
+get-system-machine()
+{
+    local hw_manufacturer=$(cat ${HARD_DIR}/hw-manufacturer-name)
+    local hw_product=$(cat ${HARD_DIR}/hw-product-name)
+
+    if test -z "${hw_manufacturer}" -a -z "${hw_product}" ; then
+	echo -n "Unknown"
+    else
+	echo -n "${hw_manufacturer} ${hw_product}"
+    fi
+}
+
+get-system-cpu()
+{
+    local cpu=$(cat ${HARD_DIR}/hw-cpu)
+
+    echo -n "${cpu}"
+}
+
+get-system-memory()
+{
+    local ram=$(cat /proc/meminfo | grep MemTotal:)
+    ram=${ram/MemTotal:/}
+    ram=$(echo ${ram})
+    ram=${ram/ kB/}
+    ((ram /= 1024))
+
+    echo -n "${ram}"
+}
+
+get-system-disk()
+{
+    local hdd=$(cat ${HARD_DIR}/hw-drive)
+
+    echo -n "${hdd}"
+}
+
+get-static-system-raid-from-file()
+{
+    test -n "${1}" || return 1
+    local file=${1}
+    test -s ${file} || return 11
+
+    local hdd level size info
+    local key value
+
+    while read key value
+    do
+	case ${key} in
+	    Raid_HDD)
+		hdd="${hdd},${value}"
+		;;
+	    Raid_Level)
+		level=${value}
+		;;
+	    Array_Size)
+		size=${value}
+		;;
+	    *)
+		;;
+	esac
+    done < ${file}
+
+    hdd=${hdd:1}
+    info="${level} ${size}: ${hdd}"
+
+    echo ${info}
+
+}
+
+get-runtime-system-raid()
+{
+    if test ! -s ${RUN_DIR}/${RAID_HEALTH_FILENAME} ; then
+	echo 'none'
+	return 0
+    fi
+
+    get-static-system-raid-from-file ${RUN_DIR}/${RAID_HEALTH_FILENAME}
+}
+
+get-static-system-raid()
+{
+    if test -s ${HARD_DIR}/hw-raid ; then
+	get-static-system-raid-from-file ${HARD_DIR}/hw-raid
+    else
+	echo 'none'
+    fi
+}
+
+get-system-raid()
+{
+    case ${APL_ROLE} in
+	gateway)
+	    get-runtime-system-raid
+	    ;;
+	manager)
+	    if is-in-manager-conf-context ; then
+		get-static-system-raid
+	    else
+		get-runtime-system-raid
+	    fi
+	    ;;
+	*)
+	    ;;
+    esac
+}
+
+get-file-modification-date()
+{
+    if test -z "${1}" ; then
+	echo None
+	return 1
+    fi
+
+    local file=${1}
+
+    if test -f "${file}" ; then
+	date=$(ls -ldgo --time-style=long-iso "${file}")
+	date=${date:13}
+	date=${date/ /+}
+	date=${date/*+}
+	date=${date//-/\/}
+	date=${date/ /-}
+	date=${date/ *}
+
+	echo ${date}
+	return 0
+    else
+	echo None
+	return 3
+    fi
+}
+
+get-tls-ca-file()
+{
+    test -n "${1}" || return 1
+    local name=${1}
+
+    if test -s ${TMP_DIR}/${LOADED}.${THIRD_CA}.${name} ; then
+	echo ${TMP_DIR}/${LOADED}.${THIRD_CA}.${name}
+    else
+	echo ${SSL_LOCAL_CA_DIR}/${name}.certificate
+    fi
+}
+
+tls-ca-object-exist()
+{
+    test -n "${1}" || return 1
+    local in_tls=${1}
+
+    local elt i=0 range
+    local tls browsing
+
+    for elt in ${TLS_CA_LIST}
+    do
+	range=$[${i} % 2]
+	case ${range} in
+	    0)
+		tls=${elt}
+		;;
+	    1)
+		browsing=${elt}
+		if test ${tls} == ${in_tls} ; then
+		    echo ${browsing}
+		    return 0
+		fi
+		;;
+	    *)
+		return 255
+		;;
+	esac
+	((i++))
+    done
+
+    return 11
+}
+
+get-tls-server-component-file()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    local name=${1}
+    local component=${2}
+
+    case ${component} in
+	conf)
+	    if test -s ${TMP_DIR}/${TLS_SERVER}.${name}.conf ; then
+		echo ${TMP_DIR}/${TLS_SERVER}.${name}.conf
+	    else
+		echo ${SSL_SERVER_DIR}/${name}.${component}
+	    fi
+	    ;;
+	*)
+	    if test -s ${TMP_DIR}/${LOADED}.${TLS_SERVER}.${component}.${name} ; then
+		echo ${TMP_DIR}/${LOADED}.${TLS_SERVER}.${component}.${name}
+	    else
+		echo ${SSL_SERVER_DIR}/${name}.${component}
+	    fi
+	    ;;
+    esac
+}
+
+get-tls-client-component-file()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    local name=${1}
+    local component=${2}
+
+    if test -s ${TMP_DIR}/${LOADED}.${TLS_CLIENT}.${component}.${name} ; then
+	echo ${TMP_DIR}/${LOADED}.${TLS_CLIENT}.${component}.${name}
+    else
+	echo ${SSL_CLIENT_DIR}/${name}.cur/${name}.${component}
+    fi
+}
+
+get-tls-ca-system-component-file()
+{
+    test -n "${1}" || return 1
+    local component=${1}
+
+    case ${component} in
+	conf)
+	    if test -s ${TMP_DIR}/${SYSTEM_CA}.conf ; then
+		echo ${TMP_DIR}/${SYSTEM_CA}.conf
+	    else
+		echo ${SSL_CA_DIR}/${SYSTEM_CA}.conf
+	    fi
+	    ;;
+	*)
+	    if test -s ${TMP_DIR}/${LOADED}.${SYSTEM_CA}.${component} ; then
+		echo ${TMP_DIR}/${LOADED}.${SYSTEM_CA}.${component}
+	    else
+		echo ${SSL_CA_DIR}/${SYSTEM_CA}.${component}
+	    fi
+	    ;;
+    esac
+}
+
+tls-tmp-csr-exist()
+{
+    test -n "${1}" || return 1
+    local name=${1}
+
+    test -s ${TMP_DIR}/${LOADED}.${TLS_SERVER}.csr.${name}
+}
+
+tls-tmp-cert-exist()
+{
+    test -n "${1}" || return 1
+    local name=${1}
+
+    test -s ${TMP_DIR}/${LOADED}.${TLS_SERVER}.certificate.${name}
+}
+
+tls-cert-exist()
+{
+    test -n "${1}" || return 1
+    local name=${1}
+
+    test -s ${SSL_SERVER_DIR}/${name}.certificate
+}
+
+tls-tmp-conf-exist()
+{
+    test -n "${1}" || return 1
+    local name=${1}
+
+    test -s ${TMP_DIR}/${TLS_SERVER}.${name}.conf
+}
+
+tls-get-names-from-tmp-conf()
+{
+    test -n "${1}" || return 1
+    local id=${1}
+
+    tls-tmp-conf-exist ${id} || return 11
+
+    while read key value
+    do
+	test -n "${value}" || continue
+	test ${key} == commonName || continue
+	echo ${value}
+	break
+    done < ${TMP_DIR}/${TLS_SERVER}.${id}.conf
+}
+
+gen-default-cert-conf()
+{
+    test -n "${1}" || return 1
+    local tls_id=${1}
+
+    name="${tls_id,,}"
+    test "${name}" != "${name//.}" || name=${name}.${DOMAIN_NAME}
+
+    gen-cert-conf ${name} > ${TMP_DIR}/${TLS_SERVER}.${tls_id}.conf
+}
+
+auto-gen-missing-tls()
+{
+    local tls
+
+    for tls in ${TLS_SERVER_LIST}
+    do
+	! tls-tmp-csr-exist ${tls} || continue
+	! tls-tmp-cert-exist ${tls} || continue
+	! tls-cert-exist ${tls} || continue
+	! tls-tmp-conf-exist ${tls} || continue
+
+	gen-default-cert-conf ${tls}
+    done
+}
+
+check-tls-cert-2sign()
+{
+    test -n "${1}" || return 1
+    local tls_id=${1}
+
+    test -f ${TMP_DIR}/${TLS_SERVER}.${tls_id}.2sign
+}
+
+check-tls-cert-use-ocsp()
+{
+    test -n "${1}" || return 1
+    local tls_id=${1}
+
+    if test -f ${TMP_DIR}/${TLS_SERVER}.${tls_id}.2sign ; then
+	local ocsp=$(cat ${TMP_DIR}/${TLS_SERVER}.${tls_id}.2sign 2> /dev/null)
+	test "${ocsp}" == 'ocsp'
+    else
+	local cert_file=$(get-tls-server-component-file ${tls_id} certificate)
+	local ocsp_uri=$(get-tls-ocsp-uri ${cert_file})
+	test -n "${ocsp_uri}"
+    fi
+}
+
+check-tls-cert-2gen()
+{
+    test -n "${1}" || return 1
+    local tls_id=${1}
+
+    test -f ${TMP_DIR}/${TLS_SERVER}.${tls_id}.conf
+}
+
+waf-rules-modified()
+{
+    local base rule rules 
+    
+    rules=$(ls ${WAF_DIR}/*.rules 2> /dev/null)
+    for rule in ${rules}
+    do
+	if test -f ${rule}.current ; then
+	    diff --brief ${rule} ${rule}.current > /dev/null 2>&1 || return 0
+	else
+	    return 0
+	fi
+    done
+
+    rules=$(ls ${WAF_DIR}/*.rules.current 2> /dev/null)
+    for rule in ${rules}
+    do
+	base=$(file-basename ${rule} .rules.current)
+	test -f ${WAF_DIR}/${base}.rules || return 0
+    done
+
+    return 11
+}
+
+get-system-end()
+{
+    test -n "${1}" || return 1
+    local role=${1}
+
+    local hard_dir gateway_nb
+
+    case ${role} in
+	gateway)
+	    hard_dir=${HARD_DIR}
+	    ;;
+	manager)
+	    local level=${2}
+
+	    if test -n "${level}" ; then
+		gateway_nb=$(get-variable-value-from-file /${HARD_DIR_NAME}/model.conf MANAGER_GATEWAY_NB)
+		hard_dir=/${HARD_DIR_NAME}
+	    else
+		hard_dir=${HARD_DIR}
+	    fi
+	    ;;
+	*)
+	    hard_dir=${HARD_DIR}
+	    ;;
+    esac
+
+    case ${CLOUD_NAME} in
+	aws|azure)
+	    case ${CLOUD_USAGE} in
+		free)
+		    echo "never 0"
+		    return 0
+		    ;;
+		payg)
+		    if test "${CLOUD_VALID_IP}" == yes ; then
+			echo "payg 0"
+			return 0
+		    else
+			echo "expired 0"
+			return 0
+		    fi
+		    ;;
+		byol)
+		    ;;
+		*)
+		    ;;
+	    esac
+	    ;;
+	*)
+	    ;;
+    esac
+
+    if ! is-licensed ${role} ${gateway_nb} ; then
+	echo "never 0"
+	return 0
+    fi
+
+    local state end_date
+    local max_renewal=$[5 * 3600]
+
+    if test ! -f ${hard_dir}/${INSTALL_DATE} -o ! -f ${hard_dir}/${VARIATION_DATE} ; then
+	state=error
+	end_date=$(date +"%Y/%m/%d-%T")
+	echo "${state} ${end_date}"
+	return 1
+    fi
+
+    local date_second=$(date +"%s" 2> /dev/null)
+    local vdate=$(cat ${hard_dir}/${VARIATION_DATE})
+    local end_second to_midnight_second max_renewal_second
+
+    if test -f ${hard_dir}/${RENEW_DAYS} -a -f ${hard_dir}/${SERIAL_DATE} ; then
+	
+	local renew_days=$(cat ${hard_dir}/${RENEW_DAYS})
+	local sdate=$(cat ${hard_dir}/${SERIAL_DATE})
+	
+	sdate=$[${sdate} + ${vdate}]
+	end_second=$[${sdate} + (${LICENSE_PERIOD} * ${renew_days})]
+	to_midnight_second=$[86400 - (${end_second} % 86400)]
+	max_renewal_second=$[${end_second} + ${to_midnight_second} + ${max_renewal}]
+
+	if test ${date_second} -le ${end_second} ; then
+	    state=active
+	elif test ${date_second} -lt ${max_renewal_second} ; then
+	    state=scheduled
+	else
+	    state=expired
+	fi
+    else
+	local idate=$(cat ${hard_dir}/${INSTALL_DATE})
+	idate=$[${idate} + ${vdate}]
+	end_second=$[${idate} + ${TRIAL_PERIOD}]
+
+	if test ${date_second} -le ${end_second} ; then
+	    state=trial
+	else
+	    state=expired
+	fi
+    fi
+    
+    local end_date=$(get-date-from-epoch-seconds ${end_second})
+    echo "${state} ${end_date}"
+    return 0
+}
+
+conf-tmp-files-present()
+{
+    local file
+
+    for file in ${TMP_CONF_FILES}
+    do
+	ls ${TMP_DIR}/${file} > /dev/null 2>&1
+	test ${?} -ne 0 || return 0
+    done
+
+    files=$(ls -1 ${TMP_DIR}/${LOADED}.${URLLIST}.*.*.{domains,urls,expressions}.gz 2>/dev/null)
+    test -z "${files}" || return 0
+
+    return 11
+}
+
+tls-client-modified()
+{
+    ls -1 ${SSL_CLIENT_DIR}/*.new > /dev/null 2>&1 || ls -1 ${SSL_CLIENT_DIR}/*.2del > /dev/null 2>&1
+}
+
+clock-modified()
+{
+    ls ${TMP_DIR}/${CLOCK_2SAVE} > /dev/null 2>&1
+}
+
+name-resolution-to-ip-armed()
+{
+    ls ${TMP_DIR}/${NAME_2RESOLVE} > /dev/null 2>&1
+}
+
+conf-urllist-autoupdate-modified()
+{
+    local new_auto_guards=$(ls -1 ${URLLIST_DIR}/*.${URLLIST_AUTO} 2> /dev/null)
+    test -n "${new_auto_guards}"
+}
+
+conf-not-resolved()
+{
+    test -f ${USERENV_DIR}/${ENV_NOT_RESOLVED_NAME}
+}
+
+userenv-conf-modified()
+{
+    test -f ${USERENV_FILE} || return 0
+    test -f ${USERENV_FILE_CANCEL} || return 0
+
+    ! diff --brief \
+	 ${USERENV_FILE} \
+	 ${USERENV_FILE_CANCEL} \
+	 > /dev/null 2>&1
+}
+
+configuration-db-modified()
+{
+    test -f ${CONFIGURATION_DB_FILE} || return 0
+    test -f ${CONFIGURATION_DB_FILE_CURRENT} || return 0
+
+    local new_values_file=${TMP_DIR}/configuration.data.new.${$}
+    local cur_values_file=${TMP_DIR}/configuration.data.cur.${$}
+
+    sqlite3 ${CONFIGURATION_DB_FILE} ".tables" > ${new_values_file}
+    sqlite3 ${CONFIGURATION_DB_FILE_CURRENT} ".tables" > ${cur_values_file}
+
+    sqlite3 ${CONFIGURATION_DB_FILE} "select * from waf_reputation_country;" >> ${new_values_file}
+    sqlite3 ${CONFIGURATION_DB_FILE_CURRENT} "select * from waf_reputation_country;" >> ${cur_values_file}
+
+    ! diff --brief \
+	 ${new_values_file} \
+	 ${cur_values_file} \
+	 > /dev/null 2>&1
+
+    local ret=${?}
+
+    rm -f \
+       ${new_values_file} \
+       ${cur_values_file}
+
+    return ${ret}
+}
+
+ssh-host-key-generation-armed()
+{
+    test -f ${TMP_DIR}/${SSH_HOST_ARM_NEW}
+}
+
+update-modification-state()
+{
+    if conf-modified ; then
+	echo yes > ${USERENV_DIR}/${MODIFICATION_STATE_FILENAME}
+    else
+	echo no > ${USERENV_DIR}/${MODIFICATION_STATE_FILENAME}
+    fi
+}
+
+quick-conf-modified()
+{
+    local context=${1}
+    local id=${2}
+
+    local userenv_dir
+
+    if test -n "${context}" -a -n "${id}" ; then
+	local context_dir=$(get-manager-context-rdir ${context})
+	local env_rdir=${context_dir}/${id}
+	userenv_dir=${HOME}/${env_rdir}/
+    else
+	userenv_dir=${USERENV_DIR}
+    fi
+
+    test -f ${userenv_dir}/${MODIFICATION_STATE_FILENAME} || return 11
+    local state
+    read state < ${userenv_dir}/${MODIFICATION_STATE_FILENAME}
+    test ${state} == 'yes'
+}
+
+get-vlan-tag()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    local in_flow=${1}
+    local in_state=${2}
+
+    case ${in_state} in
+	cur)
+	    local list="${CURRENT_VLAN_FLOW_LIST}"
+	    ;;
+	new)
+	    local list="${VLAN_FLOW_LIST}"
+	    ;;
+	*)
+	    return 3
+	    ;;
+    esac
+
+    local i=0 elt range
+    local vid flows_col flows_spc
+
+    for elt in ${list}
+    do
+	range=$[${i} % 2]
+	case ${range} in
+	    0)
+		vid=${elt}
+		;;
+	    1)
+		flows_col=${elt}
+		flows_spc=$(colon2space ${flows_col})
+
+		if member "${flows_spc}" "${in_flow}" ; then
+		    echo "${vid}"
+		    return 0
+		fi
+		;;
+	    *)
+		return 11
+		;;
+	esac
+	((i++))
+    done
+
+    return 13
+}
+
+get-vlan-ip-netmask()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    local in_vlan=${1}
+    local in_state=${2}
+
+    case ${in_state} in
+	cur)
+	    local list="${CURRENT_IP_VLAN_LIST}"
+	    ;;
+	new)
+	    local list="${IP_VLAN_LIST}"
+	    ;;
+	*)
+	    return 3
+	    ;;
+    esac
+
+    local elt i=0 rang
+    local vlan ip netmask
+
+    for elt in ${list}
+    do
+	rang=$[${i} % 3]
+	case ${rang} in
+	    0)
+		vlan=${elt}
+		;;
+	    1)
+		ip=${elt}
+		;;
+	    2)
+		netmask=${elt}
+		if test ${vlan} == ${in_vlan}
+		then
+		    echo "${ip} ${netmask}"
+		    return 0
+		fi
+		;;
+	    *)
+		return 11
+		;;
+	esac
+	((i++))
+    done
+    return 13
+}
+
+get-vlan-ip()
+{
+    test -z "${1}" && echo "0.0.0.0" && return 1
+    test -z "${2}" && echo "0.0.0.0" && return 1
+    local vlan=${1}
+    local state=${2}
+
+    local ip_netmask=$(get-vlan-ip-netmask ${vlan} ${state})
+    local ip=${ip_netmask/ *}
+    test -n "${ip}" && echo "${ip}" && return 0
+    echo ; return 1
+}
+
+get-vlan-netmask()
+{
+    test -z "${1}" && echo "0.0.0.0" && return 1
+    test -z "${2}" && echo "0.0.0.0" && return 1
+    local vlan=${1}
+    local state=${2}
+
+    local ip_netmask=$(get-vlan-ip-netmask ${vlan} ${state})
+    local netmask=${ip_netmask/* }
+    test -n "${netmask}" && echo "${netmask}" && return 0
+    echo ; return 1
+}
+
+get-vlan-mode()
+{
+    test -n "${1}" || return 1
+    local state=${1}
+
+    case ${state} in
+	cur)
+	    echo -n ${CURRENT_VLAN_MODE}
+	    ;;
+	new)
+	    echo -n ${VLAN_MODE}
+	    ;;
+	*)
+	    ;;
+    esac
+}
+
+get-internal-ip()
+{
+    test -n "${1}" || return 1
+    local state=${1}
+
+    case ${state} in
+	cur)
+	    echo -n ${CURRENT_IP_INTERNAL_IP}
+	    ;;
+	new)
+	    echo -n ${IP_INTERNAL_IP}
+	    ;;
+	*)
+	    ;;
+    esac
+}
+
+get-web-ip()
+{
+    test -n "${1}" || return 1
+    local state=${1}
+
+    local vlan_mode=$(get-vlan-mode ${state})
+
+    if test ${vlan_mode} == False ; then
+	local ip=$(get-internal-ip ${state})
+	echo -n "${ip}"
+	return 0
+    fi
+
+    local vlan=$(get-vlan-tag web ${state})
+    local ip=$(get-vlan-ip ${vlan} ${state})
+
+    echo -n "${ip}"
+}
+
+get-web-netmask()
+{
+    test -n "${1}" || return 1
+    local state=${1}
+
+    local vlan=$(get-vlan-tag web ${state})
+    local netmask=$(get-vlan-netmask ${vlan} ${state})
+    echo -n "${netmask}"
+}
+
+get-rweb-ip()
+{
+    test -n "${1}" || return 1
+    local state=${1}
+
+    local vlan=$(get-vlan-tag rweb ${state})
+    local ip=$(get-vlan-ip ${vlan} ${state})
+    echo -n "${ip}"
+}
+
+get-rweb-netmask()
+{
+    test -n "${1}" || return 1
+    local state=${1}
+
+    local vlan=$(get-vlan-tag rweb ${state})
+    local netmask=$(get-vlan-netmask ${vlan} ${state})
+    echo -n "${netmask}"
+}
+
+get-peer-ip()
+{
+    test -n "${1}" || return 1
+    local state=${1}
+
+    local vlan=$(get-vlan-tag peer ${state})
+    local ip=$(get-vlan-ip ${vlan} ${state})
+    echo -n "${ip}"
+}
+
+get-peer-netmask()
+{
+    test -n "${1}" || return 1
+    local state=${1}
+
+    local vlan=$(get-vlan-tag peer ${state})
+    local netmask=$(get-vlan-netmask ${vlan} ${state})
+    echo -n "${netmask}"
+}
+
+get-admin-ip()
+{
+    test -n "${1}" || return 1
+    local state=${1}
+
+    local vlan=$(get-vlan-tag admin ${state})
+    local ip=$(get-vlan-ip ${vlan} ${state})
+    echo -n "${ip}"
+}
+
+get-admin-netmask()
+{
+    test -n "${1}" || return 1
+    local state=${1}
+
+    local vlan=$(get-vlan-tag admin ${state})
+    local netmask=$(get-vlan-netmask ${vlan} ${state})
+    echo -n "${netmask}"
+}
+
+get-file-ip()
+{
+    test -n "${1}" || return 1
+    local state=${1}
+
+    local vlan=$(get-vlan-tag file ${state})
+    local ip=$(get-vlan-ip ${vlan} ${state})
+    echo -n "${ip}"
+}
+
+get-file-netmask()
+{
+    test -n "${1}" || return 1
+    local state=${1}
+
+    local vlan=$(get-vlan-tag file ${state})
+    local netmask=$(get-vlan-netmask ${vlan} ${state})
+    echo -n "${netmask}"
+}
+
+get-mon-ip()
+{
+    test -n "${1}" || return 1
+    local state=${1}
+
+    local vlan=$(get-vlan-tag mon ${state})
+    local ip=$(get-vlan-ip ${vlan} ${state})
+    echo -n "${ip}"
+}
+
+get-mon-netmask()
+{
+    test -n "${1}" || return 1
+    local state=${1}
+
+    local vlan=$(get-vlan-tag mon ${state})
+    local netmask=$(get-vlan-netmask ${vlan} ${state})
+    echo -n "${netmask}"
+}
+
+get-multi-gateways-route-list()
+{
+    test -n "${1}" || return 0
+    local routes=${1}
+
+    local ip mk gw wt pg
+    local i=0 elt range
+    local result
+
+    local uniq_ip_mk_list
+    local ip_mk
+    local gw_wt_pg_list
+
+    for elt in ${routes}
+    do
+	range=$[${i} % 5]
+	case ${range} in
+	    0)
+		ip=${elt}
+		;;
+	    1)
+		mk=${elt}
+		;;
+	    2)
+		gw=${elt}
+		;;
+	    3)
+		;;
+	    4)
+		member "${uniq_ip_mk_list}" ${ip}_${mk} || uniq_ip_mk_list="${uniq_ip_mk_list} ${ip}_${mk}"
+		;;
+	    *)
+		return 1
+		;;
+	esac
+	((i++))
+    done
+    uniq_ip_mk_list="${uniq_ip_mk_list:1}"
+
+    i=0
+    for ip_mk in ${uniq_ip_mk_list}
+    do
+	unset gw_wt_pg_list
+	for elt in ${routes}
+	do
+	    range=$[${i} % 5]
+	    case ${range} in
+		0)
+		    ip=${elt}
+		    ;;
+		1)
+		    mk=${elt}
+		    ;;
+		2)
+		    gw=${elt}
+		    ;;
+		3)
+		    wt=${elt}
+		    ;;
+		4)
+		    pg=${elt}
+		    test ${ip}_${mk} != ${ip_mk} || gw_wt_pg_list="${gw_wt_pg_list} ${gw}/${wt}/${pg}"
+		    ;;
+		*)
+		    return 1
+		    ;;
+	    esac
+	    ((i++))
+	done
+	gw_wt_pg_list="${gw_wt_pg_list:1}"
+	gw_wt_pg_list="${gw_wt_pg_list// /:}"
+	ip=${ip_mk/_*}
+	mk=${ip_mk/*_}
+	result="${result} ${ip} ${mk} ${gw_wt_pg_list}"
+    done
+
+    echo ${result:1}
+}
+
+get-site-balancer()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    local in_name=${1}
+    local in_state=${2}
+    local in_context=${3}
+
+    local list
+
+    case ${in_state} in
+	cur)
+	    list="${CURRENT_RWEB_SITE_BALANCER_LIST}"
+	    ;;
+	new)
+	    case ${in_context} in
+		configurator)
+		    list="${_RWEB_SITE_BALANCER_LIST}"
+		    ;;
+		*)
+		    list="${RWEB_SITE_BALANCER_LIST}"
+		    ;;
+	    esac
+	    ;;
+	*)
+	    return 1
+	    ;;
+    esac
+
+    local i=0 elt range
+    local name algorithm sticky mode cookie
+
+    for elt in ${list}
+    do
+	range=$[${i} % 5]
+	case ${range} in
+	    0)
+		name=${elt}
+		;;
+	    1)
+		algorithm=${elt}
+		;;
+	    2)
+		sticky=${elt}
+		;;
+	    3)
+		mode=${elt}
+		;;
+	    4)
+		cookie=${elt}
+		if test ${name} == ${in_name} ; then
+		    echo "${algorithm} ${sticky} ${mode} ${cookie}" 
+		    return 0
+		fi
+		;;
+	    *)
+		return 11
+		;;
+	esac
+	((i++))
+    done
+
+    return 0
+}
+
+get-site-hosts()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    local sites=${1}
+    local in_name=${2}
+
+    local i=0 elt range
+    local name hosts
+
+    for elt in ${sites}
+    do
+	range=$[${i} % 2]
+	case ${range} in
+	    0)
+		name=${elt}
+		;;
+	    1)
+		hosts=${elt}
+		if test ${name} == ${in_name} ; then
+		    echo $(colon2space ${hosts})
+		    return 0
+		fi
+		;;
+	    *)
+		return 1
+		;;
+	esac
+	((i++))
+    done
+    
+    return 1
+}
+
+get-rweb-standby-url()
+{
+    test -n "${1}" || return 1
+    local in_name=${1}
+    local list=${2}
+
+    local range i=0 elt
+    local name protocol url
+
+    for elt in ${list}
+    do
+	range=$[${i} % 3]
+	case ${range} in
+	    0)
+		name=${elt}
+		;;
+	    1)
+		protocol=${elt}
+		;;
+	    2)
+		url=${elt}
+		if test ${name} == ${in_name} ; then
+		    if test ${protocol} == none ; then
+			echo self
+		    else
+			echo ${protocol}://${url}
+		    fi
+		    return 0
+		fi
+		;;
+	    *)
+		return 255
+		;;
+	esac
+	((i++))
+    done
+
+    return 11
+}
+
+get-qos-bw()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    local interface=${1}
+    local sense=${2}
+    local in_current=${3}
+
+    local bw
+
+    test ${interface} != vpnipsec || interface=external
+    test -z "${in_current}" || in_current="${in_current}_"
+
+    interface=${interface^^}
+    sense=${sense^^}
+    in_current=${in_current^^}
+
+    bw=\${$(echo ${in_current}QOS_BW_${interface}_${sense})}
+    bw="$(eval echo ${bw})"
+    
+    echo "${bw}"
+}
+
+get-qos-shape()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    test -n "${3}" || return 3
+    local interface=${1}
+    local sense=${2}
+    local in_flow=${3}
+    local in_current=${4}
+
+    local elt i=0 range
+    local flow qos list
+
+    test ${interface} != vpnipsec || interface=external
+    test -z "${in_current}" || in_current="${in_current}_"
+
+    interface=${interface^^}
+    sense=${sense^^}
+    in_current=${in_current^^}
+
+    list=\${$(echo ${in_current}QOS_SHAPE_${interface}_${sense}_LIST)}
+    list="$(eval echo ${list})"
+    
+    for elt in ${list}
+    do
+	range=$[${i} % 2]
+	case ${range} in
+	    0)
+		unset qos
+		flow=${elt}
+		;;
+	    1)
+		qos=${elt}
+		test "${flow}" != "${in_flow}" || break
+		;;
+	    *)
+		return 1
+		;;
+	esac
+	((i++))
+    done
+
+    test "${flow}" == "${in_flow}" || unset qos
+    echo "${qos}"
+}
+
+get-qos-borrow()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    local interface=${1}
+    local sense=${2}
+    local in_current=${3}
+
+    local borrow
+
+    test ${interface} != vpnipsec || interface=external
+    test -z "${in_current}" || in_current="${in_current}_"
+
+    interface=${interface^^}
+    sense=${sense^^}
+    in_current=${in_current^^}
+
+    borrow=\${$(echo ${in_current}QOS_BORROW_${interface}_${sense})}
+    borrow="$(eval echo ${borrow})"
+    
+    echo "${borrow}"
+}
+
+rweb-get-denyurl()
+{
+    test -n "${1}" || return 1
+    local in_name=${1}
+    local in_urls=${2}
+
+    local elt i=0 range
+    local name url
+
+    for elt in ${in_urls}
+    do
+	range=$[${i} % 2]
+	case ${range} in
+	    0)
+		name=${elt}
+		;;
+	    1)
+		url=${elt}
+		if test "${name}" == "${in_name}" ; then
+		    echo ${url}
+		    return 0
+		fi
+		;;
+	    *)
+		return 1
+		;;
+	esac
+	((i++))
+    done
+
+    return 1
+}
+
+get-ha-state()
+{
+    local state
+
+    if test -f ${RUN_DIR}/${HEALTH_STATE_FILENAME} ; then
+	state=failover
+    else
+	state=active
+    fi
+
+    echo ${state}
+}
+
+is-bond-dev()
+{
+    test -n "${1}" || return 1
+    local devs=${1}
+
+    test "${devs}" != "${devs/ *}"
+}
+
+gen-netrc()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    local in_ip=${1}
+    local in_protocol=${2}
+
+    local account_dir=${DOWNLOAD_ACCOUNT_DIR-${HOME}}
+
+    if test -f ${account_dir}/.netrc.${in_protocol} ; then
+	local dum1 ip dum2 login dum3 password
+	while read dum1 ip dum2 login dum3 password
+	do
+	    test ${dum1} != default || continue
+	    test "${ip}" != "${in_ip}" || break
+	done < ${account_dir}/.netrc.${in_protocol}
+
+	if test "${ip}" == "${in_ip}" ; then
+	    echo -e "machine ${ip} login ${login} password ${password}"
+	else
+	    echo -e "default login anonymous password ${CURRENT_ANONYMOUS_FTP_EMAIL}"
+	fi
+    else
+	echo -e "default login anonymous password ${CURRENT_ANONYMOUS_FTP_EMAIL}"
+    fi
+}
+
+get-curl-command()
+{
+    local protocol=${1}
+    local ftp_passive_mode=${2}
+
+    local curl_command="curl --disable --fail -4 --retry 0 --retry-delay 0"
+    local curl_args
+
+    case ${protocol} in
+	ftp)
+	    curl_args="--netrc --ssl-reqd --ftp-ssl-ccc --ftp-ssl-ccc-mode active --tls-max 1.3"
+
+	    test -n "${ftp_passive_mode}" || ftp_passive_mode=True
+	    if test ${ftp_passive_mode} == True ; then
+		curl_args=" ${curl_args} --ftp-pasv"
+	    else
+		curl_args=" ${curl_args} --ftp-port -"
+	    fi
+	    ;;
+	sftp)
+	    curl_args=" --netrc --insecure --compressed-ssh"
+	    ;;
+	*)
+	    ;;
+    esac
+
+    echo "${curl_command}${curl_args}"
+}
+
+is-av-extended-enabled()
+{
+    test -n "${1}" || return 1
+    local state=${1}
+    local av_protocol=${2}
+    local av_server=${3}
+
+    if test ${APL_ROLE} == gateway ; then
+	case ${state} in
+	    new)
+		local av_extended_method=${AV_EXTENDED_METHOD}
+		;;
+	    cur)
+		local av_extended_method=${CURRENT_AV_EXTENDED_METHOD}
+		;;
+	    *)
+		return 1
+		;;
+	esac
+
+	test ${av_extended_method} != push || return 0
+    fi
+
+    case ${state} in
+	new)
+	    local file_server_password_list=${FILE_SERVER_PASSWORD_LIST}
+	    local access_file_list=${ACCESS_FILE_LIST}
+	    local av_extended_url=${AV_EXTENDED_URL}
+	    ;;
+	cur)
+	    local file_server_password_list=${CURRENT_FILE_SERVER_PASSWORD_LIST}
+	    local access_file_list=${CURRENT_ACCESS_FILE_LIST}
+	    local av_extended_url=${CURRENT_AV_EXTENDED_URL}
+	    ;;
+	*)
+	    return 1
+	    ;;
+    esac
+
+    local i=0 elt range 
+    local protocol name
+
+    if test -z "${av_protocol}" -a -z "${av_server}" ; then
+	local av_protocol_server_path=$(get-protocol-server-path-from-url "${av_extended_url}")
+	local av_protocol=$(get-record-field "${av_protocol_server_path}" 1)
+	local av_server=$(get-record-field "${av_protocol_server_path}" 2)
+    fi
+
+    if test "${av_protocol}" != tftp ; then
+	for elt in ${file_server_password_list}
+	do
+	    range=$[${i} % 4]
+	    case ${range} in
+		0)
+		    protocol=${elt}
+		    ;;
+		1)
+		    name=${elt}
+		    ;;
+		2)
+		    ;;
+		3)
+		    test "${name}" != "${av_server}" -o "${protocol}" != "${av_protocol}" || break
+		    ;;
+		*)
+		    return 1
+		    ;;
+	    esac
+	    ((i++))
+	done
+	test "${name}" == "${av_server}" -a "${protocol}" == "${av_protocol}" || return 1
+    fi
+
+    i=0
+    for elt in ${access_file_list}
+    do
+	range=$[${i} % 4]
+	case ${range} in
+	    0)
+		;;
+	    1)
+		name=${elt}
+		;;
+	    2)
+		;;
+	    3)
+		test "${name}" != "${av_server}" || break
+		;;
+	    *)
+		return 1
+		;;
+	esac
+	((i++))
+    done
+
+    test "${name}" == "${av_server}"
+}
+
+vpnipsec-authenticate-psk-modified()
+{
+    local new_psk_file=${VPN_IPSEC_DIR}/${IPSEC_AUTHENTICATE_PSK_FILENAME}
+    local cur_psk_file=${VPN_IPSEC_DIR}/${IPSEC_AUTHENTICATE_PSK_FILENAME}.current
+
+    new_psk=$(cat ${new_psk_file} 2> /dev/null)
+    cur_psk=$(cat ${cur_psk_file} 2> /dev/null)
+
+    new_psk=$(decrypt-password "${new_psk}" "${IPSEC_PASSWD}")
+    cur_psk=$(decrypt-password "${cur_psk}" "${IPSEC_PASSWD}")
+
+    test "${new_psk}" != "${cur_psk}"
+}
+
+vpnipsec-authenticate-modified()
+{
+    test ${VPN_IPSEC_AUTHENTICATE} == ${CURRENT_VPN_IPSEC_AUTHENTICATE} || return 0
+    test ${VPN_IPSEC_AUTHENTICATE:0:3} == psk || return 11
+
+    vpnipsec-authenticate-psk-modified
+}
+
+vpnipsec-access-access-soft-modified()
+{
+    test ! -f ${VPN_IPSEC_DIR}/whitelist.diff || return 0
+
+    if test -f ${VPN_IPSEC_DIR}/whitelist.raz ; then
+	test -s ${VPN_IPSEC_DIR}/whitelist.current -o -s ${VPN_IPSEC_DIR}/whitelist
+    else
+	return 1
+    fi
+}
+
+conf-file-modified()
+{
+    ! conf-tmp-files-present || return 0
+    ! tls-client-modified || return 0
+    ! waf-rules-modified || return 0
+    ! vpnipsec-authenticate-psk-modified || return 0
+    ! vpnipsec-access-access-soft-modified || return 0
+
+    return 11
+}
+
+static-conf-modified()
+{
+    ! conf-file-modified || return 0
+    ! conf-urllist-autoupdate-modified || return 0
+    ! userenv-conf-modified || return 0
+    ! configuration-db-modified || return 0
+    ! admin-2fa-modified ${USER} || return 0
+
+    return 11
+}
+
+dynamic-conf-modified()
+{
+    ! conf-not-resolved || return 0
+    ! clock-modified || return 0
+    ! name-resolution-to-ip-armed || return 0
+    ! ssh-host-key-generation-armed || return 0
+
+    return 11
+}
+
+conf-modified()
+{
+    ! static-conf-modified || return 0
+    ! dynamic-conf-modified || return 0
+
+    return 11
+}
+
+test-current-ldap-auth-state()
+{
+    test ${CURRENT_AUTHENTICATE_MODE} == True || return 111
+    test ${CURRENT_AUTHENTICATE_LDAP} == True || return 113
+    test -n "${CURRENT_LDAP_BASE_DN}" -a -n "${CURRENT_LDAP_LOGIN}" -a -n "${CURRENT_LDAP_SERVER_LIST}" || return 115
+}
+
+test-current-ldap-auth-attribute-group-ok()
+{
+    test -n "${CURRENT_LDAP_GROUP_DN}" || return 111
+}
+
+test-current-kerberos-auth-state()
+{
+    test ${CURRENT_AUTHENTICATE_MODE} == True || return 111
+    test ${CURRENT_AUTHENTICATE_KERBEROS} == True || return 113
+    test -n "${CURRENT_KERBEROS_SERVER_LIST}" || return 115
+}
+
+test-current-kerberos-web-is-active()
+{
+    test ${CURRENT_WEB_MODE} == True || return 111
+    test ${CURRENT_AUTHENTICATE_WEB} == True || return 113
+}
+
+test-current-kerberos-rweb-is-active()
+{
+    test ${CURRENT_RWEB_MODE} == True || return 111
+    test ${CURRENT_AUTHENTICATE_RWEB} == True || return 113
+    test -n "${CURRENT_KERBEROS_RWEB_LIST}" || return 115
+}
+
+print-ldap-urls()
+{
+    local servers="${1}"
+
+    local elt i=0 range
+    local proto name ip port
+    local urls
+
+    for elt in ${servers}
+    do
+	range=$[${i} % 4]
+	case ${range} in
+	    0)
+		proto=${elt}
+		;;
+	    1)
+		name=${elt}
+		;;
+	    2)
+		ip=${elt}
+		;;
+	    3)
+		port=${elt}
+
+		case ${proto} in
+		    ldap)
+			urls="${urls} ldap://${ip}:${port}"
+			;;
+		    ldaps)
+			urls="${urls} ldaps://${name}:${port}"
+			;;
+		    sldap)
+			urls="${urls} ldap://${name}:${port}"
+			;;
+		    *)
+			;;
+		esac
+		;;
+	    *)
+		;;
+	esac
+	((i++))
+    done
+
+    urls="${urls:1}"
+
+    echo "${urls}"
+}
+
+test-sldap()
+{
+    test -n "${1}" || return 1
+    local servers=${1}
+
+    local i=0 elt range
+    local proto name ip port
+    local urls
+
+    for elt in ${servers}
+    do
+	range=$[${i} % 4]
+	case ${range} in
+	    0)
+		proto=${elt}
+		test ${proto} != sldap || return 0
+		;;
+	    1|2|3)
+		;;
+	    *)
+		;;
+	esac
+	((i++))
+    done
+    return 1
+}
+
+show-dhcp-leases()
+{
+    test -f /var/db/dhcpd.leases || return 0
+    
+    local tmp_leases_file=${TMP_DIR}/dhcpd.leases.${$}
+
+    local keyword arg1 arg2 arg3 rest
+    local in_lease state ip lease_time seconds mac hostname len
+    local i=0
+
+    while read keyword arg1 arg2 arg3 rest
+    do
+	test -n "${keyword}" || continue
+	test "${keyword:0:1}" != '#' || continue
+
+	case ${keyword} in
+	    lease)
+		if test -z "${in_lease}" -a "${arg2}" == '{' ; then
+		    ip=${arg1}
+		    in_lease=yes
+		fi
+		;;
+	    '}')
+		if test -n "${in_lease}" ; then
+		    unset in_lease
+		    test $[${i} % 50] -ne 49 || working-sign
+		    test -n "${hostname}" || hostname=nil
+		    echo "${state} ${hostname} ${mac} ${ip} ${lease_time}"
+		    unset state hostname mac ip lease_time
+		    ((i++))
+		fi
+		;;
+	    ends)
+		if test -n "${in_lease}" ; then
+		    len=${#arg3}
+		    ((len--))
+		    lease_time="${arg2} ${arg3:0:${len}}"
+		    lease_time=$(date --date="${lease_time}" +"%Y/%m/%d-%T" 2> /dev/null)
+		fi
+		;;
+	    binding)
+		if test -n "${in_lease}" -a "${arg1}" == state -a -n "${arg2}" ; then
+		    state=${arg2}
+		    len=${#state}
+		    ((len--))
+		    state=${state:0:${len}}
+		fi
+		;;
+	    hardware)
+		if test -n "${in_lease}" -a "${arg1}" == ethernet ; then
+		    mac=${arg2}
+		    len=${#mac}
+		    ((len--))
+		    mac=${mac:0:${len}}
+		fi
+		;;
+	    client-hostname)
+		if test -n "${in_lease}" ; then
+		    hostname=${arg1}
+		    len=${#hostname}
+		    ((len -= 3))
+		    hostname=${hostname:1:${len}}
+		fi
+		;;
+	    *)
+		;;
+	esac
+    done < /var/db/dhcpd.leases > ${tmp_leases_file}
+
+    stop-working
+
+    local leases_list
+
+    tac ${tmp_leases_file} | \
+	while read state hostname mac ip lease_time
+	do
+	    if test ${state} == active ; then
+		if ! member "${leases_list}" ${mac} ; then
+		    echo "${state} ${hostname} ${mac^^} ${ip} ${lease_time}"
+		    leases_list="${leases_list} ${mac}"
+		fi
+	    else
+		member "${leases_list}" ${mac} || leases_list="${leases_list} ${mac}"
+	    fi
+	done
+
+    rm -f ${tmp_leases_file}
+}
+
+get-rewrite-http-errors-state()
+{
+    test -n "${1}" || return 1
+    local in_name=${1}
+    local states=${2}
+
+    local i=0 elt range
+    local name state
+
+    for elt in ${states}
+    do
+	range=$[${i} % 2]
+	case ${range} in
+	    0)
+		name=${elt}
+		;;
+	    1)
+		state=${elt}
+		if test ${name} == ${in_name} ; then
+		    echo ${state}
+		    return 0
+		fi
+		;;
+	    *)
+		return 255
+		;;
+	esac
+	((i++))
+    done
+
+    echo ${WAF_REWRITE_HTTP_ERRORS}
+    return 11
+}
+
+echo-exchanged-file-percent1()
+{
+    local value=${1}
+
+    if test -z "${value}" ; then
+	echo -n '0'
+    else
+	value=${value/\.*}
+	echo -n ${value}
+    fi
+}
+
+echo-exchanged-file-percent()
+{
+    local file="${1}"
+
+    if test -z "${file}" ; then
+	echo -n '0'
+	return 0
+    fi
+
+    if test ! -f ${TMP_DIR}/${file} ; then
+	echo -n '0'
+	return 0
+    fi
+
+    local download_info=$(tail -1 ${TMP_DIR}/${file} | sed -e 's/\x0D/\x0A/g' | tail -1 2> /dev/null)
+    download_info=${download_info//#}
+    
+    echo-exchanged-file-percent1 ${download_info}
+}
+
+check-exchanging()
+{
+    local file="${1}"
+    local exchanging_files
+
+    if test -z "${file}" ; then
+	exchanging_files=$(ls -1 ${TMP_DIR}/*.${PROGRESS} 2> /dev/null)
+	test -n "${exchanging_files}" || return 11
+    else
+	exchanging_files=${file}.${PROGRESS}
+	test -s ${exchanging_files} || return 13
+    fi
+
+    local progress base
+
+    for file in ${exchanging_files}
+    do
+	base=$(file-basename ${file})
+	progress=$(echo-exchanged-file-percent "${base}")
+	test "${progress}" == '100' || return 0
+    done
+
+    return 15
+}
+
+get-system-load()
+{
+    if test ! -f /proc/loadavg ; then
+	echo 0:0:0
+	return 1
+    fi
+
+    local loads=$(cat /proc/loadavg)
+    local load1 load2 load3 total
+
+    load1=${loads/ *}
+    loads=${loads#* }
+
+    load2=${loads/ *}
+    loads=${loads#* }
+
+    load3=${loads/ *}
+
+    total=$(echo "${load1} + ${load2} + ${load3}" | bc)
+
+    load1=$(echo "${load1} * 100.00 / ${total}" | bc)
+    load2=$(echo "${load2} * 100.00 / ${total}" | bc)
+    load3=$(echo "${load3} * 100.00 / ${total}" | bc)
+
+    load1=$(round-float ${load1})
+    load2=$(round-float ${load2})
+    load3=$(round-float ${load3})
+
+    echo ${load1}:${load2}:${load3}
+}
+
+get-max-vpn-nb()
+{
+    local level=$(get-usage-level) max
+
+    case ${level} in
+	0)
+	    max=$((MAX_VPN_NB / 32))
+	    ;;
+	1)
+	    max=$((MAX_VPN_NB / 8))
+	    ;;
+	2)
+	    max=$((MAX_VPN_NB / 2))
+	    ;;
+	3)
+	    max=${MAX_VPN_NB}
+	    ;;
+	*)
+	    max=4
+	    echo ${max}
+	    return 1
+	    ;;
+    esac
+
+    echo ${max}
+    return 0
+}
+
+get-max-vpn-network-nb()
+{
+    local level=$(get-usage-level) max
+
+    case ${level} in
+	0)
+	    max=$((MAX_VPN_NETWORK_NB / 32))
+	    ;;
+	1)
+	    max=$((MAX_VPN_NETWORK_NB / 8))
+	    ;;
+	2)
+	    max=$((MAX_VPN_NETWORK_NB / 2))
+	    ;;
+	3)
+	    max=${MAX_VPN_NETWORK_NB}
+	    ;;
+	*)
+	    max=4
+	    echo ${max}
+	    return 1
+	    ;;
+    esac
+
+    echo ${max}
+    return 0
+}
+
+get-role-code()
+{
+    local code
+
+    case ${APL_ROLE} in
+	gateway)
+	    code=0
+	    ;;
+	manager)
+	    code=1
+	    ;;
+	*)
+	    code=0
+	    ;;
+    esac
+
+    echo ${code}
+
+}
+
+member-access-file()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    local list=${1}
+    local in_ip=${2}
+    
+    local elt i=0 range
+    local ip
+	
+    for elt in ${list}
+    do
+	range=$[${i} % 4]
+	case ${range} in
+	    0)
+		;;
+	    1)
+		ip=${elt}
+		;;
+	    2)
+		;;
+	    3)
+		test "${ip}" != "${in_ip}" || return 0
+		;;
+	    *)
+		return 1
+		;;
+	esac
+	((i++))
+    done
+    
+    return 11
+}
+
+echo-appliance-information-header()
+{
+    test -n "${1}" || return 1
+    local role=${1}
+    local context_base=${2}
+    local context_id=${3}
+
+    local template_id
+    local os=$(get-system-soft)
+    test "${context_base}" != template || template_id=${context_id}
+
+    echo "# Operating System Version: ${os}"
+
+    if test -n "${template_id}" ; then
+	echo "# Template Identifier: ${template_id}"
+    else
+	local context
+	test -z "${context_id}" || context=" (saved by a manager)"
+	    
+	local raid_title="# RAID Configuration: "
+	local model=$(get-system-hard long)
+	local hdd=$(get-system-disk)
+	local raid=$(get-system-raid)
+
+	local raid1 raid2 raid_line=${raid_title}${raid}
+	local len=${#raid_line}
+
+	if test ${len} -gt 79 ; then
+	    raid1=${raid/ GB: */ GB:}
+	    len=${#raid1}
+	    ((len++))
+	    raid2=${raid:${len}}
+	else
+	    raid1=${raid}
+	fi
+
+	echo "# Appliance Role: ${role^}${context}"
+	echo "# Appliance Model: ${model}"
+	echo "# Hard Drives: ${hdd}"
+	echo "${raid_title}${raid1}"
+	test -z "${raid2}" || echo "# ${raid2}"
+    fi
+}
+
+get-bond-devs()
+{
+    test -n "${1}" || return 1
+    dev=${1}
+
+    if test ${dev:0:4} == "bond" ; then
+
+	case ${dev:4:1} in
+	    0)
+		! is-bond-dev "${CURRENT_BOND_INTERNALS}" || dev="${dev}:${CURRENT_BOND_INTERNALS}"
+		;;
+	    1)
+		! is-bond-dev "${CURRENT_BOND_EXTERNALS}" || dev="${dev}:${CURRENT_BOND_EXTERNALS}"
+		;;
+	    2)
+		! is-bond-dev "${CURRENT_BOND_AUXILIARIES}" || dev="${dev}:${CURRENT_BOND_AUXILIARIES}"
+		;;
+	    *)
+		;;
+	esac
+    fi
+
+    echo ${dev}
+}
+
+get-logical-interface()
+{
+    test -n "${1}" || return 1
+    local dev=${1}
+
+    local bonds=$(get-bond-devs ${dev})
+    local devs=${bonds/*:}
+    local bond=${bonds/:*}
+    local vlan=${bond/*.}
+
+    test "${bond}" != "${devs}" || devs=${devs/.*}
+    test ${vlan} != ${bond} || unset vlan
+    test -z "${vlan}" || vlan=".${vlan}"
+
+    local interface
+
+    if test "${devs}" == "${CURRENT_BOND_INTERNALS}" ; then
+	interface="internal${vlan}"
+    elif test "${devs}" == "${CURRENT_BOND_EXTERNALS}" ; then
+	interface="external${vlan}"
+    elif test "${devs}" == "${CURRENT_BOND_AUXILIARIES}" ; then
+	interface="auxiliary${vlan}"
+    fi
+
+    echo ${interface}
+}
+
+get-country-name()
+{
+    test -n "${1}" || return 1
+    local in_code=${1}
+
+    while read code name
+    do
+	test -n "${code}" || continue
+	if test ${in_code} == ${code} ; then
+	    echo ${name}
+	    return 0
+	fi
+    done < ${APPLIANCE_DIR}/etc/countries
+    return 11
+}
+
+get-rweb-waf-application-type()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    local in_name=${1}
+    local in_state=${2}
+
+    local i=0 elt range list
+    local name atype
+
+    case ${in_state} in
+	cur)
+	    list="${CURRENT_WAF_RWEB_BYPASS_APPLICATION_LIST}"
+	    ;;
+	new)
+	    list="${WAF_RWEB_BYPASS_APPLICATION_LIST}"
+	    ;;
+	*)
+	    return 3
+	    ;;
+    esac
+
+    for elt in ${list}
+    do
+	range=$[${i} % 2]
+	case ${range} in
+	    0)
+		name=${elt}
+		;;
+	    1)
+		atype=${elt}
+		if test ${name} == ${in_name} ; then
+		    echo ${atype}
+		    return 0
+		fi
+		;;
+	    *)
+		return 255
+		;;
+	esac
+	((i++))
+    done
+
+    echo 'other'
+}
+
+get-domain-controller-chain()
+{
+    test -n "${1}" || return 1
+    local domain=${1}
+
+    local chain dc
+
+    while true
+    do
+	dc=${domain/.*}
+	chain="${chain},dc=${dc}"
+	rest=${domain#*.}
+	test "${domain}" != "${rest}" || break
+	domain=${rest}
+    done
+    chain=${chain:1}
+
+    echo ${chain}
+}
+
+test-guard-rules-use-ldap()
+{
+    test -n "${1}" || return 0
+    local rules=${1}
+    local policies=${2}
+
+    local rule_elt rule_range rule_i=0
+    local policy_elt policy_range policy_i
+    local rule_name policy_name
+    local filters filter filter_type
+
+    for rule_elt in ${rules}
+    do
+	rule_range=$[${rule_i} % 3]
+	case ${rule_range} in
+	    0)
+		rule_name=${rule_elt}
+		;;
+	    1)
+		;;
+	    2)
+		policy_i=0
+		if test ${rule_name} != default ; then
+		    for policy_elt in ${policies}
+		    do
+			policy_range=$[${policy_i} % 2]
+			case ${policy_range} in
+			    0)
+				policy_name=${policy_elt}
+				;;
+			    1)
+				if test ${policy_name} == ${rule_name} ; then
+
+				    filters=$(colon2space ${policy_elt})
+				    for filter in ${filters}
+				    do
+					filter_type=${filter/_*}
+					test ${filter_type} != ldap || return 0
+				    done
+
+				fi
+				;;
+			    *)
+				return 255
+				;;
+			esac
+			((policy_i++))
+		    done	    
+		fi
+		;;
+	    *)
+		return 255
+		;;
+	esac
+	((rule_i++))
+    done
+
+    return 11
+}
+
+test-new-guard-rules-use-ldap()
+{
+    test-guard-rules-use-ldap "${GUARD_RULE_LIST}" "${GUARD_POLICY_LIST}"
+}
+
+test-cur-guard-rules-use-ldap()
+{
+    test-guard-rules-use-ldap "${CURRENT_GUARD_RULE_LIST}" "${CURRENT_GUARD_POLICY_LIST}"
+}
+
+get-external-gateways()
+{
+    local elt range i=0
+    local gateway
+    local external_gateways
+
+    local ext_net=$(ipcalc -s ${IP_EXTERNAL_IP} ${IP_EXTERNAL_MASK} -n)
+    local ext_brd=$(ipcalc -s ${IP_EXTERNAL_IP} ${IP_EXTERNAL_MASK} -b)
+
+    ext_net=${ext_net/NETWORK=/}
+    ext_brd=${ext_brd/BROADCAST=/}
+
+    for elt in ${IP_ROUTE_LIST}
+    do
+	range=$[${i} % 5]
+	case ${range} in
+	    0|1|3)
+		;;
+	    2)
+		gateway=${elt}
+		;;
+	    4)
+		! ip-is-included ${gateway} ${ext_net} ${ext_brd} ${IP_EXTERNAL_MASK} || external_gateways="${external_gateways} ${gateway}"
+		;;
+	    *)
+		return 255
+		;;
+	esac
+	((i++))
+    done
+
+    echo ${external_gateways:1}
+}
+
+get-gateway-weight()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    local in_gw=${1}
+    local in_state=${2}
+
+    case ${in_state} in
+	cur)
+	    local routes="${CURRENT_IP_ROUTE_LIST}"
+	    ;;
+	new)
+	    local routes="${IP_ROUTE_LIST}"
+	    ;;
+	*)
+	    return 255
+	    ;;
+    esac
+
+    local elt range i=0
+    local gw wt
+
+    for elt in ${routes}
+    do
+	range=$[${i} % 5]
+	case ${range} in
+	    0|1)
+		;;
+	    2)
+		gw=${elt}
+		;;
+	    3)
+		wt=${elt}
+		;;
+	    4)
+		if test ${gw} == ${in_gw} ; then
+		    echo ${wt}
+		    return 0
+		fi
+		;;
+	    *)
+		return 255
+		;;
+	esac
+	((i++))
+    done
+
+    return 11
+}
+
+get-vpn-ipsec-tos()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    local in_vpn_id=${1}
+    local state=${2}
+
+    case ${state} in
+	new)
+	    local vpn_ipsec_to_list=${VPN_IPSEC_TO_LIST}
+	    ;;
+	cur)
+	    local vpn_ipsec_to_list=${CURRENT_VPN_IPSEC_TO_LIST}
+	    ;;
+	*)
+	    return 255
+	    ;;
+    esac
+
+    local elt range i=0
+    local vpn_id tos
+
+    for elt in ${vpn_ipsec_to_list}
+    do
+	range=$[${i} % 2]
+	case ${range} in
+	    0)
+		vpn_id=${elt}
+		;;
+	    1)
+		tos=${elt}
+
+		if test ${vpn_id} == ${in_vpn_id} ; then
+		    colon2space ${tos}
+		    return 0
+		fi
+		;;
+	    *)
+		return 255
+		;;
+	esac
+	((i++))
+    done
+
+    return 11
+}
+
+get-vpn-ipsec-all-tos()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    local vpn_id=${1}
+    local master_address=${2}
+
+    local remote_addresses tos=$(get-vpn-ipsec-tos ${vpn_id} new) 
+
+    if test -z "${tos}" ; then
+	remote_addresses=${master_address}
+    else
+	remote_addresses="${master_address} ${tos}"
+    fi
+
+    echo ${remote_addresses}
+}
+
+get-vpn-ipsec-nat-role()
+{
+    test -n "${1}" || return 1
+    local in_vpn_id=${1}
+    local roles=${2}
+
+    local elt range i=0
+    local vpn_id role
+
+    for elt in ${roles}
+    do
+	range=$[${i} % 2]
+	case ${range} in
+	    0)
+		vpn_id=${elt}
+		;;
+	    1)
+		role=${elt}
+
+		if test ${vpn_id} == ${in_vpn_id} ; then
+		    echo ${role}
+		    return 0
+		fi
+		;;
+	    *)
+		return 255
+		;;
+	esac
+	((i++))
+    done
+
+    return 11
+}
+
+get-vpn-ipsec-networks()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    local in_ipsec_type=${1}
+    local in_vpn_id=${2}
+
+    local elt range i=0
+    local ipsec_type vpn_id local_ip_mk_list remote_ip_mk_list
+
+    for elt in ${VPN_IPSEC_NETWORK_LIST}
+    do
+	range=$[${i} % 4]
+	case ${range} in
+	    0)
+		ipsec_type=${elt}
+		;;
+	    1)
+		vpn_id=${elt}
+		;;
+	    2)
+		local_ip_mk_list=${elt}
+		;;
+	    3)
+		remote_ip_mk_list=${elt}
+
+		if test ${ipsec_type} == ${in_ipsec_type} -a ${vpn_id} == ${in_vpn_id} ; then
+		    echo ${local_ip_mk_list} ${remote_ip_mk_list}
+		    return 0
+		fi
+		;;
+	    *)
+		return 255
+		;;
+	esac
+	((i++))
+    done
+
+    return 11
+}
+
+get-manager-key-id()
+{
+    test -n "${1}" || return 1
+    local manager_role=${1}
+    
+    case "${manager_role}" in
+	backup)
+	    echo ${BACKUP_MANAGER_NAME}
+	    ;;
+	master)
+	    echo ${MASTER_MANAGER_NAME}
+	    ;;
+	peer)
+	    echo ${PEER_MANAGER_NAME}
+	    ;;
+	*)
+	    return 11
+	    ;;
+    esac
+}
+
+get-urllist-serial-days()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    test -n "${3}" || return 3
+    test -n "${4}" || return 4
+    test -n "${5}" || return 5
+    local file=${1}
+    local prefix=${2}
+    local ftype=${3}
+    local urllist=${4}
+    local suffix=${5}
+
+    local base_file=$(file-basename ${file} .${suffix}.gz)
+    local urllist_serial_days=${base_file/${prefix}\.${ftype}\.}
+    local urllist_serial=${urllist_serial_days/\.DAY+*+YAD}
+    local days=${urllist_serial_days/*\.DAY+/}
+
+    days=${days/+YAD/}
+    check-digit ${days} || days=0
+
+    echo ${days}
+}
+
+av-extended-is-auto-updated-in-time()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    date_s=${1}
+    date_update=${2}
+
+    local allowed_interval margin=600
+    local interval=$[${date_s} - ${date_update}]
+
+    case ${APL_ROLE} in
+	gateway)
+	    allowed_interval=3600
+	    ;;
+	manager)
+	    allowed_interval=1800
+	    ;;
+	*)
+	    ;;
+    esac
+
+    ((allowed_interval += margin))
+
+    test ${interval} -le ${allowed_interval}
+}
+
+get-default-tcp-flood-limit()
+{
+    local value=$[${SIMULTANEOUS_USERS_NB} * 10]
+    value=$(min-value ${value} 10000)
+    echo ${value}
+}
+
+get-default-tcp-flood-burst()
+{
+    local value=$[$(get-default-tcp-flood-limit) * 5]
+    value=$(min-value ${value} 10000)
+    echo ${value}
+}
+
+get-default-udp-flood-limit()
+{
+    local value=$[${SIMULTANEOUS_USERS_NB} * 10]
+    value=$(min-value ${value} 10000)
+    echo ${value}
+}
+
+get-default-udp-flood-burst()
+{
+    local value=$[$(get-default-udp-flood-limit) * 5]
+    value=$(min-value ${value} 10000)
+    echo ${value}
+}
+
+get-default-web-flood-limit()
+{
+    local value=$[${SIMULTANEOUS_RUSERS_NB} * 10]
+    value=$(min-value ${value} 10000)
+    echo ${value}
+}
+
+get-default-web-flood-burst()
+{
+    local value=$[$(get-default-web-flood-limit) * 5]
+    value=$(min-value ${value} 10000)
+    echo ${value}
+}
+
+get-default-rweb-flood-limit()
+{
+    local value=$[${SIMULTANEOUS_RUSERS_NB} * 10]
+    value=$(min-value ${value} 10000)
+    echo ${value}
+}
+
+get-default-rweb-flood-burst()
+{
+    local value=$[$(get-default-rweb-flood-limit) * 5]
+    value=$(min-value ${value} 10000)
+    echo ${value}
+}
+
+get-default-flood-limit()
+{
+    test -n "${1}" | return 1
+    local dos=${1}
+
+    case ${dos} in
+	tcpflood)
+	    get-default-tcp-flood-limit
+	    ;;
+	udpflood)
+	    get-default-udp-flood-limit
+	    ;;
+	webflood)
+	    get-default-web-flood-limit
+	    ;;
+	rwebflood)
+	    get-default-rweb-flood-limit
+	    ;;
+	*)
+	    return 11
+	    ;;
+    esac
+}
+
+get-default-flood-burst()
+{
+    test -n "${1}" | return 1
+    local dos=${1}
+
+    case ${dos} in
+	tcpflood)
+	    get-default-tcp-flood-burst
+	    ;;
+	udpflood)
+	    get-default-udp-flood-burst
+	    ;;
+	webflood)
+	    get-default-web-flood-burst
+	    ;;
+	rwebflood)
+	    get-default-rweb-flood-burst
+	    ;;
+	*)
+	    return 11
+	    ;;
+    esac
+}
+
+get-default-piptcp()
+{
+    echo 300
+}
+
+get-default-pipweb()
+{
+    echo 500
+}
+
+get-default-piprweb()
+{
+    echo 200
+}
+
+get-default-pipdns()
+{
+    echo 100
+}
+
+get-default-pipocsp()
+{
+    echo 5
+}
+
+get-default-pip()
+{
+    test -n "${1}" | return 1
+    local dos=${1}
+
+    case ${dos} in
+    	piptcp)
+	    get-default-piptcp
+	    ;;
+	pipweb)
+	    get-default-pipweb
+	    ;;
+	piprweb)
+	    get-default-piprweb
+	    ;;
+	pipdns)
+	    get-default-pipdns
+	    ;;
+	pipocsp)
+	    get-default-pipocsp
+	    ;;
+	*)
+	    return 11
+	    ;;
+    esac
+}
+
+rweb-get-protocol()
+{
+    test -n "${1}" || return 1
+    local in_name=${1}
+    local in_context=${2}
+
+    local list elt range i=0
+    local name protocol
+    local http=0 https=0
+
+    case ${in_context} in
+	configurator)
+	    list="${_RWEB_SITE_LIST}"
+	    ;;
+	*)
+	    list="${RWEB_SITE_LIST}"
+	    ;;
+    esac
+
+    for elt in ${list}
+    do
+	range=$[${i} % 5]
+	case ${range} in
+	    0)
+		name=${elt}
+		;;
+	    1)
+		protocol=${elt}
+		if test ${name} == ${in_name} ; then
+		    case ${protocol} in
+			http)
+			    http=1
+			    test ${https} -eq 0 || break
+			    ;;
+			https)
+			    https=1
+			    test ${http} -eq 0 || break
+			    ;;
+			*)
+			    ;;
+		    esac
+		fi
+		;;
+	    2|3|4)
+		;;
+	    *)
+		return 1
+		;;
+	esac
+	((i++))
+    done
+    
+    if test ${http} -eq 1 ; then
+	if test ${https} -eq 1 ; then
+	    echo 'both'
+	else
+	    echo 'http'
+	fi
+    else
+	if test ${https} -eq 1 ; then
+	    echo 'https'
+	else
+	    echo 'nil'
+	fi
+    fi
+}
+
+commit-ipsec-whitelist()
+{
+    local work_file=${TMP_DIR}/ipsec-whitelist.${$}
+    local ret diff_id diff id
+
+    if test -f ${VPN_IPSEC_DIR}/whitelist.raz ; then
+	touch ${work_file}
+    else
+	if test -f ${VPN_IPSEC_DIR}/whitelist ; then
+	    cp -f ${VPN_IPSEC_DIR}/whitelist ${work_file}
+	else
+	    touch ${work_file}
+	    install -m 664 -o ${ADMIN_NAME} -g ${GROUP_NAME} ${work_file} ${VPN_IPSEC_DIR}/whitelist
+	fi
+    fi
+
+    if test -s ${VPN_IPSEC_DIR}/whitelist.diff ; then
+	while read diff_id
+	do
+	    diff=${diff_id:0:1}
+	    id=${diff_id:1}
+
+	    case ${diff} in
+		-)
+		    sed -i "/^${id}$/d" ${work_file}
+		    ;;
+		+)
+		    echo ${id} >> ${work_file}
+		    ;;
+		*)
+		    ;;
+	    esac
+	done < ${VPN_IPSEC_DIR}/whitelist.diff
+
+	sort --unique ${work_file} > ${work_file}.sorted
+	mv -f ${work_file}.sorted ${work_file}
+    fi
+
+    diff --brief ${VPN_IPSEC_DIR}/whitelist ${work_file} > /dev/null 2>&1
+    ret=${?}
+
+    if test ${ret} -ne 0 ; then
+	install -m 664 -o ${ADMIN_NAME} -g ${GROUP_NAME} ${work_file} ${VPN_IPSEC_DIR}/whitelist.work
+	mv -f ${VPN_IPSEC_DIR}/whitelist.work ${VPN_IPSEC_DIR}/whitelist
+    fi
+
+    case ${APL_ROLE} in
+	gateway)
+	    cp -af ${VPN_IPSEC_DIR}/whitelist ${VPN_IPSEC_DIR}/whitelist.current
+	    ;;
+	manager)
+	    ;;
+	*)
+	    ;;
+    esac
+
+    rm -f ${VPN_IPSEC_DIR}/whitelist.{raz,diff} ${work_file}
+
+    return ${ret}
+}
+
+dynamic-dns-request-is-modified()
+{
+    test ${DYNAMIC_DNS_STATE} != ${CURRENT_DYNAMIC_DNS_STATE} -o \
+	 "${DYNAMIC_DNS_PROVIDER}" != "${CURRENT_DYNAMIC_DNS_PROVIDER}" -o \
+	 "${DYNAMIC_DNS_HOSTNAME}" != "${CURRENT_DYNAMIC_DNS_HOSTNAME}" -o \
+	 "${DYNAMIC_DNS_USERNAME}" != "${CURRENT_DYNAMIC_DNS_USERNAME}" -o \
+	 "${DYNAMIC_DNS_PASSWORD}" != "${CURRENT_DYNAMIC_DNS_PASSWORD}"
+}

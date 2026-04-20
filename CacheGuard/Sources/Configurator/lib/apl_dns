@@ -1,0 +1,500 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       Configurator
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+set-cur-self-ns()
+{
+    member "${CURRENT_NAME_SERVER_LIST}" "127.0.0.1"
+    if test ${?} -eq 0 -o "${CURRENT_DNS_MODE}" == True ; then
+	export CURRENT_SELF_NS=True
+    else
+	export CURRENT_SELF_NS=False
+    fi
+}
+
+set-dns-parameters()
+{
+    unique_hostname=$[256 + ${IP_PEER_IP/*./}]
+    export UNIQUE_SHOSTNAME="gw${unique_hostname}"
+
+    set-new-self-ns
+    set-cur-self-ns
+}
+
+gen-named-acl-conf()
+{
+    local access_web_list=${1}
+    local transparent_web_list=${2}
+
+    local acl=web
+    
+    if test -z "${access_web_list}" -a -z "${transparent_web_list}" ; then
+	echo "acl ${acl} { 0.0.0.0/0; };"
+	return 0
+    fi
+
+    local ip_px ip_px_list
+    echo -n "acl ${acl} { "
+
+    local elt i=0 range
+    local ip px
+
+    for elt in ${access_web_list}
+    do
+	range=$[${i} % 4]
+	case ${range} in
+	    0)
+	        ;;
+	    1)
+		ip=${elt}
+		;;
+	    2)
+		px=${elt}
+		;;
+	    3)
+		ip_px_list="${ip_px_list} ${ip}/${px}"
+		;;
+	    *)
+		return 1
+		;;
+	esac
+	((i++))
+    done
+
+    i=0
+    for elt in ${transparent_web_list}
+    do
+	range=$[${i} % 4]
+	case ${range} in
+	    0)
+	        ;;
+	    1)
+		ip=${elt}
+		;;
+	    2)
+		px=${elt}
+		;;
+	    3)
+		ip_px_list="${ip_px_list} ${ip}/${px}"
+		;;
+	    *)
+		return 1
+		;;
+	esac
+	((i++))
+    done
+
+    ip_px_list=$(uniq-elt ${ip_px_list})
+
+    for ip_px in ${ip_px_list}
+    do
+	echo -n "${ip_px}; "
+    done
+    
+    echo "};"
+}
+
+gen-named-conf()
+{
+    if test ${DNS_MODE} == True ; then
+	echo -n "acl listen_ip { "
+	test "${IP_WEB_IP}" == "0.0.0.0" || echo -n "${IP_WEB_IP}/32; "
+	echo "};"
+	gen-named-acl-conf "${ACCESS_IF_IP_PX_WEB_LIST}" "${TRANSPARENT_IF_IP_PX_LIST}"
+    else
+        echo "acl listen_ip { };"
+        echo "acl web { };"
+    fi
+
+    echo
+
+    cat named.conf-top-constant
+    cat named.conf-tuned
+    cat named.conf-bottom-constant
+}
+
+gen-ipsec-site-fqdn-resolved-lists()
+{
+    test -n "${1}" || return 1
+    local state=${1}
+
+    case ${state} in
+	new)
+	    test ${VPN_IPSEC_MODE} == True -a ${VPN_IPSEC_ACCESS_MODE} == False || return 0
+	    test -n "${NAME_SERVER_LIST}" -o "${SELF_NS}" == True || return 0
+	    ;;
+	cur)
+	    test ${CURRENT_VPN_IPSEC_MODE} == True -a ${CURRENT_VPN_IPSEC_ACCESS_MODE} == False || return 0
+	    test -n "${CURRENT_NAME_SERVER_LIST}" -o "${CURRENT_SELF_NS}" == True || return 0
+	    ;;
+	*)
+	    return 255
+	    ;;
+    esac
+
+    local elt range i=0
+    local vpn_id fqdns remote_isakmp_port remote_natt_port
+    local name ips remote_ips
+    local error_list
+
+    local vpn_ipsec_site_nr_list
+
+    local dig_options="+noall +short +ignore +timeout=4 +tries=2"
+
+    for elt in ${VPN_IPSEC_SITE_DN_LIST}
+    do
+	range=$[${i} % 4]
+	case ${range} in
+	    0)
+ 		vpn_id=${elt}
+		;;
+	    1)
+		fqdns=${elt}
+		;;
+	    2)
+		remote_isakmp_port=${elt}
+		;;
+	    3)
+		remote_natt_port=${elt}
+
+		fqdns=${fqdns//,/ }
+		unset remote_ips
+
+		for name in ${fqdns}
+		do
+		    ips=$(dig ${name} ${dig_options} 2> /dev/null)
+		    if test ${?} -ne 0 ; then
+			error_list="${error_list} ${name}"
+		    else
+			test -n "${ips}" || error_list="${error_list} ${name}"
+		    fi
+
+		    for ip in ${ips}
+		    do
+			check-expr-ip "${ip}" || continue
+			remote_ips="${remote_ips},${ip}"
+		    done
+		done
+		remote_ips=${remote_ips:1}
+
+		test -z "${remote_ips}" || vpn_ipsec_site_nr_list="${vpn_ipsec_site_nr_list} ${vpn_id} ${remote_ips} ${remote_isakmp_port} ${remote_natt_port}"
+		;;
+	    *)
+		return 255
+		;;
+	esac
+	((i++))
+    done
+
+    VPN_IPSEC_SITE_NR_LIST=${vpn_ipsec_site_nr_list:1}
+
+    error_list=${error_list:1}
+    test -z "${error_list}"
+}
+
+gen-names-resolved-lists()
+{
+    test -n "${NAME_SERVER_LIST}" -o "${SELF_NS}" == True || return 11
+
+    local elt range i
+    local name_port if_name interface name ip port ips
+    local protocol_name_port
+    local protocol
+
+    local error_list ipsec_ret
+
+    local access_file_if_nr_list
+    local access_mon_if_nr_list
+    local snmp_trap_server_nr_list
+    local syslog_server_nr_list
+    local kerberos_server_nr_list
+    local email_server_nr_list
+
+    local dig_options="+noall +short +ignore +timeout=4 +tries=2"
+
+    gen-ipsec-site-fqdn-resolved-lists new
+    ipsec_ret=${?}
+
+    if test ${AUTHENTICATE_MODE} == True -a ${AUTHENTICATE_KERBEROS} == True ; then
+	for name in ${KERBEROS_SERVER_DN_LIST}
+	do
+	    ips=$(dig ${name} ${dig_options} 2> /dev/null)
+	    if test ${?} -ne 0 ; then
+		error_list="${error_list} ${name}"
+	    else
+		test -n "${ips}" || error_list="${error_list} ${name}"
+	    fi
+
+	    for ip in ${ips}
+	    do
+		check-expr-ip "${ip}" || continue
+		kerberos_server_nr_list="${kerberos_server_nr_list} ${ip}"
+	    done
+	done
+    fi
+
+    for if_name in ${ACCESS_FILE_IF_DN_LIST}
+    do
+	interface=${if_name/:*}
+	name=${if_name#*:}
+
+	ips=$(dig ${name} ${dig_options} 2> /dev/null)
+	if test ${?} -ne 0 ; then
+	    error_list="${error_list} ${name}"
+	else
+	    test -n "${ips}" || error_list="${error_list} ${name}"
+	fi
+
+	for ip in ${ips}
+	do
+	    check-expr-ip "${ip}" || continue
+	    access_file_if_nr_list="${access_file_if_nr_list} ${interface}:${ip}"
+	done
+    done
+
+    for if_name in ${ACCESS_MON_IF_DN_LIST}
+    do
+	interface=${if_name/:*}
+	name=${if_name#*:}
+
+	ips=$(dig ${name} ${dig_options} 2> /dev/null)
+	if test ${?} -ne 0 ; then
+	    error_list="${error_list} ${name}"
+	else
+	    test -n "${ips}" || error_list="${error_list} ${name}"
+	fi
+
+	for ip in ${ips}
+	do
+	    check-expr-ip "${ip}" || continue
+	    access_mon_if_nr_list="${access_mon_if_nr_list} ${interface}:${ip}"
+	done
+    done
+
+    for name_port in ${SNMP_TRAP_SERVER_DN_LIST}
+    do
+	name=${name_port/:*/}
+	port=${name_port/*:/}
+
+	ips=$(dig ${name} ${dig_options} 2> /dev/null)
+	if test ${?} -ne 0 ; then
+	    error_list="${error_list} ${name}"
+	else
+	    test -n "${ips}" || error_list="${error_list} ${name}"
+	fi
+	
+	for ip in ${ips}
+	do
+	    check-expr-ip "${ip}" || continue
+	    snmp_trap_server_nr_list="${snmp_trap_server_nr_list} ${ip}:${port}"
+	done
+    done
+
+    i=0
+    for elt in ${SYSLOG_SERVER_DN_LIST}
+    do
+	range=$[${i} % 3]
+	case ${range} in
+	    0)
+		protocol=${elt}
+		;;
+	    1)
+		name=${elt}
+		;;
+	    2)
+		port=${elt}
+
+		ips=$(dig ${name} ${dig_options} 2> /dev/null)
+		if test ${?} -ne 0 ; then
+		    error_list="${error_list} ${name}"
+		else
+		    test -n "${ips}" || error_list="${error_list} ${name}"
+		fi
+		
+		for ip in ${ips}
+		do
+		    check-expr-ip "${ip}" || continue
+		    syslog_server_nr_list="${syslog_server_nr_list} ${protocol} ${ip} ${port}"
+		done
+		;;
+	    *)
+		return 255
+		;;
+	esac
+	((i++))
+    done
+
+    if test -n "${EMAIL_ACCOUNT_SERVER_FQDN}" ; then
+	ips=$(dig ${EMAIL_ACCOUNT_SERVER_FQDN} ${dig_options} 2> /dev/null)
+	if test ${?} -ne 0 ; then
+	    error_list="${error_list} ${EMAIL_ACCOUNT_SERVER_FQDN}"
+	else
+	    test -n "${ips}" || error_list="${error_list} ${EMAIL_ACCOUNT_SERVER_FQDN}"
+	fi
+
+	for ip in ${ips}
+	do
+	    check-expr-ip "${ip}" || continue
+	    email_server_nr_list="${email_server_nr_list} ${ip}"
+	done
+    fi
+
+    error_list="${error_list:1}"
+
+    ACCESS_FILE_IF_NR_LIST=${access_file_if_nr_list:1}
+    ACCESS_MON_IF_NR_LIST=${access_mon_if_nr_list:1}
+    SNMP_TRAP_SERVER_NR_LIST=${snmp_trap_server_nr_list:1}
+    SYSLOG_SERVER_NR_LIST=${syslog_server_nr_list:1}
+    KERBEROS_SERVER_NR_LIST=${kerberos_server_nr_list:1}
+    EMAIL_SERVER_NR_LIST=${email_server_nr_list:1}
+
+    test -z "${error_list}" -a ${ipsec_ret} -eq 0
+}
+
+is-dn-present-in-snmp-conf()
+{
+    test -n "${SNMP_TRAP_SERVER_DN_LIST}"
+}
+
+is-dn-present-in-ipsec-site-conf()
+{
+    test -n "${VPN_IPSEC_SITE_DN_LIST}"
+}
+
+is-dn-present-in-access()
+{
+    test \
+	-n "${ACCESS_FILE_IF_DN_LIST}" -o \
+	-n "${ACCESS_MON_IF_DN_LIST}" -o \
+	-n "${KERBEROS_SERVER_DN_LIST}" -o \
+	-n "${SYSLOG_SERVER_DN_LIST}"
+}
+
+is-dn-present()
+{
+    is-dn-present-in-access || \
+	is-dn-present-in-snmp-conf || \
+	is-dn-present-in-ipsec-site-conf \
+	    test -n "${EMAIL_ACCOUNT_SERVER_FQDN}"
+}
+
+set-conf-not-resolved()
+{
+    touch ${USERENV_DIR}/${ENV_NOT_RESOLVED_NAME}
+    chown ${ACCOUNT}:${GROUP_NAME} ${USERENV_DIR}/${ENV_NOT_RESOLVED_NAME}
+}
+
+set-conf-resolved()
+{
+    rm -f ${USERENV_DIR}/${ENV_NOT_RESOLVED_NAME}
+}
+
+get-conf-not-resolved()
+{
+    test -f ${USERENV_DIR}/${ENV_NOT_RESOLVED_NAME}
+}
+
+do-accessed-names-resolution()
+{
+    test "${STATE_CFG_IPTABLES}" == modified -o "${STATE_CFG_TC}" == modified || return 0
+
+    if test ! is-dn-present ; then
+	set-conf-resolved
+	return 0
+    fi
+
+    local ret1 ret2
+
+    log "Resolving names to IP addresses"
+    gen-names-resolved-lists ; ret1=${?}
+    log-result ${ret1}
+
+    set-accessed-names-resolved ; ret2=${?}
+
+    if test ${ret1} -eq 0 ; then	
+	if test ${ret2} -eq 0 ; then
+	    set-conf-resolved
+	else
+	    set-conf-not-resolved
+	fi
+    else
+	set-conf-not-resolved
+    fi
+
+    test ${ret1} -eq 0 -a ${ret2} -eq 0
+}
+
+check-av-names-resolution()
+{
+    local names
+    local ip ips av_ip_list
+
+    unset AV_IP_LIST
+
+    test -n "${NAME_SERVER_LIST}" -o "${SELF_NS}" == True || return 11
+
+    names="db.${AV_COUNTRY_CODE}.clamav.net database.clamav.net ${AV_DOMAIN_NAME}"
+    ips=$(dig ${names} +noall +short +ignore +timeout=4 +tries=2 2> /dev/null)
+
+    test ${?} -eq 0 || return 13
+    test -n "${ips}" || return 15
+
+    for ip in ${ips}
+    do
+	! check-expr-ip "${ip}" || member "${av_ip_list}" "${ip}" || av_ip_list="${av_ip_list} ${ip}"
+    done
+
+    test -n "${av_ip_list}" || return 17
+
+    av_ip_list="${av_ip_list:1}"
+    AV_IP_LIST=${av_ip_list}
+
+    return 0
+}
+
+do-names-resolution-av()
+{
+    test ${AV_MODE} == True || return 0
+    is-connected-to-internet || return 0
+
+    local ret
+
+    log "Checking AV servers name resolution"
+    check-av-names-resolution ; local ret=${?}
+    log-result ${ret}
+    return ${ret}
+}
+
+do-names-resolution()
+{
+    local ret1 ret2 ret3
+
+    do-accessed-names-resolution ; ret1=${?}
+    do-names-resolution-av ; ret2=${?}
+    set-snmp-trap-names-resolved ; ret3=${?}
+
+    rm -f ${TMP_DIR}/${NAME_2RESOLVE}
+    test ${ret1} -eq 0 -a ${ret2} -eq 0 -a ${ret3} -eq 0
+}
+
+LIB_APL_DNS=Yes

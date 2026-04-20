@@ -1,0 +1,288 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       Tuner
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+CACHEGUARD_DIR=/etc/sysconfig/cacheguard
+source ${CACHEGUARD_DIR}/constant
+source ${APPLIANCE_DIR}/etc/role
+source ${HARD_DIR}/model.conf
+source /usr/local/lib/apl_common
+source ${APPLIANCE_DIR}/lib/lib-interface
+
+set-environment()
+{
+    [ ! -f /root/apply-patch/PATCH.env ] || source /root/apply-patch/PATCH.env
+
+    local tmp_filename=model.generated
+
+    export GENERATED_DIR=/tmp/${tmp_filename}.${$}
+    export TUNNER_REPORT=/tmp/report.${tmp_filename}.${$}
+    unset APL
+
+    mkdir -p "${GENERATED_DIR}"
+    cd ${CACHEGUARD_DIR}
+}
+
+clean-tmp-files()
+{
+    rm -rf ${GENERATED_DIR}
+    rm -f ${TUNNER_REPORT}
+}
+
+external-form()
+{
+    test -n "${1}" || return 1
+    
+    case "${1}" in
+	True)
+	    echo -n "on"
+	    return 0
+	    ;;
+	False)
+	    echo -n "off"
+	    return 0
+	    ;;
+	*)
+	    echo -n "Error"
+	    return 1
+	    ;;
+    esac
+}
+
+get-memory-type()
+{
+    local memory_type
+
+    local name=$(uname -r 2> /dev/null)
+    name=${name#*-}
+    name=${name%-*}
+
+    case ${name} in
+	${SYS_RELEASE_NAME}-64)
+	    memory_type=64mem
+	    ;;
+	${SYS_RELEASE_NAME}-hm)
+	    memory_type=highmem
+	    ;;
+	${SYS_RELEASE_NAME})
+	    memory_type=lowmem
+	    ;;
+	${SYS_RELEASE_NAME}-uml-64)
+	    memory_type=highmem
+	    ;;
+	${SYS_RELEASE_NAME}-uml)
+	    memory_type=lowmem
+	    ;;
+	*)
+	    memory_type=unknown
+	    ;;
+    esac
+
+    echo "${memory_type}"
+}
+
+get-os-cur-version()
+{
+    local os_version=$(cat ${HARD_DIR}/os-version 2> /dev/null)
+
+    echo -n "${os_version}"
+}
+
+get-assertion-from-file()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    local in_variable=${1}
+    local in_file=${2}
+    test -s ${in_file} || return 11
+
+    local assertion variable
+
+    while read assertion
+    do
+	test -n "${assertion}" || continue
+	variable=${assertion/=*}
+	if test ${variable} == ${in_variable} ; then
+	    echo "${assertion}"
+	    break
+	fi
+    done < ${in_file}
+}
+
+retune-model-1.4.2()
+{
+    local default_sz=5
+    local assertion var
+
+    if test -f ${GENERATED_DIR}/model.conf ; then
+	while read assertion
+	do
+	    test -n "${assertion}" || continue
+	    test ${assertion:0:1} != '#' || continue
+	    var=${assertion/=*}
+	    test "${var}" != OCSPD_MEMORY_SZ || break
+	done < ${GENERATED_DIR}/model.conf
+    fi
+
+    test -n "${assertion}" || assertion="OCSPD_MEMORY_SZ=${default_sz}"
+
+    sed -ie "/^NAMED_MEMORY_SZ=/a ${assertion}" ${APL}${HARD_DIR}/model.conf
+}
+
+retune-model-1.5.1()
+{
+    local line set_root pattern="set root="
+    local len=${#pattern}
+
+    while read line
+    do
+	if test "${line:0:${len}}" == "${pattern}" ; then
+	    set_root=${line}
+	    break
+	fi
+    done < ${APL}/boot/grub/grub.cfg
+    test -n "${set_root}" || return 11
+
+    sed -ie "s@${pattern}.*@${set_root}@g" ${GENERATED_DIR}/grub.cfg
+
+    chattr -R -i ${APL}/boot/grub
+    install -m 644 -o root -g root ${GENERATED_DIR}/grub.cfg ${APL}/boot/grub/grub.cfg
+    chattr -R +i ${APL}/boot/grub
+}
+
+retune-model-1.5.5()
+{
+    local default_sz=2048
+    local assertion var
+
+    if test -f ${GENERATED_DIR}/model.conf ; then
+	while read assertion
+	do
+	    test -n "${assertion}" || continue
+	    test ${assertion:0:1} != '#' || continue
+	    var=${assertion/=*}
+	    test "${var}" != CLAMAV_MEMORY_SZ || break
+	done < ${GENERATED_DIR}/model.conf
+    fi
+
+    test -n "${assertion}" || assertion="CLAMAV_MEMORY_SZ=${default_sz}"
+
+    sed -ie "s/^CLAMAV_MEMORY_SZ=.*$/${assertion}/" ${APL}${HARD_DIR}/model.conf
+}
+
+retune-model-2.1.1()
+{
+    test -n "${1}" || return 1
+    local state=${1}
+
+    chattr -R -i ${APL}/boot/grub
+
+    if test ${state} == ok ; then
+	test ! -f ${GENERATED_DIR}/grub.cfg || \
+	    install -m 644 -o root -g root ${GENERATED_DIR}/grub.cfg ${APL}/boot/grub/grub.cfg
+    else
+	local old_release=$(uname -r 2> /dev/null)
+	local new_release=$(get-other-kernel-release ${old_release})
+	test -z "${new_release}" || sed -ie "s/${old_release}/${new_release}/g" ${APL}/boot/grub/grub.cfg
+    fi
+
+    chattr -R +i ${APL}/boot/grub
+}
+
+apply-os-version-tuning()
+{
+    test -n "${1}" || return 1
+    local state=${1}
+
+    case ${PATCH_OS_NEW_VERSION} in
+	'1.4.2'|'1.5.1'|'1.5.5')
+	    test ${state} == ko || retune-model-${PATCH_OS_NEW_VERSION}
+	    ;;
+	'2.1.1')
+	    retune-model-${PATCH_OS_NEW_VERSION} ${state}
+	    ;;
+	*)
+	    ;;
+    esac
+}
+
+main()
+{
+    set-environment
+
+    local os_version=$(get-os-cur-version)
+    local memory_type=$(get-memory-type)
+    local memory_sz=$(get-installed-memory-sz)
+    local cache=$(external-form ${PERSISTENT_CACHE})
+    local web_log=$(external-form ${PERSISTENT_WEB_LOG})
+    local rweb_log=$(external-form ${PERSISTENT_RWEB_LOG})
+    local keyboard=$(cat ${ETC_DIR}/keymap 2> /dev/null)
+    local ret
+
+    cd ${CACHEGUARD_DIR}
+
+    case ${APL_ROLE} in
+	gateway)
+	    RETUNE=yes \
+		  apl_model_configure \
+		  "${memory_type}" \
+		  "${CPU_NB}" \
+		  "${memory_sz}" \
+		  "${DISK_INFOS}" \
+		  "${NETWORK_DEVICES}" \
+		  "${keyboard}" \
+		  "${APL_ROLE}:${USERS_NB},${URLLIST_RECORDS_NB},${RUSERS_NB},${RWEB_NB},${LOGROTATE_NB},$[${RWEB_CACHE_SZ} * 1024],${MAX_UPLOAD_FILE_SZ},${cache},${web_log},${rweb_log}" \
+		  > ${TUNNER_REPORT} 2>&1
+	    ;;
+	manager)
+	    RETUNE=yes \
+		  apl_model_configure \
+		  "${memory_type}" \
+		  "${CPU_NB}" \
+		  "${memory_sz}" \
+		  "${DISK_INFOS}" \
+		  "${NETWORK_DEVICES}" \
+		  "${keyboard}" \
+		  "${APL_ROLE}:${MANAGER_GATEWAY_NB},${MANAGER_TEMPLATE_NB},${MANAGER_TOTAL_USERS_NB},${MANAGER_TOTAL_RWEB_NB},${URLLIST_RECORDS_NB}" \
+		  > ${TUNNER_REPORT} 2>&1
+	    ;;
+	*)
+	    ;;
+    esac
+
+    ret=${?}
+
+    if test ${ret} -eq 0 ; then
+	apl_model_install retune ${APL_ROLE}
+	apply-os-version-tuning ok
+    else
+	apply-os-version-tuning ko
+    fi
+
+    clean-tmp-files
+    return ${ret}
+}
+
+# Main()
+
+main "${@}"

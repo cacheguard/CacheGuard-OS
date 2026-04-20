@@ -1,0 +1,43 @@
+<a name='gateway-machine' class='doc-title'></a><h3>Gateway Machine Requirements</h3>
+The required machine resources for a Gateway system primarily depend on the total number of users to protect (in forwarding mode) or the maximum number of <strong>simultaneous</strong> users of Web applications to protect (in reverse mode). By “simultaneous users”, we mean active users who consume the appliance’s resources (mainly RAM and CPU). Simultaneous users differ from concurrent users, who may all be connected to protected Web applications without necessarily consuming any resources on the CacheGuard appliance. On Web application servers, concurrent users typically consume RAM and/or disk space, whereas on CacheGuard, only simultaneous users consume RAM and CPU (number of simultaneous users ≤ number of concurrent users).
+<p>
+During installation, the OS is fine-tuned according to the expected number of users to support, ensuring an optimal balance between performance and resource consumption. To provide an optimised quality of service, the tuning process assumes that not all users are connected simultaneously — only about 20 percent of them. For example, an appliance installed for 100 users is configured to support 20 simultaneous users while still allowing short bursts of up to 100 simultaneous users for limited periods.
+<p>
+For 100 users (20 simultaneous users), a typical machine configuration is as follows:
+<ul>
+  <li>Architecture: x86/x64</li>
+  <li>CPU: 4 cores</li>
+  <li>RAM: 8 GB</li>
+  <li>Disk: 250 GB</li>
+  <li>Network: 2 × Ethernet NIC</li>
+</ul>
+<p>
+For higher numbers of users, it is advisable to use a machine with additional RAM, CPU cores, and disk capacity. As a general rule, add one CPU core and 1 GB of RAM (+75 GB of disk space in forwarding mode) for every 10 additional simultaneous users. For instance, an appliance supporting 40 simultaneous users would require six CPU cores, 10 GB of RAM, and approximately 400 GB of disk space in forwarding mode.
+<p>
+On physical hardware, CacheGuard-OS performs more efficiently with multiple lower-capacity disks configured as a RAID array rather than a single high-capacity disk. CacheGuard-OS natively supports software RAID using only about 3% of CPU resources. Supported RAID levels include RAID 0 (striping), RAID 1 (mirroring), RAID 5 (striping with parity), RAID 6 (striping with double parity), and RAID 10 (striping with mirroring).
+<p>
+CacheGuard-OS allows you to enable all integrated security and optimisation features simultaneously on the same machine. Some features, such as real-time HTTP compression and antivirus, are more CPU-intensive than others, and activating antivirus functionality requires approximately 2 GB of RAM. The configuration guidelines provided above apply when all features are enabled concurrently. Fewer resources may be sufficient if not all features are required. Please note that, in all cases, CacheGuard-OS requires at least <strong>512 MB</strong> of RAM for installation.
+<p>
+CacheGuard-OS requires at least <strong>two NICs</strong> (Network Interface Cards). If your machine has only one NIC, you may use a USB Ethernet adapter as the second interface. To take advantage of link bonding or to use an auxiliary network interface, additional NICs (or USB Ethernet adapters) are required.
+<p>
+CacheGuard-OS can also be installed for a minimal number of users on a compact computer. The minimum configuration to support 10 users in forwarding mode is as follows:
+<ul>
+  <li>Architecture: x64</li>
+  <li>CPU: 2 cores</li>
+  <li>RAM: 4 GB</li>
+  <li>Disk: 40 GB</li>
+  <li>Network: 2 × Ethernet NIC</li>
+</ul>
+This configuration allows all CacheGuard-OS features to be enabled simultaneously on a 64-bit machine. However, if high-memory-demand services such as antivirus are unnecessary, CacheGuard-OS can operate with as little as 256 MB of RAM. With that amount of RAM, your CacheGuard-OS-based system can function effectively as a firewall and VPN server. Nevertheless, installation still requires a minimum of <strong>512 MB</strong> of RAM.
+<p>
+<a name='manager-machine' class='doc-title'></a><h3>Manager Machine Requirements</h3>
+The required resources for a Manager system mainly depend on the total number of Gateway systems to be managed. To manage up to 10 Gateway systems, a typical configuration is as follows:
+<ul>
+  <li>Architecture: x86/x64</li>
+  <li>CPU: 2 cores</li>
+  <li>RAM: 1 GB</li>
+  <li>Disk: 25 GB</li>
+  <li>Network: 1 × Ethernet NIC</li>
+</ul>
+<p>
+To manage additional Gateways, opt for a system with increased disk capacity. As a general guideline, add approximately 25 GB of disk space for every 10 additional Gateway systems to be managed.

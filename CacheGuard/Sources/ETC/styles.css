@@ -1,0 +1,110 @@
+html {
+    height:100%;
+}
+
+body {
+    margin:0;
+    padding:0;
+    background-color:Gray;
+    font-family:arial,helvetica,sans-serif;
+    height:100%;
+}
+
+a {
+    outline:0;
+    color:black;
+    text-decoration:none;
+}
+
+a:link {
+    text-decoration:none;
+    font-weight:normal;
+    color:FireBrick;
+}
+
+a:visited {
+    text-decoration:none;
+    color:FireBrick;
+}
+
+a:hover {
+    text-decoration:none;
+    color:Red;
+}
+
+table {
+    width:100%;
+    font-size:80%;
+    border-width:0;
+    padding:0;
+    margin:0;
+    border-spacing:1px;
+    background-color:Gray;
+    table-layout:fixed;
+}
+
+table td {
+    padding:10px;
+    vertical-align:middle;
+    word-wrap:break-word;
+    background-color:LightGray;
+}
+
+table td:first-child {
+    width:120px;
+}
+
+table tr:first-child td:first-child {
+    background-color:FireBrick;
+    color:White;
+    font-size:110%;
+    font-weight:bold;
+}
+
+table tr:first-child td:last-child {
+    background-color:White;
+    color:FireBrick;
+    font-size:150%;
+    font-weight:bold;
+}   
+
+table.directory {
+    width:100%;
+    font-size:90%;
+    border-width:0;
+    padding:0;
+    margin:0;
+    border-spacing:1px;
+    background-color:Gray;
+    table-layout:fixed;
+}
+
+table.directory td {
+    padding:4px;
+    vertical-align:middle;
+    word-wrap:break-word;
+    background-color:LightGray;
+}
+
+table.directory tr:first-child td {
+    background-color:White;
+    color:black;
+    font-size:100%;
+    font-weight:bold;
+}
+
+#wrap {
+    position:relative;
+    width:100%;
+    height:100%;
+    margin:0 auto;
+    background:Gray;
+    overflow:auto;
+}
+
+#content {
+    position:relative;
+    width:100%;
+    background:DarkGray;
+    margin:0;
+}

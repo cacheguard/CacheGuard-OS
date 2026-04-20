@@ -1,0 +1,105 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       Scripts
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+CACHEGUARD_DIR=/etc/sysconfig/cacheguard
+source ${CACHEGUARD_DIR}/constant
+source ${APPLIANCE_DIR}/etc/role
+source ${ABASE_DIR}/${ENV_RDIR}/${ENV_CURRENT_NAME}
+
+get-geo-lite-country()
+{
+    local geoip_url="${GEO_LITE_COUNTRY_URL}"
+    unset https_proxy
+    unset HTTPS_PROXY
+    curl \
+	--disable --fail -4 \
+	--no-show-error --stderr /dev/null \
+	--header 'Cache-Control: no-cache' \
+	--location \
+	--url ${geoip_url}
+}
+
+reload-web()
+{
+    test -n "${1}" || return 1
+    local service=${1}
+
+    local action=reload
+    local iteration=3
+
+    while true
+    do
+	test ${iteration} -gt 0 || break
+	/etc/rc.d/init.d/${service} ${action} > /dev/null 2>&1
+	test ${?} -ne 0 || break
+	sleep 3
+	((iteration--))
+    done
+
+    if test ${iteration} -gt 0 ; then
+	logger -p daemon.info -t apl_update_geoip -- "the ${service} has been successfully reloaded."
+    else
+	logger -p daemon.alert -t apl_update_geoip -- "unable to reload the ${service}."
+    fi
+}
+
+main()
+{
+    local tmp_geoip_file=/tmp/geo-ip.${$}
+    local ret
+
+    get-geo-lite-country > ${tmp_geoip_file}
+    ret=${?}
+
+    if test ${ret} -ne 0 ; then
+	rm -f ${tmp_geoip_file}
+	logger -p daemon.alert -t apl_update_geoip -- "unable to download the Geo IP file. The curl command returned the ${ret} value code."
+	return ${ret}
+    fi
+
+    diff --brief ${tmp_geoip_file} ${WEB_SERVER_DIR}/share/GeoLiteCountry.dat > /dev/null 2>&1
+    ret=${?}
+
+    if test ${ret} -eq 0 ; then
+	rm -f ${tmp_geoip_file}
+	return ${ret}
+    fi
+
+    chattr -i ${WEB_SERVER_DIR}/share
+    install -m 444 -o root -g root ${tmp_geoip_file} ${WEB_SERVER_DIR}/share/GeoLiteCountry.dat
+    chattr +i ${WEB_SERVER_DIR}/share
+
+    rm -f ${tmp_geoip_file}
+
+    logger -p daemon.info -t apl_update_geoip -- "the Geo IP file has been successfully updated."
+
+    reload-web httpd
+    test ${CURRENT_ADMIN_WADMIN} == False || reload-web wadmind
+
+    return 0
+}
+
+# Main()
+
+main

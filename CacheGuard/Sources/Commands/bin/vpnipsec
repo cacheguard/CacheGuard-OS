@@ -1,0 +1,3642 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       Commands
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+source functions
+
+show-vpn-ipsec-authenticate1()
+{
+    local version=${1}
+    local auth=${2}
+
+    local psk_file
+
+    echo-command-form "vpnipsec authenticate"
+    if test "${version}" == 'new' ; then
+	echo-mark-new
+    else
+	echo-mark-cur
+    fi
+    
+    if test ${auth:0:3} == 'psk' ; then
+
+	if test "${version}" == 'new' ; then
+	    psk_file=${VPN_IPSEC_DIR}/${IPSEC_AUTHENTICATE_PSK_FILENAME}
+	else
+	    psk_file=${VPN_IPSEC_DIR}/${IPSEC_AUTHENTICATE_PSK_FILENAME}.current
+	fi
+
+	local secret=$(cat ${psk_file} 2> /dev/null)
+	secret=$(decrypt-password "${secret}" "${IPSEC_PASSWD}")
+	echo-value "psk ${secret}"
+
+    else
+	local tls tls_id id_type method
+	if test ${auth:0:3} == 'tls' ; then
+	    method=tls
+	    tls=${auth:4}
+	    
+	elif test ${auth:0:6} == 'eaptls' ; then
+	    method=eaptls
+	    tls=${auth:7}
+	fi
+	tls_id=${tls/:*}
+	id_type=${tls/*:}
+
+	echo-value "${method} ${tls_id} ${id_type}"
+    fi
+}
+
+show-vpn-ipsec-authenticate()
+{
+    echo-begin-show
+    show-vpn-ipsec-authenticate1 'current' "${CURRENT_VPN_IPSEC_AUTHENTICATE}"
+    ! vpnipsec-authenticate-modified || show-vpn-ipsec-authenticate1 'new' "${VPN_IPSEC_AUTHENTICATE}"
+    echo-end-show
+}
+
+manage-vpn-ipsec-authenticate()
+{
+    if test -z "${1}" ; then
+	show-vpn-ipsec-authenticate
+	return 0
+    fi
+    local auth_method=${1}
+
+    case ${auth_method} in
+
+	eaptls|tls)
+	    test -n "${2}" || return 1
+
+	    local id_type tls_id=${2}
+
+	    if test -z "${3}" ; then
+		id_type=dn
+	    else
+		id_type=${3}
+		check-vpn-id-type ${id_type} || return 83
+	    fi
+	    case ${auth_method} in
+		eaptls)
+		    VPN_IPSEC_AUTHENTICATE="eaptls:${tls_id}:${id_type}"
+		    ;;
+		tls)
+		    VPN_IPSEC_AUTHENTICATE="tls:${tls_id}:${id_type}"
+		    ;;
+		*)
+		    ;;
+	    esac
+	    SAVENV=1
+	    ;;
+
+	psk|psk:encrypted)
+	    if test ${auth_method} == 'psk' ; then
+		local secret=${2}
+		if test ${auth_method} == 'psk' -a "${secret}" == 'auto' ; then
+		    secret=$(random-psk)
+		else
+		    check-psk "${secret}" || return 202
+		fi
+		secret=$(encrypt-password "clear:${secret}" "${IPSEC_PASSWD}")
+		user-has-admin-rights || return 31
+		echo "${secret}" > ${VPN_IPSEC_DIR}/${IPSEC_AUTHENTICATE_PSK_FILENAME}
+		VPN_IPSEC_AUTHENTICATE="psk"
+		SAVENV=1
+
+	    elif test ${auth_method} == 'psk:encrypted' ; then
+
+		local secret=${2}
+		test -n "${secret}" || return 0
+
+		local clear_secret=$(decrypt-password "encrypted:${secret}" "${IPSEC_PASSWD}")
+		check-psk "${clear_secret}" || return 202
+		user-has-admin-rights || return 31
+		echo "encrypted:${secret}" > ${VPN_IPSEC_DIR}/${IPSEC_AUTHENTICATE_PSK_FILENAME}
+		VPN_IPSEC_AUTHENTICATE="psk"
+		SAVENV=1
+	    else
+		return 255
+	    fi
+	    ;;
+	*)
+	    return 195
+	    ;;
+    esac
+}
+
+get-vpn-network-internal-format()
+{
+    if test -z "${1}" ; then
+	echo 'nil'
+	return 0
+    fi
+    local in_networks=${1}
+
+    local networks
+    local elt i=0 range
+    local ip mk
+
+    for elt in ${in_networks}
+    do
+	range=$[${i} % 2]
+	case ${range} in
+	    0)
+		ip=${elt}
+		;;
+	    1)
+		mk=${elt}
+		networks="${networks},${ip}/${mk}"
+		;;
+	    *)
+		return 1
+		;;
+	esac
+	((i++))
+    done
+    networks="${networks:1}"
+
+    echo ${networks}
+}
+
+check-vpn-ipsec-type()
+{
+    test -n "${1}" || return 1
+    local ipsec_type=${1}
+
+    case ${ipsec_type} in
+	site|access)
+	    return 0
+	    ;;
+	*)
+	    return 11
+	    ;;
+    esac
+}
+
+check-vpn-side()
+{
+    test -n "${1}" || return 1
+    local side=${1}
+
+    case ${side} in
+	'local'|remote)
+	    return 0
+	    ;;
+	*)
+	    return 11
+	    ;;
+    esac
+}
+
+check-vpn-role()
+{
+    test -n "${1}" || return 1
+    local role=${1}
+
+    case ${role} in
+	active|passive|raz)
+	    return 0
+	    ;;
+	*)
+	    return 11
+	    ;;
+    esac
+}
+
+vpn-ipsec-exist()
+{
+    test -n "${1}" || return 1
+    local in_vpn_id=${1}
+
+    local elt i=0 range
+    local vpn_id
+
+    for elt in ${VPN_IPSEC_SITE_LIST}
+    do
+	range=$[${i} % 12]
+	case ${range} in
+	    0)
+ 		vpn_id=${elt}
+		;;
+	    1|2|3|4|5|6|7|8|9|10)
+		;;
+	    11)
+		test ${vpn_id} != ${in_vpn_id} || return 0
+		;;
+	    *)
+		return 1
+		;;
+	esac
+	((i++))
+    done
+
+    return 11
+}
+
+show-vpn-ipsec-access1()
+{
+    local version=${1} elt
+
+    echo-command-form "vpnipsec access"
+    if test "${version}" == 'new' ; then
+	echo-mark-new
+    else
+	echo-mark-cur
+    fi
+
+    echo-value "${2}"   
+}
+
+show-vpn-ipsec-access()
+{
+    echo-begin-show
+    show-vpn-ipsec-access1 current "${CURRENT_VPN_IPSEC_ACCESS}"
+    if test "${CURRENT_VPN_IPSEC_ACCESS}" != "${VPN_IPSEC_ACCESS}" ; then
+	show-vpn-ipsec-access1 new "${VPN_IPSEC_ACCESS}"
+    fi
+    echo-end-show
+}
+
+check-valid-vpnipsec-client()
+{
+    test -n "${1}" || return 1
+    client_type=${1}
+
+    case ${client_type} in
+	android|apple|linux|windows)
+	    return 0
+	    ;;
+	*)
+	    return 11
+	    ;;
+    esac
+}
+
+get-diffie-hellman-group()
+{
+    test -n "${1}" || return 1
+    local dh=${1}
+
+    local group
+
+    case ${dh} in
+	modp1536)
+	    group=5
+	    ;;
+	modp2048)
+	    group=14
+	    ;;
+	modp3072)
+	    group=15
+	    ;;
+	modp4096)
+	    group=16
+	    ;;
+	modp6144)
+	    group=17
+	    ;;
+	modp8192)
+	    group=18
+	    ;;
+	ecp192)
+	    group=25
+	    ;;
+	ecp224)
+	    group=26
+	    ;;
+	ecp256)
+	    group=19
+	    ;;
+	ecp384)
+	    group=20
+	    ;;
+	ecp521)
+	    group=21
+	    ;;
+	ecp224bp)
+	    group=27
+	    ;;
+	ecp256bp)
+	    group=28
+	    ;;
+	ecp384bp)
+	    group=29
+	    ;;
+	ecp512bp)
+	    group=30
+	    ;;
+	*)
+	    ;;
+    esac
+
+    echo ${group}
+}
+
+get-diffie-hellman-apple()
+{
+    test -n "${1}" || return 1
+    local dh=${1}
+
+    local group
+
+    case ${dh} in
+	modp1536)
+	    group=5
+	    ;;
+	modp2048)
+	    group=14
+	    ;;
+	modp3072)
+	    group=15
+	    ;;
+	modp4096)
+	    group=16
+	    ;;
+	modp6144)
+	    group=17
+	    ;;
+	modp8192)
+	    group=18
+	    ;;
+	ecp256)
+	    group=19
+	    ;;
+	ecp384)
+	    group=20
+	    ;;
+	ecp521)
+	    group=21
+	    ;;
+	*)
+	    ;;
+    esac
+
+    echo ${group}
+}
+
+get-diffie-hellman-windows-name()
+{
+    test -n "${1}" || return 1
+    local dh=${1}
+
+    local group
+
+    case ${dh} in
+	modp2048)
+	    group=Group14
+	    ;;
+	ecp256|ecp384)
+	    group=${dh^^}
+	    ;;
+	*)
+	    ;;
+    esac
+
+    echo ${group}
+}
+
+gen-uuid()
+{
+    local k1 k2 k3 k4 k5
+
+    k1=$(random-phrase-base16 8)
+    k2=$(random-phrase-base16 4)
+    k3=$(random-phrase-base16 4)
+    k4=$(random-phrase-base16 4)
+    k5=$(random-phrase-base16 12)
+
+    local uuid="${k1}-${k2}-${k3}-${k4}-${k5}"
+
+    echo ${uuid}
+}
+
+invert-domain-name()
+{
+    test -n "${1}" || return 1
+    local domain=${1}
+
+    local inverted len d
+
+    domain=${domain//./ }
+
+    for d in ${domain}
+    do
+	inverted="${d} ${inverted}"
+    done
+
+    len=${#inverted} ; ((len--))
+    inverted=${inverted:0:${len}}
+    inverted=${inverted// /.}
+
+    echo ${inverted}
+}
+
+get-ipsec-access-server-address()
+{
+    local server_tls_id=${1}
+
+    if test -n "${server_tls_id}" ; then
+	local names=$(get-subject-alternative-names ${server_tls_id})
+	local name=${names/ *}
+	echo ${name}
+	return 0
+    fi
+
+    local ip
+
+    if test -n "${CURRENT_VPN_IPSEC_BEHIND_NAT_IP_LIST}" ; then
+	ip=${CURRENT_VPN_IPSEC_BEHIND_NAT_IP_LIST/ *}
+    else
+	if test ${CURRENT_HA_MODE} == False ; then
+	    ip=${CURRENT_IP_EXTERNAL_IP}
+	else
+	    ip=$(get-prefered-vrrp-ip "${CURRENT_VRRP_EXTERNAL_LIST}")
+	    test -n "${ip}" || ip=${CURRENT_IP_EXTERNAL_IP}
+	fi
+    fi
+
+    echo ${ip}
+}
+
+get-windows-certificate-subject()
+{
+    test -n "${1}" || return 1
+    local in_subject=${1}
+
+    local out_subject
+    local in_subject_array assertion n i=0
+    declare -a in_subject_array
+
+    in_subject=${in_subject/*Subject: C=/C=}
+    in_subject=${in_subject// = /=}
+    in_subject=${in_subject/ST=/S=}
+
+    while true
+    do
+	assertion=${in_subject/, *}
+	in_subject_array[${i}]=${assertion}
+	in_subject=${in_subject#*, }
+	test "${assertion}" != "${in_subject}" || break
+	((i++))
+    done
+
+    n=${#in_subject_array[@]}
+    ((n--))
+
+    for ((i=n ; i>=0 ; i--))
+    do
+	assertion=${in_subject_array[${i}]}
+	out_subject="${out_subject}, ${assertion}"
+    done
+
+    echo ${out_subject:2}
+}
+
+gen-vpn-ipsec-access-conf()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    test -n "${3}" || return 3
+    local client_type=${1}
+    local client_tls_id=${2}
+    local op=${3}
+    local server_tls_id=${4}
+
+    local ca_cname remote_id local_id
+    local error_message lt gt
+
+    local ca_cname=$(get-tls-canonical-name ${SSL_CA_DIR}/${SYSTEM_CA}.certificate)
+    local vpn_server_addr=$(get-ipsec-access-server-address ${server_tls_id})
+    local vpn_name=${ca_cname}
+
+    case ${op} in
+	save|email)
+	    lt='<'
+	    gt='>'
+	    ;;
+	*)
+	    if test "${TERM}" == "${WADMIN_TERM}" ; then
+		lt='&lt;'
+		gt='&gt;'
+	    else
+		lt='<'
+		gt='>'
+	    fi
+	    ;;
+    esac
+
+    local security=${CURRENT_VPN_IPSEC_ACCESS#* }
+    local ike_encryption=${security/ *} security=${security#* }
+    local ike_integrity=${security/ *} security=${security#* }
+    local dh=${security/ *} security=${security#* }
+    local esp_encryption=${security/ *} security=${security#* }
+    local esp_integrity=${security/ *}
+
+    if test ${CURRENT_VPN_IPSEC_AUTHENTICATE} != psk ; then
+	if test ! -d ${SSL_CLIENT_DIR}/${client_tls_id}.cur ; then
+	    error_message="${error_message} ${Errors[75]}"
+	else
+	    tls-client-pfx-exist ${client_tls_id} || error_message="${error_message} ${Errors[518]}"
+	fi
+    fi
+
+    if test ${CURRENT_VPN_IPSEC_AUTHENTICATE:0:6} == eaptls ; then
+	error_message="${error_message} Server side EAP-TLS certificate authentication based is not supported."
+    elif test ${CURRENT_VPN_IPSEC_AUTHENTICATE:0:3} == tls ; then
+	check-tls-cert-signed-by-ca \
+	    ${SSL_SERVER_DIR}/${server_tls_id}.certificate \
+	    ${SSL_CA_DIR}/${SYSTEM_CA}.certificate || \
+	    error_message="${error_message} The server certificate associated to the IPsec VPN is not signed by the system CA."
+    fi
+
+    case ${client_type} in
+
+	android)
+	    if test ${CURRENT_VPN_IPSEC_AUTHENTICATE} == psk ; then
+		error_message="${error_message} Server side PSK authentication based is not supported."
+	    fi
+
+	    if test ${CURRENT_VPN_IPSEC_ACCESS_AUTHENTICATE} == psk ; then
+		error_message="${error_message} Client side PSK authentication based is not supported."
+	    fi
+
+	    if test -n "${error_message}" ; then
+		error_message=${error_message:1}
+		echo "{"
+		echo -n "   \"_comment\": \"The VPN profile for the Android(R) VPN client can't be generated because: "
+		echo "${error_message}\""
+		echo "}"
+	    fi
+	    ;;
+
+	apple)
+	    local tls_id id
+
+	    if test ${CURRENT_VPN_IPSEC_AUTHENTICATE:0:3} == psk ; then
+		if test ${CURRENT_VPN_IPSEC_ACCESS_AUTHENTICATE} != psk ; then
+		    error_message="${error_message} When using PSK based authentication, it should be used on the server side as well as on the client side."
+		fi
+	    else
+		if test ${CURRENT_VPN_IPSEC_ACCESS_AUTHENTICATE} == psk ; then
+		    error_message="${error_message} When using PSK based authentication, it should be used on the server side as well as on the client side."
+		fi
+
+		if test ${CURRENT_VPN_IPSEC_AUTHENTICATE:0:3} == tls ; then
+		    tls_id=${CURRENT_VPN_IPSEC_AUTHENTICATE:4}
+		elif test ${CURRENT_VPN_IPSEC_AUTHENTICATE:0:6} == eaptls ; then
+		    tls_id=${CURRENT_VPN_IPSEC_AUTHENTICATE:7}
+		fi
+
+		id=${tls_id/*:}
+		if test ${id} == dn ; then
+		    error_message="${error_message} DN based certificate identifier is not supported."
+		fi
+	    fi
+
+	    case ${ike_encryption} in
+		aes128|aes256)
+		    ike_encryption=${ike_encryption:0:3}-${ike_encryption:3}
+		    ike_encryption=${ike_encryption^^}
+		    ;;
+		*)
+		    error_message="${error_message} Only the aes128 and aes256 IKE Encryption Algorithms are supported."
+		    ;;
+	    esac
+
+	    case ${ike_integrity} in
+		sha1)
+		    ike_integrity=SHA1-160
+		    ;;
+		sha256|sha384|sha512)
+		    ike_integrity=SHA2-${ike_integrity:3}
+		    ike_integrity=${ike_integrity^^}
+		    ;;
+		*)
+		    error_message="${error_message} Only the sha1, sha256, sha384 and sha512 IKE Integrity Algorithm are supported."
+	    esac
+
+	    local dh_apple=$(get-diffie-hellman-apple ${dh})
+	    if test -z "${dh_apple}"  ; then
+		error_message="${error_message} Only the group 5 and 14-21 Diffie Hellman Key Strengths are supported."
+	    fi
+
+	    case ${esp_encryption} in
+		aes128|aes256)
+		    esp_encryption=${esp_encryption:0:3}-${esp_encryption:3}
+		    esp_encryption=${esp_encryption^^}
+		    ;;
+		*)
+		    error_message="${error_message} Only the aes128 and aes256 ESP Encryption Algorithms are supported."
+		    ;;
+	    esac
+
+	    case ${esp_integrity} in
+		sha1)
+		    esp_integrity=SHA1-160
+		    ;;
+		sha256|sha384|sha512)
+		    esp_integrity=SHA2-${esp_integrity:3}
+		    esp_integrity=${esp_integrity^^}
+		    ;;
+		*)
+		    error_message="${error_message} Only the sha1, sha256, sha384 and sha512 ESP Integrity Algorithms are supported."
+		    ;;
+	    esac
+
+	    if test -n "${error_message}" ; then
+		error_message=${error_message:1}
+		echo "${lt}?xml version=\"1.0\" encoding=\"UTF-8\"?${gt}"
+		echo
+		echo "${lt}!--"
+		echo -n "The Apple(R) configuration profile can't be generated because: "
+		echo "${error_message}"
+		echo "--${gt}"
+	    fi
+	    ;;
+
+	linux)
+	    if test ${CURRENT_VPN_IPSEC_AUTHENTICATE} == psk ; then
+		error_message="${error_message} Server side PSK authentication based is supported but requires that you install the strongSwan application on your machine and manually configure it."
+	    fi
+
+	    if test ${CURRENT_VPN_IPSEC_ACCESS_AUTHENTICATE} == psk ; then
+		error_message="${error_message} Client side PSK authentication based is supported but requires that you install the strongSwan application on your machine and manually configure it."
+	    fi
+
+	    if test -n "${error_message}" ; then
+		error_message=${error_message:1}
+		echo -n "### The bash script can't be generated because: "
+		echo -e "${error_message}"
+	    fi
+	    ;;
+
+	windows)
+	    if test ${CURRENT_VPN_IPSEC_AUTHENTICATE} == psk ; then
+		error_message="${error_message} Server side PSK authentication based is not supported."
+	    fi
+
+	    case ${CURRENT_VPN_IPSEC_ACCESS_AUTHENTICATE} in
+		psk)
+		    error_message="${error_message} Client side PSK authentication based is not supported."
+		    ;;
+		*)
+		    ;;
+	    esac
+
+	    case ${ike_encryption} in
+		aes128|aes192|aes256)
+		    ;;
+		*)
+		    error_message="${error_message} Only the aes128, aes192 and aes256 IKE Encryption Algorithms are supported."
+		    ;;
+	    esac
+
+	    if test ${ike_integrity} != sha256 ; then
+		error_message="${error_message} Only the sha256 IKE Integrity Algorithm is supported."
+	    fi
+
+	    local dh_windows=$(get-diffie-hellman-windows-name ${dh})
+	    if test -z "${dh_windows}"  ; then
+		error_message="${error_message} Only the modp2048, ecp256 and ecp384 Diffie Hellman Key Strengths are supported."
+	    fi
+
+	    case ${esp_encryption} in
+		aes128|aes192|aes256)
+		    ;;
+		*)
+		    error_message="${error_message} Only the aes128, aes192 and aes256 ESP Encryption Algorithms are supported."
+		    ;;
+	    esac
+
+	    case ${esp_integrity} in
+		sha1|sha256|sha384)
+		    ;;
+		*)
+		    error_message="${error_message} Only the sha1, sha256 and sha384 ESP Integrity Algorithms are supported."
+		    ;;
+	    esac
+
+	    ike_encryption=${ike_encryption^^}
+	    ike_integrity=${ike_integrity^^}128
+	    esp_integrity=${esp_integrity^^}
+	    esp_encryption=${esp_encryption^^}
+
+	    if test -n "${error_message}" ; then
+		error_message=${error_message:1}
+		echo -n "### The PowerShell script can't be generated because: "
+		echo -e "${error_message}"
+	    fi
+	    ;;
+
+	*)
+	    ;;
+    esac
+
+    test -z "${error_message}" || return 0
+
+    local elt range i=0
+    local ipsec_type local_ip_mk_list
+    local split_tunneling_networks split_tunneling_ip_px network ip px
+
+    local gateway_ip=$(get-web-ip cur)
+
+    local pkcs12_message="This file embeds a strictly personal, password-protected PKCS#12 file. You will be prompted to enter the corresponding password, which must be provided by your administrator."
+
+    local disclaimer_message="This file has been generated by ${vpn_name} and is striclty personal and confidential. If you have received it by mistake, please inform ${vpn_name} and then delete it. It is forbidden to copy, forward, or in any way reveal the contents of this file to anyone. The integrity and security of this file cannot be guaranteed. Therefore, the sender will not be held liable for any damage caused by this file."
+
+    for elt in ${CURRENT_VPN_IPSEC_NETWORK_LIST}
+    do
+	range=$[${i} % 4]
+	case ${range} in
+	    0)
+		ipsec_type=${elt}
+		;;
+	    1)
+		;;
+	    2)
+		local_ip_mk_list=${elt}
+		;;
+	    3)
+		if test ${ipsec_type} != 'access' ; then
+		    ((i++))
+		    continue
+		fi
+
+		test ${local_ip_mk_list} != nil || break
+
+		local_ip_mk_list=${local_ip_mk_list//,/ }
+		for network in ${local_ip_mk_list}
+		do
+		    test ${network} != 0.0.0.0/0.0.0.0 || continue
+		    split_tunneling_networks="${split_tunneling_networks} ${network}"
+		done
+		split_tunneling_networks=${split_tunneling_networks:1}
+
+		break
+		;;
+	    *)
+		return 255
+		;;
+	esac
+	((i++))
+    done
+
+    if test -z "${ipsec_type}" -o \
+	    "${ipsec_type}" != 'access' -o \
+	    "${local_ip_mk_list}" == nil
+    then
+	if test ${CURRENT_VLAN_MODE} == False ; then
+	    local ip_internal_net=$(ipcalc -sn ${CURRENT_IP_INTERNAL_IP} ${CURRENT_IP_INTERNAL_MASK})
+	    ip_internal_net=${ip_internal_net/NETWORK=/}
+	    split_tunneling_networks=${ip_internal_net}/${CURRENT_IP_INTERNAL_MASK}
+	else
+	    split_tunneling_networks=${ip_mask/ /\/}
+	fi
+    fi
+
+    for network in ${split_tunneling_networks}
+    do
+	ip=${network/\/*}
+	px=$(ipcalc -sp ${network/\// })
+	px=${px/PREFIX=/}
+
+	split_tunneling_ip_px="${split_tunneling_ip_px} ${ip}/${px}"
+    done
+    split_tunneling_ip_px=${split_tunneling_ip_px:1}
+
+    if test ${CURRENT_VPN_IPSEC_AUTHENTICATE} != psk ; then
+
+	local tmp_x509_cert_file=${ADMIN_TMP_DIR}/vpnipsec-x509.crt.${$}
+
+	openssl x509 -in ${SSL_CLIENT_DIR}/${client_tls_id}.cur/${client_tls_id}.certificate -text -noout > ${tmp_x509_cert_file} 2> /dev/null
+	local local_subject=$(grep 'Subject: ' ${tmp_x509_cert_file} 2> /dev/null)
+
+	case ${client_type} in
+	    apple)
+		remote_id=${vpn_server_addr}
+		local_id=$(get-tls-canonical-name-from-dn "${local_subject}")
+		;;
+	    android|linux)
+		local tls_id id
+		if test ${CURRENT_VPN_IPSEC_AUTHENTICATE:0:3} == tls ; then
+		    tls_id=${CURRENT_VPN_IPSEC_AUTHENTICATE:4}
+		elif test ${CURRENT_VPN_IPSEC_AUTHENTICATE:0:6} == eaptls ; then
+		    tls_id=${CURRENT_VPN_IPSEC_AUTHENTICATE:7}
+		fi
+
+		id=${tls_id/*:}
+		test ${id} != fqdn || local_id=$(get-tls-canonical-name-from-dn "${local_subject}")
+		;;
+	    windows)
+		local windows_user_subject=$(get-windows-certificate-subject "${local_subject}")
+
+		openssl x509 -in ${SSL_CA_DIR}/${SYSTEM_CA}.certificate -text -noout > ${tmp_x509_cert_file} 2> /dev/null
+		local windows_ca_subject=$(grep 'Subject: ' ${tmp_x509_cert_file} 2> /dev/null)
+		windows_ca_subject=$(get-windows-certificate-subject "${windows_ca_subject}")
+		;;
+
+	    *)
+		return 255
+		;;
+	esac
+
+	rm -f ${tmp_x509_cert_file}
+    fi
+
+    local password_request_message="Enter your private key password"
+
+    case ${client_type} in
+
+	android)
+
+	    local auth_type
+	    local uuid=$(gen-uuid 2> /dev/null)
+
+	    if test -n "${split_tunneling_ip_px}" ; then
+		split_tunneling_ip_px=${split_tunneling_ip_px// /\",\"}
+		split_tunneling_ip_px="\"${split_tunneling_ip_px}\""
+	    fi
+
+	    case ${CURRENT_VPN_IPSEC_ACCESS_AUTHENTICATE} in
+		tls)
+		    auth_type='ikev2-cert'
+		    ;;
+		eaptls)
+		    auth_type='ikev2-eap-tls'
+		    ;;
+		*)
+		    ;;
+	    esac
+
+	    cat << EOT
+{
+    "_comment": "Profile to be imported into the Android(R) strongSwan(R) application: save this profile to a file with the .sswan extension, then import it into the strongSwan® application. ${pkcs12_message}",
+    "uuid": "${uuid}",
+    "name": "${vpn_name}",
+    "type": "${auth_type}",
+    "ike-proposal": "${ike_encryption}-${ike_integrity}-${dh}",
+    "esp-proposal": "${esp_encryption}-${esp_integrity}-${dh}",
+    "dns-servers": "${gateway_ip}",
+    "remote": {
+	"addr": "${vpn_server_addr}",
+	"port": ${CURRENT_ISAKMP_PORT},
+	"cert": "$(head -n-1 ${SSL_CA_DIR}/${SYSTEM_CA}.certificate | tail -n +2)",
+	"revocation": "true",
+	"revocation.ocsp": "true",
+	"revocation.crl": "false",
+	"revocation.strict": "false"
+    },
+    "local": {
+	"id": "${local_id}",
+	"p12": "$(cat ${SSL_CLIENT_DIR}/${client_tls_id}.cur/${client_tls_id}.pfx)"
+    },
+    "split-tunneling": {
+	"subnets": [${split_tunneling_ip_px}]
+    },
+    "proxy": {
+	"host": "${gateway_ip}",
+	"port": ${CURRENT_PROXY_PORT}
+    },
+    "_disclaimer": "${disclaimer_message}"
+}
+EOT
+	    ;;
+
+	apple)
+	    local uuid_profile=$(gen-uuid 2> /dev/null)
+	    local uuid_vpn=$(gen-uuid 2> /dev/null)
+	    local uuid_firewall=$(gen-uuid 2> /dev/null)
+	    local uuid_proxy=$(gen-uuid 2> /dev/null)
+	    local uuid_ca=$(gen-uuid 2> /dev/null)
+	    local payload_basename=$(invert-domain-name ${CURRENT_SHOSTNAME}.${CURRENT_DOMAIN_NAME})
+
+	    cat << EOT
+${lt}?xml version="1.0" encoding="UTF-8"?${gt}
+${lt}!DOCTYPE plist PUBLIC "-//Apple(R) Inc//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd"${gt}
+
+${lt}!--
+Profile to import into an Apple(R) device: save this profile to a file with the .mobileconfig extension, then import it into the Apple(R) device. Please note that Apple(R) configuration profiles do not support split tunnelling based on remote networks. ${pkcs12_message}
+--${gt}
+
+${lt}plist version="1.0"${gt}
+  ${lt}dict${gt}
+    ${lt}key${gt}PayloadDescription${lt}/key${gt}
+    ${lt}string${gt}${vpn_name} allows you to secure your online presence and preserves your privacy.${lt}/string${gt}
+    ${lt}key${gt}PayloadDisplayName${lt}/key${gt}
+    ${lt}string${gt}${vpn_name}${lt}/string${gt}
+    ${lt}key${gt}PayloadOrganization${lt}/key${gt}
+    ${lt}string${gt}${CURRENT_DOMAIN_NAME}${lt}/string${gt}
+    ${lt}key${gt}PayloadIdentifier${lt}/key${gt}
+    ${lt}string${gt}${payload_basename}${lt}/string${gt}
+    ${lt}key${gt}PayloadUUID${lt}/key${gt}
+    ${lt}string${gt}${uuid_profile}${lt}/string${gt}
+    ${lt}key${gt}PayloadType${lt}/key${gt}
+    ${lt}string${gt}Configuration${lt}/string${gt}
+    ${lt}key${gt}PayloadVersion${lt}/key${gt}
+    ${lt}integer${gt}1${lt}/integer${gt}
+    ${lt}key${gt}PayloadRemovalDisallowed${lt}/key${gt}
+    ${lt}false/${gt}
+    ${lt}key${gt}PayloadContent${lt}/key${gt}
+    ${lt}array${gt}
+      ${lt}dict${gt}
+        ${lt}key${gt}PayloadIdentifier${lt}/key${gt}
+        ${lt}string${gt}${payload_basename}.conf${lt}/string${gt}
+        ${lt}key${gt}PayloadUUID${lt}/key${gt}
+        ${lt}string${gt}${uuid_vpn}${lt}/string${gt}
+        ${lt}key${gt}PayloadType${lt}/key${gt}
+        ${lt}string${gt}com.apple.vpn.managed${lt}/string${gt}
+        ${lt}key${gt}UserDefinedName${lt}/key${gt}
+        ${lt}string${gt}${vpn_name}${lt}/string${gt}
+	${lt}key${gt}PayloadDisplayName${lt}/key${gt}
+	${lt}string${gt}Settings for ${vpn_name}${lt}/string${gt}
+	${lt}key${gt}PayloadOrganization${lt}/key${gt}
+	${lt}string${gt}${CURRENT_DOMAIN_NAME}${lt}/string${gt}
+        ${lt}key${gt}PayloadVersion${lt}/key${gt}
+        ${lt}integer${gt}1${lt}/integer${gt}
+        ${lt}key${gt}VPNType${lt}/key${gt}
+        ${lt}string${gt}IKEv2${lt}/string${gt}
+	${lt}key${gt}ServerAddresses${lt}/key${gt}
+	${lt}array${gt}
+	  ${lt}string${gt}${gateway_ip}${lt}/string${gt}
+	${lt}/array${gt}
+	${lt}key${gt}IKEv2${lt}/key${gt}
+	${lt}dict${gt}
+          ${lt}key${gt}RemoteAddress${lt}/key${gt}
+          ${lt}string${gt}${vpn_server_addr}${lt}/string${gt}
+	  ${lt}key${gt}AuthenticationMethod${lt}/key${gt}
+EOT
+	    if test ${CURRENT_VPN_IPSEC_AUTHENTICATE} == psk ; then
+
+		local psk_file psk
+
+		psk_file=${VPN_IPSEC_DIR}/${IPSEC_AUTHENTICATE_PSK_FILENAME}.current
+		psk=$(cat ${psk_file} 2> /dev/null)
+		psk=$(decrypt-password "${psk}" "${IPSEC_PASSWD}")
+
+		cat << EOT
+	  ${lt}string${gt}SharedSecret${lt}/string${gt}
+	  ${lt}key${gt}SharedSecret${lt}/key${gt}
+	  ${lt}string${gt}${psk}${lt}/string${gt}
+          ${lt}key${gt}RemoteIdentifier${lt}/key${gt}
+          ${lt}string${gt}${vpn_name}${lt}/string${gt}
+EOT
+	    else
+		local uuid_user_cert=$(gen-uuid 2> /dev/null)
+		local apple_extended_auth
+
+		case ${CURRENT_VPN_IPSEC_ACCESS_AUTHENTICATE} in
+		    tls)
+			apple_extended_auth=0
+			;;
+		    eaptls)
+			apple_extended_auth=1
+			;;
+		    *)
+			apple_extended_auth=0
+		esac
+
+		cat << EOT
+	  ${lt}string${gt}Certificate${lt}/string${gt}
+          ${lt}key${gt}RemoteIdentifier${lt}/key${gt}
+          ${lt}string${gt}${remote_id}${lt}/string${gt}
+	  ${lt}key${gt}LocalIdentifier${lt}/key${gt}
+	  ${lt}string${gt}${local_id}${lt}/string${gt}
+	  ${lt}key${gt}ExtendedAuthEnabled${lt}/key${gt}
+	  ${lt}integer${gt}${apple_extended_auth}${lt}/integer${gt}
+	  ${lt}key${gt}PayloadCertificateUUID${lt}/key${gt}
+	  ${lt}string${gt}${uuid_user_cert}${lt}/string${gt}
+	  ${lt}key${gt}CertificateType${lt}/key${gt}
+          ${lt}string${gt}RSA${lt}/string${gt}
+	  ${lt}key${gt}ServerCertificateIssuerCommonName${lt}/key${gt}
+	  ${lt}string${gt}${ca_cname}${lt}/string${gt}
+	  ${lt}key${gt}EnableCertificateRevocationCheck${lt}/key${gt}
+	  ${lt}integer${gt}1${lt}/integer${gt}
+EOT
+	    fi
+
+	    cat << EOT	
+	  ${lt}key${gt}IKESecurityAssociationParameters${lt}/key${gt}
+          ${lt}dict${gt}
+            ${lt}key${gt}EncryptionAlgorithm${lt}/key${gt}
+            ${lt}string${gt}${ike_encryption}${lt}/string${gt}
+            ${lt}key${gt}IntegrityAlgorithm${lt}/key${gt}
+            ${lt}string${gt}${ike_integrity}${lt}/string${gt}
+            ${lt}key${gt}DiffieHellmanGroup${lt}/key${gt}
+            ${lt}integer${gt}${dh_apple}${lt}/integer${gt}
+          ${lt}/dict${gt}
+          ${lt}key${gt}ChildSecurityAssociationParameters${lt}/key${gt}
+          ${lt}dict${gt}
+            ${lt}key${gt}EncryptionAlgorithm${lt}/key${gt}
+            ${lt}string${gt}${esp_encryption}${lt}/string${gt}
+            ${lt}key${gt}IntegrityAlgorithm${lt}/key${gt}
+            ${lt}string${gt}${esp_integrity}${lt}/string${gt}
+            ${lt}key${gt}DiffieHellmanGroup${lt}/key${gt}
+            ${lt}integer${gt}${dh_apple}${lt}/integer${gt}
+          ${lt}/dict${gt}
+	  ${lt}key${gt}OnDemandEnabled${lt}/key${gt}
+	  ${lt}integer${gt}0${lt}/integer${gt}
+	  ${lt}key${gt}OnDemandRules${lt}/key${gt}
+	  ${lt}array${gt}
+	    ${lt}dict${gt}
+	      ${lt}key${gt}Action${lt}/key${gt}
+	      ${lt}string${gt}Connect${lt}/string${gt}
+	      ${lt}key${gt}InterfaceTypeMatch${lt}/key${gt}
+	      ${lt}string${gt}Cellular${lt}/string${gt}
+	    ${lt}/dict${gt}
+	    ${lt}dict${gt}
+	      ${lt}key${gt}Action${lt}/key${gt}
+	      ${lt}string${gt}Connect${lt}/string${gt}
+	      ${lt}key${gt}InterfaceTypeMatch${lt}/key${gt}
+	      ${lt}string${gt}WiFi${lt}/string${gt}
+	    ${lt}/dict${gt}
+	    ${lt}dict${gt}
+	      ${lt}key${gt}Action${lt}/key${gt}
+	      ${lt}string${gt}Connect${lt}/string${gt}
+	      ${lt}key${gt}InterfaceTypeMatch${lt}/key${gt}
+	      ${lt}string${gt}Ethernet${lt}/string${gt}
+	    ${lt}/dict${gt}
+	    ${lt}dict${gt}
+	      ${lt}key${gt}Action${lt}/key${gt}
+	      ${lt}string${gt}Disconnect${lt}/string${gt}
+	    ${lt}/dict${gt}
+	  ${lt}/array${gt}
+	${lt}/dict${gt}
+	${lt}key${gt}Proxies${lt}/key${gt}
+	${lt}dict${gt}
+	  ${lt}key${gt}PayloadIdentifier${lt}/key${gt}
+	  ${lt}string${gt}${payload_basename}.proxy${lt}/string${gt}
+	  ${lt}key${gt}PayloadUUID${lt}/key${gt}
+	  ${lt}string${gt}${uuid_proxy}${lt}/string${gt}
+	  ${lt}key${gt}PayloadDisplayName${lt}/key${gt}
+	  ${lt}string${gt}Proxy settings for ${vpn_name}${lt}/string${gt}
+	  ${lt}key${gt}ProxyAutoConfigEnable${lt}/key${gt}
+	  ${lt}integer${gt}0${lt}/integer${gt}
+	  ${lt}key${gt}HTTPEnable${lt}/key${gt}
+	  ${lt}integer${gt}1${lt}/integer${gt}
+	  ${lt}key${gt}HTTPProxy${lt}/key${gt}
+	  ${lt}string${gt}${gateway_ip}${lt}/string${gt}
+	  ${lt}key${gt}HTTPPort${lt}/key${gt}
+	  ${lt}integer${gt}${CURRENT_PROXY_PORT}${lt}/integer${gt}
+	  ${lt}key${gt}HTTPSEnable${lt}/key${gt}
+	  ${lt}integer${gt}1${lt}/integer${gt}
+	  ${lt}key${gt}HTTPSProxy${lt}/key${gt}
+	  ${lt}string${gt}${gateway_ip}${lt}/string${gt}
+	  ${lt}key${gt}HTTPSPort${lt}/key${gt}
+	  ${lt}integer${gt}${CURRENT_PROXY_PORT}${lt}/integer${gt}
+	${lt}/dict${gt}
+	${lt}key${gt}Firewall${lt}/key${gt}
+	${lt}dict${gt}
+	  ${lt}key${gt}PayloadIdentifier${lt}/key${gt}
+	  ${lt}string${gt}${payload_basename}.fw${lt}/string${gt}
+	  ${lt}key${gt}PayloadUUID${lt}/key${gt}
+	  ${lt}string${gt}${uuid_firewall}${lt}/string${gt}
+	  ${lt}key${gt}PayloadDisplayName${lt}/key${gt}
+	  ${lt}string${gt}Firewall settings for ${vpn_name}${lt}/string${gt}
+	  ${lt}key${gt}PayloadType${lt}/key${gt}
+	  ${lt}string${gt}com.apple.security.firewall${lt}/string${gt}
+	  ${lt}key${gt}PayloadVersion${lt}/key${gt}
+	  ${lt}integer${gt}1${lt}/integer${gt}
+	  ${lt}key${gt}EnableFirewall${lt}/key${gt}
+	  ${lt}true/${gt}
+	  ${lt}key${gt}BlockAllIncoming${lt}/key${gt}
+	  ${lt}true/${gt}
+	  ${lt}key${gt}EnableStealthMode${lt}/key${gt}
+	  ${lt}true/${gt}
+	${lt}/dict${gt}
+      ${lt}/dict${gt}
+EOT
+	    if test ${CURRENT_VPN_IPSEC_AUTHENTICATE} != psk ; then
+		cat << EOT
+      ${lt}dict${gt}
+        ${lt}key${gt}PayloadIdentifier${lt}/key${gt}
+	${lt}string${gt}${payload_basename}.user.cert${lt}/string${gt}
+        ${lt}key${gt}PayloadUUID${lt}/key${gt}
+        ${lt}string${gt}${uuid_user_cert}${lt}/string${gt}
+	${lt}key${gt}PayloadDisplayName${lt}/key${gt}
+	${lt}string${gt}User certificate to authenticate ${client_tls_id} on the ${vpn_name} service${lt}/string${gt}
+        ${lt}key${gt}PayloadType${lt}/key${gt}
+        ${lt}string${gt}com.apple.security.pkcs12${lt}/string${gt}
+        ${lt}key${gt}PayloadVersion${lt}/key${gt}
+        ${lt}integer${gt}1${lt}/integer${gt}
+	${lt}key${gt}Password${lt}/key${gt}
+        ${lt}string${gt}${lt}/string${gt}
+        ${lt}key${gt}PayloadContent${lt}/key${gt}
+        ${lt}data${gt}
+          $(cat ${SSL_CLIENT_DIR}/${client_tls_id}.cur/${client_tls_id}.pfx)
+        ${lt}/data${gt}
+      ${lt}/dict${gt}
+EOT
+	    fi
+	    cat << EOT
+      ${lt}dict${gt}
+	${lt}key${gt}PayloadIdentifier${lt}/key${gt}
+        ${lt}string${gt}${payload_basename}.ca${lt}/string${gt}
+        ${lt}key${gt}PayloadUUID${lt}/key${gt}
+        ${lt}string${gt}${uuid_ca}${lt}/string${gt}
+	${lt}key${gt}PayloadDisplayName${lt}/key${gt}
+	${lt}string${gt}${vpn_name} CA${lt}/string${gt}
+        ${lt}key${gt}PayloadType${lt}/key${gt}
+        ${lt}string${gt}com.apple.security.root${lt}/string${gt}
+        ${lt}key${gt}PayloadVersion${lt}/key${gt}
+        ${lt}integer${gt}1${lt}/integer${gt}
+        ${lt}key${gt}PayloadContent${lt}/key${gt}
+        ${lt}data${gt}
+          $(head -n-1 ${SSL_CA_DIR}/${SYSTEM_CA}.certificate | tail -n +2)
+        ${lt}/data${gt}
+      ${lt}/dict${gt}
+    ${lt}/array${gt}
+  ${lt}/dict${gt}
+${lt}/plist${gt}
+
+${lt}!--
+${disclaimer_message}
+--${gt}
+EOT
+	    ;;
+
+	linux)
+	    local linux_profile eap_identity eap_lib_comment
+
+	    case ${CURRENT_VPN_IPSEC_ACCESS_AUTHENTICATE} in
+		tls)
+		    linux_profile="ikev2-pub"
+		    ;;
+		eaptls)
+		    eap_identity=" --eap-identity \"\${LOCAL_ID}\""
+		    linux_profile="ikev2-eap"
+		    eap_lib_comment=" In addition, the libcharon-extra-plugins package must be installed on your Linux machine in order to use EAP-TLS authentication."
+		    ;;
+		*)
+		    ;;
+	    esac
+
+	    cat << EOT
+#!/bin/bash
+
+# This Linux Bash script allows you to connect to the CacheGuard BO service. Save this script in an empty directory on your Linux machine, then run it as the root user. This script uses the charon-cmd command, which is part of the strongSwan(R) application. You must install this command on your machine before running the script.${eap_lib_comment} ${pkcs12_message} In order to avoid having to enter that password whenever you want to connect, you can assign the value "yes" to the UNPROTECT_PKCS12_4EVER variable below.
+
+DEBUG_LEVEL=0
+UNPROTECT_PKCS12_4EVER="no"
+LOCAL_ID="${local_id}"
+
+CA_CERT_FILE="${vpn_name// /-}-CA.cert"
+PFX_FILE="\${LOCAL_ID}.pfx"
+PKCS12_FILE="\${LOCAL_ID}.p12"
+RSA_KEY_FILE="\${LOCAL_ID}.key"
+CERT_FILE="\${LOCAL_ID}.crt"
+
+read-password()
+{
+    test -z "\${RSA_KEY_PASSWORD_READ}" || return 0
+
+    echo -n "${password_request_message}: "
+    stty -echo
+    read RSA_KEY_PASSWORD
+    stty echo
+    RSA_KEY_PASSWORD_READ='ok'
+}
+
+generate-ssl-files()
+{
+    test -f \${CA_CERT_FILE} || echo "$(cat ${SSL_CA_DIR}/${SYSTEM_CA}.certificate)
+" > \${CA_CERT_FILE}
+
+    test -f \${PFX_FILE} || echo "$(cat ${SSL_CLIENT_DIR}/${client_tls_id}.cur/${client_tls_id}.pfx)
+" > \${PFX_FILE}
+
+    test -f \${PKCS12_FILE} || base64 --decode \${PFX_FILE} > \${PKCS12_FILE} || return 11
+
+    test -n "\${UNPROTECT_PKCS12_4EVER}" || return 0
+    test "\${UNPROTECT_PKCS12_4EVER}" == 'yes' || return 0
+
+    local openssl_version=\$(openssl version 2> /dev/null)
+    local legacy_option
+
+    openssl_version=\${openssl_version/OpenSSL }
+    openssl_version=\${openssl_version:0:1}
+
+    test \${openssl_version} == 1 || legacy_option=' -legacy'
+
+    if test ! -f "\${CERT_FILE}" ; then
+       	read-password
+	openssl pkcs12\${legacy_option} -in "\${PKCS12_FILE}" -clcerts -nokeys -out "\${CERT_FILE}" --password pass:"\${RSA_KEY_PASSWORD}"
+	if test \${?} -ne 0 ; then
+	    rm -f \${CERT_FILE}
+	    return 13
+	fi
+    fi
+
+    if test ! -f "\${RSA_KEY_FILE}" ; then
+       	read-password
+	openssl pkcs12\${legacy_option} -in "\${PKCS12_FILE}" -nocerts -nodes -out "\${RSA_KEY_FILE}" --password pass:"\${RSA_KEY_PASSWORD}"
+	if test \${?} -ne 0 ; then
+	    rm -f \${RSA_KEY_FILE}
+	    return 15
+	fi
+    fi
+}
+
+vpn-connect()
+{
+    local vpn_host="${vpn_server_addr}"
+    local remote_id="${vpn_server_addr}"
+
+    local ike_proposal="${ike_encryption}-${ike_integrity}-${dh}"
+    local esp_proposal="${esp_encryption}-${esp_integrity}-${dh}"
+
+    if test "\${UNPROTECT_PKCS12_4EVER}" == 'no' ; then
+	charon-cmd --debug \${DEBUG_LEVEL} --host \${vpn_host} --profile ${linux_profile} --identity "\${LOCAL_ID}"${eap_identity} --p12 "\${PKCS12_FILE}" --remote-identity "\${remote_id}" --ike-proposal \${ike_proposal} --esp-proposal \${esp_proposal}
+    else
+	charon-cmd --debug \${DEBUG_LEVEL} --host \${vpn_host} --profile ${linux_profile} --identity "\${LOCAL_ID}"${eap_identity} --cert "\${CA_CERT_FILE}" --rsa "\${RSA_KEY_FILE}" --cert "\${CERT_FILE}" --remote-identity "\${remote_id}" --ike-proposal \${ike_proposal} --esp-proposal \${esp_proposal}
+
+    fi
+}
+
+main()
+{
+    generate-ssl-files || return \${?}
+    vpn-connect || return \${?}
+}
+
+main
+
+# ${disclaimer_message}
+EOT
+	    ;;
+
+	windows)
+	    local windows_certificate_store
+
+	    case ${CURRENT_VPN_IPSEC_ACCESS_AUTHENTICATE} in
+		tls)
+		    windows_certificate_store='LocalMachine'
+		    ;;
+		eaptls)
+		    windows_certificate_store='CurrentUser'
+		    ;;
+		*)
+		    windows_certificate_store='LocalMachine'
+		    ;;
+	    esac
+
+	    test -z "${split_tunneling_ip_px}" ||
+		split_tunneling_ip_px="'${split_tunneling_ip_px// /\',\'}'"
+
+	    cat << EOT
+# This Windows(R) PowerShell(R) script allows you to connect to the ${vpn_name} service. Save this script to a file with the .ps1 extension, then run it on a Windows machine with administrative privileges. ${pkcs12_message}
+
+# To delete the VPN connection named "${vpn_name}", use the -Delete:\${True} option.
+
+Function executionIsAllowed
+{
+    return ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")
+}
+
+Function removeExistingVPN
+{
+    Param( \${vpnName} )
+    \$vpnConnection = Get-VpnConnection -ErrorAction SilentlyContinue -Name "\${vpnName}"
+
+    if (\$vpnConnection) {
+	if (\${vpnConnection}.ConnectionStatus -eq "Connected") {
+      	    rasdial "\${vpnName}" /DISCONNECT 2>&1 | Out-Null
+	}
+	Remove-VpnConnection -ErrorAction SilentlyContinue -Name "\${vpnName}" -Force
+    }
+}
+
+Function removeCertificates
+{
+    Param( \${caCertificateSubject}, \${userCertificateSubject} )
+
+    \${certificate} = Get-ChildItem cert:\LocalMachine\Root\ | Where-Object { \$_.Subject -eq "\${caCertificateSubject}" }
+    if (\${certificate} -ne '') {
+        \${certificate} | Remove-Item -Force -Confirm:\${False}
+    }
+
+    \${certificate} = Get-ChildItem cert:\LocalMachine\My\ | Where-Object { \$_.Subject -eq "\${userCertificateSubject}" }
+    if (\${certificate} -ne '') {
+        \${certificate} | Remove-Item -Force -Confirm:\${False}
+    }
+
+    \${certificate} = Get-ChildItem cert:\CurrentUser\My\ | Where-Object { \$_.Subject -eq "\${userCertificateSubject}" }
+    if (\${certificate} -ne '') {
+        \${certificate} | Remove-Item -Force -Confirm:\${False}
+    }
+}
+
+Function importCertificates
+{
+    Param( \${caCertificateFile}, \${userCertificateFile} )
+
+    try {
+	\${ret} = Import-Certificate -FilePath \${caCertificateFile} -CertStoreLocation Cert:\LocalMachine\Root -Confirm:\${False}
+    }
+    catch {
+	[int]\${StatusCode} = \$_.Exception.Response.StatusCode
+	Write-Host \$_.Exception.Message
+    }
+
+    \${userCertificatePassword} = Read-Host -AsSecureString "${password_request_message}"
+
+    try {
+	\${ret} = Import-PfxCertificate -Password \${userCertificatePassword} -FilePath \${userCertificateFile} -CertStoreLocation Cert:${windows_certificate_store}\My -Confirm:\${False}
+    }
+    catch {
+	[int]\${StatusCode} = \$_.Exception.Response.StatusCode
+	Write-Host \$_.Exception.Message
+    }
+}
+
+Function downloadFileFromURL {
+    Param( \${url}, \${file} )
+
+    try {
+	\${request} = Invoke-WebRequest -Uri \${url} -OutFile \${file}
+	[int]\${StatusCode} = \${request}
+    }
+    catch {
+	[int]\${StatusCode} = \$_.Exception.Response.StatusCode
+	\${errorMessage} = \$_.Exception.Message
+    }
+
+    if (\${StatusCode} -eq 0) {
+	return \${True}
+    } else {
+	Write-Host \$errorMessage
+	return ${False}
+    }
+}
+
+Function addNewVPN
+{
+    Param( \${vpnName}, \${vpnAddress}, \${proxyAddress}, \${splitTunnelingNetworks} )
+
+    \${ikeEncryption} = "${ike_encryption}"
+    \${ikeIntegrity} = "${ike_integrity}"
+    \${espIntegrity} = "${esp_integrity}"
+    \${espEncryption} = "${esp_encryption}"
+    \${dhGroup} = "${dh_windows}"
+EOT
+	    local windows_authentication windows_eap_parameter
+
+	    case ${CURRENT_VPN_IPSEC_ACCESS_AUTHENTICATE} in
+		tls)
+		    windows_authentication='MachineCertificate'
+		    ;;
+		eaptls)
+		    windows_eap_parameter=' -EapConfigXmlStream ${eapConfiguration}.EapConfigXmlStream'
+		    cat << EOT
+    \${eapConfiguration} = New-EapConfiguration -Tls -UserCertificate -Confirm:\${False}
+EOT
+		    windows_authentication='Eap'
+		    ;;
+		*)
+		    windows_authentication='MachineCertificate'
+		    ;;
+	    esac
+
+	    cat << EOT
+
+    Add-VpnConnection -Name "\${vpnName}" -ServerAddress "\${vpnAddress}" -TunnelType IKEv2 -AuthenticationMethod ${windows_authentication}${windows_eap_parameter} -EncryptionLevel "Maximum" -Force
+
+    Set-VpnConnectionIPsecConfiguration -ConnectionName "\${vpnName}" -CipherTransformConstants \${ikeEncryption} -AuthenticationTransformConstants \${ikeIntegrity} -IntegrityCheckMethod \${espIntegrity} -EncryptionMethod \${espEncryption} -DHGroup \${dhGroup} -PfsGroup None -Force
+
+    if (\${splitTunnelingNetworks}.Count -eq 0) {
+	Set-VpnConnection "\${vpnName}" -SplitTunneling \${False} -Force
+    } else {
+	\${splitTunnelingNetworks} | ForEach-Object { Add-VpnConnectionRoute -ConnectionName "\${vpnName}" -DestinationPrefix \${_} }
+    }
+
+    Set-VpnConnectionProxy -ConnectionName "\${vpnName}" -ProxyServer "\${proxyAddress}"
+}
+
+Function setupVPN
+{
+    Param( \${vpnName}, \${vpnAddress}, \${proxyAddress}, \${splitTunnelingNetworks} )
+
+    \${caCertificateFile} = New-TemporaryFile
+    \${userCertificateFile} = New-TemporaryFile
+
+    echo "$(cat ${SSL_CA_DIR}/${SYSTEM_CA}.certificate)
+" > \${caCertificateFile}.FullName
+
+    echo "$(cat ${SSL_CLIENT_DIR}/${client_tls_id}.cur/${client_tls_id}.pfx)
+" > \${userCertificateFile}.FullName
+
+    importCertificates \${caCertificateFile}.FullName \${userCertificateFile}.FullName
+    rm \${caCertificateFile}.FullName
+    rm \${userCertificateFile}.FullName
+
+    addNewVPN "\${vpnName}" "\${vpnAddress}" \${proxyAddress} \${splitTunnelingNetworks}
+}
+
+function Main
+{
+    Param(
+	\${Delete}
+    )
+
+    \${ret} = executionIsAllowed
+    if (\${ret} -eq \${False}) {
+	Write-Host "***Error: this script should be executed as an administrator."
+	return
+    }
+
+    removeCertificates "${windows_ca_subject}" "${windows_user_subject}"
+    removeExistingVPN "${vpn_name}"
+
+    if (\${Delete} -eq \${True}) {
+	return
+    }
+
+    setupVPN "${vpn_name}" ${vpn_server_addr} ${gateway_ip}:${CURRENT_PROXY_PORT} @(${split_tunneling_ip_px})
+}
+
+Main @args
+
+# ${disclaimer_message}
+EOT
+	    ;;
+	*)
+	    return 255
+	    ;;
+    esac
+}
+
+manage-vpn-ipsec-access-conf()
+{
+    test -n "${1}" || return 1
+    local client_type=${1}
+
+    check-valid-vpnipsec-client ${client_type} || return 73
+
+    test -n "${2}" || return 1
+    local client_tls_id=${2}
+
+    local client_vpn_id=${client_tls_id}.${CURRENT_DOMAIN_NAME}
+
+    local server_tls_id
+
+    if test ${CURRENT_VPN_IPSEC_AUTHENTICATE} != psk ; then
+	if test ${CURRENT_VPN_IPSEC_AUTHENTICATE:0:3} == 'tls' ; then
+	    server_tls_id=${CURRENT_VPN_IPSEC_AUTHENTICATE:4}
+
+	elif test ${CURRENT_VPN_IPSEC_AUTHENTICATE:0:6} == 'eaptls' ; then
+	    server_tls_id=${CURRENT_VPN_IPSEC_AUTHENTICATE:7}
+	fi
+	server_tls_id=${server_tls_id/:*}
+    fi
+
+    test -n "${3}" || return 1
+    local op=${3}
+
+    case ${op} in
+	save|email)
+	    test -d ${SSL_CLIENT_DIR}/${client_tls_id}.cur || return 75
+	    if ! tls-client-pfx-exist ${client_tls_id} ; then
+		INDIRECT_ERROR_CODE=518
+		return 254
+	    fi
+	    ;;
+	*)
+	    ;;
+    esac
+
+    local tmp_profile_file=${ADMIN_TMP_DIR}/vpn-ipsec-access-${client_type}.profile.${$}
+
+    case ${op} in
+	show)
+	    gen-vpn-ipsec-access-conf ${client_type} ${client_tls_id} ${op} ${server_tls_id} > ${tmp_profile_file}
+	    test "${TERM}" == "${WADMIN_TERM}" -o "${__BATCH_MODE}"  == yes || echo
+	    cat ${tmp_profile_file}
+	    test "${TERM}" == "${WADMIN_TERM}" -o "${__BATCH_MODE}"  == yes || echo
+	    rm -f ${tmp_profile_file}
+	    ;;
+	save)
+	    local proto=${4}
+	    local ip=${5}
+	    local fn=${6}
+
+	    test -n "${proto}" || return 1
+	    test -n "${ip}" || return 1
+	    test -n "${fn}" || return 1
+
+	    check-file-protocol ${proto} || return 63
+	    check-ip-name ${ip} || return 113
+	    check-filename ${fn} || return 19
+	    check-file-ip ${ip} || return 27
+
+	    gen-vpn-ipsec-access-conf ${client_type} ${client_tls_id} ${op} ${server_tls_id} > ${tmp_profile_file}
+	    save-files ${proto} ${ip} "${tmp_profile_file} ${fn}" "" ascii || return ${?}
+	    rm -f ${tmp_profile_file}
+	    ;;
+	email)
+	    local email=${4}
+	    local name=${ARGS[5]}
+	    local output=${ARGS[6]}
+	    check-email ${email} || return 17
+	    check-email-name "${name}" || return 253
+
+	    local to
+	    local profile_type profile_extension profile_mime
+	    local admin_name
+	    local profile_instructions_file=/tmp/profile.instructions.${$}
+
+	    local body_file=/tmp/vpnipsec-profile.${$}
+	    local vpn_name=$(get-tls-canonical-name ${SSL_CA_DIR}/${SYSTEM_CA}.certificate)
+	    local gateway_ip=$(get-web-ip cur)
+	    local gateway_link="<a href='http://${gateway_ip}/'>http://${gateway_ip}</a>"
+	    local proxy_address="${gateway_ip}:${CURRENT_PROXY_PORT}"
+	    local sent_file_prefix=${vpn_name// /-}
+
+	    local auto_web_proxy_message manual_web_proxy_message
+	    local ipv6_default_route_message ssl_mediation_description
+
+	    auto_web_proxy_message="Once connected to the VPN, the Web proxy will be automatically used. For your information the <strong>${vpn_name}</strong> proxy address is <u>${proxy_address}</u>."
+
+	    manual_web_proxy_message="Once connected to the VPN, the Web proxy will be available at the <u>${proxy_address}</u> address. It is highly recommended to explicitly configure your device (including all your Web browsers and other applications) to always use the <strong>${vpn_name}</strong> proxy."
+
+	    test ${CURRENT_SSLMEDIATE_MODE} == False || \
+		ssl_mediation_description="The Web proxy uses a technology called <strong>SSL mediation</strong>. SSL mediation allows you to optimize and/or secure network traffic even in an encrypted format. This technology requires that you trust the <strong>${vpn_name}</strong> CA certificate."
+
+	    gen-vpn-ipsec-access-conf ${client_type} ${client_tls_id} ${op} ${server_tls_id} > ${tmp_profile_file}
+	    profile_extension=$(get-vpnipsec-profile-extension ${client_type})
+
+	    case ${client_type} in
+		android)
+		    profile_type='profile'
+		    profile_mime="vnd.strongswan";
+		    local app_name='strongSwan'
+		    local app_link="https://play.google.com/store/apps/details?id=org.strongswan.android"
+		    cat << EOT > ${profile_instructions_file}
+<li>Install the <strong>${app_name} VPN Client</strong> App (<a href='${app_link}'>${app_link}</a>) on your device (if it's not yet installed) and start it.</li>
+
+<li>Delete any existing VPN profile named <strong>${vpn_name}</strong> in that App.</li>
+
+<li>Open the VPN profile file attached to this email with the ${app_name} App and import it (follow instructions given by the App).</li>
+
+<li>At this stage a VPN connection named <strong>${vpn_name}</strong> should appear in the list of VPN connections in your ${app_name} App. To connect the VPN, all you have to do is to turn it on.</li>
+
+<li>${manual_web_proxy_message} Please refer to your Android documentation for more information on how to configure your device to use a proxy.</li>
+EOT
+		    if test ${CURRENT_SSLMEDIATE_MODE} == True ; then
+			cat << EOT >> ${profile_instructions_file}
+
+<li>${ssl_mediation_description} To do so, proceed as follows:</li>
+
+<li>Once connected to the VPN, visit the ${gateway_link} page to download the <strong>${vpn_name}</strong> CA certificate on your device. Then refer to your Android documentation for more information on how to configure your device to trust that CA certificate.</li>
+EOT
+		    fi
+		    ;;
+		apple)
+		    profile_type='profile'
+		    profile_mime="x=apple-aspen-config";
+		    cat << EOT > ${profile_instructions_file}
+<li>Delete any existing configuration profile named <strong>${vpn_name}</strong> on your device. On an iPhone, configuration profiles are located at <u>Settings &gt; General &gt;  VPN & Device Management</u>.</li>
+
+<li>Download the Apple profile file attached to this email. To download on an iPhone, just click on it and then you should get the <u>Profile Downloaded</u> message. You can then find the downloaded profile in your <u>Settings</u>.</li>
+
+<li>Open the downloaded profile file and follow instructions given by your Apple device.</li>
+
+<li>At this stage a VPN connection named <strong>${vpn_name}</strong> should appear in the list of VPN connections on your Apple device. To connect the VPN, all you have to do is to turn it on.</li>
+
+<li>Stay connected on an iPhone: in order to automatically connect the VPN whenever you connect the network, proceed as follows: got to the <i>Settings &gt; General &gt; VPN & Device Management &gt; VPN &gt; <strong>${vpn_name}</strong></i> and toggle on the <i>Connect On Demand</i> option.</li>
+
+<li>${auto_web_proxy_message}</li>
+EOT
+		    if test ${CURRENT_SSLMEDIATE_MODE} == True ; then
+			cat << EOT >> ${profile_instructions_file}
+
+<li>${ssl_mediation_description} To do so, proceed as follows:</li>
+
+<li>Locate the <strong>${vpn_name}</strong> CA certificate on your device (on an iPhone, CA certificates are located at <u>Settings &gt; General &gt;  About &gt; Certificate Trust Settings</u>). Then enable full trust for the <strong>${vpn_name}</strong> CA certificate.</li>
+EOT
+		    fi
+		    ;;
+		linux)
+		    profile_type='script'
+		    profile_mime="octet-stream";
+
+		    local eap_lib_comment
+
+		    local file_prefix=${client_tls_id}.${CURRENT_DOMAIN_NAME}
+		    local app_name='strongSwan'
+		    local porgram_dir=${vpn_name// /-}
+
+		    test ${CURRENT_VPN_IPSEC_ACCESS_AUTHENTICATE} != eaptls || eap_lib_comment=" In addition, the <strong>libcharon-extra-plugins</strong> should also be installed on your Linux machine in order to use the EAP-TLS authentication."
+
+		    cat << EOT > ${profile_instructions_file}
+<li>Install the <strong>${app_name} charon-cmd</strong> command on your machine (if it's not yet installed). On many Linux distro, you can use a package manager such as RPM or APT to install that command.${eap_lib_comment}</li>
+
+<li>Download the bash script file attached to this email and put in a dedicated empty directory that you can name <i>${porgram_dir}</i> for instance. Then enter that directory (<i>cd ${porgram_dir}</i>) and run it as the user root to connect the VPN. To do so, you can use the <i>sudo bash ${sent_file_prefix}.${profile_extension}</i> command.</li>
+
+<li>${manual_web_proxy_message}</li>
+EOT
+		    if test ${CURRENT_SSLMEDIATE_MODE} == True ; then
+			cat << EOT >> ${profile_instructions_file}
+
+<li>${ssl_mediation_description} The <strong>${vpn_name}</strong>. The CA certificate to trust in is named ${sent_file_prefix}-CA.cert and you can find it in the previously created directory.</li>
+EOT
+		    fi
+		    ;;
+
+		windows)
+		    profile_type='script'
+		    profile_mime="octet-stream";
+		    ipv6_default_route_message="If your machine uses IPv6 and after having connected the VPN, a default route via an IPv6 gateway persists, you must delete that route by using the following command: <u>route delete ::/0 <i>&lt;ipv6-gateway-ip&gt;</i></u> where <u><i>&lt;ipv6-gateway-ip&gt;</i></u> is your default IPv6 gateway."
+
+		    cat << EOT > ${profile_instructions_file}
+<li>Download the PowerShell script file attached to this email and then run it as Administrator.</li>
+
+<li>At this stage a VPN connection named <strong>${vpn_name}</strong> should appear in the list of VPN connections on your Windows machine. To connect the VPN, all you have to do is to turn it on.</li>
+
+<li>${auto_web_proxy_message}</li>
+
+<li>${ipv6_default_route_message}</li>
+EOT
+		    if test ${CURRENT_SSLMEDIATE_MODE} == True ; then
+			cat << EOT >> ${profile_instructions_file}
+
+<li>${ssl_mediation_description} Please note that the <strong>${vpn_name}</strong> CA certificate is installed as a trusted CA certificate for Web browsing by the PowerShell setup script.</li>
+EOT
+		    fi
+		    ;;
+		*)
+		    return 255
+		    ;;
+	    esac
+
+	    if test -n "${CURRENT_ADMINISTRATOR_NAME}" ; then
+		admin_name=${CURRENT_ADMINISTRATOR_NAME}
+	    else
+		admin_name="Your Administrator"
+	    fi
+
+	    if test -z "${name}" ; then
+		to="<strong>${vpn_name}</strong> VPN user"
+	    else
+		to="${name}"
+	    fi
+
+	    cat << EOT > ${body_file}
+Dear ${to},
+<p>
+Attached you will find a ${profile_type} file that allows you to connect your <strong>${client_type^}</strong> device to the <strong>${vpn_name}</strong> VPN and Web proxy.
+<p>
+<strong>Important notice</strong>: your ${profile_type} file embeds a password protected private key that you should not share with third parties. Your administrator should be able to transmit you its password in a secure way. Your private key identifier is <strong>${client_vpn_id}</strong> and allows you to have one and only one VPN connection at the same time.
+<p>
+To configure your device proceed as follows:
+<ul>
+EOT
+	    cat ${profile_instructions_file} >> ${body_file}
+	    rm -f ${profile_instructions_file}
+
+	    cat << EOT >> ${body_file}
+</ul>
+<p>
+Best Regards,<br />
+${admin_name}
+EOT
+	    local subject="VPN Profile"
+
+	    case ${output} in
+		stdout)
+		    __EMAIL_OUTPUT=stdout send-email ${email} \
+				                     "${subject}" \
+						     ${body_file} \
+						     "${name}" \
+						     ${sent_file_prefix}.${profile_extension} \
+						     ${tmp_profile_file} \
+						     ${profile_mime}
+		    ;;
+		*)
+		    send-email ${email} \
+			       "${subject}" \
+			       ${body_file} \
+			       "${name}" \
+			       ${sent_file_prefix}.${profile_extension} \
+			       ${tmp_profile_file} \
+			       ${profile_mime}
+		    ;;
+	    esac
+
+	    local ret=${?}
+
+	    rm -f ${body_file}
+	    rm -f ${tmp_profile_file}
+
+	    return ${ret}
+	    ;;
+	*)
+	    return 1
+	    ;;
+    esac
+}
+
+show-vpn-ipsec-access-authenticate1()
+{
+    local version=${1}
+    local auth=${2}
+
+    local col=$[${PRINT_COL} + 7]
+
+    echo-command-form "vpnipsec access authenticate"
+    if test "${version}" == 'new' ; then
+	echo-mark-new
+    else
+	echo-mark-cur
+    fi
+
+    echo-value ${auth} ${col}
+}
+
+show-vpn-ipsec-access-authenticate()
+{
+    echo-begin-show
+    show-vpn-ipsec-access-authenticate1 current ${CURRENT_VPN_IPSEC_ACCESS_AUTHENTICATE}
+    test ${CURRENT_VPN_IPSEC_ACCESS_AUTHENTICATE} == ${VPN_IPSEC_ACCESS_AUTHENTICATE} || show-vpn-ipsec-access-authenticate1 new ${VPN_IPSEC_ACCESS_AUTHENTICATE}
+    echo-end-show
+
+}
+
+manage-vpn-ipsec-access-authenticate()
+{
+    if test -z "${1}" ; then
+	show-vpn-ipsec-access-authenticate
+	return ${?}
+    fi
+
+    local auth_type=${1}
+    check-vpn-auth-type ${auth_type} || return 195
+
+    export VPN_IPSEC_ACCESS_AUTHENTICATE=${auth_type}
+    SAVENV=1
+}
+
+show-vpn-ipsec-access-access()
+{
+    local col=$[${PRINT_COL} + 1]
+
+    echo-begin-show
+    echo-command-form "vpnipsec access access"
+
+    echo-mark-cur
+
+    local diff_id id i=0
+
+    if test -s ${VPN_IPSEC_DIR}/whitelist ; then
+	while read id
+	do
+	    test ${i} -eq 0 || echo-blank-command
+	    echo-value "${id}" ${col}
+	    ((i++))
+	done < ${VPN_IPSEC_DIR}/whitelist
+    else
+	echo-value-null ${col}
+    fi
+
+    local modified
+
+    if test -s ${VPN_IPSEC_DIR}/whitelist.diff ; then
+	modified=yes
+    else
+	if test -f ${VPN_IPSEC_DIR}/whitelist.raz ; then
+	    test ! -s ${VPN_IPSEC_DIR}/whitelist.current -a ! -s ${VPN_IPSEC_DIR}/whitelist || modified=yes
+	fi
+    fi
+
+    if test -n "${modified}" ; then
+	echo-command-form "vpnipsec access access"
+	echo-mark-new
+
+	if test -f ${VPN_IPSEC_DIR}/whitelist.raz ; then
+	    echo-value-null ${col}
+	    i=1
+	else
+	    i=0
+	fi
+
+	if test -s ${VPN_IPSEC_DIR}/whitelist.diff ; then
+	    while read diff_id
+	    do
+		test ${i} -eq 0 || echo-blank-command
+		echo-value "${diff_id}" ${col}
+		((i++))
+	    done < ${VPN_IPSEC_DIR}/whitelist.diff
+	fi
+    fi
+
+    echo-end-show
+}
+
+manage-vpn-ipsec-access-access()
+{
+    if test -z "${1}" ; then
+	show-vpn-ipsec-access-access
+	return ${?}
+    fi
+
+    local op=${1}
+
+    case ${op} in
+	add|del)
+	    local id=${ARGS[2]}
+	    check-ike-eap-id "${id}" || return 29
+
+	    id=${id// =/=}
+	    id=${id//= /=}
+
+	    case ${op} in
+		add)
+		    echo +${id} >> ${VPN_IPSEC_DIR}/whitelist.diff
+		    FILEENV=1
+		    ;;
+		del)
+		    echo -${id} >> ${VPN_IPSEC_DIR}/whitelist.diff
+		    FILEENV=1
+		    ;;
+		*)
+		    return 255
+		    ;;
+	    esac
+	    ;;
+	raz)
+	    echo -n > ${VPN_IPSEC_DIR}/whitelist.raz
+	    rm -f ${VPN_IPSEC_DIR}/whitelist.diff
+	    FILEENV=1
+	    ;;
+	*)
+	    return 122
+	    ;;
+    esac
+}
+
+manage-vpn-ipsec-access()
+{
+    if test -z "${1}" ; then
+	show-vpn-ipsec-access "${@}"
+	return ${?}
+    fi
+
+    local state=${1}
+
+    case ${state} in
+	conf)
+	    shift
+	    shift-args
+	    manage-vpn-ipsec-access-conf "${@}"
+	    return ${?}
+	    ;;
+	authenticate)
+	    shift
+	    manage-vpn-ipsec-access-authenticate "${@}"
+	    return ${?}
+	    ;;
+	access)
+	    shift
+	    shift-args
+	    manage-vpn-ipsec-access-access "${@}"
+	    return ${?}
+	    ;;	    
+	*)
+	    ;;
+    esac
+
+    check-boolean ${state} || return 18
+
+    local default_ike_encryption='aes256'
+    local default_ike_integrity='sha256'
+    local default_dh='modp2048'
+    local default_esp_encryption='aes256'
+    local default_esp_integrity='sha256'
+
+    local ike_encryption ike_integrity dh esp_encryption esp_integrity
+
+    if test -z "${2}" ; then
+	ike_encryption=${default_ike_encryption}
+	ike_integrity=${default_ike_integrity}
+	dh=${default_dh}
+	esp_encryption=${default_esp_encryption}
+	esp_integrity=${default_esp_integrity}
+    else
+	ike_encryption=${2}
+	check-encryption-algorithm ${ike_encryption} || return 196
+	if test -z "${3}" ; then
+	    ike_integrity=${default_ike_integrity}
+	    dh=${default_dh}
+	    esp_encryption=${default_esp_encryption}
+	    esp_integrity=${default_esp_integrity}
+	else
+	    ike_integrity=${3}
+	    check-integrity-algorithm ${ike_integrity} || return 197
+	    if test -z "${4}" ; then
+		dh=${default_dh}
+		esp_encryption=${default_esp_encryption}
+		esp_integrity=${default_esp_integrity}
+	    else
+		dh=${4}
+		check-diffie-hellman-group ${dh} || return 198
+		if test -z "${5}" ; then
+		    esp_encryption=${default_esp_encryption}
+		    esp_integrity=${default_esp_integrity}
+		else
+		    esp_encryption=${5}
+		    check-encryption-algorithm ${esp_encryption} || return 196
+		    if test -z "${6}" ; then
+			esp_integrity=${default_esp_integrity}
+		    else
+			esp_integrity=${6}
+			check-integrity-algorithm ${esp_integrity} || return 197
+		    fi
+		fi
+	    fi
+	fi
+    fi
+
+    export VPN_IPSEC_ACCESS="${state} ${ike_encryption} ${ike_integrity} ${dh} ${esp_encryption} ${esp_integrity}"
+    SAVENV=1
+}
+
+show-vpn-ipsec-site1()
+{
+    local vpns=${2}
+
+    echo-command-form "vpnipsec site"
+    if test "${1}" == 'new' ; then
+	echo-mark-new
+    else
+	echo-mark-cur
+    fi
+
+    if test -z "${vpns}" ; then
+	echo-value-null
+	return 0
+    fi
+
+    local elt range i=0 n=0
+    local vpn_id remote_address auth_type auth_key1 auth_key2 ike_encryption ike_integrity dh esp_encryption esp_integrity remote_isakmp_port remote_natt_port
+    local record auth_key
+
+    for elt in ${vpns}
+    do
+	range=$[${i} % 12]
+	case ${range} in
+	    0)
+ 		vpn_id=${elt}
+		;;
+	    1)
+		remote_address=${elt}
+		;;
+	    2)
+		auth_type=${elt}
+		;;
+	    3)
+		auth_key1=${elt}
+		;;
+	    4)
+		auth_key2=${elt}
+		;;
+	    5)
+		ike_encryption=${elt}
+		;;
+	    6)
+		ike_integrity=${elt}
+		;;
+	    7)
+		dh=${elt}
+		;;
+	    8)
+		esp_encryption=${elt}
+		;;
+	    9)
+		esp_integrity=${elt}
+		;;
+	    10)
+		remote_isakmp_port=${elt}
+		;;
+	    11)
+		remote_natt_port=${elt}
+
+		case ${auth_type} in
+		    psk)
+			auth_key="..."
+			;;
+		    eaptls|tls)
+			case ${auth_key1} in
+			    certificate|fqdn)
+				auth_key="${auth_key1} ${auth_key2}"
+				;;
+			    dn)
+				auth_key2=$(decode-string ${auth_key2})
+				auth_key="${auth_key1} '${auth_key2}'"
+				;;
+			    *)
+				return 255
+				;;
+			esac
+			;;
+		    *)
+			return 255
+			;;
+		esac
+
+		record="${vpn_id} ${remote_address} ${auth_type} ${auth_key} ${ike_encryption} ${ike_integrity} ${dh} ${esp_encryption} ${esp_integrity} ${remote_isakmp_port} ${remote_natt_port}"
+		test ${n} -eq 0 || echo-blank-command
+		echo-value "${record}"
+		((n++))
+		;;
+	    *)
+		return 1
+		;;
+	esac
+	((i++))
+    done
+}
+
+show-vpn-ipsec-site()
+{
+    echo-begin-show
+    show-vpn-ipsec-site1 current "${CURRENT_VPN_IPSEC_SITE_LIST}"
+    test "${CURRENT_VPN_IPSEC_SITE_LIST}" == "${VPN_IPSEC_SITE_LIST}" || show-vpn-ipsec-site1 new "${VPN_IPSEC_SITE_LIST}"
+    echo-end-show
+}
+
+get-site-psk()
+{
+    test -n "${1}" || return 1
+    in_vpn_id=${1}
+
+    local elt i=0 range
+    local vpn_id auth_type psk
+
+    for elt in ${VPN_IPSEC_SITE_LIST}
+    do
+	range=$[${i} % 12]
+	case ${range} in
+	    0)
+ 		vpn_id=${elt}
+		;;
+	    2)
+		auth_type=${elt}
+		;;
+	    3)
+		psk=${elt}
+		;;
+	    1|4|5|6|7|8|9|10)
+		;;
+	    11)
+		if test ${vpn_id} == ${in_vpn_id} -a ${auth_type} == psk ; then
+		    echo ${psk}
+		    return 0
+		fi
+		;;
+	    *)
+		return 1
+		;;
+	esac
+	((i++))
+    done
+
+    return 11
+}
+
+manage-vpn-ipsec-site()
+{
+    if test -z "${1}" ; then
+	show-vpn-ipsec-site
+	return 0
+    fi
+
+    local action=${1}
+    check-internal-action ${action} || return 1
+
+    if test ${action:0:3} == add ; then
+	len=$(record12-length-list "${VPN_IPSEC_SITE_LIST}")
+	local max_vpn_nb=$(get-max-vpn-nb)
+	test ${len} -lt ${max_vpn_nb} || return 90
+    fi
+
+    if test ${action} == raz ; then
+
+	local elt i=0 range
+	local ipsec_type vpn_id local_ip_mk_list remote_ip_mk_list vias
+	local vpn_ipsec_route_list vpn_ipsec_via_list
+
+	for elt in ${VPN_IPSEC_NETWORK_LIST}
+	do
+	    range=$[${i} % 4]
+	    case ${range} in
+		0)
+		    ipsec_type=${elt}
+		    ;;
+		1)
+		    vpn_id=${elt}
+		    ;;
+		2)
+		    local_ip_mk_list=${elt}
+		    ;;
+		3)
+		    remote_ip_mk_list=${elt}
+		    test ${ipsec_type} == 'site' || vpn_ipsec_route_list="${vpn_ipsec_route_list} ${ipsec_type} ${vpn_id} ${local_ip_mk_list} ${remote_ip_mk_list}"
+		    ;;
+		*)
+		    return 1
+		    ;;
+	    esac
+	    ((i++))
+	done
+
+	i=0
+	for elt in ${VPN_IPSEC_VIA_LIST}
+	do
+	    range=$[${i} % 3]
+	    case ${range} in
+		0)
+		    ipsec_type=${elt}
+		    ;;
+		1)
+		    vpn_id=${elt}
+		    ;;
+		2)
+		    vias=${elt}
+		    test ${ipsec_type} == 'site' || vpn_ipsec_via_list="${vpn_ipsec_via_list} ${ipsec_type} ${vpn_id} ${vias}"
+		    ;;
+		*)
+		    return 255
+		    ;;
+	    esac
+	    ((i++))
+	done
+
+	VPN_IPSEC_NETWORK_LIST=${vpn_ipsec_route_list:1}
+	VPN_IPSEC_VIA_LIST=${vpn_ipsec_via_list:1}
+
+	unset VPN_IPSEC_TO_LIST
+	unset VPN_IPSEC_BEHIND_NAT_ROLE_LIST
+	unset VPN_IPSEC_SITE_LIST
+
+	SAVENV=1
+	return 0
+    fi
+
+    test -n "${2}" || return 1
+    local vpn_id=${2}
+    test ${vpn_id} != ${ACCESS_VPN_ID} || return 32
+    check-id-length ${vpn_id} || return 127
+    check-id ${vpn_id} || return 35
+
+    if test ${action} == del ; then
+	VPN_IPSEC_SITE_LIST=$(remove-record-from-list 12 1 "${vpn_id}" "${VPN_IPSEC_SITE_LIST}")
+	VPN_IPSEC_NETWORK_LIST=$(remove-record-from-list 4 2 "site ${vpn_id}" "${VPN_IPSEC_NETWORK_LIST}")
+	VPN_IPSEC_VIA_LIST=$(remove-record-from-list 3 2 "site ${vpn_id}" "${VPN_IPSEC_VIA_LIST}")
+	VPN_IPSEC_TO_LIST=$(remove-record-from-list 2 1 "${vpn_id}" "${VPN_IPSEC_TO_LIST}")
+	VPN_IPSEC_BEHIND_NAT_ROLE_LIST=$(remove-record-from-list 2 1 ${vpn_id} "${VPN_IPSEC_BEHIND_NAT_ROLE_LIST}")
+	SAVENV=1
+	return 0
+    fi
+
+    test -n "${3}" || return 1
+    local remote_address=${3}
+
+    if test ${remote_address} == any ; then
+	remote_address=0.0.0.0
+    else
+	check-ip-name ${remote_address} || return 113
+    fi
+
+    test -n "${4}" || return 1
+    local auth_type=${4}
+
+    local auth_key auth_key1
+
+    case ${auth_type} in
+	psk)
+	    local secret=${5}
+	    if test "${secret}" == nil ; then
+		secret=$(get-site-psk ${vpn_id})
+		test -n "${secret}" || return 202
+		auth_key1=${secret}
+	    else
+		case ${action} in
+		    add)
+			test -n "${secret}" || return 1
+			check-psk "${secret}" || return 202
+			auth_key1="${secret}"
+			;;
+		    add:encrypted)
+			test -n "${secret}" || return 0
+			auth_key1=$(decrypt-password "encrypted:${secret}" "${IPSEC_PASSWD}")
+			check-psk "${auth_key1}" || return 202
+			;;
+		    *)
+			return 255
+			;;
+		esac
+	    fi
+	    auth_key="${auth_key1} nil"
+	    ;;
+	tls)
+	    test -n "${5}" || return 1
+	    test -n "${6}" || return 1
+	    local auth_key1=${5}
+
+	    case ${auth_key1} in
+		certificate)
+		    if test ${auth_type} == eaptls ; then
+			INDIRECT_ERROR_CODE=521
+			return 254
+		    fi
+		    local tls_id=${6}
+		    auth_key="${auth_key1} ${tls_id}"
+		    ;;
+		dn)
+		    local dn=${ARGS[6]}
+		    check-ldap-dn "${dn}" || return 7
+		    dn=$(encode-string "${dn}")
+		    auth_key="${auth_key1} ${dn}"
+		    ;;
+		fqdn)
+		    local fqdn=${6}
+		    check-domainname ${fqdn} || return 16
+		    auth_key="${auth_key1} ${fqdn}"
+		    ;;
+		*)
+		    return 1
+		    ;;
+	    esac
+	    shift
+	    shift-args
+	    ;;
+	*)
+	    INDIRECT_ERROR_CODE=522  
+	    return 254
+	    ;;
+    esac
+
+    local default_ike_encryption='aes256'
+    local default_ike_integrity='sha256'
+    local default_dh='modp2048'
+    local default_esp_encryption='aes256'
+    local default_esp_integrity='sha256'
+    local default_remote_isakmp_port='500'
+    local default_remote_natt_port='4500'
+
+    local ike_encryption ike_integrity dh esp_encryption esp_integrity remote_isakmp_port remote_natt_port
+
+    if test -z "${ARGS[6]}" ; then
+	ike_encryption=${default_ike_encryption}
+	ike_integrity=${default_ike_integrity}
+	dh=${default_dh}
+	esp_encryption=${default_esp_encryption}
+	esp_integrity=${default_esp_integrity}
+	remote_isakmp_port=${default_remote_isakmp_port}
+	remote_natt_port=${default_remote_natt_port}
+    else
+	ike_encryption=${ARGS[6]}
+	check-encryption-algorithm ${ike_encryption} || return 196
+	if test -z "${ARGS[7]}" ; then
+	    ike_integrity=${default_ike_integrity}
+	    dh=${default_dh}
+	    esp_encryption=${default_esp_encryption}
+	    esp_integrity=${default_esp_integrity}
+	    remote_isakmp_port=${default_remote_isakmp_port}
+	    remote_natt_port=${default_remote_natt_port}
+	else
+	    ike_integrity=${ARGS[7]}
+	    check-integrity-algorithm ${ike_integrity} || return 197
+	    if test -z "${ARGS[8]}" ; then
+		dh=${default_dh}
+		esp_encryption=${default_esp_encryption}
+		esp_integrity=${default_esp_integrity}
+		remote_isakmp_port=${default_remote_isakmp_port}
+		remote_natt_port=${default_remote_natt_port}
+	    else
+		dh=${ARGS[8]}
+		check-diffie-hellman-group ${dh} || return 198
+		if test -z "${ARGS[9]}" ; then
+		    esp_encryption=${default_esp_encryption}
+		    esp_integrity=${default_esp_integrity}
+		    remote_isakmp_port=${default_remote_isakmp_port}
+		    remote_natt_port=${default_remote_natt_port}
+		else
+		    esp_encryption=${ARGS[9]}
+		    check-encryption-algorithm ${esp_encryption} || return 196
+		    if test -z "${ARGS[10]}" ; then
+			esp_integrity=${default_esp_integrity}
+			remote_isakmp_port=${default_remote_isakmp_port}
+			remote_natt_port=${default_remote_natt_port}
+		    else
+			esp_integrity=${ARGS[10]}
+			check-integrity-algorithm ${esp_integrity} || return 197
+			if test -z "${ARGS[11]}" ; then
+			    remote_isakmp_port=${default_remote_isakmp_port}
+			    remote_natt_port=${default_remote_natt_port}
+			else
+			    remote_isakmp_port=${ARGS[11]}
+			    remote_isakmp_port=$(remove-leading-zeros ${remote_isakmp_port})
+			    check-service-port-nb ${remote_isakmp_port} || return 61
+			    if test -z "${ARGS[12]}" ; then
+				remote_natt_port=${default_remote_natt_port}
+			    else
+				remote_natt_port=${ARGS[12]}
+				remote_natt_port=$(remove-leading-zeros ${remote_natt_port})
+				check-service-port-nb ${remote_natt_port} || return 61
+			    fi
+			fi
+		    fi
+		fi
+	    fi
+	fi
+    fi
+
+    record="${vpn_id} ${remote_address} ${auth_type} ${auth_key} ${ike_encryption} ${ike_integrity} ${dh} ${esp_encryption} ${esp_integrity} ${remote_isakmp_port} ${remote_natt_port}"
+    export VPN_IPSEC_SITE_LIST=$(insert-record-in-slist 12 1 "${record}" "${VPN_IPSEC_SITE_LIST}")
+    SAVENV=1
+}
+
+echo-vpn-ipsec-networks()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    local local_ip_mk_list=${1}
+    local remote_ip_mk_list=${2}
+
+    local ip_mk ip mk
+
+    local null=$(get-null-value)
+
+    if test ${local_ip_mk_list} == 'nil' ; then
+	echo-blank-command
+	echo-value "local ${null}"
+    else
+	local_ip_mk_list=${local_ip_mk_list//,/ }
+	for ip_mk in ${local_ip_mk_list}
+	do
+	    ip=${ip_mk/\/*}
+	    mk=${ip_mk/*\/}
+
+	    echo-blank-command
+	    if test ${ip} == '0.0.0.0' -a ${mk} == '0.0.0.0' ; then
+		echo-value "local default"
+	    else
+		echo-value "local ${ip} ${mk}"
+	    fi
+	done
+    fi
+		
+    if test ${remote_ip_mk_list} == 'nil' ; then
+	echo-blank-command
+	echo-value "remote ${null}"
+    else
+	remote_ip_mk_list=${remote_ip_mk_list//,/ }
+	for ip_mk in ${remote_ip_mk_list}
+	do
+	    ip=${ip_mk/\/*}
+	    mk=${ip_mk/*\/}
+	    if test ${ip} == '0.0.0.0' -a ${mk} == '0.0.0.0' ; then
+		echo-blank-command
+		echo-value "remote default"
+	    else
+		echo-blank-command
+		echo-value "remote ${ip} ${mk}"
+	    fi
+	done
+    fi
+}
+
+echo-vpn-ipsec-type()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    local ipsec_type=${1}
+    local vpn_id=${2}
+
+    case ${ipsec_type} in
+	site)
+	    echo-value "${ipsec_type} ${vpn_id}:"
+	    ;;
+	access)
+	    echo-value "${ipsec_type}:"
+	    ;;
+	*)
+	    return 255
+	    ;;
+    esac
+}
+
+show-vpn-ipsec-network-all1()
+{
+    local vpns=${2}
+
+    echo-command-form "vpnipsec network"
+    if test "${1}" == 'new' ; then
+	echo-mark-new
+    else
+	echo-mark-cur
+    fi
+
+    if test -z "${vpns}" ; then
+	echo-value-null
+	return 0
+    fi
+
+    local elt range i=0 n=0
+    local ipsec_type vpn_id local_ip_mk_list remote_ip_mk_list
+
+    for elt in ${vpns}
+    do
+	range=$[${i} % 4]
+	case ${range} in
+	    0)
+		ipsec_type=${elt}
+		;;
+	    1)
+		vpn_id=${elt}
+		;;
+	    2)
+		local_ip_mk_list=${elt}
+		;;
+	    3)
+		remote_ip_mk_list=${elt}
+		test ${n} -eq 0 || echo-blank-command
+		echo-vpn-ipsec-type ${ipsec_type} ${vpn_id}
+		((n++))
+		echo-vpn-ipsec-networks ${local_ip_mk_list} ${remote_ip_mk_list}
+		((n++))
+		;;
+	    *)
+		return 255
+		;;
+	esac
+	((i++))
+    done
+}
+
+show-vpn-ipsec-network-all()
+{
+    echo-begin-show
+    show-vpn-ipsec-network-all1 current "${CURRENT_VPN_IPSEC_NETWORK_LIST}"
+    test "${CURRENT_VPN_IPSEC_NETWORK_LIST}" == "${VPN_IPSEC_NETWORK_LIST}" || show-vpn-ipsec-network-all1 new "${VPN_IPSEC_NETWORK_LIST}"
+    echo-end-show
+}
+
+show-vpn-ipsec-network()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    local in_ipsec_type=${1}
+    local in_vpn_id=${2}
+
+    echo-begin-show
+    echo-command-form "vpnipsec network"
+    echo-mark-cur
+    echo-vpn-ipsec-type ${in_ipsec_type} ${in_vpn_id}
+
+    local elt range i=0
+    local ipsec_type vpn_id local_ip_mk_list remote_ip_mk_list
+    local new_networks new_local_ip_mk_list new_remote_ip_mk_list
+
+    for elt in ${CURRENT_VPN_IPSEC_NETWORK_LIST}
+    do
+	range=$[${i} % 4]
+	case ${range} in
+	    0)
+		ipsec_type=${elt}
+		;;
+	    1)
+		vpn_id=${elt}
+		;;
+	    2)
+		local_ip_mk_list=${elt}
+		;;
+	    3)
+		remote_ip_mk_list=${elt}
+
+		if test ${ipsec_type} == ${in_ipsec_type} -a ${vpn_id} == ${in_vpn_id} ; then
+		    echo-vpn-ipsec-networks ${local_ip_mk_list} ${remote_ip_mk_list}
+
+		    new_networks=$(get-vpn-ipsec-networks ${in_ipsec_type} ${in_vpn_id})
+		    new_local_ip_mk_list=${new_networks/ *}
+		    new_remote_ip_mk_list=${new_networks/* }
+
+		    if test "${new_local_ip_mk_list}" != ${local_ip_mk_list} -o "${new_remote_ip_mk_list}" != ${remote_ip_mk_list} ; then
+			echo-command-form "vpnipsec network"
+			echo-mark-new
+			echo-vpn-ipsec-type ${ipsec_type} ${vpn_id}
+			echo-vpn-ipsec-networks ${new_local_ip_mk_list} ${new_remote_ip_mk_list}
+		    fi
+		    break
+		fi
+		;;
+	    *)
+		return 255
+		;;
+	esac
+	((i++))
+    done
+
+    if test "${ipsec_type}" != ${in_ipsec_type} -o "${vpn_id}" != ${in_vpn_id} ; then
+	echo-value-null
+	new_networks=$(get-vpn-ipsec-networks ${in_ipsec_type} ${in_vpn_id})
+
+	if test -n "${new_networks}" ; then
+	    echo-command-form "vpnipsec network"
+	    echo-mark-new
+	    echo-vpn-ipsec-type ${in_ipsec_type} ${in_vpn_id}
+
+	    new_local_ip_mk_list=${new_networks/ *}
+	    new_remote_ip_mk_list=${new_networks/* }
+
+	    echo-vpn-ipsec-networks ${new_local_ip_mk_list} ${new_remote_ip_mk_list}
+	fi
+    fi
+
+    echo-end-show
+}
+
+manage-vpn-ipsec-network()
+{
+    if test -z "${1}" ; then
+	show-vpn-ipsec-network-all
+	return 0
+    fi
+
+    local in_ipsec_type=${1}
+    check-vpn-ipsec-type ${in_ipsec_type} || return 194
+
+    local in_vpn_id
+
+    case ${in_ipsec_type} in
+	access)
+	    in_vpn_id=${ACCESS_VPN_ID}
+	    ;;
+	site)
+	    test -n "${2}" || return 1
+	    in_vpn_id=${2}
+	    test -n "${in_vpn_id}" || return 1
+	    test ${in_vpn_id} != ${ACCESS_VPN_ID} || return 32
+	    check-id-length ${in_vpn_id} || return 127
+	    check-id ${in_vpn_id} || return 35
+	    vpn-ipsec-exist ${in_vpn_id} || return 199
+	    shift
+	    ;;
+	*)
+	    return 255
+	    ;;
+    esac
+
+    if test -z "${2}" ; then
+	show-vpn-ipsec-network ${in_ipsec_type} ${in_vpn_id}
+	return 0
+    fi
+
+    local action=${2}
+    check-action ${action} || return 122
+
+    if test ${action} == raz ; then
+	VPN_IPSEC_NETWORK_LIST=$(remove-record-from-list 4 2 "${in_ipsec_type} ${in_vpn_id}" "${VPN_IPSEC_NETWORK_LIST}")
+	SAVENV=1
+	return 0
+    fi
+
+    test -n "${3}" || return 1
+    local vpn_side=${3}
+    check-vpn-side ${vpn_side} || return 77
+
+    test -n "${4}" || return 1
+    local ip=${4} mk
+    if test ${ip} == 'default' ; then
+	ip='0.0.0.0'
+	mk='0.0.0.0'
+    else
+	local px=${ip/*\/}
+
+	if test ${ip} != ${px} ; then
+	    check-prefix ${px} || return 158
+	    ip=${ip/\/*}
+	else
+	    unset px
+	fi
+
+	check-ip ${ip} || return 12
+
+	if test -z "${px}" ; then
+	    if test -z "${5}" ; then
+		mk='255.255.255.0'
+	    else
+		mk=${5}
+		check-mask ${mk} || return 13
+	    fi
+	else
+	    if test ${px} == 32 ; then
+		mk='255.255.255.255'
+	    elif test ${px} == 0 ; then
+		mk='0.0.0.0'
+	    else
+		mk=$(ipcalc -s ${ip}/${px} -m)
+		mk=${mk/NETMASK=/}
+	    fi
+	fi
+
+	check-net-ip-address ${ip} ${mk} || return 70
+    fi
+
+    local elt i=0 range
+    local ipsec_type vpn_id local_ip_mk_list remote_ip_mk_list
+    local ip_mk ip mk
+
+    for elt in ${VPN_IPSEC_NETWORK_LIST}
+    do
+	range=$[${i} % 4]
+	case ${range} in
+	    0)
+		ipsec_type=${elt}
+		;;
+	    1)
+		vpn_id=${elt}
+		;;
+	    2)
+		local_ip_mk_list=${elt}
+		;;
+	    3)
+		remote_ip_mk_list=${elt}
+		test ${ipsec_type} != ${in_ipsec_type} -o ${vpn_id} != ${in_vpn_id} || break
+		;;
+	    *)
+		return 1
+		;;
+	esac
+	((i++))
+    done
+
+    if test "${ipsec_type}" != ${in_ipsec_type} -o "${vpn_id}" != ${in_vpn_id} ; then
+
+	test ${action} == add || return 0
+
+	local local_ip_mk remote_ip_mk
+
+	case ${vpn_side} in
+	'local')
+	    local_ip_mk="${ip}/${mk}"
+	    remote_ip_mk='nil'
+	    ;;
+	remote)
+	    local_ip_mk='nil'
+	    remote_ip_mk="${ip}/${mk}"
+	    ;;
+	*)
+	    return 255
+	    ;;
+	esac
+
+	if test -z "${VPN_IPSEC_NETWORK_LIST}" ; then
+	    VPN_IPSEC_NETWORK_LIST="${in_ipsec_type} ${in_vpn_id} ${local_ip_mk} ${remote_ip_mk}"
+	else
+	    VPN_IPSEC_NETWORK_LIST="${VPN_IPSEC_NETWORK_LIST} ${in_ipsec_type} ${in_vpn_id} ${local_ip_mk} ${remote_ip_mk}"
+	fi
+	SAVENV=1
+	return 0
+    fi
+
+    case ${vpn_side} in
+	'local')
+	    if test ${local_ip_mk_list} != 'nil' ; then
+		local_ip_mk_list=${local_ip_mk_list//,/ }
+		local_ip_mk_list=${local_ip_mk_list//\// }
+		local_ip_mk_list=$(remove-record-from-list 2 2 "${ip} ${mk}" "${local_ip_mk_list}")
+		local_ip_mk_list=$(get-vpn-network-internal-format "${local_ip_mk_list}")
+	    fi
+	    ;;
+	remote)
+	    if test ${remote_ip_mk_list} != 'nil' ; then
+		remote_ip_mk_list=${remote_ip_mk_list//,/ }
+		remote_ip_mk_list=${remote_ip_mk_list//\// }
+		remote_ip_mk_list=$(remove-record-from-list 2 2 "${ip} ${mk}" "${remote_ip_mk_list}")
+		remote_ip_mk_list=$(get-vpn-network-internal-format "${remote_ip_mk_list}")
+	    fi
+	    ;;
+	*)
+	    return 255
+	    ;;
+    esac
+
+    VPN_IPSEC_NETWORK_LIST=$(remove-record-from-list 4 2 "${in_ipsec_type} ${in_vpn_id}" "${VPN_IPSEC_NETWORK_LIST}")
+
+    if test ${action} == del ; then
+	if test -z "${VPN_IPSEC_NETWORK_LIST}" ; then
+	    if test ${local_ip_mk_list} != 'nil' -o ${remote_ip_mk_list} != 'nil' ; then
+		VPN_IPSEC_NETWORK_LIST="${in_ipsec_type} ${in_vpn_id} ${local_ip_mk_list} ${remote_ip_mk_list}"
+	    fi
+	else
+	    if test ${local_ip_mk_list} != 'nil' -o ${remote_ip_mk_list} != 'nil' ; then
+		VPN_IPSEC_NETWORK_LIST="${in_ipsec_type} ${in_vpn_id} ${local_ip_mk_list} ${remote_ip_mk_list} ${VPN_IPSEC_NETWORK_LIST}"
+	    fi
+	fi
+
+	SAVENV=1
+	return 0
+    fi
+
+    test ${action} == add || return 255
+
+    case ${vpn_side} in
+	'local')
+	    if test "${local_ip_mk_list}" == 'nil' ; then
+		local_ip_mk_list=${ip}/${mk}
+	    else
+		local_ip_mk_list="${local_ip_mk_list},${ip}/${mk}"
+	    fi
+	    ;;
+	remote)
+	    if test "${remote_ip_mk_list}" == 'nil' ; then
+		remote_ip_mk_list=${ip}/${mk}
+	    else
+		remote_ip_mk_list="${remote_ip_mk_list},${ip}/${mk}"
+	    fi
+	    ;;
+	*)
+	    return 255
+	    ;;
+    esac
+
+    local routes=${local_ip_mk_list//,/ }
+    if test -z "${routes}" ; then
+	routes=${remote_ip_mk_list//,/ }
+    else
+	test -z "${remote_ip_mk_list}" || routes="${routes} ${remote_ip_mk_list//,/ }"
+    fi
+    local len=$(length-list "${routes}")
+    test ${len} -lt ${MAX_IP_ROUTES_NB} || return 90
+
+    if test -z "${VPN_IPSEC_NETWORK_LIST}" ; then
+	VPN_IPSEC_NETWORK_LIST="${in_ipsec_type} ${in_vpn_id} ${local_ip_mk_list} ${remote_ip_mk_list}"
+    else
+	VPN_IPSEC_NETWORK_LIST="${in_ipsec_type} ${in_vpn_id} ${local_ip_mk_list} ${remote_ip_mk_list} ${VPN_IPSEC_NETWORK_LIST}"
+    fi
+    SAVENV=1
+}
+
+get-vpn-ipsec-vias()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    local in_ipsec_type=${1}
+    local in_vpn_id=${2}
+
+    local elt range i=0
+    local ipsec_type vpn_id vias
+
+    for elt in ${VPN_IPSEC_VIA_LIST}
+    do
+	range=$[${i} % 3]
+	case ${range} in
+	    0)
+		ipsec_type=${elt}
+		;;
+	    1)
+		vpn_id=${elt}
+		;;
+	    2)
+		vias=${elt}
+
+		if test ${ipsec_type} == ${in_ipsec_type} -a ${vpn_id} == ${in_vpn_id} ; then
+		    colon2space ${vias}
+		    return 0
+		fi
+		;;
+	    *)
+		return 255
+		;;
+	esac
+	((i++))
+    done
+
+    return 11
+}
+
+echo-vpn-ipsec-vias()
+{
+    local vias=${@}
+
+    if test -z "${vias}" ; then
+	echo-value-null
+	return 0
+    fi
+
+    local via gateway role_prio role prio
+
+    for via in ${vias}
+    do
+	gateway=${via/_*}
+	role_prio=${via#*_}
+	role=${role_prio/_*}
+	prio=${role_prio/*_}
+
+	echo-value "${gateway} ${role} ${prio}"
+    done
+}
+
+show-vpn-ipsec-via-all1()
+{
+    local vpns=${2}
+
+    echo-command-form "vpnipsec via"
+    if test "${1}" == 'new' ; then
+	echo-mark-new
+    else
+	echo-mark-cur
+    fi
+
+    if test -z "${vpns}" ; then
+	echo-value-null
+	return 0
+    fi
+
+    local elt range i=0
+    local ipsec_type vpn_id vias
+
+    for elt in ${vpns}
+    do
+	range=$[${i} % 3]
+	case ${range} in
+	    0)
+		ipsec_type=${elt}
+		;;
+	    1)
+		vpn_id=${elt}
+		;;
+	    2)
+		case ${ipsec_type} in
+		    site)
+			echo-value "${ipsec_type} ${vpn_id}:"
+			;;
+		    access)
+			echo-value "${ipsec_type}:"
+			;;
+		    *)
+			return 255
+			;;
+		esac
+
+		vias=$(colon2space ${elt})
+		echo-vpn-ipsec-vias ${vias}
+		;;
+	    *)
+		return 255
+		;;
+	esac
+	((i++))
+    done
+}
+
+show-vpn-ipsec-via-all()
+{
+    echo-begin-show
+    show-vpn-ipsec-via-all1 current "${CURRENT_VPN_IPSEC_VIA_LIST}"
+    test "${CURRENT_VPN_IPSEC_VIA_LIST}" == "${VPN_IPSEC_VIA_LIST}" || show-vpn-ipsec-via-all1 new "${VPN_IPSEC_VIA_LIST}"
+    echo-end-show
+}
+
+show-vpn-ipsec-via()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    local in_ipsec_type=${1}
+    local in_vpn_id=${2}
+
+    echo-begin-show
+    echo-command-form "vpnipsec via"
+    echo-mark-cur
+    echo-vpn-ipsec-type ${in_ipsec_type} ${in_vpn_id}
+
+    local elt range i=0
+    local ipsec_type vpn_id vias
+    local new_vias
+
+    for elt in ${CURRENT_VPN_IPSEC_VIA_LIST}
+    do
+	range=$[${i} % 3]
+	case ${range} in
+	    0)
+		ipsec_type=${elt}
+		;;
+	    1)
+		vpn_id=${elt}
+		;;
+	    2)
+		vias=${elt}
+
+		if test ${ipsec_type} == ${in_ipsec_type} -a ${vpn_id} == ${in_vpn_id} ; then
+		    vias=$(colon2space ${vias})
+		    echo-vpn-ipsec-vias ${vias}
+
+		    new_vias=$(get-vpn-ipsec-vias ${in_ipsec_type} ${in_vpn_id})
+
+		    if test "${new_vias}" != "${vias}" ; then
+			echo-command-form "vpnipsec via"
+			echo-mark-new
+			echo-vpn-ipsec-type ${ipsec_type} ${vpn_id}
+			echo-vpn-ipsec-vias ${new_vias}
+		    fi
+		    break
+		fi
+		;;
+	    *)
+		return 255
+		;;
+	esac
+	((i++))
+    done
+
+    if test "${ipsec_type}" != ${in_ipsec_type} -o "${vpn_id}" != ${in_vpn_id} ; then
+
+	echo-value-null
+	new_vias=$(get-vpn-ipsec-vias ${in_ipsec_type} ${in_vpn_id})
+
+	if test -n "${new_vias}" ; then
+	    echo-command-form "vpnipsec via"
+	    echo-mark-new
+	    echo-vpn-ipsec-type ${in_ipsec_type} ${in_vpn_id}
+	    echo-vpn-ipsec-vias ${new_vias}
+	fi
+    fi
+
+    echo-end-show
+}
+
+manage-vpn-ipsec-via()
+{
+    if test -z "${1}" ; then
+	show-vpn-ipsec-via-all
+	return 0
+    fi
+
+    local in_ipsec_type=${1}
+    check-vpn-ipsec-type ${in_ipsec_type} || return 194
+
+    local in_vpn_id
+
+    case ${in_ipsec_type} in
+	access)
+	    in_vpn_id=${ACCESS_VPN_ID}
+	    ;;
+	site)
+	    test -n "${2}" || return 1
+	    in_vpn_id=${2}
+	    test ${in_vpn_id} != ${ACCESS_VPN_ID} || return 32
+	    vpn-ipsec-exist ${in_vpn_id} || return 199
+	    shift
+	    ;;
+	*)
+	    return 255
+	    ;;
+    esac
+
+    if test -z "${2}" ; then
+	show-vpn-ipsec-via ${in_ipsec_type} ${in_vpn_id}
+	return 0
+    fi
+
+    local action=${2}
+    check-action ${action} || return 122
+
+    if test ${action} == raz ; then
+	VPN_IPSEC_VIA_LIST=$(remove-record-from-list 3 2 "${in_ipsec_type} ${in_vpn_id}" "${VPN_IPSEC_VIA_LIST}")
+	SAVENV=1
+	return 0
+    fi
+
+    test -n "${3}" || return 1
+    local in_gateway=${3}
+    check-ip ${in_gateway} || return 12
+
+    if test ${action} == add ; then
+	test -n "${4}" || return 1
+	local in_role=${4}
+	check-ha-role ${in_role} || return 48
+
+	local in_prio
+	if test -z "${5}" ; then
+	    case ${in_role} in
+		master)
+		    in_prio=110
+		    ;;
+		backup)
+		    in_prio=100
+		    ;;
+		*)
+		    return 255
+		    ;;
+	    esac
+	else
+	    in_prio=${5}
+	    check-priority ${in_prio} || return 47
+	fi
+    fi
+
+    local elt i=0 range
+    local ipsec_type vpn_id vias
+
+    for elt in ${VPN_IPSEC_VIA_LIST}
+    do
+	range=$[${i} % 3]
+	case ${range} in
+	    0)
+		ipsec_type=${elt}
+		;;
+	    1)
+		vpn_id=${elt}
+		;;
+	    2)
+		vias=${elt}
+		test ${ipsec_type} != ${in_ipsec_type} -o ${vpn_id} != ${in_vpn_id} || break
+		;;
+	    *)
+		return 1
+		;;
+	esac
+	((i++))
+    done
+
+    if test "${ipsec_type}" != ${in_ipsec_type} -o "${vpn_id}" != ${in_vpn_id} ; then
+
+	test ${action} == add || return 0
+
+	if test -z "${VPN_IPSEC_VIA_LIST}" ; then
+	    VPN_IPSEC_VIA_LIST="${in_ipsec_type} ${in_vpn_id} ${in_gateway}_${in_role}_${in_prio}"
+	else
+	    VPN_IPSEC_VIA_LIST=$(insert-record-in-slist 3 2 "${in_ipsec_type} ${in_vpn_id} ${in_gateway}_${in_role}_${in_prio}" "${VPN_IPSEC_VIA_LIST}")
+	fi
+	SAVENV=1
+	return 0
+    fi
+
+    local vias_out via gateway
+    vias=$(colon2space ${elt})
+
+    for via in ${vias}
+    do
+	gateway=${via/_*}
+	test ${gateway} == ${in_gateway} || vias_out="${vias_out} ${via}"
+    done
+    vias_out="${vias_out:1}"
+
+    test ${action} == del || vias_out=$(insert-record-in-slist 2 1 "${in_gateway}_${in_role}_${in_prio}" "${vias_out}")
+    
+    vias_out="${vias_out// /:}"
+
+    VPN_IPSEC_VIA_LIST=$(remove-record-from-list 3 2 "${in_ipsec_type} ${in_vpn_id}" "${VPN_IPSEC_VIA_LIST}")
+
+    test -z "${vias_out}" || VPN_IPSEC_VIA_LIST=$(insert-record-in-slist 3 2 "${in_ipsec_type} ${in_vpn_id} ${vias_out}" "${VPN_IPSEC_VIA_LIST}")
+
+    SAVENV=1
+}
+
+echo-vpn-ipsec-tos()
+{
+    local tos=${@}
+
+    if test -z "${tos}" ; then
+	echo-value-null
+	return 0
+    fi
+
+    local ip
+
+    for ip in ${tos}
+    do
+	echo-blank-command
+	echo-value "${ip}"
+    done
+}
+
+show-vpn-ipsec-to-all1()
+{
+    local vpns=${2}
+
+    echo-command-form "vpnipsec to"
+    if test "${1}" == 'new' ; then
+	echo-mark-new
+    else
+	echo-mark-cur
+    fi
+
+    if test -z "${vpns}" ; then
+	echo-value-null
+	return 0
+    fi
+
+    local elt range i=0
+    local vpn_id tos
+    local n=0
+
+    for elt in ${vpns}
+    do
+	range=$[${i} % 2]
+	case ${range} in
+	    0)
+		vpn_id=${elt}
+		;;
+	    1)
+		test ${n} -eq 0 || echo-blank-command
+		echo-highlighted-value "site ${vpn_id}"
+		tos=$(colon2space ${elt})
+		echo-vpn-ipsec-tos ${tos}
+		((n++))
+		;;
+	    *)
+		return 255
+		;;
+	esac
+	((i++))
+    done
+}
+
+show-vpn-ipsec-to-all()
+{
+    echo-begin-show
+    show-vpn-ipsec-to-all1 current "${CURRENT_VPN_IPSEC_TO_LIST}"
+    test "${CURRENT_VPN_IPSEC_TO_LIST}" == "${VPN_IPSEC_TO_LIST}" || show-vpn-ipsec-to-all1 new "${VPN_IPSEC_TO_LIST}"
+    echo-end-show
+}
+
+show-vpn-ipsec-to()
+{
+    test -n "${1}" || return 1
+    local in_vpn_id=${1}
+
+    echo-begin-show
+    echo-command-form "vpnipsec to"
+    echo-mark-cur
+    echo-value "site ${in_vpn_id}:"
+
+    local elt range i=0
+    local vpn_id tos
+    local new_tos
+
+    for elt in ${CURRENT_VPN_IPSEC_TO_LIST}
+    do
+	range=$[${i} % 2]
+	case ${range} in
+	    0)
+		vpn_id=${elt}
+		;;
+	    1)
+		tos=${elt}
+
+		if test ${vpn_id} == ${in_vpn_id} ; then
+		    tos=$(colon2space ${tos})
+		    echo-vpn-ipsec-tos ${tos}
+
+		    new_tos=$(get-vpn-ipsec-tos ${in_vpn_id} new)
+
+		    if test "${new_tos}" != "${tos}" ; then
+			echo-command-form "vpnipsec to"
+			echo-mark-new
+			echo-value "site ${vpn_id}:"
+			echo-vpn-ipsec-tos ${new_tos}
+		    fi
+		    break
+		fi
+		;;
+	    *)
+		return 255
+		;;
+	esac
+	((i++))
+    done
+
+    if test "${vpn_id}" != ${in_vpn_id} ; then
+
+	echo-value-null
+	new_tos=$(get-vpn-ipsec-tos ${in_vpn_id} new)
+
+	if test -n "${new_tos}" ; then
+	    echo-command-form "vpnipsec to"
+	    echo-mark-new
+	    echo-value "site ${in_vpn_id}:"
+	    echo-vpn-ipsec-tos ${new_tos}
+	fi
+    fi
+
+    echo-end-show
+}
+
+manage-vpn-ipsec-to()
+{
+    if test -z "${1}" ; then
+	show-vpn-ipsec-to-all
+	return 0
+    fi
+
+    local in_vpn_id=${1}
+    test ${in_vpn_id} != ${ACCESS_VPN_ID} || return 32
+    vpn-ipsec-exist ${in_vpn_id} || return 199
+
+    if test -z "${2}" ; then
+	show-vpn-ipsec-to ${in_vpn_id}
+	return 0
+    fi
+
+    local action=${2}
+    check-action ${action} || return 122
+
+    if test ${action} == raz ; then
+	VPN_IPSEC_TO_LIST=$(remove-record-from-list 2 1 ${in_vpn_id} "${VPN_IPSEC_TO_LIST}")
+	SAVENV=1
+	return 0
+    fi
+
+    test -n "${3}" || return 1
+    local in_peer_ip=${3}
+    check-ip-name ${in_peer_ip} || return 113
+
+    local elt range i=0
+    local vpn_id tos
+
+    for elt in ${VPN_IPSEC_TO_LIST}
+    do
+	range=$[${i} % 2]
+	case ${range} in
+	    0)
+		vpn_id=${elt}
+		;;
+	    1)
+		tos=${elt}
+		test ${vpn_id} != ${in_vpn_id} || break
+		;;
+	    *)
+		return 1
+		;;
+	esac
+	((i++))
+    done
+
+    if test "${vpn_id}" != ${in_vpn_id} ; then
+
+	test ${action} == add || return 0
+
+	if test -z "${VPN_IPSEC_TO_LIST}" ; then
+	    VPN_IPSEC_TO_LIST="${in_vpn_id} ${in_peer_ip}"
+	else
+	    VPN_IPSEC_TO_LIST="${VPN_IPSEC_TO_LIST} ${in_vpn_id} ${in_peer_ip}"
+	fi
+	SAVENV=1
+	return 0
+    fi
+
+    local tos_out peer_ip
+
+    tos=$(colon2space ${elt})
+    tos_out=$(remove "${tos}" ${in_peer_ip})
+
+    if test ${action} == add ; then
+	local len=$(length-list "${tos}")
+	test ${len} -lt ${MAX_VPN_IPSEC_TO} || return 90
+	tos_out="${tos_out} ${in_peer_ip}"
+    fi
+    
+    tos_out="${tos_out// /:}"
+
+    VPN_IPSEC_TO_LIST=$(remove-record-from-list 2 1 ${in_vpn_id} "${VPN_IPSEC_TO_LIST}")
+
+    test -z "${tos_out}" || VPN_IPSEC_TO_LIST="${VPN_IPSEC_TO_LIST} ${in_vpn_id} ${tos_out}"
+
+    SAVENV=1
+}
+
+show-vpn-ipsec-nat-public1()
+{
+    local ips=${2}
+
+    echo-command-form "vpnipsec nat public"
+    if test "${1}" == 'new' ; then
+	echo-mark-new
+    else
+	echo-mark-cur
+    fi
+
+    if test -z "${ips}" ; then
+	echo-value-null
+	return 0
+    fi
+
+    local ip n=0
+
+    for ip in ${ips}
+    do
+	test ${n} -eq 0 || echo-blank-command
+	echo-value "${ip}"
+	((n++))
+    done
+}
+
+show-vpn-ipsec-nat-public()
+{
+    echo-begin-show
+    show-vpn-ipsec-nat-public1 current "${CURRENT_VPN_IPSEC_BEHIND_NAT_IP_LIST}"
+    test "${CURRENT_VPN_IPSEC_BEHIND_NAT_IP_LIST}" == "${VPN_IPSEC_BEHIND_NAT_IP_LIST}" || show-vpn-ipsec-nat-public1 new "${VPN_IPSEC_BEHIND_NAT_IP_LIST}"
+    echo-end-show
+}
+
+check-nat-public-nb()
+{
+    local len=$(length-list "${VPN_IPSEC_BEHIND_NAT_IP_LIST}")
+    test ${len} -lt ${MAX_VPN_IPSEC_BEHIND_NAT_IP_NB}
+}
+
+manage-vpn-ipsec-nat-public()
+{
+    if test -z "${1}" ; then
+	show-vpn-ipsec-nat-public
+	return 0
+    fi
+
+    local action=${1}
+    check-action ${action} || return 122
+
+    case ${action} in
+	raz)
+	    export VPN_IPSEC_BEHIND_NAT_IP_LIST=""
+	    ;;
+	add|del)
+	    test -n "${2}" || return 1
+	    ip=${2}
+	    check-ip ${ip} || return 12
+
+	    if test ${action} == add ; then
+		check-nat-public-nb || return 90
+		export VPN_IPSEC_BEHIND_NAT_IP_LIST=$(remove "${VPN_IPSEC_BEHIND_NAT_IP_LIST}" ${ip})
+		if test -z "${VPN_IPSEC_BEHIND_NAT_IP_LIST}" ; then
+		    VPN_IPSEC_BEHIND_NAT_IP_LIST=${ip}
+		else
+		    VPN_IPSEC_BEHIND_NAT_IP_LIST="${VPN_IPSEC_BEHIND_NAT_IP_LIST} ${ip}"
+		fi
+	    else
+		export VPN_IPSEC_BEHIND_NAT_IP_LIST=$(remove "${VPN_IPSEC_BEHIND_NAT_IP_LIST}" ${ip})
+	    fi
+	    ;;
+	*)
+	    return 255
+	    ;;
+    esac
+
+    SAVENV=1
+}
+
+show-vpn-ipsec-nat-role()
+{
+    test -n "${1}" || return 1
+    local vpn_id=${1}
+
+    local role=$(get-vpn-ipsec-nat-role ${vpn_id} "${CURRENT_VPN_IPSEC_BEHIND_NAT_ROLE_LIST}")
+    local new_role=$(get-vpn-ipsec-nat-role ${vpn_id} "${VPN_IPSEC_BEHIND_NAT_ROLE_LIST}")
+
+    echo-begin-show
+    echo-command-form "vpnipsec nat role"
+    echo-mark-cur
+
+    if test -z "${role}" ; then
+	echo-value-null
+    else
+	echo-value ${role}
+    fi
+
+    if test "${role}" != "${new_role}" ; then
+	echo-command-form "vpnipsec nat role"
+	echo-mark-new
+	if test -z "${new_role}" ; then
+	    echo-value-null
+	else
+	    echo-value ${new_role}
+	fi
+    fi
+	
+    echo-end-show
+}
+
+show-vpn-ipsec-nat-role-all1()
+{
+    local roles=${2}
+
+    echo-command-form "vpnipsec nat role"
+    if test "${1}" == 'new' ; then
+	echo-mark-new
+    else
+	echo-mark-cur
+    fi
+
+    if test -z "${roles}" ; then
+	echo-value-null
+	return 0
+    fi
+
+    local elt range i=0
+    local vpn_id role
+
+    for elt in ${roles}
+    do
+	range=$[${i} % 2]
+	case ${range} in
+	    0)
+		vpn_id=${elt}
+		;;
+	    1)
+		role=${elt}
+		test ${i} -eq 1 || echo-blank-command
+		echo-value "${vpn_id} ${role}"
+		;;
+	    *)
+		return 255
+		;;
+	esac
+	((i++))
+    done
+}
+
+show-vpn-ipsec-nat-role-all()
+{
+    echo-begin-show
+    show-vpn-ipsec-nat-role-all1 current "${CURRENT_VPN_IPSEC_BEHIND_NAT_ROLE_LIST}"
+    test "${CURRENT_VPN_IPSEC_BEHIND_NAT_ROLE_LIST}" == "${VPN_IPSEC_BEHIND_NAT_ROLE_LIST}" || show-vpn-ipsec-nat-role-all1 new "${VPN_IPSEC_BEHIND_NAT_ROLE_LIST}"
+    echo-end-show
+}
+
+manage-vpn-ipsec-nat-role()
+{
+    if test -z "${1}" ; then
+	show-vpn-ipsec-nat-role-all
+	return 0
+    fi
+
+    local in_vpn_id=${1}
+    test ${in_vpn_id} != ${ACCESS_VPN_ID} || return 32
+    vpn-ipsec-exist ${in_vpn_id} || return 199
+
+    if test -z "${2}" ; then
+	show-vpn-ipsec-nat-role ${in_vpn_id}
+	return 0
+    fi
+
+    local role=${2}
+    check-vpn-role ${role} || return 201
+
+    VPN_IPSEC_BEHIND_NAT_ROLE_LIST=$(remove-record-from-list 2 1 ${in_vpn_id} "${VPN_IPSEC_BEHIND_NAT_ROLE_LIST}")
+
+    if test ${role} != raz ; then
+	if test -z "${VPN_IPSEC_BEHIND_NAT_ROLE_LIST}" ; then
+	    VPN_IPSEC_BEHIND_NAT_ROLE_LIST="${in_vpn_id} ${role}"
+	else
+	    VPN_IPSEC_BEHIND_NAT_ROLE_LIST=$(insert-record-in-slist 2 1 "${in_vpn_id} ${role}" "${VPN_IPSEC_BEHIND_NAT_ROLE_LIST}")
+	fi
+    fi
+
+    SAVENV=1
+}
+
+manage-vpn-ipsec-nat()
+{
+    if test -z "${1}" ; then
+	manage-vpn-ipsec-nat-role
+	manage-vpn-ipsec-nat-public
+	return 0
+    fi
+
+    local sel=${1}
+    shift
+
+    case ${sel} in
+	role)
+	    manage-vpn-ipsec-nat-role "${@}"
+	    ;;
+	public)
+	    manage-vpn-ipsec-nat-public "${@}"
+	    ;;
+	*)
+	    return 1
+	    ;;
+    esac
+}
+
+show-vpn-ipsec-report()
+{
+    update-report vpnipsec-report 30 5000000 || return 104
+    test -f ${RUN_DIR}/${VPN_IPSEC_STATUS_FILENAME} || return 104
+
+    test "${TERM}" != "${WADMIN_TERM}" || return 0
+
+    local connection status remote_address remote_id duration
+    local access_mode=${CURRENT_VPN_IPSEC_ACCESS/ *}
+
+    echo-begin-show
+
+    if test ${access_mode} == 'off' ; then
+	printf "%-23s%-9s%-18s%-18s\n" '[IPsec VPN ID]' '[Status]' '[Remote IP]' '[Duration]'
+    else
+	printf "%-23s%-9s%-18s%-18s\n" '[Private IP]' '[Status]' '[Public IP]' '[Duration]'
+    fi
+
+    while read connection status remote_address remote_id duration
+    do
+	case ${status} in
+	    ESTABLISHED)
+		status=$(echo-formated-state 'OK')
+		;;
+	    CONNECTING)
+		status=$(echo-formated-state '??')
+		;;
+	    KO)
+		status=$(echo-formated-state 'KO')
+		;;
+	    *)
+		status=$(echo-formated-state '??')
+		;;
+	esac
+	test "${remote_address}" != nil || remote_address='...'
+	test -n "${duration}" || duration='...'
+	echo -n "${connection#site-}"
+	echo-value "${status}" 23 -n
+	echo-value "${remote_address}" 32 -n
+	echo-value "${duration}" 50
+
+    done < ${RUN_DIR}/${VPN_IPSEC_STATUS_FILENAME}
+
+    echo-end-show
+}
+
+run()
+{
+    contextual-command-is-allowed || return 207
+
+    local conf
+
+    if test -n "${ARGS[1]}" ; then
+	conf=${ARGS[1]}
+	shift-args
+    fi
+
+    case "${conf}" in
+	authenticate)
+	    manage-vpn-ipsec-authenticate ${ALLARGS}
+	    ;;
+	access)
+	    manage-vpn-ipsec-access ${ALLARGS}
+	    ;;
+	site)
+	    manage-vpn-ipsec-site ${ALLARGS}
+	    ;;
+	network)
+	    manage-vpn-ipsec-network ${ALLARGS}
+	    ;;
+	via)
+	    manage-vpn-ipsec-via ${ALLARGS}
+	    ;;	
+	to)
+	    manage-vpn-ipsec-to ${ALLARGS}
+	    ;;
+	nat)
+	    manage-vpn-ipsec-nat ${ALLARGS}
+	    ;;
+
+	report)
+	    show-vpn-ipsec-report ${ALLARGS}
+	    ;;
+	'')
+	    manage-vpn-ipsec-authenticate
+	    manage-vpn-ipsec-access
+	    manage-vpn-ipsec-access authenticate
+	    manage-vpn-ipsec-access access
+	    manage-vpn-ipsec-site
+	    manage-vpn-ipsec-network
+	    manage-vpn-ipsec-via
+	    manage-vpn-ipsec-to
+	    manage-vpn-ipsec-nat
+	    ;;
+	*)
+	    return 1
+	    ;;
+    esac
+}
+
+main "${@}"

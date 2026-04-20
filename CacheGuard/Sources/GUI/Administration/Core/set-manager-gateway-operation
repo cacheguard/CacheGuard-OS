@@ -1,0 +1,72 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       GUI
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+set-manager-gateway-operation()
+{
+    local domain_gateway_ip domain id_ip id ip
+
+    local operation=${VALUES[0]}
+    local scope=${VALUES[1]}
+
+    case ${scope} in
+	gateway)
+	    domain_gateway_ip=${VALUES[2]}
+	    domain=${domain_gateway_ip/:*}
+	    id_ip=${domain_gateway_ip/*:}
+	    id=${id_ip/,*}
+	    ip=${id_ip/*,}
+	    ;;
+	all)
+	    ;;
+	*)
+	    domain=${scope/*:}
+	    ;;
+    esac
+
+    test -z "${domain}" || domain=" ${domain}"
+    test -z "${id}" || id=" ${id}"
+    test -z "${ip}" || ip=" ${ip}"
+
+    case ${operation} in
+	pull|push)
+	    log-command "manager" "gateway ${operation}${domain}${id}"
+	    execute-command "manager gateway ${operation}${domain}${id}"
+	    ;;
+	apply)
+	    if test -f ${HOME}/${MANAGER_EXEC_CONTEXT_FILE} ; then
+		gen-gui-error 19
+	    else
+		log-command "manager" "gateway begin exec local${domain}${id} [apply force] end"
+		local context="gateway local${domain}${id}${ip}"
+		context=${context// /:}
+		cli-execute-command "end internal exec ${context} apply force"
+	    fi
+	    ;;
+	*)
+	    return 0
+	    ;;
+    esac
+}
+
+set-manager-gateway-operation

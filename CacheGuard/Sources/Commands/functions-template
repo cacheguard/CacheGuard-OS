@@ -1,0 +1,63 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       Commands
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+trap "" TSTP CONT
+
+load-all-files()
+{
+    test -z "${TRANSACTION}" || return 0
+
+    source ${ROOT_DIR}#APPLIANCE_DIR#/etc/constant
+    source ${ROOT_DIR}${APPLIANCE_DIR}/etc/role
+    source ${ROOT_DIR}${HARD_DIR}/model.conf
+    source ${ROOT_DIR}${HARD_DIR}/cloud.conf
+
+    source ${ROOT_DIR}${APPLIANCE_DIR}/lib/jobs-tab
+    source ${ROOT_DIR}${APPLIANCE_DIR}/lib/lib-cache
+    source ${ROOT_DIR}${APPLIANCE_DIR}/lib/lib-check
+    source ${ROOT_DIR}${APPLIANCE_DIR}/lib/lib-common
+    source ${ROOT_DIR}${APPLIANCE_DIR}/lib/lib-db-waf
+    source ${ROOT_DIR}${APPLIANCE_DIR}/lib/lib-environment
+    source ${ROOT_DIR}${APPLIANCE_DIR}/lib/lib-error
+    source ${ROOT_DIR}${APPLIANCE_DIR}/lib/lib-file
+    source ${ROOT_DIR}${APPLIANCE_DIR}/lib/lib-interface
+    source ${ROOT_DIR}${APPLIANCE_DIR}/lib/lib-ip
+    source ${ROOT_DIR}${APPLIANCE_DIR}/lib/lib-job
+    source ${ROOT_DIR}${APPLIANCE_DIR}/lib/lib-list
+    source ${ROOT_DIR}${APPLIANCE_DIR}/lib/lib-openssl
+    source ${ROOT_DIR}${APPLIANCE_DIR}/lib/lib-2fa
+    source ${ROOT_DIR}${APPLIANCE_DIR}/lib/lib-passwd
+    source ${ROOT_DIR}${APPLIANCE_DIR}/lib/lib-site
+    source ${ROOT_DIR}${APPLIANCE_DIR}/lib/lib-timezone
+    source ${ROOT_DIR}${APPLIANCE_DIR}/lib/lib-tls
+    source ${ROOT_DIR}${APPLIANCE_DIR}/lib/lib-tools
+    source ${ROOT_DIR}${APPLIANCE_DIR}/lib/lib-urllist
+    source ${ROOT_DIR}${APPLIANCE_DIR}/lib/lib-usage
+    source ${ROOT_DIR}${APPLIANCE_DIR}/lib/lib-waf
+
+    MIN_NIC_NB=$(get-min-nic)
+    source ${ROOT_DIR}${APPLIANCE_DIR}/lib/errors-tab
+}
+
+load-all-files

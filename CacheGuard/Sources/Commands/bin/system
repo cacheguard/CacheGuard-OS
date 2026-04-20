@@ -1,0 +1,1316 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       Commands
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+source functions
+
+check-report-type()
+{
+    local report=${1}
+
+    case ${report} in
+	antivirus|service|counter|load|cpu|disk|connection|raid|link|gateway|vpnipsec|memory)
+	    return 0
+	    ;;
+	"")
+	    return 0
+	    ;;
+	*)
+	    return 11
+	    ;;
+    esac
+}
+
+show-report-service()
+{
+    test -f ${RUN_DIR}/${SERVICES_STATE_FILENAME} || return 0
+
+    local service flag
+    local name state ext_state
+
+    while read service flag
+    do
+	if test ${flag} -eq 0 ; then
+	    state="[${STATE_OK}]"
+	else
+	    state="[${STATE_KO}]"
+	fi
+
+	name=$(get-service-title ${service})
+	test -n "${name}" || continue
+
+	echo -n "${name}"
+	echo-value ${state} ${REPORT_COL}
+
+    done < ${RUN_DIR}/${SERVICES_STATE_FILENAME}
+}
+
+show-report-load()
+{
+    local load=$(get-system-load) load1 load2 load3
+
+    load1=${load/:*}
+    load2=${load#*:} load2=${load2/:*}
+    load3=${load/*:}
+
+    echo -n "Relative load over 1 minute" ; echo-value ${load1}% ${REPORT_COL}
+    echo -n "Relative load over 5 minutes" ; echo-value ${load2}% ${REPORT_COL}
+    echo -n "Relative load over 15 minutes" ; echo-value ${load3}% ${REPORT_COL}
+}
+
+show-report-cpu()
+{
+    local cpu_usage=$(cat /var/run/${CPU_USAGE_FILENAME} 2> /dev/null)
+
+    if test -n "${cpu_usage}" ; then
+	cpu_usage="${cpu_usage}%"
+    else
+	cpu_usage='Unavailable'
+    fi
+
+    echo -n "CPU usage over ${STATISTICS_INTERVAL} seconds" ; echo-value "${cpu_usage}" ${REPORT_COL}
+}
+
+show-report-counter1()
+{
+    test -n "${1}" || return 1
+    local counter_name=${1}
+
+    local counter_file=${RUN_DIR}/${counter_name}.log
+    local message log_type
+
+    case "${counter_name}" in
+	web|rweb)
+	    message="Total number of access [${counter_name}]"
+	    ;;
+	firewall|guard|waf|antivirus|avserver)
+	    message="Total number of blocked access [${counter_name}]"
+	    ;;
+	*)
+	    return 1
+	    ;;
+    esac
+    
+    case "${counter_name}" in
+	web)
+	    log_type=${CURRENT_LOG_TYPE_WEB/:*}
+	    ;;
+	rweb)
+	    log_type=${CURRENT_LOG_TYPE_RWEB/:*}
+	    ;;
+	firewall)
+	    log_type=${CURRENT_LOG_TYPE_FIREWALL/:*}
+	    ;;
+	guard)
+	    log_type=${CURRENT_LOG_TYPE_GUARD/:*}
+	    ;;
+	antivirus)
+	    log_type=${CURRENT_LOG_TYPE_ANTIVIRUS/:*}
+	    ;;
+	avserver)
+	    log_type=${CURRENT_LOG_TYPE_ANTIVIRUS_SERVER/:*}
+	    ;;
+	waf)
+	    log_type=${CURRENT_LOG_TYPE_WAF/:*}
+	    ;;
+	*)
+	    return 1
+	    ;;
+    esac
+
+    echo -n ${message}
+    if test ${log_type} == False ; then
+	echo-value "Unavailable" ${REPORT_COL}
+	return 0
+    fi
+
+    local nb date value
+
+    if test -f ${counter_file}.${COUNTER_POSTFIX} ; then
+	nb=$(cat ${counter_file}.${COUNTER_POSTFIX} 2> /dev/null)
+    else
+	nb=0
+    fi
+
+    if test -f ${counter_file}.${COUNTER_DATE_POSTFIX} ; then
+	local seconds=$(cat ${counter_file}.${COUNTER_DATE_POSTFIX} 2> /dev/null)
+	if test ${seconds} -eq 0 ; then
+	    date=""
+	else
+	    date=$(get-date-from-epoch-seconds ${seconds})
+	fi
+    fi
+
+    value=$(format-number ${nb})
+    test -z "${date}" || value="${value} since ${date}"
+
+    echo-value "${value}" ${REPORT_COL}
+}
+
+show-report-counter()
+{
+    local log_name=${1}
+
+    local log
+    
+    if test -z "${log_name}" ; then
+	for log in \
+	    ${WEB_LOG} \
+		${RWEB_LOG} \
+		${FIREWALL_LOG} \
+		${ACCESS_GUARD_LOG} \
+		${ANTI_VIRUS_LOG} \
+		${ANTI_VIRUS_SERVER_LOG} \
+		${WAF_LOG}
+	do
+	    log_name=${log/\.log}
+	    show-report-counter1 ${log_name}    
+	done
+    else
+	show-report-counter1 ${log_name}
+    fi
+}
+
+report-counter-raz()
+{
+    test -n "${1}" || return 1
+    local counter_name=${1}
+
+    local counter_file=${RUN_DIR}/${counter_name}.log
+
+    test ! -f ${counter_file}.${COUNTER_POSTFIX} || echo -n 0 > ${counter_file}.${COUNTER_POSTFIX}
+    test ! -f ${counter_file}.${COUNTER_DATE_POSTFIX} || echo -n 0 > ${counter_file}.${COUNTER_DATE_POSTFIX}
+}
+
+show-report-memory()
+{
+    local total=$(cat /proc/meminfo | grep MemTotal:)
+    local free=$(cat /proc/meminfo | grep MemFree:)
+    local stotal=$(cat /proc/meminfo | grep SwapTotal:)
+    local sfree=$(cat /proc/meminfo | grep SwapFree:)
+
+    total=${total/MemTotal:/}
+    free=${free/MemFree:/}
+    stotal=${stotal/SwapTotal:}
+    sfree=${sfree/SwapFree:}
+
+    total=$(echo ${total})
+    total=${total/ kB/}
+
+    free=$(echo ${free})
+    free=${free/ kB/}
+
+    stotal=$(echo ${stotal})
+    stotal=${stotal/ kB/}
+
+    sfree=$(echo ${sfree})
+    sfree=${sfree/ kB/}
+
+    ((total /= 1024))
+    ((free /= 1024))
+    ((stotal /= 1024))
+    ((sfree /= 1024))
+
+    total=$(format-number ${total})
+    free=$(format-number ${free})
+    stotal=$(format-number ${stotal})
+    sfree=$(format-number ${sfree})
+
+    echo -n "Total RAM" ; echo-value "${total} MB" ${REPORT_COL}
+    echo -n "Free RAM" ; echo-value "${free} MB" ${REPORT_COL}
+
+    echo -n "Total Swap" ; echo-value "${stotal} MB" ${REPORT_COL}
+    echo -n "Free Swap" ; echo-value "${sfree} MB" ${REPORT_COL}
+}
+
+get-formatted-bond-devs()
+{
+    test -n "${1}" || return 1
+    dev=${1}
+
+    local devs=$(get-bond-devs ${dev})
+
+    if test "${devs/:}" == "${dev}" ; then
+	echo ${dev}
+    else
+	echo "${devs/:*} [${devs/*:}]"
+    fi
+}
+
+show-report-link()
+{
+    test -f ${RUN_DIR}/${LINKS_STATE_FILENAME} || return 0
+
+    local dev state ips
+    local ext_state ip
+
+    while read dev state ips
+    do
+	test -n "${ips}" || continue
+
+	dev=$(get-formatted-bond-devs ${dev})
+	ext_state=$(echo-formated-state ${state})
+	echo -n "Link ${dev}"
+	echo-value "${ext_state}" ${REPORT_COL} -ne
+
+	local col=$[${REPORT_COL} + 5]
+
+	if test -n "${ips}" ; then
+	    for ip in ${ips}
+	    do
+		echo-value ${ip} ${col}
+	    done
+	else
+	    echo-value-null ${col}
+	fi
+    done < ${RUN_DIR}/${LINKS_STATE_FILENAME}
+}
+
+show-report-connection()
+{
+    test ${TERM} != ${WADMIN_TERM} || return 0
+
+    test -s ${RUN_DIR}/${CONNECTION_FILENAME} || return 0
+    test -s ${RUN_DIR}/${CONNECTION_SUMMARY_FILENAME} || return 0
+
+    local dev interface connection
+
+    while read dev connection
+    do
+	test -n "${dev}" || continue
+	test -n "${connection}" || connection=0
+	interface=$(get-logical-interface ${dev})
+	test -n "${interface}" || continue
+	test ${interface} != 'auxiliary' || continue
+	echo -n "${interface^} TCP Connections"
+	echo-value ${connection} ${REPORT_COL}
+    done < ${RUN_DIR}/${CONNECTION_FILENAME}
+
+    local all=$(cat ${RUN_DIR}/${CONNECTION_SUMMARY_FILENAME})
+
+    echo -n "All TCP Connections"
+    echo-value ${all} ${REPORT_COL}
+}
+
+show-report-gateway()
+{
+    test -f ${RUN_DIR}/${GATEWAYS_STATE_FILENAME} || return 0
+
+    local dev_gateway_pinged
+    local dev gateway pinged
+    local state ext_state
+
+    while read dev_gateway_pinged state
+    do
+	dev=${dev_gateway_pinged/\/*}
+	gateway_pinged=${dev_gateway_pinged#*\/}
+	gateway=${gateway_pinged/\/*}	
+	pinged=${gateway_pinged/*\/}
+
+	ext_state=$(echo-formated-state ${state})
+	echo -n "Gateway ${gateway} [${dev}]"
+	echo-value ${ext_state} ${REPORT_COL}
+    done < ${RUN_DIR}/${GATEWAYS_STATE_FILENAME}
+}
+
+show-report-vpnipsec()
+{
+    test -s ${RUN_DIR}/${VPN_IPSEC_SITE_STATE_FILENAME} || return 0
+
+    local connection remote_address state
+    local site ext_state
+
+    while read connection remote_address state
+    do
+	test -n "${connection}" || continue
+	site=${connection#site-}
+	ext_state=$(echo-formated-state ${state})
+	echo -n "IPsec Site ${site}"
+	echo-value ${ext_state} ${REPORT_COL}
+    done < ${RUN_DIR}/${VPN_IPSEC_SITE_STATE_FILENAME}
+}
+
+show-report-disk()
+{
+    local io=$(cat ${RUN_DIR}/${DISKS_STATS_IO_FILENAME} 2>/dev/null)
+    local time_io=$(cat ${RUN_DIR}/${DISKS_STATS_TIME_IO_FILENAME} 2>/dev/null)
+    local rel_avg=$(cat ${RUN_DIR}/${DISKS_STATS_AVG_FILENAME} 2>/dev/null)
+
+    local check_interval
+
+    if test -f ${RUN_DIR}/${DISKS_STATS_AVG_FILENAME}.date1 -a -f ${RUN_DIR}/${DISKS_STATS_AVG_FILENAME}.date2 ; then
+	local date1=$(cat ${RUN_DIR}/${DISKS_STATS_AVG_FILENAME}.date1 2> /dev/null)
+	local date2=$(cat ${RUN_DIR}/${DISKS_STATS_AVG_FILENAME}.date2 2> /dev/null)
+	((check_interval = date2 - date1))
+    else
+	check_interval=0
+    fi
+
+    if test ${io} -eq 0 ; then
+	local avg=0
+    else
+	local avg=$[${time_io} / ${io}]
+    fi
+
+    echo -n "Disk(s) average i/o time" ; echo-value "${avg}ms" ${REPORT_COL}
+    echo -n "Disk(s) average i/o time in ${check_interval} seconds" ; echo-value "${rel_avg}ms" ${REPORT_COL}
+
+    test -s ${RUN_DIR}/${DISKS_HEALTH_FILENAME} || return 0
+
+    local disk state ext_state
+
+    while read disk state lifetime
+    do
+	if test "${state}" -eq 0 ; then
+	    ext_state="[${STATE_OK}]"
+	else
+	    ext_state="[${STATE_KO}]"
+	fi
+
+	test -z "${lifetime}" || lifetime=" ${lifetime}% life"
+	echo -ne "Disk SMART ${disk/\/dev\//}"
+	echo-value "${ext_state}${lifetime}" ${REPORT_COL}
+    done < ${RUN_DIR}/${DISKS_HEALTH_FILENAME}
+}
+
+show-report-raid()
+{
+    if test ! -s ${RUN_DIR}/${RAID_HEALTH_FILENAME} ; then
+	echo -ne "Raid Level"
+	echo-value-null ${REPORT_COL}
+	return 0
+    fi
+
+    local key value
+
+    while read key value
+    do
+	case ${key} in
+	    Raid_State)
+		case "${value}" in
+		    clean|active)
+			value="[${STATE_OK}] ${value}"
+			;;
+		    *)
+			value="[${STATE_KO}] ${value// }"
+			;;
+		esac
+		;;
+	    Build_Status)
+		value="${value}%"
+		;;
+	    *)
+		;;
+	esac
+	echo -ne "${key//_/ }"
+	echo-value "${value}" ${REPORT_COL}
+
+    done < ${RUN_DIR}/${RAID_HEALTH_FILENAME}
+}
+
+display-av-update-log-basic()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    local status=${1}
+    local date_h=${2}
+
+    if test ${status} == "OK" ; then
+        local date_update=$(cat ${AV_AUTO_UPDATE_FILE} 2> /dev/null)
+        date_update=$(get-date-from-epoch-seconds ${date_update})
+        display-log-line 0 ${date_h} Antivirus auto updated at ${date_update}...[${status}]
+    else
+        display-log-line 0 ${date_h} Antivirus auto updating...[${status}]
+    fi
+}
+
+display-av-update-log-extended()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    local date_h=${1}
+    local date_s=${2}
+
+    local status date_update
+
+    if test -s ${AV_VAR_DIR}/${AV_EXTENDED_LAST_UPDATE_FILENAME} ; then
+	
+	date_update=$(cat ${AV_VAR_DIR}/${AV_EXTENDED_LAST_UPDATE_FILENAME} 2> /dev/null)
+
+	if av-extended-is-auto-updated-in-time ${date_s} ${date_update} ; then
+	    status=OK
+	else
+	    status=KO
+	fi
+	date_update=$(get-date-from-epoch-seconds ${date_update})
+	display-log-line 0 ${date_h} Extended Antivirus auto updated at ${date_update}...[${status}]
+    else
+	status=KO
+	display-log-line 0 ${date_h} Extended Antivirus auto updating...[${status}]
+    fi
+
+    test ${APL_ROLE} == manager || return 0
+    test -s ${MANAGER_GATEWAY_INDEX} || return 0
+
+    local uuid domain id ip
+    local push_status push_date error_txt
+
+    while read uuid domain id ip
+    do
+	test -n "${ip}" || continue
+	test -s ${AV_VAR_DIR}/${id}.${MPUSHED_STATUS} || continue
+	read push_status push_date < ${AV_VAR_DIR}/${id}.${MPUSHED_STATUS}
+	push_date=$(get-date-from-epoch-seconds ${push_date})
+
+	if test ${push_status} -eq 0 ; then
+	    status=OK
+	    unset error_txt
+	else
+	    status=KO
+	    error_txt=" (${push_status})"
+	fi
+	display-log-line 0 ${date_h} "Pushing Extended Antivirus to '${id}' at ${push_date}${error_txt}...[${status}]"
+    done < ${MANAGER_GATEWAY_INDEX}
+}
+
+manage-report()
+{
+    check-report-type "${1}" || return 1
+
+    REPORT_COL=$[${PRINT_COL} + 20]
+    echo-begin-show
+
+    case "${1}" in
+	load)
+	    show-report-load
+	    ;;
+	cpu)
+	    show-report-cpu
+	    ;;
+	counter)
+	    test ${APL_ROLE} == 'gateway' || return 232
+	    show-report-counter ${2}
+	    ;;
+	disk)
+	    update-report health-disk 5 500000 || return 104
+	    test "${TERM}" == "${WADMIN_TERM}" || show-report-disk
+	    ;;
+	link)
+	    update-report health-link || return 104
+	    show-report-link
+	    ;;
+	gateway)
+	    local ip_route_gw_wt_pg_list=$(get-multi-gateways-route-list "${IP_ROUTE_LIST}")
+	    local gateway_nb=$(record3-length-list "${ip_route_gw_wt_pg_list}")
+
+	    if test ${gateway_nb} -eq 0 ; then
+		info 5
+	    else
+		show-report-gateway
+	    fi
+	    ;;
+	vpnipsec)
+	    local access_mode=${CURRENT_VPN_IPSEC_ACCESS/ *}
+
+	    if test ${CURRENT_VPN_IPSEC_MODE} == True -a ${access_mode} == 'off' ; then
+		update-report health-vpnipsec || return 104
+		test "${TERM}" == "${WADMIN_TERM}" || show-report-vpnipsec
+	    fi
+	    ;;
+	connection)
+	    update-report connection || return 104
+	    test "${TERM}" == "${WADMIN_TERM}" || show-report-connection
+	    ;;
+
+	memory)
+	    show-report-memory
+	    ;;
+	raid)
+	    update-report health-raid || return 104
+	    test "${TERM}" == "${WADMIN_TERM}" || show-report-raid
+	    ;;
+	service)
+	    update-report health-service || return 104
+	    test "${TERM}" == "${WADMIN_TERM}" || show-report-service
+	    ;;
+	antivirus)
+	    local date_s=$(date +"%s")
+	    local date_h=$(get-date-from-epoch-seconds ${date_s})
+
+	    if test -s ${AV_AUTO_UPDATE_FILE} ; then
+		local status=OK
+		update-report av-update-report || return 104
+	    else
+		local status=KO
+	    fi
+
+	    case ${APL_ROLE} in
+		gateway)
+		    display-av-update-log-basic ${status} ${date_h}
+		    ! is-av-extended-enabled cur || display-av-update-log-extended ${date_h} ${date_s}
+		    ;;
+		manager)
+		    ! is-av-extended-enabled cur || display-av-update-log-extended ${date_h} ${date_s}
+		    ;;
+		*)
+		    ;;
+	    esac
+	    ;;
+	'')
+	    local report_nb=6
+
+	    local ip_route_gw_wt_pg_list=$(get-multi-gateways-route-list "${IP_ROUTE_LIST}")
+	    local gateway_nb=$(record3-length-list "${ip_route_gw_wt_pg_list}")
+	    local timeout=$[250000 + ${report_nb} * 100000]
+
+	    update-report health 10 ${timeout} || return 104
+	    test "${TERM}" != "${WADMIN_TERM}" || return 0
+
+	    show-report-cpu
+	    show-report-load
+	    show-report-memory
+	    show-report-disk
+	    show-report-raid
+	    show-report-link
+
+	    test ${gateway_nb} -eq 0 || show-report-gateway
+
+	    show-report-vpnipsec
+	    show-report-connection
+	    show-report-service
+	    test ${APL_ROLE} != 'gateway' || show-report-counter
+	    ;;
+	*)
+	    error 255
+	    ;;
+    esac
+
+    echo-end-show
+}
+
+show-system-soft()
+{
+    local os=$(get-system-soft)
+    echo-command-form "system soft"
+    echo-mark-cur
+    echo-value "${os}"
+}
+
+show-system-hard()
+{
+    local role=$(get-contextual-role)
+
+    local model=$(get-system-hard long)
+
+    case ${role} in
+	gateway)
+	    local len=${#model} width
+	    ((width = COLUMNS - PRINT_COL))
+
+	    echo-command-form "system hard"
+	    echo-mark-cur
+
+	    if test ${len} -le ${width} ; then
+		echo-value "${model}"
+	    else
+		local part1=${model/-CR*}
+		local len=${#part1}
+		((len++))
+		local part2=${model:${len}}
+
+		echo-value "${part1}-"
+		echo-blank-command
+		echo-value "${part2}"
+	    fi
+	    ;;
+
+	manager)
+	    echo-command-form "system hard"
+	    echo-mark-cur
+	    echo-value "${model}"
+	    ;;
+	*)
+	    return 255
+	    ;;
+    esac
+}
+
+show-system-machine()
+{
+    local machine=$(get-system-machine)
+    echo-command-form "system machine"
+    echo-mark-cur
+    echo-value "${machine}"
+}
+
+show-system-architecture()
+{
+    echo-command-form "system architecture"
+    echo-mark-cur
+    echo-value "${CPU_ARCHITECTURE}"
+}
+
+show-system-cpu()
+{
+    local cpu=$(get-system-cpu)
+    local len=${#cpu} width
+
+    ((width = COLUMNS - PRINT_COL))
+
+    echo-command-form "system cpu"
+    echo-mark-cur
+
+    if test ${len} -le ${width} ; then
+	echo-value "${cpu}"
+    else
+	local part1=${cpu/, *}
+	local len=${#part1}
+	((len += 2))
+	local part2=${cpu:${len}}
+
+	echo-value "${part1},"
+	echo-blank-command
+	echo-value "${part2}"
+    fi
+}
+
+show-system-memory()
+{
+    local ram=$(get-installed-memory-sz)
+    ((ram /= 1024))
+
+    echo-command-form "system memory"
+    echo-mark-cur
+    echo-value "${ram} MB"
+}
+
+show-system-disk()
+{
+    local hdd=$(get-system-disk)
+    echo-command-form "system disk"
+    echo-mark-cur
+    echo-value "${hdd}"
+}
+
+show-system-raid()
+{
+    local raid=$(get-system-raid)
+    echo-command-form "system raid"
+    echo-mark-cur
+    echo-value "${raid}"
+}
+
+show-system-serial()
+{
+    local serial=$(get-system-id)
+    echo-command-form "system serial"
+    echo-mark-cur
+    echo-value "${serial}"
+}
+
+show-system-uuid()
+{
+    local uuid=$(get-system-uuid)
+    echo-command-form "system uuid"
+    echo-mark-cur
+    echo-value "${uuid}"
+}
+
+show-system-end()
+{
+    local role=$(get-contextual-role)
+    local end=$(get-system-end ${role})
+
+    echo-command-form "system end"
+
+    local state="${end/ *}"
+    local date="${end/* }"
+
+    if test ${state} == expired -o ${state} == error ; then
+	state=$(get-highlight-text "${state}")
+    fi
+
+    echo-mark-cur
+
+    case ${state} in
+	never)
+	    echo-value "[never]"
+	    ;;
+	payg)
+	    echo-value "[cloud subscription end]"
+	    ;;
+	*)
+	    echo-value "${date} (${state})"
+	    ;;
+    esac
+}
+
+show-system-role()
+{
+    local role=$(get-contextual-role)
+
+    echo-command-form "system role"
+    echo-mark-cur
+    echo-value "${role^}"
+}
+
+show-system()
+{
+    case ${1} in
+	role|hard|machine|architecture|cpu|memory|disk|raid|serial|uuid|end)
+	    if cli-is-in-template-context ; then
+		display-warning 6
+		return 0
+	    fi
+
+	    echo-begin-show
+	    show-system-${1}
+	    echo-end-show
+	    ;;
+
+	soft)
+	    echo-begin-show
+	    show-system-${1}
+	    echo-end-show
+	    ;;
+	"")
+	    echo-begin-show
+	    show-system-soft
+
+	    if ! cli-is-in-template-context ; then
+
+		local key
+
+		for key in role hard machine architecture cpu memory disk raid serial uuid end
+		do
+		    show-system-${key}
+		done
+	    fi
+
+	    echo-end-show
+	    ;;
+	*)
+	    return 1
+	    ;;
+    esac
+}
+
+load-os-patch()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 1
+    test -n "${3}" || return 1
+    local protocol=${1}
+    local ip=${2}
+    local fn=${3}
+
+    local patch_file=${TMP_DIR}/${LOADED}.os.tar.compressed
+    test ! -f ${patch_file} || return 54
+    rm -f ${patch_file}.${PROGRESS}
+
+    load-files ${protocol} ${ip} "${fn} ${patch_file}.tmp" "${patch_file}.${PROGRESS}" binary patch
+    local ret=${?}
+
+    if test ${ret} -eq 0 ; then
+	if test -f ${patch_file}.tmp ; then
+	    mv -f ${patch_file}.tmp ${patch_file}
+	    NEWENV=1
+	fi
+    else
+	rm -f ${patch_file}.tmp
+	update-modification-state
+    fi
+
+    return ${ret}
+}
+
+accept-license()
+{
+    test ${TERM} != ${WADMIN_TERM} || return 0
+    test "${__BATCH_MODE}" != yes || error 111
+
+    local response
+
+    echo -n "Do you accept the terms of the latest ${COMMERCIAL_NAME}-OS License @ ${LICENSE_URL} (Y|N) [Y]? "
+    read response
+    test -z "${response}" -o "${response}" == y -o "${response}" == Y || return 1
+}
+
+manage-patch()
+{
+    test -n "${1}" || return 1
+    local pt=${1}
+
+    user-has-admin-rights || return 31
+    ! is-in-manager-conf-context || return 212
+
+    local ip fn
+
+    if test ${pt} == aload ; then
+	local cur_version new_version
+	cur_version=$(cat ${HARD_DIR}/os-version)
+	new_version=$(get-patch-version ${cur_version})
+	test ${?} -eq 0 || return 104
+
+	if test "${new_version}" == "${cur_version}" ; then
+	    info 3
+	    return 0
+	elif test "${new_version}" == "0.0.0" ; then
+	    info 4
+	    return 0	    
+	fi
+
+	local architecture
+
+	case ${CPU_ARCHITECTURE} in
+	    x86_64)
+		architecture=X64
+		;;
+	    *)
+		architecture=X86
+		;;
+	esac
+
+	pt="https"
+	ip=${PATCH_SERVER}
+	fn=${PATCH_DIR_NAME}/${COMMERCIAL_NAME}-${OS_GENERATION}-${new_version}-${architecture}-patch.cgp
+    else
+	ip=${2}
+	fn=${3}
+
+	test -n "${pt}" || return 1
+	test -n "${ip}" || return 1
+	test -n "${fn}" || return 1
+
+	check-file-protocol ${pt} || return 63
+	check-ip-name ${ip} || return 113
+	check-file-ip ${ip} || return 27
+	check-filename ${fn} || return 19
+    fi
+
+    accept-license || return 0
+    load-os-patch ${pt} ${ip} ${fn}
+}
+
+load-os-backup()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 1
+    test -n "${3}" || return 1
+
+    local protocol=${1}
+    local ip=${2}
+    local fn=${3}
+
+    check-lock || return 123
+    clear-backup-file || return ${?}
+
+    local backup_file="${TMP_DIR}/${LOADED}.backup"
+
+    rm -f ${backup_file} ${backup_file}.${PROGRESS}
+
+    load-files ${protocol} ${ip} "${fn} ${backup_file}.tmp" "${backup_file}.${PROGRESS}" binary backup
+    local ret=${?}
+
+    test ${ret} -ne 0 || test ! -f ${backup_file}.tmp || mv -f ${backup_file}.tmp ${backup_file}
+    NEWENV=1
+    return ${ret}
+}
+
+save-os-backup()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 1
+    test -n "${3}" || return 1
+
+    local protocol=${1}
+    local ip=${2}
+    local fn=${3}
+
+    local backup_file=${TMP_DIR}/${SAVED}.backup
+    test -f ${backup_file} || return 120
+    save-files ${protocol} ${ip} "${backup_file} ${fn}" "${TMP_DIR}/${SAVED}.backup.${PROGRESS}" binary backup
+}
+
+display-backup-log()
+{
+    display-log ${BACKUP_LOG}
+}
+
+show-system-backup()
+{
+    local backup_file="${TMP_DIR}/${SAVED}.backup"
+    local date=$(get-file-modification-date "${backup_file}")
+
+    echo-begin-show
+    echo-command-form "system backup"
+    echo-value ${date}
+    echo-end-show
+}
+
+clear-backup-file()
+{
+    local btype backup_file
+
+    for btype in ${SAVED} ${LOADED}
+    do
+	backup_file="${TMP_DIR}/${btype}.backup"
+	! check-exchanging ${backup_file} || return 191
+	rm -f ${backup_file} ${backup_file}.${PROGRESS}
+    done
+}
+
+manage-backup()
+{
+    if test -z "${1}" ; then show-system-backup ; return ${?} ; fi
+    local op=${1}
+
+    user-has-admin-rights || return 31
+    ! is-in-manager-conf-context || return 212
+
+    case ${op} in
+	create)
+	    case "${2}" in
+		''|'wait')
+		    check-lock || return 123
+		    clear-backup-file || return ${?}
+		    test -z "${2}" || test ${2} == wait || return 1
+		    supervisor-action "backup" inform ${2}
+		    test ${?} -eq 0 || return 104
+		    ;;
+		report)
+		    display-backup-log
+		    return 0
+		    ;;
+		*)
+		    return 1
+		    ;;
+	    esac
+	    ;;
+
+	clear)
+	    check-lock || return 123
+	    clear-backup-file
+	    ;;
+
+	load|save)
+	    local pt=${2}
+	    local ip=${3}
+	    local fn=${4}
+
+	    test -n "${pt}" || return 1
+	    test -n "${ip}" || return 1
+	    test -n "${fn}" || return 1
+
+	    check-file-protocol ${pt} || return 63
+	    check-ip-name ${ip} || return 113
+	    check-file-ip ${ip} || return 27
+	    check-filename ${fn} || return 19
+
+	    case ${op} in
+		load)
+		    load-os-backup ${pt} ${ip} ${fn}
+		    ;;
+		save)
+		    save-os-backup ${pt} ${ip} ${fn}
+		    ;;
+		*)
+		    return 255
+		    ;;
+	    esac
+	    ;;
+	*)
+	    return 1
+	    ;;
+    esac
+}
+
+system-soft-check()
+{
+    local new_os_version
+
+    new_os_version=$(get-os-latest-version)
+    test ${?} -eq 0 || return 104
+
+    local message=$(get-system-soft-check-message "${new_os_version}")
+
+    echo-command-form "system soft check"
+    echo-value "${message}"
+    echo-value "(visit ${PATCH_URL:8})"
+}
+
+commit-pushed-files()
+{
+    local files file base extension
+    local name bool rest
+    local list
+
+    files=$(ls -1 ${URLLIST_DIR}/work.*.${URLLIST_AUTO} 2> /dev/null)
+    for file in ${files}
+    do
+	base=$(file-basename ${file})
+	base=${base/work\.}
+
+	if test -f ${URLLIST_DIR}/${base}.current ; then
+	    diff --brief ${file} ${URLLIST_DIR}/${base}.current > /dev/null 2>&1
+	    if test ${?} -eq 0 ; then
+		rm -f ${file}
+	    else
+		mv -f ${file} ${URLLIST_DIR}/${base}
+	    fi
+	else
+	    read bool rest < ${file}
+	    if test "${bool}" == off ; then
+		rm -f ${file}
+	    else
+		mv -f ${file} ${URLLIST_DIR}/${base}
+	    fi
+	fi
+    done
+
+    commit-mpushed-urllists user
+    
+    files=$(ls -1 ${TMP_DIR}/work.${LOADED}.${WAF_RWEB_CUSTOM}.* 2> /dev/null)
+    for file in ${files}
+    do
+	db-waf-load-filter-commit ${file}
+    done
+
+    files=$(ls -1 ${TMP_DIR}/2del.${WAF_RWEB_CUSTOM}.* 2> /dev/null)
+    for file in ${files}
+    do
+	name=$(file-basename ${file})
+	name=${name/2del\.${WAF_RWEB_CUSTOM}\.}
+	db-waf-rule-raz ${name}
+	rm -f ${file}
+    done
+
+    test ! -f ${TMP_DIR}/work.${LOADED}.${AV_WHITELIST_SIG} || load-whitelist-signature-commit
+    test ! -f ${TMP_DIR}/work.${LOADED}.${SNMP_SSL}.certificate || validate-load-admin-snmp-certificate-commit
+
+    files=$(ls -1 ${TMP_DIR}/work.${LOADED}.${SSH_KEY}.* 2> /dev/null)
+    for file in ${files}
+    do
+	load-ssh-public-key-commit ${file}
+    done
+
+    for extension in key certificate
+    do
+	load-tls-ca-system-commit ${TMP_DIR}/work.${LOADED}.${SYSTEM_CA}.${extension}
+    done
+
+    files=$(ls -1 ${TMP_DIR}/work.${LOADED}.${THIRD_CA}.* 2> /dev/null)
+    for file in ${files}
+    do
+	load-tls-ca-third-commit ${file}
+    done
+
+    files=$(ls -1 ${TMP_DIR}/work.${LOADED}.${TLS_SERVER}.{certificate,key,csr}.* 2> /dev/null)
+    for file in ${files}
+    do
+	load-tls-server-commit ${file}
+    done
+
+    files=$(ls -1 ${TMP_DIR}/work.${TLS_SERVER}.*.2rev 2> /dev/null)
+    for file in ${files}
+    do
+	name=$(file-basename ${file} .2rev)
+	name=${name/work\.${TLS_SERVER}\.}
+	if test -f ${SSL_SERVER_DIR}/${name}.revoked ; then
+	    rm -f ${file}
+	else
+	    mv -f ${file} ${TMP_DIR}/${TLS_SERVER}.${name}.2rev
+	fi
+    done
+
+    files=$(ls -1 ${TMP_DIR}/work.${LOADED}.${TLS_CLIENT}.certificate.* 2> /dev/null)
+    for file in ${files}
+    do
+	name=$(file-basename ${file})
+	name=${name/work\.${LOADED}\.${TLS_CLIENT}\.certificate\.}
+	list="${list} ${name}"
+	load-tls-client-commit ${file}
+    done
+    list=${list:1}
+
+    files=$(ls -1 ${TMP_DIR}/work.${TLS_CLIENT}.*.2rev 2> /dev/null)
+    for file in ${files}
+    do
+	name=$(file-basename ${file} .2rev)
+	name=${name/work\.${TLS_CLIENT}\.}
+	if test -f ${SSL_CLIENT_DIR}/${name}.revoked ; then
+	    rm -f ${file}
+	else
+	    mv -f ${file} ${TMP_DIR}/${TLS_CLIENT}.${name}.2rev
+	fi
+    done
+
+    files=$(ls -1d ${SSL_CLIENT_DIR}/*.cur 2> /dev/null)
+    for file in ${files}
+    do
+	name=$(file-basename ${file} .cur)
+	! member "${list}" ${name} || continue
+	echo > ${SSL_CLIENT_DIR}/${name}.2del
+    done
+}
+
+run()
+{
+    if test -z "${ARGS[1]}" ; then show-system ; return 0 ; fi
+
+    case ${ARGS[1]} in
+	soft)
+	    if test -z "${ARGS[2]}" ; then
+		show-system ${ARGS[1]}
+		return 0
+	    else
+		case ${ARGS[2]} in
+		    check)
+			system-soft-check
+			return ${?}
+			;;
+		    *)
+			return 1
+			;;
+		esac
+	    fi
+	    ;;
+	role|hard|machine|architecture|cpu|memory|disk|raid|serial|uuid|end)
+	    show-system ${ARGS[1]}
+	    return 0
+	    ;;
+	patch)
+	    shift-args
+	    manage-patch ${ALLARGS}
+	    ;;
+	backup)
+	    shift-args
+	    manage-backup ${ALLARGS}
+	    ;;
+	report)
+	    if test "${ARGS[2]}" == counter ; then
+		test -z "${ARGS[3]}" || check-traffic-log-type ${ARGS[3]} || return 1
+		case "${ARGS[4]}" in
+		    raz)
+			user-has-admin-rights || return 31
+			report-counter-raz ${ARGS[3]}
+			return 0
+			;;
+		    "")
+			;;
+		    *)
+			return 1
+			;;
+		esac
+	    fi
+	    
+	    shift-args
+	    manage-report ${ALLARGS}
+	    return ${?}
+	    ;;
+	internal)
+	    test -n "${ARGS[2]}" || return 0
+	    local action=${ARGS[2]}
+	    case ${action} in
+		integrateconf)
+		    commit-pushed-files
+		    update-modification-state
+		    ;;
+		*)
+		    return 0
+		    ;;
+	    esac
+	    ;;
+	*)
+	    return 1
+	    ;;
+    esac
+}
+
+go()
+{
+    if test -z "${1}" ; then
+	main
+	return ${?}
+    fi
+
+    if test ${1} == internal ; then
+
+	test -n "${2}" || return 0
+	local action=${2}
+
+	case ${action} in
+	    alert)
+		test -n "${3}" || return 0
+		local event=${3}
+
+		case ${event} in
+		    login)
+			test -n "${4}" || return 0
+			local state=${4}
+
+			case ${state} in
+			    failed)
+				test -n "${5}" || return 0
+				test -n "${6}" || return 0
+				local interface=${5}
+				local ip=${6}
+				supervisor-push-args "${interface}" "${ip}"
+				supervisor-action "failed-login"
+				;;
+			    *)
+				;;
+			esac
+			;;
+		    *)
+			;;
+		esac
+		;;
+
+	    reference)
+		local uuid=$(get-system-uuid)
+		local passwd=$(cat ${PRIVATE_DIR}/.${APPLIANCE_PASSWD} 2> /dev/null)
+		echo -n "${passwd}:${APL_ROLE}:${uuid},${USERS_NB}:${RWEB_NB}"
+		;;
+
+	    batch)
+		test "${__BATCH_MODE}" != yes || echo yes
+		;;
+
+	    cleanurllistmpushed)
+		rm -f ${TMP_DIR}/${MPUSHED}.*
+		;;
+	    integrateconf)
+		main "${@}"
+		;;
+	    *)
+		;;
+	esac
+	
+	return ${?}
+    fi
+
+    main "${@}"
+}
+
+go "${@}"

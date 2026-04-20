@@ -1,0 +1,218 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       Shared
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+CURL_CONNECT_TIMEOUT=${CURL_CONNECT_TIMEOUT:-7}
+CURL_MAX_TIME=${CURL_MAX_TIME:-15}
+
+set-admin-ssh-key-provisioned()
+{
+    test ! -f ${CLOUD_DIR}/.admin-ssh-key-provisioned || return 0
+    touch ${CLOUD_DIR}/.admin-ssh-key-provisioned
+    chattr +i ${CLOUD_DIR}/.admin-ssh-key-provisioned
+}
+
+set-admin-password-provisioned()
+{
+    test ! -f ${CLOUD_DIR}/.admin-password-provisioned || return 0
+    touch ${CLOUD_DIR}/.admin-password-provisioned
+    chattr +i ${CLOUD_DIR}/.admin-password-provisioned
+}
+
+set-azure-apl-provisioned()
+{
+    test ! -f ${CLOUD_DIR}/.cloud-provisioned || return 0
+    touch ${CLOUD_DIR}/.cloud-provisioned
+    chattr +i ${CLOUD_DIR}/.cloud-provisioned
+}
+
+wait4-azure-provisioning()
+{
+    local total_timeout=300 usleep=500000
+    local retval
+
+    wait4-file ${CLOUD_DIR}/.cloud-provisioned f $((total_timeout * 1000000 / usleep)) ${usleep}
+    retval=${?}
+
+    return ${retval}
+}
+
+is-admin-password--provisioned()
+{
+    test -f ${CLOUD_DIR}/.admin-password-provisioned
+}
+
+is-admin-ssh-key-provisioned()
+{
+    test -f ${CLOUD_DIR}/.admin-ssh-key-provisioned
+}
+
+get-cloud-data-name()
+{
+    local data_name
+
+    case ${CLOUD_NAME} in
+	azure)
+	    data_name="Azure custom data"
+	    ;;
+	aws)
+	    data_name="AWS user data"
+	    ;;
+	*)
+	    data_name="Cloud data"
+	    ;;
+    esac
+
+    echo ${data_name}
+}
+
+azure-vm-provisioned()
+{
+    local total_timeout=30 usleep=500000
+    local retval
+
+    wait4-file ${CLOUD_DIR}/provisioned f $((total_timeout * 1000000 / usleep)) ${usleep}
+    retval=${?}
+
+    return ${retval}
+}
+
+cloud-load-data()
+{
+    local retval
+
+    case ${CLOUD_NAME} in
+	azure)
+	    if azure-vm-provisioned ; then
+		test ! -f ${CLOUD_DIR}/CustomData || source ${CLOUD_DIR}/CustomData
+
+		local account machine product run
+		local api_version=2023-07-01
+
+		account=$(curl --disable --fail -4 --no-show-error --silent --connect-timeout ${CURL_CONNECT_TIMEOUT} --max-time ${CURL_MAX_TIME} \
+			       --header "Metadata:True" \
+			       --url "http://${CLOUD_METADATA_IP}/metadata/instance/compute/subscriptionId?api-version=${api_version}&format=text" \
+			       2> /dev/null)
+
+		machine=$(curl --disable --fail -4 --no-show-error --silent --connect-timeout ${CURL_CONNECT_TIMEOUT} --max-time ${CURL_MAX_TIME} \
+			       --header "Metadata:True" \
+			       --url "http://${CLOUD_METADATA_IP}/metadata/instance/compute/vmId?api-version=${api_version}&format=text" \
+			       2> /dev/null)
+
+		product=$(curl --disable --fail -4 --no-show-error --silent --connect-timeout ${CURL_CONNECT_TIMEOUT} --max-time ${CURL_MAX_TIME} \
+			       --header "Metadata:True" \
+			       --url "http://${CLOUD_METADATA_IP}/metadata/instance/compute/plan/name?api-version=${api_version}&format=text" \
+			       2> /dev/null)
+
+		run="${account}@${machine}:${product}"
+		run=$(encode-string "${run}")
+
+		CLOUD_RUN_ID=${run}
+	    fi
+	    ;;
+	aws)
+	    local tmp_file=/tmp/aws-user-data.${$}
+	    local token_validity=600
+
+	    CLOUD_AWS_TOKEN=$(curl --disable --fail -4 --no-show-error --silent --connect-timeout ${CURL_CONNECT_TIMEOUT} --max-time ${CURL_MAX_TIME} \
+				   --request PUT \
+				   --header "X-aws-ec2-metadata-token-ttl-seconds: ${token_validity}" \
+				   --url http://${CLOUD_METADATA_IP}/latest/api/token 2> /dev/null)
+
+	    retval=${?}
+
+	    test ${retval} -eq 0 || return ${retval}
+	    test -n "${CLOUD_AWS_TOKEN}" || return ${retval}
+
+	    curl --disable --fail -4 --no-show-error --silent --connect-timeout ${CURL_CONNECT_TIMEOUT} --max-time ${CURL_MAX_TIME} \
+		 --header "X-aws-ec2-metadata-token: ${CLOUD_AWS_TOKEN}" \
+		 --url http://${CLOUD_METADATA_IP}/latest/user-data \
+		 --output ${tmp_file} 2> /dev/null
+
+	    retval=${?}
+
+	    test ${retval} -ne 0 || source ${tmp_file}
+
+	    curl --disable --fail -4 --no-show-error --silent --connect-timeout ${CURL_CONNECT_TIMEOUT} --max-time ${CURL_MAX_TIME} \
+		 --header "X-aws-ec2-metadata-token: ${CLOUD_AWS_TOKEN}" \
+		 --url http://${CLOUD_METADATA_IP}/latest/dynamic/instance-identity/document \
+		 --output ${tmp_file} 2> /dev/null
+
+	    retval=${?}
+
+	    if test ${retval} -eq 0 -a -f ${tmp_file} ; then
+
+		local var col val len
+		local account machine product run
+
+		while read var colon val
+		do
+		    test -n "${val}" || continue
+
+		    len=${#var}
+		    ((len -= 2))
+		    var=${var:1:${len}}
+
+		    case ${var} in
+			accountId|instanceId|marketplaceProductCodes)
+
+			    test "${val:0:4}" != null || continue
+
+			    val=${val:1}
+			    val=${val/\"*}
+
+			    case ${var} in
+				accountId)
+				    account=${val}
+				    ;;
+				instanceId)
+				    machine=${val}
+				    ;;
+				marketplaceProductCodes)
+				    product=${val}
+				    ;;
+				*)
+				    ;;
+			    esac
+			;;
+		    *)
+			continue
+			;;
+		    esac
+		done < ${tmp_file}
+
+	        run="${account}@${machine}:${product}"
+		run=$(encode-string "${run}")
+
+		CLOUD_RUN_ID=${run}
+	    fi
+
+	    rm -f ${tmp_file}
+	    ;;
+	*)
+	    retval=11
+	    ;;
+    esac
+
+    return ${retval}
+}

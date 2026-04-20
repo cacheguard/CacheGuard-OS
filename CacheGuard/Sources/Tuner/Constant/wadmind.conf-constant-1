@@ -1,0 +1,16 @@
+<IfModule mime_module>
+    TypesConfig _Web_Server_Dir_/etc/mime.types
+    AddType application/x-x509-ca-cert .crt
+    AddType application/x-pkcs7-crl    .crl
+</IfModule>
+
+AddOutputFilterByType DEFLATE text/html text/plain text/xml text/javascript
+BrowserMatch ".*MSIE.*" nokeepalive ssl-unclean-shutdown downgrade-1.0 force-response-1.0
+
+SSLProtocol TLSv1.3 TLSv1.2
+SSLPassPhraseDialog builtin
+SSLSessionCacheTimeout 600
+SSLCipherSuite "ALL:+HIGH:!ADH:!EXP:!SSLv2:!SSLv3:!MEDIUM:!LOW:!NULL:!aNULL"
+SSLHonorCipherOrder on
+SSLRandomSeed startup file:/dev/urandom 512
+SSLRandomSeed connect builtin

@@ -1,0 +1,1113 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       Configurator
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+check-serial-number()
+{
+    [[ "${1}" =~ ^[[:digit:]]{8}\-[[:digit:]]{7,9}$ ]]
+}
+
+get-sn-from-lic-id()
+{
+    test -s ${HARD_DIR}/${SN_ID} || return 1
+
+    local _id=$(cat ${HARD_DIR}/${SN_ID} 2> /dev/null)
+    local sn=${_id/_${SN_PREFIX}-L*_/}
+
+    echo -n "${sn}"
+}
+
+clean-tmp-usage()
+{
+    rm -f \
+       ${TMP_DIR}/${REGISTER_EMAIL} \
+       ${TMP_DIR}/${REGISTER_OTP} \
+       ${TMP_DIR}/${REGISTER_KEY} \
+       ${TMP_DIR}/${UNREGISTER_SN}
+}
+
+save-register-state()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    test -n "${3}" || return 3
+    local rtype=${1}
+    local command_code=${2}
+    local state=${3}
+    local service_code=${4}
+
+    echo ${rtype} local:${command_code} ${state} remote:${service_code} > ${HARD_DIR}/${REGISTER_STATE}
+}
+
+save-register-embedded-state()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    test -n "${3}" || return 3
+    local app_reference=${1}
+    local command_code=${2}
+    local state=${3}
+    local service_code=${4}
+
+    echo local:${command_code} ${state} remote:${service_code} > ${HARD_DIR}/${app_reference}.${REGISTER_STATE}
+}
+
+reset-embedded-registration-states()
+{
+    rm -f ${HARD_DIR}/*.${REGISTER_STATE}
+}
+
+is-embedded-registration-state-ok()
+{
+    test -n "${1}" || return 1
+    local app_reference=${1}
+
+    test -s ${HARD_DIR}/${app_reference}.${REGISTER_STATE} || return 11
+
+    local rlocal state remote
+    read rlocal state remote < ${HARD_DIR}/${app_reference}.${REGISTER_STATE} || return 13
+
+    test "${rlocal}" == local:0 -a \
+	 "${state}" == OK -a \
+	 "${remote}" == remote:2
+}
+
+save-unregistered-state()
+{
+    rm -f \
+       ${HARD_DIR}/${REGISTER_STATE} \
+       ${HARD_DIR}/${SN_IP} \
+       ${HARD_DIR}/${SERIAL_DATE} \
+       ${HARD_DIR}/${RENEW_DAYS} \
+       /etc/${TECHNICAL_NAME}/${SN_SN} \
+       /etc/${TECHNICAL_NAME}/${SN_PASSWD} \
+       /etc/${TECHNICAL_NAME}/${LIC_KEY}
+
+    rm -f \
+       /etc/${TECHNICAL_NAME}/${EMBEDDED_VPNSUBSCR_LIC_KEY}
+
+    reset-embedded-registration-states
+}
+
+update-sn-user-passwd()
+{
+    update-sn-passwd-shadow || return 11
+    gen-sn-password | chpasswd 2> /dev/null
+    local ret=${PIPESTATUS[0]}
+
+    return ${ret}
+}
+
+gen-sn-login-access()
+{
+    local sn_user=$(cat ${HARD_DIR}/${SN_ID})
+
+    test -n "${sn_user}" || return 11
+    test -f ${CONF_DIR}/login.access || return 13
+
+    sed -e "s/_${SN_PREFIX}-L.*:/${sn_user}:/" ${CONF_DIR}/login.access
+}
+
+update-sn-user()
+{
+    case ${CLOUD_NAME} in
+	aws)
+	    return 0
+	    ;;
+	azure)
+	    ;;
+	*)
+	    ;;
+    esac
+
+    update-sn-user-passwd || return 11
+
+    safe-generate gen-sn-login-access ${CONF_DIR}/login.access
+    if test ${?} -ne 0 ; then
+	rm -f ${CONF_DIR}/login.access.{old,new}
+	return 21
+    fi
+
+    mv -f ${CONF_DIR}/login.access.new ${CONF_DIR}/login.access
+    rm -f ${CONF_DIR}/login.access.old
+}
+
+reset-date-variation()
+{
+    echo -n "0" > ${HARD_DIR}/${VARIATION_DATE} 2> /dev/null
+}
+
+set-suspension-state()
+{
+    test -n "${1}" || return 1
+    local state=${1}
+
+    local state_file=${RUN_DIR}/${SUSPENSION_STATE_FILENAME}
+
+    case ${state} in
+	error|trial|renew|license|cloudip)
+	    echo -n ${state} > ${state_file}
+	    SUSPENSION_STATE=${state}
+	    ;;
+	cancel)
+	    rm -f ${state_file}
+	    SUSPENSION_STATE=none
+	    ;;
+	*)
+	    ;;
+    esac
+}
+
+get-suspension-state()
+{
+    local state_file=${RUN_DIR}/${SUSPENSION_STATE_FILENAME}
+
+    if test -s ${state_file} ; then
+	cat ${state_file}
+    else
+	echo none
+    fi
+}
+
+set-usage-parameters()
+{
+    local state=$(get-suspension-state)
+    SUSPENSION_STATE=${state}
+}
+
+reactivate-access-before()
+{
+    :
+}
+
+reactivate-access-after()
+{
+    :
+}
+
+allow-access()
+{
+    test ${APL_ROLE} == gateway || return 0
+
+    local log=${1}
+
+    test "${SUSPENSION_STATE}" != none || return 0
+
+    if test -n "${log}" ; then
+	local msgD=$(cat ${LOCAL_DIR}/${TECHNICAL_NAME}/etc/.fileD 2>/dev/null)
+	msgD=$(echo -en "${msgD}")
+	log "${msgD}"
+    fi
+
+    reactivate-access-before
+    set-suspension-state cancel &&
+	reactivate-web-gateway ; local ret=${?}
+    reactivate-access-after
+
+    test -z "${log}" || log-result ${ret}
+    return ${ret}
+}
+
+suspend-access-before()
+{
+    :
+}
+
+suspend-access-after()
+{
+    :
+}
+
+suspend-access()
+{
+    test ${APL_ROLE} == gateway || return 0
+    test ${CURRENT_SQUID_IS_ACTIVE} == True || return 0
+
+    test -n "${1}" || return 1
+    local state=${1}
+    local log=${2}
+
+    test "${SUSPENSION_STATE}" == none || return 0
+
+    if test -n "${log}" ; then
+	local msgC=$(cat ${LOCAL_DIR}/${TECHNICAL_NAME}/etc/.fileC 2>/dev/null)
+	msgC=$(echo -en "${msgC}")
+	log "${msgC}"
+    fi
+
+    suspend-access-before
+    suspend-web-gateway ${state} ; local ret=${?}
+    suspend-access-after
+
+    test -z "${log}" || log-result ${ret}
+    set-suspension-state ${state}
+}
+
+verify-usage-consistency()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    local call=${1}
+    local date=${2}
+    local log=${3}
+
+    if test \
+	! -s ${HARD_DIR}/${INSTALL_DATE} -o \
+	! -s ${HARD_DIR}/${VARIATION_DATE} -o \
+	! -s ${HARD_DIR}/${SN_ID}
+    then
+	test ${call} == passive || suspend-access error ${log}
+	return 11
+    fi
+
+    local idate=$(cat ${HARD_DIR}/${INSTALL_DATE} 2>/dev/null)
+    local vdate=$(cat ${HARD_DIR}/${VARIATION_DATE} 2>/dev/null)
+
+    idate=$[${idate} + ${vdate}]
+
+    if test ${date} -lt ${idate} ; then
+	test ${call} == passive || suspend-access error ${log}
+	return 13
+    fi
+
+    return 0
+}
+
+verify-usage-not-trial()
+{
+    test -n "${1}" || return 0
+    local date=${1}
+
+    case ${CLOUD_NAME} in
+	aws|azure)
+	    case ${CLOUD_USAGE} in
+		free)
+		    return 0
+		    ;;
+		payg)
+		    return 0
+		    ;;
+		byol)
+		    ;;
+		*)
+		    ;;
+	    esac
+	    ;;
+	*)
+	    ;;
+    esac
+
+    if test \
+	   -s /etc/${TECHNICAL_NAME}/${LIC_KEY} -a \
+	   -s /etc/${TECHNICAL_NAME}/${SN_SN} -a \
+	   -s ${HARD_DIR}/${SERIAL_DATE} -a \
+	   -s ${HARD_DIR}/${RENEW_DAYS}
+    then
+	return 0
+    fi
+
+    local idate=$(cat ${HARD_DIR}/${INSTALL_DATE} 2>/dev/null)
+    local vdate=$(cat ${HARD_DIR}/${VARIATION_DATE} 2>/dev/null)
+
+    idate=$[${idate} + ${vdate}]
+    test ${date} -ge ${idate} || return 0
+
+    local end=$[${idate} + ${TRIAL_PERIOD} + ${TRIAL_PERIOD_MARGIN}]
+    test ${date} -gt ${end}
+}
+
+is-regular-usage()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    local sn=${1}
+    local key=${2}
+
+    local lic_min lic_maj
+
+    case ${APL_ROLE} in
+	gateway)
+	    lic_min=${LIC_GATEWAY_MIN}
+	    lic_maj=${LIC_GATEWAY_MAJ}
+	    ;;
+	manager)
+	    lic_min=${LIC_MANAGER_MIN}
+	    lic_maj=${LIC_MANAGER_MAJ}
+	    ;;
+	*)
+	    lic_min=1
+	    lic_maj=12
+	    ;;
+    esac
+
+    local level=$(get-usage-level)
+    local id="${SN_PREFIX}-L${level}_${sn}"
+
+    local checksum1=$(echo ${key} | \
+			  openssl enc -d -base64 2> /dev/null | \
+			  openssl rsautl -verify -inkey /etc/license-public-key.pem -pubin 2> /dev/null)
+
+    local checksum2=$(echo -n ${id} | openssl dgst -sha1 2> /dev/null)
+    checksum2=$(remove-dgst-prefix "${checksum2}")
+
+    checksum2="${checksum2:${lic_min}:${lic_maj}}"
+
+    test "${checksum1}" == "${checksum2}"
+}
+
+is-regular-subscription()
+{
+    local date=$(date +"%s" 2> /dev/null)
+
+    test -s ${HARD_DIR}/${VARIATION_DATE} || return 1
+    test -s ${HARD_DIR}/${SERIAL_DATE} || return 3
+    test -s ${HARD_DIR}/${RENEW_DAYS} || return 5
+
+    local sdate=$(cat ${HARD_DIR}/${SERIAL_DATE} 2>/dev/null)
+    local vdate=$(cat ${HARD_DIR}/${VARIATION_DATE} 2>/dev/null)
+    local license_days=$(cat ${HARD_DIR}/${RENEW_DAYS} 2>/dev/null)
+
+    sdate=$[${sdate} + ${vdate}]
+
+    local end=$[${sdate} + (${LICENSE_PERIOD} * ${license_days})]
+
+    test ${date} -le ${end}
+}
+
+verify-usage-key()
+{
+    test -n "${1}" || return 1
+    local call=${1}
+    local log=${2}
+
+    case ${CLOUD_NAME} in
+	aws|azure)
+	    case ${CLOUD_USAGE} in
+		free)
+		    return 0
+		    ;;
+		payg)
+		    if test "${CLOUD_VALID_IP}" == yes ; then
+			return 0
+		    else
+			test ${call} == passive || suspend-access cloudip ${log}
+			return 11
+		    fi
+		    ;;
+		byol)
+		    ;;
+		*)
+		    ;;
+	    esac
+	    ;;
+	*)
+	    ;;
+    esac
+
+    if test ! -s /etc/${TECHNICAL_NAME}/${LIC_KEY} -o ! -s /etc/${TECHNICAL_NAME}/${SN_SN} -o ! -s ${HARD_DIR}/${SN_ID} ; then
+	test ${call} == passive || suspend-access trial ${log}
+	return 21
+    fi
+
+    local sn1=$(get-sn-from-lic-id)
+    local sn2=$(cat /etc/${TECHNICAL_NAME}/${SN_SN} 2>/dev/null)
+    
+    if test "${sn1}" != "${sn2}" ; then
+	test ${call} == passive || suspend-access error ${log}
+	return 23
+    else
+	local key=$(cat /etc/${TECHNICAL_NAME}/${LIC_KEY} 2>/dev/null)
+	if ! is-regular-usage "${sn2}" "${key}" ; then
+	    test ${call} == passive || suspend-access error ${log}
+	    return 25
+	fi
+    fi
+
+    return 0
+}
+
+verify-new-usage()
+{
+    test -s ${TMP_DIR}/${REGISTER_KEY} || return 0
+
+    local msg1=$(cat ${LOCAL_DIR}/${TECHNICAL_NAME}/etc/.file1 2>/dev/null) ; msg1=$(echo -en "${msg1}")
+    local ret
+
+    log "${msg1}"
+
+    if test ! -s /etc/${TECHNICAL_NAME}/${SN_SN} ; then
+	ret=11
+	log-result ${ret}
+	clean-tmp-usage
+	return ${ret}
+    fi
+
+    local sn=$(cat /etc/${TECHNICAL_NAME}/${SN_SN} 2> /dev/null)
+    local key=$(cat ${TMP_DIR}/${REGISTER_KEY} 2>/dev/null)
+
+    key="${key}=="
+
+    if is-regular-usage "${sn}" "${key}" ; then
+	ret=0
+	log-result ${ret}
+	local msg0=$(cat ${LOCAL_DIR}/${TECHNICAL_NAME}/etc/.file0 2>/dev/null) ; msg0=$(echo -en "${msg0}")
+	log "${msg0}"
+	echo "${key}" > /etc/${TECHNICAL_NAME}/${LIC_KEY}
+	ret=${?}
+	log-result ${ret}
+
+	if test ${APL_ROLE} == gateway ; then
+	    FLAG_SQUID=1
+	    FLAG_GUARD_RELOAD=1
+	fi
+    else
+	ret=13
+	log-result ${ret}
+	clean-tmp-usage
+    fi
+
+    return ${ret}
+}
+
+is-regular-embedded-usage()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    test -n "${3}" || return 3
+    local embedded=${1}
+    local sn=${2}
+    local key=${3}
+
+    local lic_min lic_maj
+    local app=$(get-embedded-internal-code ${embedded})
+
+    case ${embedded} in
+	vpnsubscr)
+	    lic_min=${EMBEDDED_VPNSUBSCR_LIC_MIN}
+	    lic_maj=${EMBEDDED_VPNSUBSCR_LIC_MAJ}
+	    ;;
+	*)
+	    lic_min=0
+	    lic_maj=16
+	    ;;
+    esac
+
+    local id="${SN_PREFIX}-A${app}_${sn}"
+
+    local checksum1=$(echo ${key} | \
+			  openssl enc -d -base64 -A 2> /dev/null | \
+			  openssl rsautl -verify -inkey /etc/license-public-key.pem -pubin 2> /dev/null)
+
+    local checksum2=$(echo -n ${id} | openssl dgst -sha1 2> /dev/null)
+    checksum2=$(remove-dgst-prefix "${checksum2}")
+
+    checksum2="${checksum2:${lic_min}:${lic_maj}}"
+
+    test "${checksum1}" == "${checksum2}"
+}
+
+verify-new-embedded-vpnsubscr-usage()
+{
+    if test ${EMBEDDED_VPNSUBSCR_IS_ACTIVE} == False ; then
+	rm -f ${TMP_DIR}/${EMBEDDED_VPNSUBSCR_REGISTER_KEY}
+	return 0
+    fi
+
+    if ! is-embedded-license-required vpnsubscr ; then
+	rm -f ${TMP_DIR}/${EMBEDDED_VPNSUBSCR_REGISTER_KEY}
+	return 0
+    fi
+
+    if test -s /etc/${TECHNICAL_NAME}/${EMBEDDED_VPNSUBSCR_LIC_KEY} ; then
+	rm -f ${TMP_DIR}/${EMBEDDED_VPNSUBSCR_REGISTER_KEY}
+	return 0
+    fi
+
+    local msg3=$(cat ${LOCAL_DIR}/${TECHNICAL_NAME}/etc/.file3 2>/dev/null) ; msg3=$(echo -en "${msg3}")
+    local ret
+
+    log "${msg3}"
+
+    if test ! -s /etc/${TECHNICAL_NAME}/${SN_SN} ; then
+	ret=11
+	log-result ${ret}
+	rm -f ${TMP_DIR}/${EMBEDDED_VPNSUBSCR_REGISTER_KEY}
+	return ${ret}
+    fi
+
+    if test ! -s ${TMP_DIR}/${EMBEDDED_VPNSUBSCR_REGISTER_KEY} ; then
+	ret=13
+	log-result ${ret}
+	rm -f ${TMP_DIR}/${EMBEDDED_VPNSUBSCR_REGISTER_KEY}
+	return ${ret}
+    fi
+
+    local sn=$(cat /etc/${TECHNICAL_NAME}/${SN_SN} 2> /dev/null)
+    local key=$(cat ${TMP_DIR}/${EMBEDDED_VPNSUBSCR_REGISTER_KEY} 2>/dev/null)
+
+    key="${key}=="
+
+    if is-regular-embedded-usage vpnsubscr "${sn}" "${key}" ; then
+	ret=0
+	log-result ${ret}
+	local msg2=$(cat ${LOCAL_DIR}/${TECHNICAL_NAME}/etc/.file2 2>/dev/null) ; msg2=$(echo -en "${msg2}")
+	log "${msg2}"
+	echo "${key}" > /etc/${TECHNICAL_NAME}/${EMBEDDED_VPNSUBSCR_LIC_KEY}
+	save-register-embedded-state ${EMBEDDED_VPNSUBSCR_NAME} ${ret} OK
+	ret=${?}
+	log-result ${ret}
+    else
+	ret=15
+	log-result ${ret}
+    fi
+
+    rm -f ${TMP_DIR}/${EMBEDDED_VPNSUBSCR_REGISTER_KEY}
+
+    return ${ret}
+}
+
+verify-new-embedded-usage()
+{
+    test ${APL_ROLE} == gateway || return 0
+    verify-new-embedded-vpnsubscr-usage
+}
+
+set-register-check()
+{
+    test -n "${1}" || return 101
+    test -n "${2}" || return 102
+    local call=${1}
+    local date=${2}
+    local log=${3}
+
+    case ${CLOUD_NAME} in
+	aws|azure)
+	    return 0
+	    ;;
+	*)
+	    ;;
+    esac
+
+    if test ! -s ${HARD_DIR}/${VARIATION_DATE} -o ! -s ${HARD_DIR}/${SERIAL_DATE} -o ! -s ${HARD_DIR}/${RENEW_DAYS} ; then
+	test ${call} == passive || suspend-access error ${log}
+	return 111
+    fi
+
+    local vdate=$(cat ${HARD_DIR}/${VARIATION_DATE} 2>/dev/null)
+    local sdate=$(cat ${HARD_DIR}/${SERIAL_DATE} 2>/dev/null)
+    local license_days=$(cat ${HARD_DIR}/${RENEW_DAYS} 2>/dev/null)
+
+    sdate=$[${sdate} + ${vdate}]
+
+    if test ! -s /etc/${TECHNICAL_NAME}/${SN_SN} ; then
+	test ${call} == passive || suspend-access error ${log}
+	return 113
+    fi
+
+    if test ! -s /etc/${TECHNICAL_NAME}/${SN_PASSWD} ; then
+	test ${call} == passive || suspend-access error ${log}
+	return 115
+    fi
+
+    local register_ret ret=0
+    local msg msg_state
+    local code_value code
+
+    msg=$(register-check 2> /dev/null)
+    register_ret=${?}
+    msg_state=${msg:0:3} ; test -n "${msg_state}" || msg_state="XX:"
+    code_value=${msg#*:}
+    code=${code_value/:*}
+
+    case ${register_ret} in
+	0)
+	    case "${msg_state}" in
+		"OK:")
+		    local value=${code_value/*:}
+		    local license_state_newdays=${value}
+		    local license_state=${license_state_newdays/,*}
+		    local license_newdays=${license_state_newdays#*,}
+		    
+		    case "${license_state}" in
+			0|1)
+			    check-digit ${license_newdays} || license_newdays=${license_days}
+
+			    if test ${license_newdays} -gt ${license_days} ; then
+				echo ${license_newdays} > /tmp/${RENEW_DAYS}.${$}
+				mv -f /tmp/${RENEW_DAYS}.${$} ${HARD_DIR}/${RENEW_DAYS}
+			    fi
+
+			    local end=$[${sdate} + (${LICENSE_PERIOD} * ${license_newdays}) + ${LICENSE_PERIOD_MARGIN_2}]
+
+			    if test ${date} -gt ${end} ; then
+				test ${call} == passive || suspend-access renew ${log}
+				ret=117
+			    fi
+			    ;;
+
+			2)
+			    test ${call} == passive || suspend-access renew ${log}
+			    ret=131
+			    ;;
+			*)
+			    ret=141
+			    ;;
+		    esac
+		    ;;
+		"KO:")
+		    ret=151
+		    ;;
+		*)
+		    ret=161
+		    ;;
+	    esac
+	    ;;
+	*)
+	    ret=171
+	    ;;
+    esac
+
+    save-register-state check ${register_ret} ${msg_state:0:2} ${code}
+
+    return ${ret}
+}
+
+verify-usage()
+{
+    test -n "${1}" || return 1
+    local call=${1}
+    local log=${2}
+
+    is-licensed || return 0
+
+    local date=$(date +"%s" 2> /dev/null)
+
+    verify-usage-consistency ${call} ${date} ${log} || return 11
+    verify-usage-not-trial ${date} || return 0
+    verify-usage-key ${call} ${log} || return 13
+    set-register-check ${call} ${date} ${log} || return 15
+    test ${call} == active || return 0
+    allow-access ${log}
+}
+
+log-registration-result()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    local register_type=${1}
+    local code=${2}
+
+    test ${register_type} != cld || return 0
+    log-result ${code}
+}
+
+set-register-appliance()
+{
+    test -n "${1}" || return 101
+    local register_type=${1}
+
+    local register_ret ret
+    local msg msg_state
+    local code_value code
+
+    if test ${register_type} != cld ; then
+	local msgA=$(cat ${LOCAL_DIR}/${TECHNICAL_NAME}/etc/.fileA 2>/dev/null) ; msgA=$(echo -en "${msgA}")
+	log "${msgA}"
+    fi
+
+    msg=$(register-appliance "${@}" 2> /dev/null)
+    register_ret=${?}
+
+    msg_state=${msg:0:3} ; test -n "${msg_state}" || msg_state="XX:"
+    code_value=${msg#*:}
+    code=${code_value/:*}
+
+    if test ${register_ret} -eq 0 ; then
+	if test "${msg_state}" == "OK:" ; then
+	    if ! check-digit ${code} ; then
+		ret=100
+	    else
+		local value=${code_value/*:}
+		local sn_passwd_ip=${value}
+		
+		if ! [[ "${sn_passwd_ip}" =~ ^[^,]+,[^,]+,[^,]+$ ]] ; then
+		    ret=110
+		else
+		    local sn=${sn_passwd_ip/,*}
+		    local passwd_ip=${sn_passwd_ip#*,}
+		    local passwd=${passwd_ip/,*}
+		    local ip=${passwd_ip#*,}
+
+		    if ! check-serial-number "${sn}" ; then
+			ret=111
+		    elif ! check-ip ${ip} ; then
+			ret=112
+		    else
+			echo ${ip} > ${HARD_DIR}/${SN_IP}
+			echo ${sn} > /etc/${TECHNICAL_NAME}/${SN_SN}
+			echo ${passwd} > /etc/${TECHNICAL_NAME}/${SN_PASSWD}
+
+			local level=$(get-usage-level)
+			local id="${SN_PREFIX}-L${level}_${sn}"
+			echo _${id} > ${HARD_DIR}/${SN_ID}
+
+			update-sn-user
+			if test ${?} -eq 0 ; then
+			    ret=0
+			else
+			    ret=120
+			fi
+		    fi
+		fi
+
+		case ${ret} in
+		    0)
+			log-registration-result ${register_type} 0
+			;;
+		    100)
+			log-registration-result ${register_type} 100
+			;;
+		    110)
+			log-registration-result ${register_type} 201
+			;;
+		    111)
+			log-registration-result ${register_type} 203
+			;;
+		    112)
+			log-registration-result ${register_type} 205
+			;;
+		    120)
+			log-registration-result ${register_type} 209
+			;;
+		esac
+	    fi
+
+	elif test "${msg_state}" == "KO:" ; then
+	    ret=21
+	    if check-digit ${code} ; then
+		log-registration-result ${register_type} $[100 + ${code}]
+	    else
+		log-registration-result ${register_type} 100
+	    fi
+	else
+	    ret=23
+	    log-registration-result ${register_type} 300
+	    test "${APL_MODEL}" != 'test' || echo "${msg}" > /tmp/debug.set-register-appliance.${$}
+	fi
+    else
+	ret=25
+	log-registration-result ${register_type} ${register_ret}
+    fi
+
+    save-register-state appliance ${register_ret} ${msg_state:0:2} ${code}
+
+    return ${ret}
+}
+
+set-unregistered-appliance()
+{
+    local log=${1}
+
+    local sn_user=$(gen-testing-sn-user)
+
+    if test -n "${log}" ; then
+	local msgE=$(cat ${LOCAL_DIR}/${TECHNICAL_NAME}/etc/.fileE 2>/dev/null) ; msgE=$(echo -en "${msgE}")
+	log "${msgE}"
+    fi
+
+    save-unregistered-state &&
+	echo ${sn_user} > ${HARD_DIR}/${SN_ID} &&
+	update-sn-user
+
+    local ret=${?}
+
+    test -z "${log}" || log-result ${ret}
+    return ${ret}
+}
+
+set-register-serial()
+{
+    local register_ret ret
+    local msg msg_state
+    local code_value code
+
+    local msgB=$(cat ${LOCAL_DIR}/${TECHNICAL_NAME}/etc/.fileB 2>/dev/null) ; msgB=$(echo -en "${msgB}")
+
+    log "${msgB}"
+
+    msg=$(register-serial 2> /dev/null)
+    register_ret=${?}
+    msg_state=${msg:0:3} ; test -n "${msg_state}" || msg_state="XX:"
+    code_value=${msg#*:}
+    code=${code_value/:*}
+
+    if test ${register_ret} -eq 0 ; then
+	if test "${msg_state}" == "OK:" ; then
+
+	    if ! check-digit ${code} ; then
+		ret=11
+		log-result 100
+	    else
+		local license_date_and_license_days=${msg:6}
+		local license_date=${license_date_and_license_days/,*/}
+		local license_days=${license_date_and_license_days/*,/}
+
+		check-digit ${license_date} || license_date=$(date +"%s" 2> /dev/null)
+
+		echo ${license_date} > /tmp/${SERIAL_DATE}.${$}
+		
+		if check-digit ${license_days} ; then
+		    echo ${license_days} > /tmp/${RENEW_DAYS}.${$}
+		else
+		    echo 0 > /tmp/${RENEW_DAYS}.${$}
+		fi
+
+		mv -f /tmp/${SERIAL_DATE}.${$} ${HARD_DIR}/${SERIAL_DATE}
+		mv -f /tmp/${RENEW_DAYS}.${$} ${HARD_DIR}/${RENEW_DAYS}
+
+		reset-date-variation
+
+		ret=0
+		log-result ${ret}
+	    fi
+
+	elif test "${msg_state}" == "KO:" ; then
+	    if check-digit ${code} ; then
+		ret=21
+		log-result $[200 + ${code}]
+	    else
+		ret=23
+		log-result 100
+	    fi
+	else
+	    ret=31
+	    log-result 300
+	fi
+    else
+	ret=41
+	log-result ${ret}
+    fi
+
+    save-register-state serial ${register_ret} ${msg_state:0:2} ${code}
+
+    return ${ret}
+}
+
+set-registration()
+{
+    case ${CLOUD_NAME} in
+	aws|azure)
+	    if test -s /etc/${TECHNICAL_NAME}/${SN_SN} -a -s /etc/${TECHNICAL_NAME}/${SN_PASSWD} ; then
+		test ! -f ${TMP_DIR}/${UNREGISTER_SN} || set-unregistered-appliance
+		return ${?}
+	    fi
+
+	    local ret
+
+	    local email=${1}
+	    local first=${2}
+	    local last=${3}
+	    local run=${4}
+
+	    set-register-appliance cld "${email}" "${first}" "${last}" "${run}"
+	    ret=${?}
+
+	    clean-tmp-usage
+	    return ${ret}
+	    ;;
+	*)
+	    ;;
+    esac
+
+    if test -f ${TMP_DIR}/${UNREGISTER_SN} ; then
+	set-unregistered-appliance log
+    else
+	network-is-configured || return 0
+
+	if test -s ${TMP_DIR}/${REGISTER_OTP} ; then
+	    local otp=$(cat ${TMP_DIR}/${REGISTER_OTP} 2> /dev/null)
+	    if test -s ${TMP_DIR}/${REGISTER_EMAIL} ; then
+		local email=$(cat ${TMP_DIR}/${REGISTER_EMAIL} 2> /dev/null)
+		set-register-appliance new "${otp}" "${email}"
+	    else
+		set-register-appliance old "${otp}"
+	    fi
+	elif test -s ${TMP_DIR}/${REGISTER_KEY} ; then
+	    test ! -s /etc/${TECHNICAL_NAME}/${SN_SN} || set-register-serial
+	fi
+    fi
+
+    clean-tmp-usage
+}
+
+set-register-embedded-vpnsubscr()
+{
+    local register_ret ret
+    local msg msg_state
+    local code_value code
+
+    local msgF=$(cat ${LOCAL_DIR}/${TECHNICAL_NAME}/etc/.fileF 2>/dev/null) ; msgF=$(echo -en "${msgF}")
+
+    log "${msgF}"
+
+    msg=$(register-embedded-application vpnsubscr 2> /dev/null)
+    register_ret=${?}
+    msg_state=${msg:0:3} ; test -n "${msg_state}" || msg_state="XX:"
+    code_value=${msg#*:}
+    code=${code_value/:*}
+
+    if test ${register_ret} -eq 0 ; then
+	if test "${msg_state}" == "OK:" ; then
+	    
+	    if ! check-digit ${code} ; then
+		ret=11
+		log-result 100
+	    else
+		ret=0
+		log-result ${ret}
+	    fi
+	elif test "${msg_state}" == "KO:" ; then
+	    if check-digit ${code} ; then
+		ret=21
+		log-result $[200 + ${code}]
+	    else
+		ret=23
+		log-result 100
+	    fi
+	else
+	    ret=31
+	    log-result 300
+	fi
+    else
+	ret=41
+	log-result ${ret}
+    fi
+
+    save-register-embedded-state ${EMBEDDED_VPNSUBSCR_NAME} ${register_ret} ${msg_state:0:2} ${code}
+
+    return ${ret}
+}
+
+set-embedded-vpnsubscr-registration()
+{
+    test -s /etc/${TECHNICAL_NAME}/${EMBEDDED_VPNSUBSCR_LIC_KEY} || return 0
+    ! is-embedded-registration-state-ok ${EMBEDDED_VPNSUBSCR_NAME} || return 0
+    set-register-embedded-vpnsubscr
+}
+
+set-embedded-registration()
+{
+    network-is-configured || return 0
+
+    set-embedded-vpnsubscr-registration
+}
+
+update-alive-date()
+{
+    test -n "${1}" || return 1
+    local date=${1}
+
+    echo ${date} > ${ETC_DIR}/${ALIVE_DATE}
+}
+
+update-latest-os-version()
+{
+    local version
+
+    version=$(get-os-latest-version)
+    test ${?} -eq 0 || return 11
+
+    echo ${version} > ${RUN_DIR}/new-os-version
+}
+
+set-alive-check()
+{
+    return 0
+
+    local call=${1}
+
+    local msg ret
+    local trial='no'
+    local date=$(date +"%s" 2> /dev/null)
+
+    verify-usage-not-trial ${date} || trial='yes'
+    msg=$(alive-check ${date} ${trial} 2> /dev/null) ; ret=${?}
+    test ${ret} -eq 0 || return ${ret}
+
+    local msg_state=${msg:0:3}
+    local code_value=${msg#*:}
+    local code=${code_value/:*}
+
+    case "${msg_state}" in
+	"OK:")
+	    ret=0
+	    ;;
+	"KO:")
+	    ret=0
+	    ;;
+	*)
+	    ret=151
+	    ;;
+    esac
+
+    test ${ret} -eq 0 || return ${ret}
+    test -n "${code}" || return 153
+    check-digit ${code} || return 155
+
+    echo "${msg}" > ${HARD_DIR}/${SN_ALIVE}
+
+    case ${code} in
+	2)
+	    update-alive-date ${date}
+	    return 0
+	    ;;
+	71)
+	    return 171
+	    ;;
+	73)
+	    update-alive-date ${date}
+	    return 173
+	    ;;
+	99)
+	    return 175
+	    ;;
+	75)
+	    update-alive-date ${date}
+	    ;;
+	*)
+	    return 255
+	    ;;
+    esac
+
+    is-licensed || return 181
+    test ${code} -eq 75 || return 183
+    verify-usage-consistency passive ${date} || return 185
+    test ${trial} == 'no' || return 187
+    test "${call}" == 'active' || return 189
+
+    set-unregistered-appliance
+    rm -f ${HARD_DIR}/${SN_ALIVE}
+    suspend-access license
+
+    return 191
+}

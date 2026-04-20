@@ -1,0 +1,53 @@
+<a name='main' class='doc-title'>
+  <h1>Traffic Logging</h1>
+</a>
+Logging provides visibility into allowed and denied traffic exchanged with or via a CacheGuard appliance. As an administrator, you can select which types of traffic should be logged. You may refer to the <a href="/doc/command/log.html">log</a> command description in the Commands Manual to learn more about the available log types. Logs are stored locally on a CacheGuard appliance and can be saved on trusted remote file servers for inspection. You also have the option to send them in real time to remote log servers using the "<i>syslog</i>" protocol (based on UDP or TCP).
+<p>
+
+<a name='manage' class='doc-title'></a><h2>Managing Logs</h2>
+A daily automatic log rotation during off-peak hours (between 04:00 and 06:59) backs up logs for a period of <i>n</i> days, where <i>n</i> is a value between 1 and 365 configured during the CacheGuard-OS installation. Each rotated log is identified by an integer between 1 and <i>n</i>, known as the log serial number. The most recent log (yesterday’s log) has the number 1, and the oldest has the number <i>n</i>. Note that if the appliance becomes overloaded, log rotation occurs hourly in order to prevent the provisioned log space on the disks from being filled.
+<p>
+To save the current (today’s) log, an explicit log rotation should be performed. The explicit log rotation allows you to avoid waiting for the daily automatic log rotation. To rotate logs and obtain a report on the rotation status, use the following commands:
+<ul>
+  <li><i>log rotate</i></li>
+  <li><i>log rotate report</i></li>
+</ul>
+Once the log rotation operation is complete, you can save the required log types on a trusted file server. Note that saved logs are in gzip-compressed format. To save the most recent Web access log in a file named "<i>web-access-log.gz</i>" on the TFTP server with the IP address <i>172.18.2.1</i>, use the following command:
+<ul>
+  <li><i>log save web 1 tftp 172.18.2.1 web-access-log.gz</i></li>
+</ul>
+Logs can be saved only on trusted file servers. To declare a file server as trusted, use the <a href="/doc/command/access.html">access file</a> command. Logging can also be completely disabled. To disable logging entirely, use the following commands:
+<ul>
+  <li><i>mode log off</i></li>
+  <li><i>apply</i></li>
+</ul>
+
+<a name='web' class='doc-title'></a><h2>Logging Web Access</h2>
+All Web accesses in forwarding and reverse modes can be logged. Web access logging enables you to monitor all Web requests in detail and determine which machine accessed which URL at what time. To activate Web access logging in forwarding and reverse modes, use the following commands:
+<ul>
+  <li><i>mode log on</i></li>
+  <li><i>log type web on</i></li>
+  <li><i>log type rweb on</i></li>
+  <li><i>apply</i></li>
+</ul>
+
+<a name='denied' class='doc-title'></a><h2>Logging Denied Traffic</h2>
+<u>Allowed</u> access logging concerns Web traffic only (in <strong>web</strong> or <strong>rweb</strong> modes). However, all rejected traffic (Web or non-Web) by services running on a CacheGuard appliance can also be logged. For instance, you can configure the appliance to log all attempts to access forbidden URLs (denied by the URL guarding) and all rejected network traffic at the IP level (denied by the firewall). To achieve this, use the following commands:
+<ul>
+  <li><i>mode log on</i></li>
+  <li><i>log type guard on</i></li>
+  <li><i>log type antivirus on</i></li>
+  <li><i>log type waf on</i></li>
+  <li><i>log type firewall on</i></li>
+  <li><i>apply</i></li>
+</ul>
+
+<a name='syslog' class='doc-title'></a><h2>Syslog Servers</h2>
+You can optionally send all locally saved logs to remote log servers that support the <i>syslog</i> protocol (UDP or TCP). Before activating the logging of any traffic type on a remote syslog server, that server must be explicitly allowed on the CacheGuard appliance. To configure the appliance to send its URL guarding logs in real time to a syslog server with the IP address <i>172.20.2.1</i> using UDP, use the following commands:
+<ul>
+  <li><i>mode log on</i></li>
+  <li><i>log syslog add udp 172.20.2.1</i></li>
+  <li><i>log type guard on on</i></li>
+  <li><i>apply</i></li>
+</ul>
+Multiple syslog servers can be specified on a CacheGuard appliance. In this case, logs are sent to all defined syslog servers in parallel.

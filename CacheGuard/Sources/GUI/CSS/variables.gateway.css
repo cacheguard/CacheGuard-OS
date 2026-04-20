@@ -1,0 +1,6 @@
+:root {
+    --itemcolor:FireBrick;
+    --itemcolorlight:rgba(178,34,34,0.3);
+    --itembg:var(--itemcolorlight) url(/image/titlebar.png) repeat-x center left;
+    --itemactivebg:FireBrick url(/image/titlebar-red.png) repeat-x center left;
+}

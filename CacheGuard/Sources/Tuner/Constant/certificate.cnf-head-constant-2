@@ -1,0 +1,15 @@
+[ policy_match ]
+countryName = supplied
+stateOrProvinceName = optional
+localityName = supplied
+organizationName = supplied
+organizationalUnitName = optional
+commonName = supplied
+emailAddress = optional
+
+[ cert_type ]
+
+[ v3_ca ]
+basicConstraints = critical,CA:TRUE
+subjectKeyIdentifier = hash
+authorityKeyIdentifier = keyid:always,issuer:always

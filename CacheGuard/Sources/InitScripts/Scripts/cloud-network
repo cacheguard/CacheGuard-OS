@@ -1,0 +1,170 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       InitScript
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+source /lib/lsb/init-functions
+
+CACHEGUARD_DIR=/etc/sysconfig/cacheguard
+source ${CACHEGUARD_DIR}/constant
+source ${APPLIANCE_DIR}/etc/role
+source ${HARD_DIR}/cloud.conf
+
+case ${CLOUD_NAME} in
+    azure)
+	;;
+    aws)
+	;;
+    *)
+	exit 0
+	;;
+esac
+
+check-cloud-ip()
+{
+    test -z "${CLOUD_VALID_IP}" || return 0
+
+    log_info_msg "Checking valid cloud IP..."
+
+    apl_cloud_update_ip
+    local retval=${?}
+
+    case ${retval} in
+	200)
+	    CLOUD_VALID_IP=yes
+	    retval=0
+	    ;;
+	201)
+	    CLOUD_VALID_IP=no
+	    retval=1
+	    ;;
+	*)
+	    ;;
+    esac
+
+    [ ${retval} -eq 0 ]
+    evaluate_retval
+
+    return ${retval}
+}
+
+start-network()
+{
+    local tries=0 max_tries=60 usleep=500000
+    local internal_net default_route
+    local retval
+
+    log_info_msg "Getting dynamic IP addresses..."
+
+    echo "RESOLV_CONF_DIR=${CLOUD_RESOLV_DIR}" > /etc/sysconfig/dhclient
+
+    case ${APL_ROLE} in
+	gateway)
+	    ip link show dev ${CLOUD_NETWORK_SECOND_DEV} > /dev/null 2> /dev/null
+
+	    if test ${?} -eq 0 ; then
+		retval=1
+		dhclient -4 -q ${CLOUD_NETWORK_SECOND_DEV} ${CLOUD_NETWORK_MAIN_DEV} 2> /dev/null
+		while true
+		do
+		    internal_net=$(ip address show dev ${CLOUD_NETWORK_SECOND_DEV} 2> /dev/null | tail -2 | head -1)
+		    if test "${internal_net/*net */net}" == net ; then
+			retval=0
+			break
+		    fi
+		    test ${tries} -lt ${max_tries} || break
+		    ((tries++))
+		    usleep ${usleep}
+		done
+	    else
+		retval=0
+		dhclient -4 -q ${CLOUD_NETWORK_MAIN_DEV} 2> /dev/null
+	    fi
+	    ;;
+	manager)
+	    retval=0
+	    dhclient -4 -q ${CLOUD_NETWORK_MAIN_DEV} 2> /dev/null
+	    ;;
+	*)
+	    ;;
+    esac
+
+    if test ${retval} -ne 0 ; then
+	[ ${retval} -eq 0 ]
+	evaluate_retval
+	return ${retval}
+    fi
+
+    local default_route
+
+    retval=1
+    tries=0
+    tries=30 usleep=500000
+
+    while true
+    do
+	default_route=$(ip route 2> /dev/null | grep 'default via')
+	if test -n "${default_route}" ; then
+	    retval=0
+	    break
+	fi
+	test ${tries} -lt ${max_tries} || break
+	((tries++))
+	usleep ${usleep}
+    done
+
+    test ${retval} -ne 0 || cp -f ${CLOUD_RESOLV_DIR}/resolv.conf ${CONF_DIR}/resolv.conf
+
+    [ ${retval} -eq 0 ]
+    evaluate_retval
+    return ${retval}
+}
+
+stop-network()
+{
+    log_info_msg "Releasing dynamic IP addresses..."
+    dhclient -4 -q -r 2> /dev/null
+    local retval=${?}
+
+    [ ${retval} -eq 0 ]
+    evaluate_retval
+    return ${retval}
+}
+
+case "${1}" in
+    start)
+	start-network &&
+	    check-cloud-ip
+	;;
+    stop)
+	stop-network
+	;;
+    restart)
+	${0} stop
+	usleep 500000
+	${0} start
+	;;
+    *)
+	echo "Usage: ${0} {start|stop|restart}"
+	exit 1
+	;;
+esac

@@ -1,0 +1,998 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       Commands
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+check-api-key()
+{
+    local key=${1}
+
+    test ${#key} -le 64 || return 11
+    [[ "${key}" =~ ^[a-zA-Z0-9_\-]*$ ]] || return 13
+}
+
+check-id-length()
+{
+    test ${#1} -le ${MAX_NAME_LEN}
+}
+
+check-id()
+{
+    test -n "${1}" || return 1
+    [[ "${1}" =~ ^[a-zA-Z]([a-zA-Z0-9_\-])*$ ]] || return 2
+
+    return 0
+}
+
+check-tls-id()
+{
+    test -n "${1}" || return 1
+    [[ "${1}" =~ ^[a-zA-Z]([a-zA-Z0-9\-]|\.)*$ ]] || return 11
+
+    return 0
+}
+
+check-interface()
+{
+    test -n "${1}" || return 1
+
+    case "${1}" in
+	internal|external|auxiliary|vpnipsec)
+	    return 0
+	    ;;
+	*)
+	    return 11
+	    ;;
+    esac
+}
+
+check-manager-interface()
+{
+    test -n "${1}" || return 1
+
+    case "${1}" in
+	internal)
+	    return 0
+	    ;;
+	*)
+	    return 1
+	    ;;
+    esac
+}
+
+check-manager-role()
+{
+    test -n "${1}" || return 1
+    
+    case "${1}" in
+	master|backup)
+	    return 0
+	    ;;
+	*)
+	    return 1
+	    ;;
+    esac
+}
+
+check-file-password-protocol()
+{
+    test -n "${1}" || return 1
+    case "${1}" in
+	ftp|sftp)
+	    return 0
+	    ;;
+	*)
+	    return 1
+	    ;;
+    esac
+}
+
+check-file-io()
+{
+    test -n "${1}" || return 1
+    case "${1}" in
+	load|save)
+	    return 0
+	    ;;
+	*)
+	    return 1
+	    ;;
+    esac
+}
+
+check-file-protocol()
+{
+    test -n "${1}" || return 1
+    case "${1}" in
+	ftp|tftp|sftp)
+	    return 0
+	    ;;
+	*)
+	    return 1
+	    ;;
+    esac
+}
+
+check-action()
+{
+    test -n "${1}" || return 1
+
+    case "${1}" in
+        add|del|raz)
+            return 0
+            ;;
+        *)
+            return 1
+            ;;
+    esac
+}
+
+
+check-internal-action()
+{
+    test -n "${1}" || return 1
+    
+    case "${1:0:3}" in
+	add)
+	    case ${1} in
+		add|add:encrypted)
+		    return 0
+		    ;;
+		*)
+		    return 1
+		    ;;
+	    esac
+	    ;;
+	del|raz)
+	    return 0
+	    ;;
+	*)
+	    return 1
+	    ;;
+    esac
+}
+
+check-boolean()
+{
+    test -n "${1}" || return 1
+    
+    case "${1}" in
+	on|off)
+	    return 0
+	    ;;
+	*)
+	    return 1
+	    ;;
+    esac
+}
+
+check-web-protocol()
+{
+    test -n "${1}" || return 1
+
+    case "${1}" in
+	http|https)
+	    return 0
+	    ;;
+	*)
+	    return 11
+	    ;;
+    esac
+}
+
+check-rule-action()
+{
+    test -n "${1}" || return 1
+    
+    case "${1}" in
+	allow|deny)
+	    return 0
+	    ;;
+	*)
+	    return 1
+	    ;;
+    esac
+}
+
+check-port-nb1()
+{
+    test -n "${1}" || return 1
+    [[ "${1}" =~ (^[1-9][0-9]{0,4}|^0)$ ]] || return 3
+    return 0
+}
+
+check-high-port-nb()
+{
+    test -n "${1}" || return 1
+
+    check-port-nb1 ${1} || return 3
+    test ${1} -ge 1024 || return 5
+    test ${1} -le 49151 || return 7
+    return 0
+}
+
+check-service-port-nb()
+{
+    test -n "${1}" || return 1
+
+    check-port-nb1 ${1} || return 11
+    test ${1} -gt 0 || return 13
+    test ${1} -le 49151 || return 15
+    return 0
+}
+
+check-port-nb()
+{
+    test -n "${1}" || return 1
+    local port=${1}
+
+    check-port-nb1 ${port} || return 11
+    test ${port} -ge 0 || return 13
+    test ${port} -le 65535 || return 15
+
+    return 0
+}
+
+check-snmp-tls-port-nb()
+{
+    test -n "${1}" || return 1
+
+    test ${1} -ne 161 || return 11
+    test ${1} -ne 10161 || return 13
+    return 0
+}
+
+check-snmp-tls-trap-port-nb()
+{
+    test -n "${1}" || return 1
+
+    test ${1} -ne 162 || return 11
+    test ${1} -ne 10162 || return 13
+    return 0
+}
+
+check-percentage()
+{
+    test -n "${1}" || return 1
+
+    [[ "${1}" =~ ^[1-9][0-9]{0,2}$ ]] || return 11
+    test ${1} -le 100 || return 13
+
+    return 0
+}
+
+check-qos()
+{
+    test -n "${1}" || return 1
+    local qos=${1}
+
+    local len=${#qos} ; ((len--))
+    if test ${qos:${len}} == '%' ; then
+	check-percentage ${qos:0:${len}}
+    else
+	check-digit ${qos} || return 11
+	test ${qos} -gt 0
+	test ${qos} -le 1000000000
+    fi
+}
+
+check-vlan()
+{
+    test -n "${1}" || return 1
+
+    [[ "${1}" =~ (^[1-9][0-9]{0,3}|^0)$ ]] || return 11
+
+    test ${1} -ge 0 || return 13
+    test ${1} -le 4095 || return 15
+
+    return 0
+}
+
+check-filename()
+{
+    test -n "${1}" || return 1
+
+    test ${#1} -le ${MAX_FILENAME_LEN} || return 11
+    [[ "${1}" =~ ^.*$ ]] || return 13
+
+    return 0
+}
+
+check-weight()
+{
+    check-digit "${1}" || return 1
+    test ${1} -ge 0 -a ${1} -le 100
+}
+
+check-net-ip-address()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    local ip=${1}
+    local netmask=${2}
+
+    test ${ip} != 0.0.0.0 || return 0
+    test ${netmask} != 255.255.255.255 || return 0
+
+    local network=$(ipcalc -s ${ip} ${netmask} -n)
+    network=${network/NETWORK=/}
+
+    test ${network} == ${ip}
+}
+
+check-net-ip-prefix-address()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    local in_ip=${1}
+    local in_prefix=${2}
+
+    test ${in_prefix} != 32 -a ${in_prefix} != 31 || return 0
+
+    local network=$(ipcalc -s ${in_ip}/${in_prefix} -n)
+    network=${network/NETWORK=/}
+
+    test ${network} == ${in_ip}
+}
+
+check-prefix()
+{
+    test -n "${1}" || return 1
+    local pr=${1}
+
+    check-digit ${pr} || return 11
+    test ${#pr} -le 2
+
+    test ${pr} -ge 0 -a ${pr} -le 32 || return 13
+}
+
+check-mask-prefix()
+{
+    test -n "${1}" || return 1
+
+    check-digit ${1} || return 3
+    test ${1} -ge 0 -a ${1} -le 32
+}
+
+check-rule-ip-address()
+{
+    test -n "${1}" || return 1
+    local address=${1}
+
+    test ${address} != any || return 0
+
+    local ip=${address/\/*}
+    local prefix=${address/*\/}
+
+    if test "${prefix}" == ${address} ; then
+	check-ip ${ip} || return 12
+    else
+	check-ip ${ip} || return 12
+	check-mask-prefix ${prefix} || return 13
+	check-net-ip-prefix-address ${ip} ${prefix} || return 154
+    fi
+
+    return 0
+}
+
+check-ip-name()
+{
+    test -n "${1}" || return 1
+    check-ip ${1} || check-sitename ${1} || return 1
+
+    return 0
+}
+
+check-local-ip()
+{
+    test -n "${1}" || return 1
+    local ip=${1}
+
+    test "${ip:0:4}" != '127.'
+}
+
+check-tls-server-nb()
+{
+    local len=$(length-list "${TLS_SERVER_LIST}")
+    local max_tls
+
+    if contextual-command-is-allowed ; then
+	max_tls=$(get-contextual-rweb-nb)
+	((max_tls *= TLS_NB_FACTOR))
+    else
+	max_tls=8
+    fi
+
+    test ${len} -le ${max_tls}
+}
+
+get-rweb-unique-nb()
+{
+    local elt i=0 range
+    local name
+
+    local name_list nb=0
+
+    for elt in ${RWEB_SITE_LIST}
+    do
+	range=$[${i} % 5]
+	case ${range} in
+	    0)
+		name=${elt}
+		;;
+	    1|2|3)
+		;;
+	    4)
+		if ! member "${name_list}" ${name} ; then
+		    name_list="${name_list} ${name}"
+		    ((nb++))
+		fi
+		;;
+	    *)
+		echo 0
+		return 1
+		;;
+	esac
+	((i++))
+    done
+    
+    echo ${nb}
+    return 0
+}
+
+check-rweb-nb()
+{
+    local len=$(get-rweb-unique-nb)
+    local rweb_nb=$(get-contextual-rweb-nb)
+    test ${len} -lt ${rweb_nb}
+}
+
+check-tls-client-nb()
+{
+    local curs=$(ls -1d ${SSL_CLIENT_DIR}/*.cur 2> /dev/null) cur
+    local news=$(ls -1 ${SSL_CLIENT_DIR}/*.new 2> /dev/null) new
+    local dels=$(ls -1 ${SSL_CLIENT_DIR}/*.2del 2> /dev/null) del
+
+    local id len=0
+
+    for cur in ${curs}
+    do
+	id=${cur%\.cur}
+	test -f ${id}.new || ((len++))
+    done
+
+    for new in ${news}
+    do
+	id=${new%\.new}
+	test -d ${id}.cur || ((len++))
+    done
+
+    for del in ${dels}
+    do
+	((len--))
+    done
+
+    local users_nb=$(get-contextual-users-nb)
+    local max_tls=$[${TLS_NB_FACTOR} * ${users_nb}]
+    test ${len} -le ${max_tls} || return 90
+}
+
+
+check-vpn-auth-type()
+{
+    test -n "${1}" || return 1
+    local auth_type=${1}
+
+    case ${auth_type} in
+	psk|tls|eaptls)
+	    return 0
+	    ;;
+	*)
+	    return 1
+	    ;;
+    esac
+}
+
+check-encryption-algorithm()
+{
+    test -n "${1}" || return 1
+    local algorithm=${1}
+
+    case ${algorithm} in
+	aes128|aes192|aes256|aes128ctr|aes192ctr|aes256ctr)
+	    return 0
+	    ;;
+	*)
+	    return 1
+	    ;;
+    esac
+}
+
+check-integrity-algorithm()
+{
+    test -n "${1}" || return 1
+    local algorithm=${1}
+
+    case ${algorithm} in
+	sha1|sha256|sha384|sha512)
+	    return 0
+	    ;;
+	*)
+	    return 1
+	    ;;
+    esac
+}
+
+check-diffie-hellman-group()
+{
+    test -n "${1}" || return 1
+    local dh=${1}
+
+    case ${dh} in
+	modp1536|modp2048|modp3072|modp4096|modp6144|modp8192)
+	    return 0
+	    ;;
+	ecp192|ecp224|ecp256|ecp384|ecp521)
+	    return 0
+	    ;;
+	ecp224bp|ecp256bp|ecp384bp|ecp512bp)
+	    return 0
+	    ;;
+	*)
+	    return 1
+	    ;;
+    esac
+}
+
+check-mac()
+{
+    [[ "${1}" =~ ^[a-fA-F0-9]{2}(:[a-fA-F0-9]{2}){5}$ ]]
+}
+
+check-file-ip()
+{
+    test -n "${1}" || return 1
+    local ip=${1}
+
+    local list
+
+    case ${APL_ROLE} in
+	gateway)
+	    list=${CURRENT_ACCESS_FILE_LIST}
+	    ;;
+	manager)
+	    if is-in-manager-conf-context ; then
+		list=$(get-variable-value-from-file ${ROOT_DIR}${ADMIN_DIR}/${ENV_RDIR}/${ENV_CURRENT_NAME} CURRENT_ACCESS_FILE_LIST)
+	    else
+		list=${CURRENT_ACCESS_FILE_LIST}
+	    fi
+	    ;;
+	*)
+	    return 255
+	    ;;
+    esac
+
+    member-access-file "${list}" ${ip}
+}
+
+check-url()
+{
+    test -n "${1}" || return 1
+    local url=${1}
+    local app=${2}
+
+    local e=[st]?
+    case ${app} in
+	file)
+	    e="[st]?"
+	    ;;
+	web)
+	    ;;
+	*)
+	    ;;
+    esac
+
+    test ${#url} -le ${MAX_URL_LEN} || return 2
+
+    # URI RegExp: ([a-zA-Z0-9]|[\-._~:/?#@\!$&\(\)*+,;=]|\[|\]|%[a-fA-F0-9]{2})
+
+    ! [[ "${url}" =~ ^(${e}ftp|https?)://[a-zA-Z0-9](/([a-zA-Z0-9]|[\-._~:/?#@\!$&\(\)*+,;=]|\[|\]|%[a-fA-F0-9]{2})*)?$ ]] || return 0
+    [[ "${url}" =~ ^(${e}ftp|https?)://[a-zA-Z0-9][a-zA-Z0-9.\-]*[a-zA-Z0-9](/([a-zA-Z0-9]|[\-._~:/?#@\!$&\(\)*+,;=]|\[|\]|%[a-fA-F0-9]{2})*)?$ ]]
+}
+
+check-clear-password()
+{
+    test -n "${1}" || return 0
+    local passwd=${1}
+
+    test "${passwd:0:6}" == "clear:"
+}
+
+check-allowed-argument()
+{
+    test -n "${1}" || return 1
+    [[ "${1}" =~ ^[[:print:]]*$ ]] || return 11
+    [[ "${1}" =~ ^[^\"\']+$ ]] || return 13
+}
+
+check-allowed-argument-no-space()
+{
+    test -n "${1}" || return 1
+    [[ "${1}" =~ ^[[:print:]]*$ ]] || return 11
+    [[ "${1}" =~ ^[^[:space:]]+$ ]] || return 13
+    [[ "${1}" =~ ^[^\"\']+$ ]] || return 15
+}
+
+check-snmp-password-length()
+{
+    test -n "${1}" || return 1
+    test ${#1} -ge 12 -a ${#1} -le 32 || return 11
+}
+
+check-snmp-password()
+{
+    test -n "${1}" || return 1
+    [[ "${1}" =~ ^([a-zA-Z0-9]|[\-._~:/?#@\!$&\(\)*+,;=%]|\[|\])+$ ]] || return 11
+}
+
+check-ftp-login-name()
+{
+    test -n "${1}" || return 1
+
+    test ${#1} -le ${MAX_LEN} || return 11
+    [[ "${1}" =~ ^([a-zA-Z0-9]|[\-._~:/?#@\!$&\(\)*+,;=%]|\[|\])+$ ]] || return 13
+}
+
+check-file-password()
+{
+    test ${#1} -le ${MAX_LEN} || return 11
+    check-allowed-argument-no-space "${1}" || return 13
+}
+
+check-computer-name()
+{
+    test -n "${1}" || return 1
+    local len=${#1}
+    
+    test ${len} -lt 15 || return 11
+    [[ "${1}" =~ ^[a-zA-Z0-9]([a-zA-Z0-9\-])*$ ]] || return 13
+
+    local without_digit=$(printf "%s" "${1//[[:digit:]]/}")
+    test ${#without_digit} -gt 0 || return 15
+
+    ((len--))
+    test ${1:${len}} != '-' || return 17
+}
+
+check-hostname()
+{
+    test -n "${1}" || return 1
+    test ${#1} -le 63 || return 11
+    [[ "${1}" =~ ^[a-zA-Z0-9]([a-zA-Z0-9])*(\-([a-zA-Z0-9])+)*$ ]] || return 13
+}
+
+check-domainname()
+{
+    test -n "${1}" || return 1
+    test ${#1} -le ${MAX_LEN} || return 11
+    [[ "${1}" =~ ^[a-zA-Z0-9]([a-zA-Z0-9])*(\-([a-zA-Z0-9])+)*([.][a-zA-Z0-9]([a-zA-Z0-9])*(\-([a-zA-Z0-9])+)*)*$ ]] || return 13
+}
+
+check-sitename()
+{
+    test -n "${1}" || return 1
+    local fdn=${1}
+
+    local hostname=${fdn/.*}
+    local domainname=${fdn#*.}
+
+    test "${hostname}" != "${domainname}" || return 3
+
+    check-hostname "${hostname}" || return 5
+    check-domainname "${domainname}" || return 7
+}
+
+check-wildcard-sitename()
+{
+    test -n "${1}" || return 1
+    test ${#1} -le ${MAX_LEN} || return 11
+    [[ "${1}" =~ ^[a-zA-Z0-9*]([a-zA-Z0-9])*(\-([a-zA-Z0-9])+)*([.][a-zA-Z0-9*]([a-zA-Z0-9])*(\-([a-zA-Z0-9])+)*)*$ ]] || return 13
+}
+
+check-integer()
+{
+    check-digit ${1} || return 11
+    test ${#1} -le 23 || return 13
+
+    local max
+
+    ((max = (2**63) - 1))
+
+    test ${1} -le ${max} || return 15
+}
+
+check-country-code()
+{
+    test -n "${1}" || return 1
+    local in_code=${1}
+    
+    while read code name
+    do
+	test -n "${code}" || continue
+	test "${code}" != "${in_code}" || return 0
+    done < ${APPLIANCE_DIR}/etc/countries
+    return 1
+}
+
+check-email-username()
+{
+    test -n "${1}" || return 1
+    test ${#1} -le ${MAX_LEN} || return 11
+    [[ "${1}" =~ ^([a-zA-Z0-9_@\.-])+$ ]] || return 13
+}
+
+check-email-name()
+{
+    test -n "${1}" || return 0
+    test ${#1} -le ${MAX_LEN} || return 11
+    [[ "${1}" =~ ^([a-zA-Z0-9_ -])+$ ]] || return 13
+}
+
+check-email-account()
+{
+    test -n "${1}" || return 1
+    test ${#1} -le ${MAX_LEN} || return 11
+    [[ "${1}" =~ ^([a-zA-Z0-9_\-]|[.])+$ ]] || return 13
+}
+
+check-email()
+{
+    test -n "${1}" || return 1
+    local email=${1}
+
+    test ${#email} -le ${MAX_LEN} || return 11
+    [[ "${email}" =~ ^.+*@.+$ ]] || return 13
+
+    local account=${email/@*}
+    local domainname=${email/*@}
+
+    check-domainname "${domainname}" || return 15
+    check-email-account "${account}" || return 17
+
+    return 0
+}
+
+check-distinguished-name()
+{
+    [[ "${1}" =~ ^([^,=\;\<\>]+=[^,]*)(,[^,=\;\<\>]+=[^,]*)*$ ]]
+}
+
+check-ldap-dn()
+{
+    test ${#1} -le ${MAX_LDAP_DN_LEN} || return 11
+    check-allowed-argument "${1}" || return 13
+    check-distinguished-name "${1}" || return 15
+}
+
+check-ldap-dn-no-space()
+{
+    test ${#1} -le ${MAX_LDAP_DN_LEN} || return 11
+    check-allowed-argument-no-space "${1}" || return 13
+    check-distinguished-name "${1}" || return 15
+}
+
+check-ike-eap-id()
+{
+    test -n "${1}" || return 1
+    test ${#1} -le ${MAX_IKE_ID_LEN} || return 11
+    check-allowed-argument "${1}" || return 13
+    ! [[ "${1}" =~ ^([a-zA-Z0-9]|\-|_|@|\.)+$ ]] || return 0
+    check-distinguished-name "${1}" || return 15
+}
+
+check-ldap-filter-1()
+{
+    [[ "${1}" =~ ^[[:print:]]+$ ]] || return 31
+    test "${1/=}" != "${1}" || return 33
+}
+
+check-ldap-filter()
+{
+    test ${#1} -le ${MAX_LDAP_FILTER_LEN} || return 13
+    check-allowed-argument "${1}" || return 11
+    check-ldap-filter-1 "${1}"
+}
+
+check-ldap-filter-no-space()
+{
+    test ${#1} -le ${MAX_LDAP_FILTER_LEN} || return 11
+    check-allowed-argument-no-space "${1}" || return 13
+    check-ldap-filter-1 "${1}"
+}
+
+check-ldap-attr()
+{
+    test ${#1} -le ${MAX_LEN} || return 11
+    check-allowed-argument-no-space "${1}" || return 13
+    [[ "${1}" =~ ^[[:print:]]+$ ]] || return 15
+    [[ "${1}" =~ ^[^,=\;\<\>]+$ ]] || return 17
+}
+
+check-ldap-value()
+{
+    test -n "${1}" || return 0
+    test ${#1} -le ${MAX_LEN} || return 11
+    [[ "${1}" =~ ^[[:print:]]*$ ]] || return 13
+    [[ "${1}" =~ ^[^\"\']+$ ]] || return 15
+}
+
+check-traffic-log-type()
+{
+    test -n "${1}" || return 1
+    case "${1}" in
+	firewall|guard|waf|antivirus|avserver|web|rweb)
+	    return 0
+	    ;;
+	*)
+	    return 1
+	    ;;
+    esac
+}
+
+check-log-type()
+{
+    test -n "${1}" || return 1
+    test "${1}" != vpnipsec || return 0
+    test "${1}" != system || return 0
+    check-traffic-log-type ${1}
+}
+
+check-password()
+{
+    local password=${1}
+
+    [[ ${#password} -ge 16 && ${#password} -le 32 && "${password}" == *[A-Z]* && "${password}" == *[a-z]* && "${password}" == *[0-9]* && "${password}" == *[\!@#%.\$\&*-]* ]]
+}
+
+check-external-password-length()
+{
+    test ${#1} -le ${MAX_LEN}
+}
+
+check-psk()
+{
+    password=${1}
+
+    test ${#password} -ge 32 || return 1
+    test ${#password} -le 64 || return 3
+    [[ "${password}" =~ ^[^\ ]*$ ]] || return 5
+}
+
+check-vpn-id-type()
+{
+    test -n "${1}" || return 1
+
+    case "${1}" in
+	dn|fqdn)
+	    return 0
+	    ;;
+	*)
+	    return 1
+	    ;;
+    esac
+}
+
+check-ha-role()
+{
+    test -n "${1}" || return 1
+    
+    case "${1}" in
+	master|backup)
+	    return 0
+	    ;;
+	*)
+	    return 1
+	    ;;
+    esac
+}
+
+check-priority()
+{
+    test -n "${1}" || return 1
+    test ${#1} -le 3 || return 11
+
+    check-digit ${1} || return 13
+
+    test ${1} -ge 0 || return 21
+    test ${1} -le 255 || return 23
+}
+
+check-file-exclusion()
+{
+    local exclusions=${@}
+
+    local role=$(get-contextual-role) exclusion
+
+    case ${role} in
+	gateway)
+	    for exclusion in ${exclusions}
+	    do
+		case ${exclusion} in
+		    admin.snmp.certificate|admin.ssh.key|antivirus.whitelist.signature|tls.ca.system|tls.ca.third|tls.client|tls.server|waf.rweb.custom)
+			return 0
+			;;
+		    *)
+			return 1
+			;;
+		esac
+	    done
+	    ;;
+	manager)
+	    for exclusion in ${exclusions}
+	    do
+		case ${exclusion} in
+		    admin.snmp.certificate|admin.ssh.key|manager.ssh|tls.server|tls.ca.third|tls.server)
+			return 0
+			;;
+		    *)
+			return 1
+			;;
+		esac
+	    done
+	    ;;
+	*)
+	    :;
+    esac
+}
+
+check-manager-ssh-key-type()
+{
+    test -n "${1}" || return 1
+
+    case "${1}" in
+	private|public)
+	    return 0
+	    ;;
+	*)
+	    return 11
+	    ;;
+    esac
+}
+
+check-uuid()
+{
+    [[ "${1}" =~ ^[0-9a-z]{8}-[0-9a-z]{4}-[0-9a-z]{4}-[0-9a-z]{4}-[0-9a-z]{12} ]]
+}
+
+check-reference()
+{
+    local reference=${1}
+
+    [[ "${reference}" =~ ^[[:print:]]+$ ]] || return 11
+    [[ "${reference}" =~ ^[[:print:]]+:(gateway|manager):[[:print:]]+,[[:digit:]]+:[[:digit:]]+$ ]] || return 13
+
+    local passport=${reference/,*}
+    local uuid=${passport/*:}
+    check-uuid "${uuid}" || return 15
+
+    return 0
+}

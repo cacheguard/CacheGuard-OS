@@ -1,0 +1,266 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       Commands
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+source functions
+
+manager-gateway-local-exec-report()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    test -n "${3}" || return 3
+    local id=${1}
+    local ip=${2}
+    local message=${3}
+
+    manager-report ${MANAGER_LOCAL_EXEC_OPERATION_LOG} ${id} ${ip} 0 "${message}"
+}
+
+manager-gateway-remote-exec-report()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    test -n "${3}" || return 3
+    local id=${1}
+    local ip=${2}
+    local message=${3}
+
+    manager-report ${MANAGER_REMOTE_EXEC_OPERATION_LOG} ${id} ${ip} 0 "${message}"
+}
+
+manager-template-exec-report()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    test -n "${3}" || return 3
+    local id=${1}
+    local ip=${2}
+    local message=${3}
+
+    manager-report ${MANAGER_TEMPLATE_EXEC_OPERATION_LOG} ${id} ${ip} 0 "${message}"
+}
+
+run-commands-in-exec-context()
+{
+    local in_context=${1}
+    local in_command
+    local context place in_domain id ip
+
+    if test -n "${in_context}" ; then
+	shift
+	in_command=${@}
+	test -n "${in_command}" || return 0
+	local tmp_context_file=${ADMIN_TMP_DIR}/exec.context.${$}
+	echo ${in_context//:/ } > ${tmp_context_file}
+	read context place in_domain id ip < ${tmp_context_file}
+	rm -f ${tmp_context_file}
+    else
+	test -f ${HOME}/${MANAGER_EXEC_CONTEXT_FILE} || return 104
+	test -s ${HOME}/${MANAGER_EXEC_COMMANDS_FILE} || return 0
+
+	read context place in_domain id ip < ${MANAGER_EXEC_CONTEXT_FILE}
+    fi
+
+    local ips ids n i=0
+    declare -a ips ids
+
+    local command commands
+
+    test -n "${place}" || return 255
+
+    case ${context} in
+	gateway)
+	    test -z "${id}" || test -n "${ip}" || return 255
+	    test -f ${MANAGER_GATEWAY_INDEX} || return 104
+	    ;;
+	template)
+	    local dir=$(get-manager-context-rdir template)
+	    local templates=$(ls -1 ${dir} 2> /dev/null)
+	    test -n "${templates}" || return 104
+	    ;;
+	*)
+	    return 255
+	    ;;
+    esac
+
+    if test ${place} == remote ; then
+	if test -n "${in_context}" ; then
+	    commands=${in_command}
+	else
+	    while read command
+	    do
+		commands="${commands}&& ${command}"
+	    done < ${HOME}/${MANAGER_EXEC_COMMANDS_FILE}
+	    commands=${commands:3}
+	fi
+    fi
+
+    if test -n "${id}" ; then
+	ids[${i}]=${id}
+	ips[${i}]=${ip}
+	((i++))
+	n=${i}
+    else
+	case ${context} in
+	    gateway)
+		local uuid domain
+		while read uuid domain id ip
+		do
+		    test -n "${ip}" || continue
+
+		    if test -z "${in_domain}" -o ${domain} == "${in_domain}" ; then
+			ids[${i}]=${id}
+			ips[${i}]=${ip}
+		    fi
+		    ((i++))
+		done < ${MANAGER_GATEWAY_INDEX}
+		n=${i}
+		test ${n} -gt 0 || return 104
+		;;
+	    template)
+		for id in ${templates}
+		do
+		    ids[${i}]=${id}
+		    ((i++))
+		done
+		n=${i}
+		test ${n} -gt 0 || return 104
+		;;
+	    *)
+		return 255
+		;;
+	esac
+    fi
+
+    case ${context} in
+	template)
+	    reset-manager-template-exec-report
+	    for ((i=0 ; i<n ; i++))
+	    do
+		id=${ids[${i}]}
+
+		manager-template-exec-report ${id} - "Begin execution on '${id}' ($[${i} + 1]/${n})"
+		run-command-in-context template ${id} "${in_command}" > ${MANAGER_TEMPLATE_EXEC_OPERATION_LOG}.${id}.out 2> ${MANAGER_TEMPLATE_EXEC_OPERATION_LOG}.${id}.err
+	    done
+	    ;;
+	gateway)
+	    case ${place} in
+		local)
+		    reset-manager-gateway-local-exec-report
+		    for ((i=0 ; i<n ; i++))
+		    do
+			id=${ids[${i}]}
+			ip=${ips[${i}]}
+
+			manager-gateway-local-exec-report ${id} ${ip} "Begin execution on '${id}' ($[${i} + 1]/${n})"
+			run-command-in-context gateway ${id} "${in_command}" > ${MANAGER_LOCAL_EXEC_OPERATION_LOG}.${id}.out 2> ${MANAGER_LOCAL_EXEC_OPERATION_LOG}.${id}.err
+		    done
+		    ;;
+		remote)
+		    reset-manager-gateway-remote-exec-report
+		    for ((i=0 ; i<n ; i++))
+		    do
+			id=${ids[${i}]}
+			ip=${ips[${i}]}
+
+			manager-gateway-remote-exec-report ${id} ${ip} "Begin execution on '${id}' ($[${i} + 1]/${n})"
+			run-command-on-gateway ${ip} "system internal batch" background > ${MANAGER_REMOTE_EXEC_OPERATION_LOG}.${id}.remote-batch 2> /dev/null
+			run-command-on-gateway ${ip} "${commands}" background > ${MANAGER_REMOTE_EXEC_OPERATION_LOG}.${id}.out 2> ${MANAGER_REMOTE_EXEC_OPERATION_LOG}.${id}.err
+		    done
+		    ;;
+		*)
+		    ;;
+	    esac
+	    ;;
+	*)
+	    return 255
+	    ;;
+    esac
+}
+
+end-manager()
+{
+    local key=${1}
+
+    if test -n "${key}" ; then
+
+	case ${key} in
+	    cancel)
+		;;
+	    internal)
+		local op=${2}
+		case ${op} in
+		    'exec')
+			local context=${3}
+			test -n "${context}" || return 0
+			shift ; shift ; shift
+			TERM='' run-commands-in-exec-context ${context} ${@}
+			;;
+		    *)
+			return 0
+			;;
+		esac
+		;;
+	    *)
+		return 1
+		;;
+	esac
+    else
+	key=do
+    fi
+
+    if is-in-manager-conf-context ; then
+	test ${key} == cancel || cli-end-manager-conf-context
+    elif is-in-manager-exec-context ; then
+	if test ${key} == cancel ; then
+	    end-manager-exec-context
+	else
+	    if is-usage-allowed ; then
+		run-commands-in-exec-context
+		end-manager-exec-context
+	    else
+		end-manager-exec-context
+		return 155
+	    fi
+	fi
+    fi
+}
+
+run()
+{
+    test -z "${TRANSACTION}" || return 106
+
+    case ${APL_ROLE} in
+	gateway)
+	    return 0
+	    ;;
+	manager)
+	    end-manager "${@}"
+	    ;;
+	*)
+	    return 255
+	    ;;
+    esac
+}
+
+main __noenv "${@}"

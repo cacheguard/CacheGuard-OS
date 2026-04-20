@@ -1,0 +1,15 @@
+LoadModule access_compat_module _Web_Server_Dir_/libexec/mod_access_compat.so
+LoadModule alias_module _Web_Server_Dir_/libexec/mod_alias.so
+LoadModule authz_core_module _Web_Server_Dir_/libexec/mod_authz_core.so
+LoadModule authz_host_module _Web_Server_Dir_/libexec/mod_authz_host.so
+LoadModule cgi_module _Web_Server_Dir_/libexec/mod_cgi.so
+LoadModule dir_module _Web_Server_Dir_/libexec/mod_dir.so
+LoadModule headers_module _Web_Server_Dir_/libexec/mod_headers.so
+LoadModule log_config_module _Web_Server_Dir_/libexec/mod_log_config.so
+LoadModule mime_module _Web_Server_Dir_/libexec/mod_mime.so
+LoadModule rewrite_module _Web_Server_Dir_/libexec/mod_rewrite.so
+LoadModule socache_shmcb_module _Web_Server_Dir_/libexec/mod_socache_shmcb.so
+LoadModule setenvif_module _Web_Server_Dir_/libexec/mod_setenvif.so
+LoadModule unixd_module _Web_Server_Dir_/libexec/mod_unixd.so
+LoadModule unique_id_module _Web_Server_Dir_/libexec/mod_unique_id.so
+LoadModule security2_module _Web_Server_Dir_/libexec/mod_security2.so

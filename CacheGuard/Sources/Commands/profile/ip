@@ -1,0 +1,322 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       Commands
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+__complete-ip()
+{
+    test -n "${COMP_CWORD-1}" || return 1
+
+    case ${COMP_CWORD} in
+	1)
+	    case ${COMP_WORDS[1]} in
+		i|'in'|int|inte|inter|intern|interna|internal)
+		    COMPREPLY=(internal)
+		    ;;
+		e|ex|ext|exte|exter|extern|externa|external)
+		    COMPREPLY=(external)
+		    ;;
+		a|au|aux|auxi|auxil|auxili|auxilia|auxiliar|auxiliary)
+		    COMPREPLY=(auxiliary)
+		    ;;
+		n)
+		    COMPREPLY=('' name neighbour)
+		    ;;
+		na|nam|name)
+		    COMPREPLY=(name)
+		    ;;
+		ne|nei|neig|neigh|neighb|neighbo|neighbou|neighbour)
+		    COMPREPLY=(neighbour)
+		    ;;
+		r|ro|rou|rout|route)
+		    COMPREPLY=(route)
+		    ;;
+		v)
+		    COMPREPLY=('' '<RET>' via vlan)
+		    ;;
+		vl|vla|vlan|vlan)
+		    COMPREPLY=(vlan)
+		    ;;
+		vi|via)
+		    COMPREPLY=(via)
+		    ;;
+		'')
+		    COMPREPLY=('' '<RET>' internal 'internal.<vlan-id>' external auxiliary name route vlan neighbour via)
+		    ;;
+		*)
+		    COMPREPLY=()
+		    ;;
+	    esac
+	    ;;
+	2)
+	    case ${COMP_WORDS[1]} in
+		internal|external|auxiliary)
+		    COMPREPLY=('' '<RET>' '<ip>')
+		    ;;
+		name|via)
+		    case ${COMP_WORDS[2]} in
+			a|ad|add)
+			    COMPREPLY=(add)
+			    ;;
+			d|de|del)
+			    COMPREPLY=(del)
+			    ;;
+			r|ra|raz)
+			    COMPREPLY=(raz)
+			    ;;
+			'')
+			    COMPREPLY=('' '<RET>' add del raz)
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		route)
+		    case ${COMP_WORDS[2]} in
+			r|ra|raz)
+			    COMPREPLY=(raz)
+			    ;;
+			a|ad|add)
+			    COMPREPLY=(add)
+			    ;;
+			d|de|del)
+			    COMPREPLY=(del)
+			    ;;
+			i|"in"|ins|inse|inser|insert|insert:)
+			    COMPREPLY=(insert:)
+			    ;;
+			m|mo|mov|move|move:)
+			    COMPREPLY=(move:)
+			    ;;
+			'')
+			    COMPREPLY=('' '<RET>' add 'add:<network-ip>/<network-mask>:<gateway-ip>' 'insert:<network-ip>/<network-mask>:<gateway-ip>' 'move:<position>' 'move:(-|+)<network-ip>/<network-mask>:<gateway-ip>' del raz)
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		*)
+		    ;;
+	    esac
+
+	    if test ${COMP_WORDS[1]:0:9} == "internal." ; then
+		COMPREPLY=('' '<RET>' '<ip>')
+	    fi
+	    ;;
+	
+	3)
+	    case ${COMP_WORDS[1]} in
+		internal|external|auxiliary)
+		    COMPREPLY=('' '<RET>' '<network-mask>')
+		    ;;
+		route)
+		    if test ${COMP_WORDS[2]} == add -o \
+			${COMP_WORDS[2]} == del -o \
+			${COMP_WORDS[2]:0:4} == "add:" -o \
+			${COMP_WORDS[2]:0:5} == "move:" -o \
+			${COMP_WORDS[2]:0:7} == "insert:" ; then
+			
+			case ${COMP_WORDS[3]} in
+			    d|de|def|defa|defau|defaul|default)
+				COMPREPLY=(default)
+				;;
+			    '')
+				COMPREPLY=('' '<network-ip>' 'default')
+				;;
+			    *)
+				COMPREPLY=()
+				;;
+			esac
+		    else
+			COMPREPLY=()
+		    fi
+		    ;;
+		via)
+		    case ${COMP_WORDS[2]} in
+			add|del)
+			    COMPREPLY=('' '<gateway-ip>')
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		name)
+		    case ${COMP_WORDS[2]} in
+			add|del)
+			    COMPREPLY=('' '<name>')
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		*)
+		    ;;
+	    esac
+	    
+	    if test ${COMP_WORDS[1]:0:9} == "internal." ; then
+		COMPREPLY=('' '<RET>' '<network-mask>')
+	    fi
+	    ;;
+	
+	4)
+	    case ${COMP_WORDS[1]} in
+		route)
+		    if test ${COMP_WORDS[2]} == add -o \
+			${COMP_WORDS[2]} == del -o \
+			${COMP_WORDS[2]:0:4} == "add:" -o \
+			${COMP_WORDS[2]:0:7} == "insert:" ; then
+			
+			if test ${COMP_WORDS[3]} == default ; then
+			    COMPREPLY=('' '<gateway-ip>')
+			else
+			    COMPREPLY=('' '<network-mask>')
+			fi
+		    else
+			COMPREPLY=()
+		    fi
+		    ;;
+		name)
+		    case ${COMP_WORDS[2]} in
+			add)
+			    COMPREPLY=('' '<ip>')
+			    ;;
+		    esac
+		    ;;
+		via)
+		    case ${COMP_WORDS[2]} in
+			add)
+			    case ${COMP_WORDS[4]} in
+				m|ma|mas|mast|maste|master)
+				    COMPREPLY=(master)
+				    ;;
+				b|ba|bac|back|backu|backup)
+				    COMPREPLY=(backup)
+				    ;;
+				'')
+				    COMPREPLY=('' 'master' 'backup')
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+
+		*)
+		    COMPREPLY=()
+		    ;;
+	    esac
+	    ;;
+	5)
+	    case ${COMP_WORDS[1]} in
+		route)
+		    if test ${COMP_WORDS[2]} == add -o \
+			${COMP_WORDS[2]} == del -o \
+			${COMP_WORDS[2]:0:4} == "add:" -o \
+			${COMP_WORDS[2]:0:7} == "insert:" ; then
+
+			if test ${COMP_WORDS[3]} == default ; then
+			    COMPREPLY=('' '<RET>' '<balance-weight>')
+			else
+			    COMPREPLY=('' '<gateway-ip>')
+			fi
+		    else
+			COMPREPLY=()
+		    fi
+		    ;;
+		via)
+		    case ${COMP_WORDS[2]} in
+			add)
+			    case ${COMP_WORDS[4]} in
+				master|backup)
+				    COMPREPLY=('' '<RET>' '<priority>')
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		*)
+		    COMPREPLY=()
+		    ;;
+	    esac
+	    ;;
+	6)
+	    case ${COMP_WORDS[1]} in
+		route)
+		    if test ${COMP_WORDS[2]} == add -o \
+			${COMP_WORDS[2]:0:4} == "add:" -o \
+			${COMP_WORDS[2]:0:7} == "insert:" ; then
+
+			if test ${COMP_WORDS[3]} == default ; then
+			    COMPREPLY=('' '<RET>' '<pinged-server>')
+			else
+			    COMPREPLY=('' '<RET>' '<balance-weight>')
+			fi
+		    else
+			COMPREPLY=()
+		    fi
+		    ;;
+		*)
+		    COMPREPLY=()
+		    ;;
+	    esac
+	    ;;
+	7)
+	    case ${COMP_WORDS[1]} in
+		route)
+		    if test ${COMP_WORDS[2]} == add -o \
+			${COMP_WORDS[2]:0:4} == "add:" -o \
+			${COMP_WORDS[2]:0:7} == "insert:" ; then
+
+			if test ${COMP_WORDS[3]} == default ; then
+			    COMPREPLY=()
+			else
+			    COMPREPLY=('' '<RET>' '<pinged-server>')
+			fi
+		    else
+			COMPREPLY=()
+		    fi
+		    ;;
+		*)
+		    COMPREPLY=()
+		    ;;
+	    esac
+	    ;;
+	*)
+	    COMPREPLY=()
+	    ;;
+    esac
+}

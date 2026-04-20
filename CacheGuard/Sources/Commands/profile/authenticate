@@ -1,0 +1,593 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       Commands
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+__complete-authenticate()
+{
+    test -n "${COMP_CWORD-1}" || return 1
+
+    case ${COMP_CWORD} in
+	1)
+	    case ${COMP_WORDS[1]} in
+		w|we|web)
+		    COMPREPLY=(web)
+		    ;;
+		r|rw|rwe|rweb)
+		    COMPREPLY=(rweb)
+		    ;;
+		m|mo|mod|mode)
+		    COMPREPLY=(mode)
+		    ;;
+		l|ld|lda|ldap)
+		    COMPREPLY=(ldap)
+		    ;;
+		ldaps)
+		    COMPREPLY=(ldaps)
+		    ;;
+		k|ke|ker|kerb|kerbe|kerber|kerbero|kerberos)
+		    COMPREPLY=(kerberos)
+		    ;;
+		a|ad)
+		    COMPREPLY=(ad)
+		    ;;
+		'')
+		    COMPREPLY=('' '<RET>' ad web rweb mode ldap ldaps kerberos)
+		    ;;
+		*)
+		    COMPREPLY=()
+		    ;;
+	    esac
+	    ;;
+	2)
+	    case ${COMP_WORDS[1]} in
+		ad)
+		    case ${COMP_WORDS[2]} in
+			r|rd|rdn)
+			    COMPREPLY=(rdn)
+			    ;;
+			'')
+			    COMPREPLY=('' '<RET>' rdn)
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		web|rweb)
+		    case ${COMP_WORDS[2]} in
+			o)
+			    COMPREPLY=('' on off)
+			    ;;
+			of|off)
+			    COMPREPLY=(off)
+			    ;;
+			on)
+			    COMPREPLY=(on)
+			    ;;
+			'')
+			    COMPREPLY=('' '<RET>' on off)
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		mode)
+		    case ${COMP_WORDS[2]} in
+			l|ld|lda|ldap)
+			    COMPREPLY=(ldap)
+			    ;;
+			k|ke|ker|kerb|kerbe|kerber|kerbero|kerberos)
+			    COMPREPLY=(kerberos)
+			    ;;
+			'')
+			    COMPREPLY=('' '<RET>' ldap kerberos)
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		ldap)
+		    case ${COMP_WORDS[2]} in
+			s|se|ser|serv|serve|server)
+			    COMPREPLY=(server)
+			    ;;
+			r|re|req|requ|reque|reques|request)
+			    COMPREPLY=(request)
+			    ;;
+			b|bi|bin|bind|bindd|binddn)
+			    COMPREPLY=(binddn)
+			    ;;
+			t|te|tes|"test")
+			    COMPREPLY=("test")
+			    ;;
+			'')
+			    COMPREPLY=('' '<RET>' server request binddn test)
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		ldaps)
+		    case ${COMP_WORDS[2]} in
+			c|ca)
+			    COMPREPLY=(ca)
+			    ;;
+			'')
+			    COMPREPLY=('' '<RET>' 'ca')
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		kerberos)
+		    case ${COMP_WORDS[2]} in
+			c|cr|cre|crea|creat|create)
+			    COMPREPLY=(create)
+			    ;;
+			e|en|enc|encr|encry|encryp|encrypt)
+			    COMPREPLY=(encrypt)
+			    ;;
+			h|ha|hap|hapa|hapas|hapass|hapassw|hapasswo|hapasswor|hapassword)
+			    COMPREPLY=(hapassword)
+			    ;;
+			w|we|web)
+			    COMPREPLY=(web)
+			    ;;
+			r)
+			    COMPREPLY=('' report rweb)
+			    ;;
+			re|rep|repo|repor|report)
+			    COMPREPLY=(report)
+			    ;;
+			rw|rwe|rweb)
+			    COMPREPLY=(rweb)
+			    ;;
+			s|se|ser|serv|serve|server)
+			    COMPREPLY=(server)
+			    ;;
+			'')
+			    COMPREPLY=('' '<RET>' create encrypt hapassword report rweb server web)
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		*)
+		    COMPREPLY=()
+		    ;;
+	    esac
+	    ;;
+	3)
+	    case ${COMP_WORDS[1]} in
+		ad)
+		    case ${COMP_WORDS[2]} in
+			rdn)
+			    COMPREPLY=('' '<RET>' "'<relative-dn>'")
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		mode)
+		    case ${COMP_WORDS[2]} in
+			ldap|kerberos)
+			    case ${COMP_WORDS[3]} in
+				o)
+				    COMPREPLY=('' on off)
+				    ;;
+				of|off)
+				    COMPREPLY=(off)
+				    ;;
+				on)
+				    COMPREPLY=(on)
+				    ;;
+				'')
+				    COMPREPLY=('' '<RET>' on off)
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		ldap)
+		    case ${COMP_WORDS[2]} in
+			server)
+			    case ${COMP_WORDS[3]} in
+				r|ra|raz)
+				    COMPREPLY=(raz)
+				    ;;
+				a|ad|add)
+				    COMPREPLY=(add)
+				    ;;
+				d|de|del)
+				    COMPREPLY=(del)
+				    ;;
+				'')
+				    COMPREPLY=('' '<RET>' add del raz)
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			request)
+			    COMPREPLY=('' '<RET>' "'<users-base-dn>'")
+			    ;;
+			binddn)
+			    COMPREPLY=('' '<RET>' "'<dn>'")
+			    ;;
+			'test')
+			    COMPREPLY=('' '<RET>' '<login-name>')
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		ldaps)
+		    case ${COMP_WORDS[2]} in
+			ca)
+			    case ${COMP_WORDS[3]} in
+				r|ra|raz)
+				    COMPREPLY=(raz)
+				    ;;
+				s|se|'set')
+				    COMPREPLY=('set')
+				    ;;
+				'')
+				    COMPREPLY=('' '<RET>' set raz)
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		kerberos)
+		    case ${COMP_WORDS[2]} in
+			create)
+			    COMPREPLY=('' '<admin-user>')
+			    ;;
+			encrypt)
+			    case ${COMP_WORDS[3]} in
+				a|ae|aes)
+				    COMPREPLY=(aes)
+				    ;;
+				d|de|des)
+				    COMPREPLY=(des)
+				    ;;
+				'')
+				    COMPREPLY=('' '<RET>' aes des)
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			hapassword)
+			    COMPREPLY=('' '<RET>' '<shared-password>')
+			    ;;
+			web)
+			    COMPREPLY=('' '<RET>' '<canonical-name>')
+			    ;;
+			rweb|server)
+			    case ${COMP_WORDS[3]} in
+				r|ra|raz)
+				    COMPREPLY=(raz)
+				    ;;
+				a|ad|add)
+				    COMPREPLY=(add)
+				    ;;
+				d|de|del)
+				    COMPREPLY=(del)
+				    ;;
+				'')
+				    COMPREPLY=('' '<RET>' add del raz)
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		*)
+		    COMPREPLY=()
+		    ;;
+	    esac
+	    ;;
+	4)
+	    case ${COMP_WORDS[1]} in
+		kerberos)
+		    case ${COMP_WORDS[2]} in
+			create)
+			    COMPREPLY=('' '<admin-password>' '<RET>')
+			    ;;
+
+			rweb)
+			    case ${COMP_WORDS[3]} in
+				add|del)
+				    COMPREPLY=('' '<site-name>')
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			server)
+			    case ${COMP_WORDS[3]} in
+				add|del)
+				    COMPREPLY=('' '<kerberos-server>')
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		ldap)
+		    case ${COMP_WORDS[2]} in
+			server)
+			    case ${COMP_WORDS[3]} in
+				add|del)
+				    case ${COMP_WORDS[4]} in
+					l|ld|lda|ldap)
+					    COMPREPLY=(ldap)
+					    ;;
+					ldaps)
+					    COMPREPLY=(ldaps)
+					    ;;
+					s|sl|sld|slda|sldap)
+					    COMPREPLY=(sldap)
+					    ;;
+					'')
+					    COMPREPLY=('' '<RET>' ldap ldaps sldap)
+					    ;;
+					*)
+					    COMPREPLY=()
+					    ;;
+				    esac
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			request)
+			    COMPREPLY=('' '<login-attr>')
+			    ;;
+			binddn)
+			    case ${COMP_WORDS[4]} in
+				o)
+				    COMPREPLY=('' on off)
+				    ;;
+				of|off)
+				    COMPREPLY=(off)
+				    ;;
+				on)
+				    COMPREPLY=(on)
+				    ;;
+				'')
+				    COMPREPLY=('' '<RET>' on off)
+				    ;;
+			    esac
+			    ;;
+			'test')
+			    COMPREPLY=('' '<RET>' '<password>')
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		ldaps)
+		    case ${COMP_WORDS[2]} in
+			ca)
+			    case ${COMP_WORDS[3]} in
+				'set')
+				    COMPREPLY=('' '<RET>' '<ca-id>')
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		*)
+		    COMPREPLY=()
+		    ;;
+	    esac
+	    ;;
+	5)
+	    case ${COMP_WORDS[1]} in
+		kerberos)
+		    case ${COMP_WORDS[2]} in
+			rweb)
+			    case ${COMP_WORDS[3]} in
+				add)
+				    COMPREPLY=('' '<canonical-name>')
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			create)
+			    case ${COMP_WORDS[5]} in
+				w|wa|wai|wait)
+				    COMPREPLY=(wait)
+				    ;;
+				'')
+				    COMPREPLY=('' '<RET>' wait)
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		ldap)
+		    case ${COMP_WORDS[2]} in
+			server)
+			    case ${COMP_WORDS[3]} in
+				add|del)
+				    case ${COMP_WORDS[4]} in
+					ldap|ldaps|sldap)
+					    COMPREPLY=('' '<server-name>')
+					    ;;
+					*)
+					    COMPREPLY=()
+					    ;;
+				    esac
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			request)
+			    COMPREPLY=('' '<RET>' '<password-attr>')
+			    ;;
+			binddn)
+			    case ${COMP_WORDS[4]} in
+				on)
+				    COMPREPLY=('' '<RET>' '<password>')
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		*)
+		    COMPREPLY=()
+		    ;;
+	    esac
+	    ;;
+	6)
+	    case ${COMP_WORDS[1]} in
+		ldap)
+		    case ${COMP_WORDS[2]} in
+			server)
+			    case ${COMP_WORDS[3]} in
+				add|del)
+				    case ${COMP_WORDS[4]} in
+					ldap|ldaps|sldap)
+					    COMPREPLY=('' '<ip>')
+					    ;;
+					*)
+					    COMPREPLY=()
+					    ;;
+				    esac
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			request)
+			    COMPREPLY=('' '<RET>' "'<filter>'")
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		*)
+		    COMPREPLY=()
+		    ;;
+	    esac
+	    ;;
+	7)
+	    case ${COMP_WORDS[1]} in
+		ldap)
+		    case ${COMP_WORDS[2]} in
+			server)
+			    case ${COMP_WORDS[3]} in
+				add|del)
+				    case ${COMP_WORDS[4]} in
+					ldap|ldaps|sldap)
+					    COMPREPLY=('' '<RET>' '<port-number>')
+					    ;;
+					*)
+					    COMPREPLY=()
+					    ;;
+				    esac
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			request)
+			    COMPREPLY=('' '<RET>' "'<group-dn>'")
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		*)
+		    COMPREPLY=()
+		    ;;
+	    esac
+	    ;;
+	*)
+	    COMPREPLY=()
+	    ;;
+    esac
+}

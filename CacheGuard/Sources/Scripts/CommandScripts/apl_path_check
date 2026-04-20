@@ -1,0 +1,858 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       Scripts
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+case "${3}" in
+    active)
+	LOCK_POSTFIX=${3}
+	;;
+    *)
+	LOCK_POSTFIX=passive
+	;;
+esac
+
+test ! -f /var/lock/apl_path_check_${LOCK_POSTFIX} || exit 11
+touch /var/lock/apl_path_check_${LOCK_POSTFIX}
+
+CACHEGUARD_DIR=/etc/sysconfig/cacheguard
+source ${CACHEGUARD_DIR}/constant
+source ${APPLIANCE_DIR}/etc/role
+source ${LOCAL_DIR}/lib/apl_functions
+source ${APPLIANCE_DIR}/lib/lib-list
+source ${ABASE_DIR}/${ENV_RDIR}/${ENV_CURRENT_NAME}
+source ${ABASE_DIR}/${ENV_RDIR}/${ENV_NAME}
+
+############################################################
+# The followings are not used (until the ENDING separator) #
+############################################################
+
+remove-zero-prefix-from-mask()
+{
+    test -n "${1}" || return 1
+    local mark_mask=${1}
+
+    local mark=${mark_mask/\/*}
+    local mask=${mark_mask/*\/} i=0
+
+    mask=${mask/0x}
+
+    while test "${mask:${i}:1}" == 0 ;
+    do
+	((i++))
+    done
+
+    echo ${mark}/0x${mask:${i}}
+}
+
+reset-useless-rules()
+{
+    test -n "${1}" || return 0
+    local table_pname=${1}
+
+    local ip_rule_file=/tmp/ip-rule-file.${table_pname}.${$} nb=0 line
+    local standby_gateway=$(get-standby-gateway cur ${table_pname}) reset_limt=1
+    
+    test -z "${standby_gateway}" || ((reset_limt++))
+    ip rule list | grep ${table_pname} > ${ip_rule_file}
+
+    while read line
+    do
+	((nb++))
+    done < ${ip_rule_file}
+
+    if test ${nb} -gt ${reset_limt} ; then
+	rm -f ${ip_rule_file}
+	return 0
+    fi
+
+    local prio fwmark table dummy len
+    while read prio dummy dummy dummy fwmark dummy table
+    do
+	len=${#prio}
+	((len--))
+	prio=${prio:0:${len}}
+
+	ip rule del priority ${prio} fwmark ${fwmark} table ${table} 2> /dev/null
+
+    done < ${ip_rule_file}
+    rm -f ${ip_rule_file}
+}
+
+############################################################
+# ------------------------- ENDING ----------------------- #
+############################################################
+
+path-check-logger()
+{
+    test -n "${1}" || return 1
+    local message=${1}
+
+    logger -p daemon.alert -t apl_path_check_${LOCK_POSTFIX} -- ${message}
+    ${LOCAL_DIR}/bin/apl_rlogger "${message}"
+}
+
+path-check-notification()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    test -n "${3}" || return 3
+    local event=${1}
+    local service=${2}
+    local message=${3}
+
+    path-check-logger "Service ${service}: ${message}"
+    test "${CURRENT_ADMIN_SNMP}" == True || return 0
+    ${LOCAL_DIR}/bin/apl_snmp_trap 11 "${event}" "${service}" "${message}"
+}
+
+get-formatted-hops()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 0
+    local dev=${1}
+    local gateways=${2}
+
+    local range elt i=0
+    local gateway weight
+    local hops
+
+    for elt in ${gateways}
+    do
+	range=$[${i} % 2]
+	case ${range} in
+	    0)
+		gateway=${elt}
+		;;
+	    1)
+		weight=${elt}
+		hops="${hops} nexthop via ${gateway} dev ${dev}"
+		test ${weight} -eq 0 || hops="${hops} weight ${weight}"
+		;;
+	    *)
+		return 255
+		;;
+	esac
+	((i++))
+    done
+
+    hops="${hops:1}"
+    echo -n ${hops}
+}
+
+get-formatted-network()
+{
+    local ip=${1}
+    local prefix=${2}
+
+    local network
+        if test -z "${ip}" -a -z "${prefix}" ; then
+	network="0.0.0.0/0"
+    else
+	network="${ip}/${prefix}"
+    fi
+    echo -n ${network}
+}
+
+get-gateways-weight()
+{
+    local gateway_weight_pinged_list=${1}
+
+    local range elt i=0
+    local gateway weight
+    local result
+
+    for elt in ${gateways}
+    do
+	range=$[${i} % 3]
+	case ${range} in
+	    0)
+		gateway=${elt}
+		;;
+	    1)
+		weight=${elt}
+		;;
+	    2)
+		result="${result} ${gateway}:${weight}"
+		;;
+	    *)
+		return 255
+		;;
+	esac
+	((i++))
+    done
+
+    echo ${result:1}
+}
+
+get-minus-gateways()
+{
+    local gateway_weights1=${1}
+    local gateway_weights2=${2}
+
+    local elt1 range1 i1=0
+    local elt2 range2 i2=0
+    local gateway1 gateway2
+    local difference found
+
+    for elt1 in ${gateway_weights1}
+    do
+	range1=$[${i1} % 2]
+	case ${range1} in
+	    0)
+		gateway1=${elt1}
+		;;
+	    1)
+		i2=0 found=1
+ 		for elt2 in ${gateway_weights2}
+		do
+		    range2=$[${i2} % 2]
+		    case ${range2} in
+			0)
+			    gateway2=${elt2}
+			    ;;
+			1)
+			    if test ${gateway1} == ${gateway2} ; then
+				found=0
+				break
+			    fi
+			    ;;
+			*)
+			    return 255
+			    ;;
+		    esac
+		    ((i2++))
+		done
+		test ${found} -eq 0 || difference="${difference} ${gateway1}"
+		;;
+	    *)
+		return 255
+		;;
+	esac
+	((i1++))
+    done
+
+    echo ${difference:1}
+}
+
+get-current-gateway-weight-from-args()
+{
+    if test "${1}" == "nexthop" ; then
+	# Sample form: nexthop via 192.168.155.254 dev eth1 weight 50
+	test -n "${3}" || return 3
+	test -n "${7}" || return 7
+	local gateway=${3}
+	local weight=${7}
+    else
+	# Sample form: 10.0.20.0/24 via 10.0.10.1 dev eth0
+	test -n "${3}" || return 3
+	local gateway=${3}
+	local weight=50
+    fi
+
+    echo -n "${gateway} ${weight}"
+}
+
+get-running-gateway-weights()
+{
+    test -n "${1}" || return 1
+    local in_network=${1}
+
+    local tmp_file1=/tmp/path.route-1.${$}
+    local tmp_file2 network
+
+    ip route list ${in_network} > ${tmp_file1} 2> /dev/null
+    network=$(head -1 ${tmp_file1} 2> /dev/null)
+    test ${in_network} != "0.0.0.0/0" || in_network="default"
+
+    if test "${in_network}" == "${network} " ; then
+    #                       This space is ^ produced by the "ip" command
+	tmp_file2=/tmp/path.route-2.${$}
+	tail -n +2 ${tmp_file1} > ${tmp_file2}
+	rm -f ${tmp_file1}
+    else
+	tmp_file2=${tmp_file1}
+    fi
+
+    local gateway_weight gateway_weights
+    local line
+
+    while read line
+    do
+	gateway_weight=$(get-current-gateway-weight-from-args ${line})
+	gateway_weights="${gateway_weights} ${gateway_weight}"
+    done < ${tmp_file2}
+    gateway_weights="${gateway_weights:1}"
+
+    rm -f ${tmp_file2}
+    echo -n ${gateway_weights}
+}
+
+gen-iptables-mangle-sticky-external-route()
+{
+    test -n "${1}" || return 0
+
+    local external_gateway_weights=${1}
+    local available_gateways=${2}
+
+    local external_gateway_nb=$(record-length-list 1 "${external_gateway_weights}")
+    test ${external_gateway_nb} -ge 2 || return 0
+
+    gen-ipsec-site-fqdn-resolved-lists cur
+    gen-iptables-mangle-external-route cur "${VPN_IPSEC_SITE_IP_LIST} ${VPN_IPSEC_SITE_NR_LIST}" "${available_gateways}"
+}
+
+iptables-update-mangle-external-routing()
+{
+    test -n "${1}" || return 0
+    local external_gateway_weights=${1}
+    local available_gateways=${2}
+
+    test -f ${IPTABLES_RUNTIME_MANGLE_EXTERNAL_ROUTE}.chains || return 0
+    test -f ${IPTABLES_RUNTIME_MANGLE_EXTERNAL_ROUTE}.rules || return 0
+
+    local packets action chain rule rest
+
+    while read packets action chain rule
+    do
+	iptables -t mangle -D ${chain} ${rule}
+    done < ${IPTABLES_RUNTIME_MANGLE_EXTERNAL_ROUTE}.rules
+
+    while read chain rest
+    do
+	chain=${chain:1}
+	iptables -t mangle -F ${chain}
+	iptables -t mangle -Z ${chain}
+	iptables -t mangle -X ${chain}
+    done < ${IPTABLES_RUNTIME_MANGLE_EXTERNAL_ROUTE}.chains
+
+    local available_external_gateway_weights
+    local gateway_weight gateway weight
+
+    for gateway_weight in ${external_gateway_weights}
+    do
+	gateway=${gateway_weight/:*}
+	weight=${gateway_weight/*:}
+
+	test ${weight} -ne 0 || continue
+	! member "${available_gateways}" ${gateway} || available_external_gateway_weights="${available_external_gateway_weights} ${gateway}:${weight}"
+    done
+    available_external_gateway_weights=${available_external_gateway_weights:1}
+
+    local gateway_nb=$(record-length-list 1 "${available_external_gateway_weights}")
+
+    gen-iptables-mangle-sticky-external-route-chain cur ${gateway_nb} > ${IPTABLES_RUNTIME_MANGLE_EXTERNAL_ROUTE}.chains.new
+    gen-iptables-mangle-sticky-external-route "${external_gateway_weights}" "${available_gateways}" > ${IPTABLES_RUNTIME_MANGLE_EXTERNAL_ROUTE}.rules.new
+
+    while read chain rest
+    do
+	chain=${chain:1}
+	iptables -t mangle -N ${chain}
+    done < ${IPTABLES_RUNTIME_MANGLE_EXTERNAL_ROUTE}.chains.new
+    mv -f ${IPTABLES_RUNTIME_MANGLE_EXTERNAL_ROUTE}.chains.new ${IPTABLES_RUNTIME_MANGLE_EXTERNAL_ROUTE}.chains
+
+    while read packets action chain rule
+    do
+	iptables -t mangle -A ${chain} ${rule}
+    done < ${IPTABLES_RUNTIME_MANGLE_EXTERNAL_ROUTE}.rules.new
+    mv -f ${IPTABLES_RUNTIME_MANGLE_EXTERNAL_ROUTE}.rules.new ${IPTABLES_RUNTIME_MANGLE_EXTERNAL_ROUTE}.rules
+}
+
+iptables-update-mangle-sdefault-routing()
+{
+    test -n "${1}" || return 0
+    local default_gateway_weights=${1}
+    local available_gateways=${2}
+
+    test -f ${IPTABLES_RUNTIME_MANGLE_SDEFAULT_ROUTE}.chains || return 0
+    test -f ${IPTABLES_RUNTIME_MANGLE_SDEFAULT_ROUTE}.rules || return 0
+
+    local packets action chain rule rest
+    local standby_default_gateway_weighs available_default_gateway_weights
+    local available_default_gateway_nb=0
+    local gateway_weight gateway weight
+    local total_weight=0 weight_probability
+
+    for gateway_weight in ${default_gateway_weights}
+    do
+	gateway=${gateway_weight/:*}
+	weight=${gateway_weight/*:}
+
+	if test ${weight} -eq 0 ; then
+	    ! member "${available_gateways}" ${gateway} || standby_default_gateway_weighs="${gateway}:${weight}"
+	else
+	    if member "${available_gateways}" ${gateway} ; then
+		available_default_gateway_weights="${available_default_gateway_weights} ${gateway}:${weight}"
+		total_weight=$[${total_weight} + ${weight}]
+		((available_default_gateway_nb++))
+	    fi
+	fi
+    done
+    available_default_gateway_weights=${available_default_gateway_weights:1}
+
+    if test -z "${available_default_gateway_weights}" ; then
+	available_default_gateway_weights=${standby_default_gateway_weighs}
+	available_default_gateway_nb=1
+	total_weight=100
+    fi
+
+    while read packets action chain rule
+    do
+	iptables -t mangle -D ${chain} ${rule}
+    done < ${IPTABLES_RUNTIME_MANGLE_SDEFAULT_ROUTE}.rules
+
+    while read chain rest
+    do
+	chain=${chain:1}
+	iptables -t mangle -F ${chain}
+	iptables -t mangle -Z ${chain}
+	iptables -t mangle -X ${chain}
+    done < ${IPTABLES_RUNTIME_MANGLE_SDEFAULT_ROUTE}.chains
+
+    gen-iptables-mangle-sticky-default-route-chain cur ${available_default_gateway_nb} > ${IPTABLES_RUNTIME_MANGLE_SDEFAULT_ROUTE}.chains.new
+    gen-iptables-mangle-sticky-default-route cur ${available_default_gateway_nb} ${total_weight} "${available_default_gateway_weights}" > ${IPTABLES_RUNTIME_MANGLE_SDEFAULT_ROUTE}.rules.new
+
+    while read chain rest
+    do
+	chain=${chain:1}
+	iptables -t mangle -N ${chain}
+    done < ${IPTABLES_RUNTIME_MANGLE_SDEFAULT_ROUTE}.chains.new
+    mv -f ${IPTABLES_RUNTIME_MANGLE_SDEFAULT_ROUTE}.chains.new ${IPTABLES_RUNTIME_MANGLE_SDEFAULT_ROUTE}.chains
+
+    while read packets action chain rule
+    do
+	iptables -t mangle -A ${chain} ${rule}
+    done < ${IPTABLES_RUNTIME_MANGLE_SDEFAULT_ROUTE}.rules.new
+    mv -f ${IPTABLES_RUNTIME_MANGLE_SDEFAULT_ROUTE}.rules.new ${IPTABLES_RUNTIME_MANGLE_SDEFAULT_ROUTE}.rules
+}
+
+check-gateways()
+{
+    local mode
+
+    case "${1}" in
+	active|passive)
+	    mode=${1}
+	    ;;
+	'')
+	    mode=passive
+	    ;;
+	*)
+	    return 21
+	    ;;
+    esac
+
+    local route_files=$(ls -1 /etc/sysconfig/ifconfig.route* 2> /dev/null)
+
+    if test -z "${route_files}" ; then
+	rm -f ${RUN_DIR}/${GATEWAYS_STATE_FILENAME}
+	return 0
+    fi
+
+    local route_file gateways
+    local dev ip prefix table network gateway pinged
+    local dev_gateway_pinged dev_gateway_pinged_list
+    local neighbour mac
+    local line len pattern
+    local range elt i
+    local all_gateways unavailable_gateways available_gateways
+    local routes default_gateway_weights external_gateway_weights
+    local gateway weight
+
+    local data_length=8
+    local count=1
+    local short_delay=200
+    local long_delay=750
+
+    local tmp_state_file=/tmp/${GATEWAYS_STATE_FILENAME}.${$}
+
+    for route_file in ${route_files}
+    do
+	unset dev pinged ip table prefix
+	while read line
+	do
+	    # We suppose that the order for variables in route files is as follows:
+	    # IFACE, IP, PREFIX, TABLE, PINGED, STATIC_GATEWAY(S)
+
+	    test -n "${line}" || continue
+	    test "${line:0:1}" != '#' || continue
+	    if test "${line:0:6}" == 'IFACE=' ; then
+		dev=${line:6}
+	    elif test "${line:0:3}" == 'IP=' ; then
+		ip=${line:3}
+	    elif test "${line:0:7}" == 'PREFIX=' ; then
+		prefix=${line:7}
+	    elif test "${line:0:6}" == 'TABLE=' ; then
+		table=${line:6}
+	    elif test "${line:0:7}" == 'PINGED=' ; then
+		pinged=${line:7}
+	    elif test "${line:0:15}" == 'STATIC_GATEWAY=' ; then
+		gateway=${line:15}
+		member "${all_gateways}" ${gateway} || all_gateways="${all_gateways} ${gateway}"
+		test -n "${table}" -o -z "${pinged}" || dev_gateway_pinged_list="${dev_gateway_pinged_list} ${dev}/${gateway}/${pinged}"
+		if test ${mode} == active ; then
+		    network=$(get-formatted-network "${ip}" "${prefix}")
+		    test -n "${table}" || table=main
+		    routes="${routes} ${dev} ${network} ${gateway}:50 ${table}"
+		fi
+		break
+	    elif test "${line:0:16}" == 'STATIC_GATEWAYS=' ; then
+		gateways="${line:17}"
+		len=${#gateways}
+		((len--))
+		gateways=${gateways:0:${len}}
+		i=0
+		for elt in ${gateways}
+		do
+		    range=$[${i} % 3]
+		    case ${range} in
+			0)
+			    gateway=${elt}
+			    member "${all_gateways}" ${gateway} || all_gateways="${all_gateways} ${gateway}"
+			    ;;
+			1)
+			    weight=${elt}
+			    ;;
+			2)
+			    pinged=${elt}
+			    if test ${weight} -ne 0 ; then
+				test ${dev} != ${CURRENT_IF_EXTERNAL} || external_gateway_weights="${external_gateway_weights} ${gateway}:${weight}"
+			    fi
+			    test -n "${table}" || dev_gateway_pinged_list="${dev_gateway_pinged_list} ${dev}/${gateway}/${pinged}"
+			    ;;
+			*)
+			    return 255
+			    ;;
+		    esac
+		    ((i++))
+		done
+
+		if test ${mode} == active ; then
+		    network=$(get-formatted-network "${ip}" "${prefix}")
+		    gateways=$(get-gateways-weight "${gateways}")
+		    test ${network} != "0.0.0.0/0" || default_gateway_weights=${gateways}
+		    test -n "${table}" || table=main
+		    routes="${routes} ${dev} ${network} ${gateways// /:} ${table}"
+		fi
+		break
+	    fi
+	done < ${route_file}
+    done
+
+    all_gateways=${all_gateways:1}
+    dev_gateway_pinged_list=$(uniq-elt ${dev_gateway_pinged_list:1})
+    external_gateway_weights=${external_gateway_weights:1}
+
+    for dev_gateway_pinged in ${dev_gateway_pinged_list}
+    do
+	dev=${dev_gateway_pinged/\/*}
+	gateway_pinged=${dev_gateway_pinged#*\/}
+	gateway=${gateway_pinged/\/*}
+	pinged=${gateway_pinged/*\/}
+
+	if test "${pinged}" == "${gateway}" ; then
+	    nping \
+		-q1 --hide-sent \
+		--icmp \
+		--count ${count} --delay ${short_delay}ms --data-length ${data_length} \
+		--interface ${dev} \
+		--dest-ip ${gateway} 2> /dev/null > /tmp/nping.${$}
+
+	    if test ${?} -ne 0 ; then
+		echo "${dev_gateway_pinged} KO"
+	    else
+		grep --quiet "Lost: 0" /tmp/nping.${$} > /dev/null 2>&1
+		if test ${?} -eq 0 ; then
+		    echo "${dev_gateway_pinged} OK"
+		else
+		    test ${mode} == passive || unavailable_gateways="${unavailable_gateways} ${gateway}"
+		    echo "${dev_gateway_pinged} KO"
+		fi
+	    fi
+	    rm -f /tmp/nping.${$}
+	else
+	    ###############################
+	    # Refresh the ARP table first #
+	    ###############################
+
+	    nping \
+		-q1 --hide-sent \
+		--icmp \
+		--count ${count} --delay ${short_delay}ms --data-length ${data_length} \
+		--interface ${dev} \
+		--dest-ip ${gateway} > /dev/null 2>&1
+
+	    ###############################
+
+	    pattern="${gateway} lladdr "
+	    neighbour=$(ip neighbour show dev ${dev} 2> /dev/null | grep "${pattern}" 2> /dev/null)
+	    mac=${neighbour/${pattern}/}
+	    mac=${mac/ *}
+
+	    if test -n "${mac}" ; then
+		nping \
+		    -q1 --hide-sent \
+		    --icmp \
+		    --count ${count} --delay ${long_delay}ms --data-length ${data_length} \
+		    --interface ${dev} --dest-mac ${mac} \
+		    --dest-ip ${pinged} 2> /dev/null > /tmp/nping.${$}
+
+		if test ${?} -ne 0 ; then
+		    echo "${dev_gateway_pinged} KO"
+		else
+		    grep --quiet "Lost: 0" /tmp/nping.${$} > /dev/null 2>&1
+		    if test ${?} -eq 0 ; then
+			echo "${dev_gateway_pinged} OK"
+		    else
+			test ${mode} == passive || unavailable_gateways="${unavailable_gateways} ${gateway}"
+			echo "${dev_gateway_pinged} KO"
+		    fi
+		fi
+		rm -f /tmp/nping.${$}
+	    else
+		echo "${dev_gateway_pinged} KO"
+	    fi
+	fi
+    done > ${tmp_state_file}
+    mv -f ${tmp_state_file} ${RUN_DIR}/${GATEWAYS_STATE_FILENAME}
+
+    ###############################
+    # The active part begins here #
+    ###############################
+
+    test ${mode} == active || return 0
+
+    routes=${routes:1}
+    unavailable_gateways=$(uniq-elt ${unavailable_gateways:1})
+    available_gateways=$(minus-list "${all_gateways}" "${unavailable_gateways}")
+
+    test ! -f ${LOCK_DIR}/apl_apply || return 21
+    test ! -f ${LOCK_DIR}/apl_apply_cancel || return 23
+    test ! -f ${LOCK_DIR}/apl_rollback || return 25
+    test ! -f ${LOCK_DIR}/apl_configure || return 27
+    test ! -f ${LOCK_DIR}/apl_reboot || return 29
+    test ! -f ${LOCK_DIR}/apl_halt || return 31
+
+    local added_gateways deleted_gateways
+    local overall_added_gateways overall_deleted_gateways
+    local available_gateway hops
+    local elt1 range1 i1
+    local weight1 gateway1 gateways1 standby1
+
+    i=0
+    for elt in ${routes}
+    do
+	range=$[${i} % 4]
+	case ${range} in
+	    0)
+		dev=${elt}
+		;;
+	    1)
+		network=${elt}
+		;;
+	    2)
+		gateways=${elt}
+		;;
+	    3)
+		table=${elt}
+
+		if test ${table} != main ; then
+
+		    ###################################################
+		    # For tables other than the MAIN table DO NOTHING #
+		    ###################################################
+
+		    ((i++))
+		    continue
+		else
+		    if test "${gateways%:*}" == "${gateways/:*}" ; then
+
+			################################################
+		        # If the MAIN table is mono gateway DO NOTHING #
+			################################################
+
+			((i++))
+			continue
+		    fi
+		fi
+
+		######################################
+		# The MAIN table is NOT mono gateway #
+		######################################
+
+		gateways=${gateways//:/ }
+		unset gateways1 standby1
+		i1=0
+
+		for elt1 in ${gateways}
+		do
+		    range1=$[${i1} % 2]
+		    case ${range1} in
+			0)
+			    gateway1=${elt1}
+			    ;;
+			1)
+			    weight1=${elt1}
+			    if test ${weight1} -eq 0 ; then
+				member "${unavailable_gateways}" ${gateway1} || standby1="${gateway1} ${weight1}"
+			    else
+				member "${unavailable_gateways}" ${gateway1} || gateways1="${gateways1} ${gateway1} ${weight1}"
+			    fi
+			    ;;
+			*)
+			    return 255
+			    ;;
+		    esac
+		    ((i1++))
+		done
+
+		gateways1=${gateways1:1}
+		gateways2=$(get-running-gateway-weights ${network})
+		test -n "${gateways1}" || gateways1=${standby1}
+
+		##################################################################
+		# ${gateways1} contains available gateways to ${network}         #
+		# ${gateways2} contains active configured gateways to ${network} #
+		##################################################################
+
+		if test "${gateways1}" != "${gateways2}" ; then
+		    hops=$(get-formatted-hops ${dev} "${gateways1}")
+
+		    if test -z "${hops}" ; then
+			ip route flush ${network}
+		    else
+			if test -n "${gateways2}" ; then
+			    ip route change ${network} ${hops}
+			else
+			    ip route add ${network} ${hops}
+			fi
+		    fi
+
+		    added_gateways=$(get-minus-gateways "${gateways1}" "${gateways2}")
+		    deleted_gateways=$(get-minus-gateways "${gateways2}" "${gateways1}")
+
+		    overall_added_gateways="${overall_added_gateways} ${added_gateways}"
+		    overall_deleted_gateways="${overall_deleted_gateways} ${deleted_gateways}"
+		fi
+		;;
+	    *)
+		return 255
+		;;
+	esac
+	((i++))
+    done
+
+    overall_added_gateways=$(uniq-elt ${overall_added_gateways:1})
+    overall_deleted_gateways=$(uniq-elt ${overall_deleted_gateways:1})
+
+    test -n "${overall_added_gateways}" -o -n "${overall_deleted_gateways}" || return 0
+
+    iptables-update-mangle-external-routing "${external_gateway_weights}" "${available_gateways}"
+    iptables-update-mangle-sdefault-routing "${default_gateway_weights}" "${available_gateways}"
+
+    ip route flush cache
+
+    ##################
+    # Notify changes #
+    ##################
+
+    for gateway in ${overall_added_gateways}
+    do
+	apl_gateway_monitor add ${gateway}
+    done
+
+    for gateway in ${overall_deleted_gateways}
+    do
+	apl_gateway_monitor del ${gateway}
+    done
+}
+
+clean-exit()
+{
+    trap '' USR1 INT QUIT TERM
+
+    local code=${1}
+
+    rm -f \
+       /var/lock/apl_path_check_${LOCK_POSTFIX} \
+       ${RUN_DIR}/${WAITING_PROCESS}.${CALLER_PID}
+
+    exit ${code}
+}
+
+clean-end-cb()
+{
+    :
+}
+
+init-clean-end-trap()
+{
+    trap "clean-end-cb" USR1 INT QUIT TERM
+    touch ${RUN_DIR}/${WAITING_PROCESS}.${CALLER_PID}
+}
+
+main()
+{
+    local reports mode
+
+    if test -n "${1}" ; then
+	CALLER_PID=${1}
+	local reports=${2}
+	local mode=${3}
+    else
+	CALLER_PID=${$}
+    fi
+
+    init-clean-end-trap
+
+    set-ports-nb
+    set-network-if-parameters
+    set-network-ip-native-parameters
+    set-network-ip-vlan-parameters
+    set-network-routes-parameters
+    set-fw-rule-parameters
+    set-ipsec-parameters cur
+
+    if test -z "${reports}" ; then
+	check-gateways
+    else
+	local report_major
+	reports=${reports//:/ }
+
+	for report_major in ${reports}
+	do
+	    case ${report_major} in
+		gateway)
+		    check-gateways ${mode}
+		    ;;
+		*)
+		    ;;
+	    esac
+	done
+    fi
+
+    clean-exit 0
+}
+
+# Main()
+
+main "${@}"

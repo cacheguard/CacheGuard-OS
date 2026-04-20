@@ -1,0 +1,103 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       Scripts
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+CACHEGUARD_DIR=/etc/sysconfig/cacheguard
+source ${CACHEGUARD_DIR}/constant
+source ${APPLIANCE_DIR}/etc/role
+source ${LOCAL_DIR}/lib/apl_functions
+source ${BASE_DIR}/${ADMIN_NAME}/${ENV_RDIR}/${ENV_CURRENT_NAME}
+
+test-ldap-group()
+{
+    local ldap_timeout=15
+    local bind_opt
+
+    test-current-ldap-auth-state || return 11
+    test-current-ldap-auth-attribute-group-ok || return 13
+
+    local base_name=${0/*\/}
+    local tmp_error_file=/tmp/${base_name}.${$}
+    local sldap urls=$(print-ldap-urls "${CURRENT_LDAP_SERVER_LIST}")
+
+    ! test-sldap "${CURRENT_LDAP_SERVER_LIST}" || sldap=" -Z"
+
+    if test ${CURRENT_LDAP_BIND_MODE} == True -a -s ${PROXY_DIR}${LDAP_DIR}/${LDAP_PASSWD} ; then
+	bind_opt=" -D ${CURRENT_LDAP_BIND_DN} -W ${LDAP_DIR}/${LDAP_PASSWD}"
+    fi
+
+    local lg=${1}
+    local gr=${2}
+
+    if test -z "${lg}" ; then
+	echo -n "Enter the user ID: "
+	read lg
+    fi
+
+    if test -z "${gr}" ; then
+	echo -n "Enter the group name: "
+	read gr
+    fi
+
+    test -n "${lg}" -a -n "${gr}" || return 15
+
+    local filter_opt
+
+    if test -z "${CURRENT_LDAP_FILTER}" ; then
+	filter_opt="${CURRENT_LDAP_LOGIN}=%s"
+    else
+	filter_opt="(&(${CURRENT_LDAP_FILTER})(${CURRENT_LDAP_LOGIN}=%s))"
+    fi
+
+    local group_name group_attribute group_base_dn
+
+    group_name=${CURRENT_LDAP_GROUP_DN// }
+    group_base_dn=${CURRENT_LDAP_GROUP_DN#*,}
+    group_name=${group_name/,*}
+    group_attribute=${group_name/=*}
+    group_name=${group_name/*=}
+
+    local result=$(echo "${lg}" "${gr}" | chroot ${PROXY_DIR} /libexec/ext_ldap_group_acl -v 3 -c ${LDAP_CONNECTION_TIMEOUT} -t ${ldap_timeout} -s sub -a never -B "${CURRENT_LDAP_BASE_DN}" -F "${filter_opt}" -b "${group_base_dn}" -f "(&(${group_attribute}=%g)(member=%u))"${bind_opt}${sldap} ${urls} 2> ${tmp_error_file})
+
+    result=${result/ *}
+
+    local error_message=$(cat ${tmp_error_file} 2> /dev/null)
+    error_message=${error_message/basic_ldap_auth: }
+    rm -f ${tmp_error_file}
+
+    if test "${result:0:2}" == OK ; then
+	echo OK
+	return 0
+    else
+	if test -z "${error_message}" ; then
+	    echo KO
+	else
+	    echo "KO: ${error_message/ext_ldap_group_acl}"
+	fi
+	return 11
+    fi
+}
+
+# Main()
+
+test-ldap-group "${@}"

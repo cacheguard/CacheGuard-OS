@@ -1,0 +1,235 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       Commands
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+host-ip-address()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    local ip=${1}
+    local netmask=${2}
+
+    test ${ip} != 0.0.0.0 || return 0
+    test ${netmask} != 255.255.255.254 || return 0
+
+    local netinfo=$(ipcalc -s ${ip} ${netmask} -p -b -n)
+
+    local prefix=$(get-nth-arg 1 ${netinfo})
+    local broadcast=$(get-nth-arg 2 ${netinfo})
+    local network=$(get-nth-arg 3 ${netinfo})
+
+    prefix=${prefix/PREFIX=/}
+    broadcast=${broadcast/BROADCAST=/}
+    network=${network/NETWORK=/}
+
+    test ${prefix} != 32 || return 3
+    test ${ip} != ${network} || return 5
+    test ${ip} != ${broadcast} || return 7
+}
+
+get-network()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    local ip=${1}
+    local netmask=${2}
+
+    if test "${netmask}" == '255.255.255.255' ; then
+	echo ${ip}
+	return 0
+    fi
+
+    local network=$(ipcalc -s ${ip} ${netmask} -n)
+    network=${network/NETWORK=/}
+
+    echo ${network}
+}
+
+get-netmask()
+{
+    test -n "${1}" || return 1
+    local ip_px=${1}
+
+    local px=${ip_px/*\/}
+
+    if test "${px}" == 32 ; then
+	echo '255.255.255.255'
+	return 0
+    fi
+
+    local netmask=$(ipcalc -s ${ip_px} -m)
+    netmask=${netmask/NETMASK=/}
+
+    echo ${netmask}
+}
+
+get-first-ip()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 1
+    local ip=${1}
+    local netmask=${2}
+
+    local network=$(ipcalc -s ${ip} ${netmask} -n)
+    network=${network/NETWORK=/}
+
+    local last_byte=${network/*\./}
+    ((last_byte++))
+
+    first3_bytes=${network%\.*}
+    first_ip=${first3_bytes}.${last_byte}
+
+    echo ${first_ip}
+}
+
+get-last-ip()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 1
+    local ip=${1}
+    local netmask=${2}
+
+    local network=$(ipcalc -s ${ip} ${netmask} -b)
+    network=${network/BROADCAST=/}
+
+    local last_byte=${network/*\./}
+    ((last_byte--))
+
+    first3_bytes=${network%\.*}
+    last_ip=${first3_bytes}.${last_byte}
+
+    echo ${last_ip}
+}
+
+ip-lt()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 1
+
+    local ip1=${1}
+    local ip2=${2}
+
+    local dip1=$(digit-ip ${ip1})
+    local dip2=$(digit-ip ${ip2})
+
+    test -n "${dip1}" || dip1=0
+    test -n "${dip2}" || dip2=0
+
+    test ${dip1} -lt ${dip2}
+}
+
+remove-ip_vlan_list_vlan()
+{
+    test -n "${1}" || return 0
+    if test -z "${2}" ; then
+	echo "${1}"
+	return 0
+    fi
+
+    local in_list=${1}
+    local in_vlan=${2}
+    
+    local i=0 out_list
+    local elt range
+    local vlan ip netmask
+    
+    for elt in ${in_list}
+    do
+	range=$[${i} % 3]
+	case ${range} in
+	    0)
+		vlan=${elt}
+		;;
+	    1)
+		ip=${elt}
+		;;
+	    2)
+		netmask=${elt}
+		test "${vlan}" == "${in_vlan}" || out_list="${out_list} ${vlan} ${ip} ${netmask}"
+		;;
+	    *)
+		return 1
+		;;
+	esac
+	((i++))
+    done
+    echo ${out_list}
+    return 0
+}
+
+get-prefered-vrrp-ip()
+{
+    local vrrp_list=${1}
+
+    local elt range i=0
+    local ip state prio
+    local master_prio backup_prio
+
+    local max_master_prio=-1 max_backup_prio=-1
+    local prefered_master_ip prefered_backup_ip
+
+    for elt in ${vrrp_list}
+    do
+	range=$[${i} % 4]
+	case ${range} in
+	    0)
+		ip=${elt}
+		;;
+	    1)
+		state=${elt}
+		;;
+	    2)
+		prio=${elt}
+		;;
+	    3)
+		case ${state} in
+		    master)
+			if test ${prio} -gt ${max_master_prio} ; then
+			    prefered_master_ip=${ip}
+			    max_master_prio=${prio}
+			fi
+			;;
+		    backup)
+			if test ${prio} -gt ${max_backup_prio} ; then
+			    prefered_backup_ip=${ip}
+			    max_backup_prio=${prio}
+			fi
+
+			;;
+		    *)
+			;;
+		esac
+		;;
+	    *)
+		return 255
+		;;
+	esac
+	((i++))
+    done
+
+    if test -n "${prefered_master_ip}" ; then
+	echo ${prefered_master_ip}
+    else
+	echo ${prefered_backup_ip}
+    fi
+}

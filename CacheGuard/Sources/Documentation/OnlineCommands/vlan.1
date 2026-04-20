@@ -1,0 +1,35 @@
+Configure 802.1q VLANs (Virtual LANs)
+.SH SYNOPSIS
+
+[1] \fBvlan\fR [(\fBadmin\fR | \fBantivirus\fR | \fBpeer\fR | \fBfile\fR | \fBmon\fR | \fBrweb\fR | \fBweb\fR) [\fI<vlan-id>\fR]]
+
+.SH DESCRIPTION
+This command allows you to define 802.1q VLANs (Virtual LANs). VLANs allow you to increase the network security by isolating each type of access crossing the same physical NIC (Network Interface Card) in a Virtual LAN (VLAN). When using VLANs an associated pseudo virtual NIC is implicitly defined for each defined VLAN.
+
+A VLAN is identified by a <vlan-id> (VLAN identifier). This is a numeric value between 0 and 4095. By default, all access types are associated to the VLAN 0. Different access types may use the same VLAN. This \fBvlan\fR command allows you to define new VLANs and associate them to an access type. Valid access types are as follows:
+
+  \(bu \fBadmin\fR: access from remote administrators (SSH and Administration GUI). You can use this VLAN to connect privileged workstations having administration rights.
+
+  \(bu \fBantivirus\fR: access to the antivirus as a service from external systems. You can use this VLAN to isolate all request/responses with the embedded antivirus.
+
+  \(bu \fBpeer\fR: access to/from peer appliances access. You can use this VLAN to connect all peer appliances.
+
+  \(bu \fBfile\fR: access to file server (FTP, TFTP and SFTP). You can use this VLAN to connect file servers.
+
+  \(bu \fBmon\fR: monitoring (SNMP) access access to/from SNMP managers. You can use this VLAN to connect monitoring servers.
+
+  \(bu \fBrweb\fR: access to backend Web servers (and/or Web application servers). You can use this VLAN for any other servers having the same security level as for Web servers.
+
+  \(bu \fBweb\fR: Web access from transparent and non transparent users. You can use this VLAN for all users having to access the internet.
+
+VLANs are all associated to the \fBinternal\fR network interface. The \fBexternal\fR network interface is associated to a unique type of access which is the access to the external untrusted world (internet). The \fBauxiliary\fR network interface is also associated to a unique type of access. You can use the \fBauxiliary\fR network interface as per your requirement (to connect the Back Office zone or the DMZ for instance).
+
+Note that when using VLANs, the native internal network interface (ie. \fBinternal\fR) is no longer available. To use VLANs activate the \fBvlan\fR feature with the command \fBmode\fR.
+
+.SH SEE ALSO
+.B apply
+(1)
+.B ip
+(1)
+.B mode
+(1)

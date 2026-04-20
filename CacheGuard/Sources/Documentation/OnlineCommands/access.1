@@ -1,0 +1,79 @@
+Manage remote accesses to the appliance
+.SH SYNOPSIS
+
+[1] \fBaccess\fR [\fBweb\fR [\fBraz\fR | (\fBadd\fR (\fBinternal\fR | \fBauxiliary\fR | \fBvpnipsec\fR | \fBadmin\fR | \fBantivirus\fR | \fBfile\fR | \fBmon\fR | \fBrweb\fR | \fBweb\fR) \fI<ip>\fR [\fI<network-mask>\fR [\fI<qos%>\fR]]) | (\fBdel\fR \fI<ip>\fR \fI<network-mask>\fR)]]
+
+[2] \fBaccess\fR [\fBadmin\fR [\fBraz\fR | (\fBadd\fR | \fBdel\fR) (\fBinternal\fR | \fBexternal\fR | \fBauxiliary\fR | \fBvpnipsec\fR) \fI<ip>\fR [\fI<network-mask>\fR]]]
+
+[3] \fBaccess\fR [\fBmon\fR [\fBraz\fR | (\fBadd\fR | \fBdel\fR) (\fBinternal\fR | \fBexternal\fR | \fBauxiliary\fR | \fBvpnipsec\fR) (\fI<ip>\fR | \fI<name>\fR)]]
+
+[4] \fBaccess\fR [\fBfile\fR [\fBraz\fR | ((\fBadd\fR (\fBinternal\fR | \fBexternal\fR | \fBauxiliary\fR | \fBvpnipsec\fR) (\fI<ip>\fR | \fI<name>\fR) [(\fBftp\fR | \fBsftp\fR) \fI<login>\fR [\fI<password>\fR]]) | (\fBdel\fR (\fI<ip>\fR | \fI<name>\fR)))]]
+
+[5] \fBaccess\fR [\fBantivirus\fR [\fBraz\fR | (\fBadd\fR (\fBinternal\fR | \fBexternal\fR | \fBauxiliary\fR | \fBvpnipsec\fR) \fI<ip>\fR [\fI<network-mask>\fR [\fI<qos%>\fR]]) | (\fBdel\fR \fI<ip>\fR \fI<network-mask>\fR)]]
+
+[6] \fBaccess\fR [\fBmanager\fR [\fBraz\fR | (\fBadd\fR (\fBmaster\fR | \fBbackup\fR) (\fBinternal\fR | \fBexternal\fR | \fBauxiliary\fR) \fI<ip>\fR "\fI<manager-public-ssh-key>\fR") | (\fBdel\fR (\fBmaster\fR | \fBbackup\fR))]]
+
+.SH DESCRIPTION
+This command is used to get or set access policies for traffic exchanged with the appliance itself (and not routed via). To configure access policies for routed traffic via the appliance refer to the command \fBfirewall\fR.
+
+The first [1] usage form is used to define allowed networks connected or routed via a given network interface to access the appliance as a gateway for Web browsing (ie as a Web proxy). Traffic bandwidths can also be customised for a network using the optional \fI<qos%>\fR parameter. The \fI<qos%>\fR value is a percentage of the ingress or egress bandwidth allocated to \fBweb\fR traffic and should be an integer between 1 and 100. Ingress and egress bandwidth values to which the percentage is applied are as follows:
+
+  \(bu For accesses allowed via the native \fBinternal\fR network interface or 802.1q pseudo network interfaces in \fBvlan\fR mode (\fBweb\fR, \fBrweb\fR...), the ingress and egress bandwidths to consider are defined with the command usage form \fBqos shape web internal\fR.
+
+  \(bu For accesses allowed via the \fBauxiliary\fR network interface, the ingress and egress bandwidths to consider are defined with the command usage form \fBqos shape web auxiliary\fR.
+
+  \(bu For accesses allowed via the \fBvpnipsec\fR virtual network interface, the ingress bandwidth to consider is defined with the command usage form \fBqos shape vpnipsec external ingress\fR. The egress bandwidth for accesses allowed via the \fBvpnipsec\fR virtual network interface can't be customised.
+
+If no \fI<qos%>\fR is given, the value of 100% is used by default.
+
+If no \fBweb\fR access entry is defined, all networks located behind all interfaces, except the \fBexternal\fR interface, are allowed to access the Web with a QoS of 100%. If at least one \fBweb\fR access entry is defined, only explicitly defined networks are allowed to use the appliance as a forwarding proxy via the specified network interface. In case where the transparent mode is activated (see the command \fBmode\fR), the appliance will act as a transparent forwarding proxy only for defined transparent networks. Use the command \fBtransparent\fR to define transparent networks.
+
+When the \fBvlan\fR mode is activated (see the command \fBmode\fR), you have the possibility to specify an explicit 802.1q pseudo interface instead of the \fBinternal\fR interface. Allowed  802.1q pseudo interfaces are \fBadmin\fR, \fBantivirus\fR, \fBfile\fR, \fBmon\fR, \fBrweb\fR and \fBweb\fR. It is recommended to always use 802.1q pseudo interfaces even if the \fBvlan\fR mode is disabled. In this way, the activation of the \fBvlan\fR mode would not require to rewrite Web access rules. Finally, when the \fBvlan\fR mode is activated, the \fBweb\ interface replaces the \fBinternal\fR interface in all Web access rules.
+
+The \fI<qos%>\fR is defined for all IPs belonging to a Web access network. The effective \fI<qos%>\fR for a given IP depends on the number of concurrent traffic exchanged from that network. An automatic scheduling system manages concurrent traffic to equitably share the bandwidth allocated to a given network. In a concurrent environment the \fI<qos%>\fR limit may be surpassed when the load of other networks is under their \fI<qos%>\fR limits. This mechanism is called borrowing. The borrowing could be activated or deactivated. See the command \fBqos\fR for further information on the borrowing mechanism. Please note that there is no obligation to have a total of 100% even if this is a recommended configuration.
+
+The second [2] usage form configures access policies for administrators using \fIssh\fR or the Web administration GUI. Only networks defined with this command are allowed to remotely administrate the system via the specified network interface. The system's administration IP address can be the internal, external or the auxiliary IP address according to the administration topology defined with the \fBadmin topology\fR command usage form. When the \fBvlan\fR mode is activated (see the command \fBmode\fR), the internal administration IP address is the IP address associated to the \fBadmin\fR 802.1q pseudo device (see the command \fBvlan\fR).
+
+It should be noted that if a user uses the appliance as an explicit Web gateway (proxy), to allow her/him to access the administration Web GUI, the appliance's internal IP (or the admin IP in VLAN mode) should be allowed to access the appliance itself as an administrator. Allowing the appliance itself to have access to the administration Web GUI is not a good idea because it can weaken the appliance security. Instead, an administrator can configure her/his Web browser to do not use the appliance as a Web proxy for the the appliance's internal IP address.
+
+The third [3] usage form configures access policies for monitoring (management) servers using the SNMP protocol. Only SNMP managers defined with this command are allowed to access the appliance via the specified network interface. If no management access policy is defined, SNMP accesses are not allowed.
+
+Operations like backing up the system or loading a URL list require access to a file server. Only file servers defined with this command are allowed to exchange data with the appliance. The fourth [4] usage form (with the \fBfile\fR keyword) allows you to define access policies for file servers. A file server is represented by its IP address or network name. If no file access policy is defined, file transfers to and from the appliance are not allowed. Supported protocols for file servers are FTP, SFTP and TFTP. For \fBftp\fR and \fBsftp\fR servers, if a login name is given, a mandatory password is then required. If no password is given on the command line, the password is requested in hidden mode (see also the command \fBpassword\fR). Please note that if the targeted FTP server supports SSL encryption and the CCC (Clear Command Channel) FTP command, the system will use SSL/TLS for the authenticating phase in order to encrypt the transmitted credentials (login/password).
+
+The integrated antivirus can be used as a service offered to external systems such as an MTA (Mail Transfer Agent). The system's antivirus server IP address can be the internal, external or the auxiliary IP address according to the antivirus topology defined with the \fBantivirus topology\fR command usage form. The fifth [5] usage form is used to define allowed networks connected or routed via a given network interface to use the appliance as an antivirus service. If no antivirus access policy is defined, the antivirus can't be accessed as a service. Traffic bandwidths can also be customised for a network using the optional \fI<qos%>\fR parameter. The \fI<qos%>\fR value is a percentage of the ingress or egress bandwidth allocated to \fBantivirus\fR traffic and should be an integer between 1 and 100. Ingress and egress bandwidth values to which the percentage is applied are as follows:
+
+  \(bu For accesses allowed via the native \fBinternal\fR network interface or the 802.1q pseudo network interface called \fBantivirus\fR (in \fBvlan\fR mode), the ingress and egress bandwidths to consider are defined with the command usage form \fBqos shape antivirus internal\fR.
+
+  \(bu For accesses allowed via the \fBauxiliary\fR network interface, the ingress and egress bandwidths to consider are defined with the command usage form \fBqos shape antivirus auxiliary\fR.
+
+  \(bu For accesses allowed via the \fBvpnipsec\fR virtual network interface, the ingress bandwidth to consider is defined with the command usage form \fBqos shape vpnipsec external ingress\fR. The egress bandwidth for accesses allowed via the \fBvpnipsec\fR virtual network interface can't be customised.
+
+If no \fI<qos%>\fR is given, the value of 100% is used by default.
+
+When an appliance is installed as a \fIgateway\fR (as opposed to an appliance installed as a \fImanager\fR), it can be directly managed and administrated using the CLI and/or the Web GUI. In case you have a \fImanager\fR appliance, you have the possibility to configure gateways using that manager. Managers uses the SSH and SFTP protocols to exchange with gateways. In practice, managers upload all configuration files on gateways using the SFTP protocol and then remote execute commands on them using the SSH protocol (gateways act as SFTP nad SSH servers). Please note that to allow managers to access gateways, SSH administration should be activated on gateways (see the \fBadmin\fR command for further information).
+
+The sixth [6] usage form allows you to give access to allowed mangers to administrate and configure the system. You can allow only one master manager and optionally one backup manager to administrate and configure a gateway. To allow a manager to access the system, use the keywords \fBmanager add\fR followed by the manager's role (\fBmaster\fR or \fBbackup\fR), the logical interface (\fBinternal\fR, \fBexternal\fR or \fBauxiliary\fR) from which the manager can access the system, the manager IP address and finally the textual representation of the managers's SSH public key. To get the public SSH key of a manager, you can use the \fBmanager ssh show\fR command on that manager. To delete a manager form the list of allowed manager, use the keywords \fBmanager del\fR followed by the manager's role (\fBmaster\fR or \fBbackup\fR). Finally you can use the keywords \fBmanager raz\fR to erase the allowed manager list. Using the keywords \fBmanager\fR without any other arguments allows you to print the list of all managers. To show a manager SSH key content, you can use the "\fBadmin ssh key show\fR \fI<key-id>\fR" command where <key-id> can be \fBmmanager\fR (for master manager) or \fBbmanager\fR (for backup manager).
+
+.SH SEE ALSO
+.B admin
+(1)
+.B antivirus
+(1)
+.B apply
+(1)
+.B firewall
+(1)
+.B manager
+(1)
+.B mode
+(1)
+.B password
+(1)
+.B peer
+(1)
+.B qos
+(1)
+.B transparent
+(1)
+.B vlan
+(1)

@@ -1,0 +1,1217 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       VPN Subscription
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+CACHEGUARD_DIR=/etc/sysconfig/cacheguard
+source ${CACHEGUARD_DIR}/constant
+source ${APPLIANCE_DIR}/etc/role
+source ${HARD_DIR}/cloud.conf
+source ${HARD_DIR}/model.conf
+source ${ABASE_DIR}/${ENV_RDIR}/${ENV_CURRENT_NAME}
+source ${LOCAL_DIR}/lib/apl_ea_vpnsubscr.env
+source ${LOCAL_DIR}/lib/apl_common
+source ${LOCAL_DIR}/lib/apl_ea_vpnsubscr_functions
+
+activate-email()
+{
+    local error_file=/tmp/vpnsubscr-email-error.${$}
+
+    set-email-service ${VPNSUBSCR_EMAIL_STATE_ACTIVATED} 2> ${error_file}
+    local error=$(get-error-text ${error_file})
+
+    if test -n "${error}" ; then
+	vpnsubscr-log-error 221 "can't activate the email record. The low level error is: ${error}"
+	return 221
+    fi
+}
+
+fail-email()
+{
+    local error_file=/tmp/vpnsubscr-email-error.${$}
+
+    set-email-service ${VPNSUBSCR_EMAIL_STATE_FAILED} 2> ${error_file}
+    local error=$(get-error-text ${error_file})
+
+    if test -n "${error}" ; then
+	vpnsubscr-log-error 223 "can't fail the email record. The low level error is: ${error}"
+	return 223
+    fi
+}
+
+reset-email()
+{
+    local error_file=/tmp/vpnsubscr-email-error.${$}
+
+    set-email-service ${VPNSUBSCR_EMAIL_STATE_INEXISTANT} 2> ${error_file}
+    local error=$(get-error-text ${error_file})
+
+    if test -n "${error}" ; then
+	vpnsubscr-log-error 225 "can't fail the email record. The low level error is: ${error}"
+	return 225
+    fi
+}
+
+gen-connection-instructions()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    test -n "${3}" || return 3
+    test -n "${4}" || return 4
+    local username=${1}
+    local device=${2}
+    local script=${3}
+    local name=${4}
+
+    local client_vpn_id=${username}.${CURRENT_DOMAIN_NAME}
+
+    local newline='%0A'
+    local bullet='- '
+    local x2newline=${newline}${newline}
+    local proxy_address="${CURRENT_IP_INTERNAL_IP}:${CURRENT_PROXY_PORT}"
+    local gateway_link="http://${CURRENT_IP_INTERNAL_IP}"
+
+    local profile_type
+    local auto_web_proxy_message manual_web_proxy_message
+    local ipv6_default_route_message ssl_mediation_description
+
+    auto_web_proxy_message="Once connected to the VPN, the Web proxy will be automatically used. For your information the \"${VPNSUBSCR_SERVICE_NAME}\" proxy address is \"${proxy_address}\"."
+
+    manual_web_proxy_message="Once connected to the VPN, the Web proxy will be available at the \"${proxy_address}\" address. It is highly recommended to explicitly configure your device (including all your Web browsers and other applications) to always use the <strong>${VPNSUBSCR_SERVICE_NAME}</strong> proxy."
+
+    test ${CURRENT_SSLMEDIATE_MODE} == False || \
+	ssl_mediation_description="The Web proxy uses a technology called \"SSL mediation\". SSL mediation allows you to optimize and/or secure network traffic even in an encrypted format. This technology requires that you trust the \"${VPNSUBSCR_SERVICE_NAME}\" CA certificate."
+
+    case ${device} in
+	android|apple)
+	    profile_type='profile'
+	    ;;
+	linux|windows)
+	    profile_type='script'
+	    ;;
+	*)
+	    profile_type='profile'
+	    ;;
+    esac
+
+    cat << EOT
+Dear ${name},
+${x2newline}
+Attached you will find a ${profile_type} file that allows you to connect your ${device^} device to the "${VPNSUBSCR_SERVICE_NAME}" and Web proxy.
+${x2newline}
+Important notice: your ${profile_type} file embeds a password protected private key that you should not share with third parties. You should receive its password separately in a secure way. Your private key identifier is '${client_vpn_id}' and allows you to have one and only one VPN connection at the same time.
+${x2newline}
+To configure your device proceed as follows:
+${x2newline}
+EOT
+
+    case ${device} in
+	android)
+	    local app_link="https://play.google.com/store/apps/details?id=org.strongswan.android"
+	    local app_name='strongSwan'
+
+	    cat << EOT
+${bullet}Install "${app_name} VPN Client" App (${app_link}) on your device (if it's not yet installed) and start it.
+${x2newline}
+${bullet}Delete any existing VPN profile named "${VPNSUBSCR_SERVICE_NAME}" in that App.
+${x2newline}
+${bullet}Open the VPN profile file attached to this email with the ${app_name} App and import it (follow instructions given by the App).
+${x2newline}
+${bullet}At this stage a VPN connection named "${VPNSUBSCR_SERVICE_NAME}" should appear in the list of VPN connections in your ${app_name} App. To connect the VPN, all you have to do is to turn it on.
+${x2newline}
+${bullet}${manual_web_proxy_message} Please refer to your Android documentation for more information on how to configure your device to use a proxy.
+EOT
+	    if test ${CURRENT_SSLMEDIATE_MODE} == True ; then
+		cat << EOT
+${x2newline}
+${ssl_mediation_description} To do so, proceed as follows: once connected to the VPN, visit the ${gateway_link} page to download the "${VPNSUBSCR_SERVICE_NAME}" CA certificate on your device. Then refer to your Android documentation for more information on how to configure your device to trust that CA certificate.
+EOT
+	    fi
+	    ;;
+	apple)
+	    cat << EOT
+${bullet}Delete any existing configuration profile named "${VPNSUBSCR_SERVICE_NAME}" on your device. On an iPhone, configuration profiles are located at "Settings > General >  VPN and Device Management".
+${x2newline}
+${bullet}Download the Apple profile file attached to this email. To download on an iPhone, just click on it and then you should get the "Profile Downloaded" message. You can then find the downloaded profile in your Settings.
+${x2newline}
+${bullet}Open the downloaded profile file and follow instructions given by your Apple device.
+${x2newline}
+${bullet}At this stage a VPN connection named "${VPNSUBSCR_SERVICE_NAME}"" should appear in the list of VPN connections on your Apple device. To connect the VPN, all you have to do is to turn it on.
+${x2newline}
+${bullet}Stay connected on an iPhone: in order to automatically connect the VPN whenever you connect the network, proceed as follows: got to the "Settings > General > VPN and Device Management > VPN > ${vpn_name} and toggle on the "Connect On Demand" option.
+${x2newline}
+${bullet}${auto_web_proxy_message}
+EOT
+	    if test ${CURRENT_SSLMEDIATE_MODE} == True ; then
+		cat << EOT
+${ssl_mediation_description} To do so, proceed as follows: locate the "${VPNSUBSCR_SERVICE_NAME}" CA certificate on your device (on an iPhone, CA certificates are located at "Settings > General >  About > Certificate Trust Settings"). Then enable full trust for the "${VPNSUBSCR_SERVICE_NAME}" CA certificate.
+EOT
+	    fi
+	    ;;
+	linux)
+	    local eap_lib_comment
+	    local file_prefix=${client_vpn_id}
+	    local app_name='strongSwan'
+	    local porgram_dir=${VPNSUBSCR_SERVICE_NAME// /-}
+
+	    test ${CURRENT_VPN_IPSEC_ACCESS_AUTHENTICATE} != eaptls || eap_lib_comment=" In addition, the libcharon-extra-plugins should also be installed on your Linux machine in order to use the EAP-TLS authentication."
+
+	    cat << EOT
+${bullet}Install the "${app_name} charon-cmd" command on your machine (if it's not yet installed). On many Linux distro, you can use a package manager such as RPM or APT to install that command.${eap_lib_comment}
+${x2newline}
+${bullet}Download the bash script file attached to this email and put in a dedicated empty directory that you can name "${porgram_dir}" for instance. Then enter that directory (cd ${porgram_dir}) and run it as the user root to connect the VPN. To do so, you can use the "sudo bash ${script}" command.
+${x2newline}
+${bullet}${manual_web_proxy_message}
+EOT
+	    if test ${CURRENT_SSLMEDIATE_MODE} == True ; then
+		cat << EOT
+${x2newline}
+${ssl_mediation_description} The "${VPNSUBSCR_SERVICE_NAME}". The CA certificate to trust in is named ${VPNSUBSCR_SERVICE_NAME}-CA.cert and you can find it in the previously created directory.
+EOT
+	    fi
+	    ;;
+	windows)
+	    ipv6_default_route_message="If your machine uses IPv6 and after having connected the VPN, a default route via an IPv6 gateway persists, you must delete that route by using the following command: \"route delete ::/0 <ipv6-gateway-ip>\" where <ipv6-gateway-ip> is your default IPv6 gateway."
+
+	    cat << EOT
+${bullet}Download the PowerShell script file attached to this email and then run it as Administrator.
+${x2newline}
+${bullet}At this stage a VPN connection named "${VPNSUBSCR_SERVICE_NAME}" should appear in the list of VPN connections on your Windows machine. To connect the VPN, all you have to do is to turn it on.
+${x2newline}
+${bullet}${auto_web_proxy_message}
+${x2newline}
+${bullet}${ipv6_default_route_message}
+EOT
+	    if test ${CURRENT_SSLMEDIATE_MODE} == True ; then
+		cat << EOT
+${ssl_mediation_description} Please note that the "${VPNSUBSCR_SERVICE_NAME}" CA certificate is installed as a trusted CA certificate for Web browsing by the PowerShell setup script.
+EOT
+	    fi	     
+	    ;;
+	*)
+	    return 255
+	    ;;
+    esac
+
+    cat << EOT
+${x2newline}
+Best Regards,
+${newline}
+${ADMINISTRATOR_CONTACT_NAME}
+EOT
+}
+
+cacheguard-apply()
+{
+    local error_file=/tmp/vpnsubscr-setup-error.${$}
+
+    su - ${ADMIN_NAME} -c "apply force wait" 2> ${error_file}
+    local error=$(get-error-text ${error_file})
+
+    if test -n "${error}" ; then
+	vpnsubscr-log-error 101 "can't perform an apply at the CacheGuard Gateway level. The low level error is: ${error}"
+	return 101
+    fi
+}
+
+send-setup-confirmation-email()
+{
+    test ${EMAIL_STATE} == ${VPNSUBSCR_EMAIL_STATE_ACTIVATED} || return 0
+
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    test -n "${3}" || return 3
+    local service=${1}
+    local service_name=${2}
+    local previous_service_name=${3}
+
+    local error_file=/tmp/vpnsubscr-setup-error.${$}
+
+    local subject="${service_name}"
+    local operation message
+
+    reset_message="Your active subscribers have been informed about this event and received their new profile (or script) files. However you will have to <strong>manually</strong> transmit them their new user certificate passwords. Also please note that suspended and cancelled subscribers have been deleted.";
+
+    if test "${service_name}" == "${previous_service_name}" ; then
+
+	case ${service} in
+	    ${VPNSUBSCR_SETUP_STATE_INITIALISED})
+		operation='activated'
+		;;
+	    ${VPNSUBSCR_SETUP_STATE_MODIFIED})
+		operation='modified'
+		;;
+	    ${VPNSUBSCR_SETUP_STATE_RESET})
+		operation='reset'
+		message="${message}<p>${reset_message}"
+		;;
+	    *)
+		# should never be here
+		operation='set'
+		;;
+	esac
+	message="Dear ${ADMINISTRATOR_CONTACT_NAME}<p>We are pleased to inform you that your <strong>${service_name}</strong> service has been successfully ${operation}."
+    else
+	message="Dear ${ADMINISTRATOR_CONTACT_NAME}<p>We are pleased to inform you that your <strong>${previous_service_name}</strong> service has been successfully replaced by the <strong>${service_name}</strong> service.<p>${reset_message}"
+    fi
+
+    message="${message}<p>All the Best,<br />Your CacheGuard Appliance."
+    su - ${ADMIN_NAME} -c "TERM=${NOPROGRESS_TERM} CLI_SILENT=yes email send ${ADMINISTRATOR_CONTACT_EMAIL} '${ADMINISTRATOR_CONTACT_NAME}' '${subject}' '${message}'" 2> ${error_file}
+    local error=$(get-error-text ${error_file})
+
+    if test -n "${error}" ; then
+	vpnsubscr-log-error 121 "can't send the setup confirmation email. The low level error is: ${error}"
+	return 121
+    fi
+}
+
+activate-setup()
+{
+    local error_file=/tmp/vpnsubscr-setup-error.${$}
+
+    set-setup-service ${VPNSUBSCR_SETUP_STATE_ACTIVATED} 2> ${error_file}
+    local error=$(get-error-text ${error_file})
+
+    if test -n "${error}" ; then
+	vpnsubscr-log-error 141 "can't activate the setup. The low level error is: ${error}"
+	return 141
+    fi
+}
+
+fail-setup()
+{
+    test -n "${1}" || return 1
+    local service=${1}
+
+    local error_file=/tmp/vpnsubscr-setup-error.${$}
+
+    case ${service} in
+	${VPNSUBSCR_SETUP_STATE_INITIALISED} | ${VPNSUBSCR_SETUP_STATE_INIT_FAILED})
+	    set-setup-service ${VPNSUBSCR_SETUP_STATE_INIT_FAILED} 2> ${error_file}
+	    ;;
+	${VPNSUBSCR_SETUP_STATE_RESET} | ${VPNSUBSCR_SETUP_STATE_RESET_FAILED})
+	    set-setup-service ${VPNSUBSCR_SETUP_STATE_RESET_FAILED} 2> ${error_file}
+	    ;;
+	*)
+	    set-setup-service ${VPNSUBSCR_SETUP_STATE_FAILED} 2> ${error_file}
+	    ;;
+    esac
+
+    local error=$(get-error-text ${error_file})
+
+    if test -n "${error}" ; then
+	vpnsubscr-log-error 143 "can't fail the setup record. The low level error is: ${error}"
+	return 143
+    fi
+}
+
+handle-first-setup()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    test -n "${3}" || return 3
+    local service_name=${1}
+    local domain_name=${2}
+    local vpn_address=${3}
+
+    local error code
+    local ingress egress
+
+    local error_file=/tmp/vpnsubscr-setup-error.${$}
+    local ca_conf_file="vpnsubscr-tls-system-ca.conf.${$}"
+    local tls_conf_file="vpnsubscr-tls-vpn-server.conf.${$}"
+
+    local fw_dos_tcp_limit=$[${USERS_NB} * 15]
+    local fw_dos_upd_limit=$[${USERS_NB} * 15]
+    local fw_dos_web_limit=$[${USERS_NB} * 10]
+
+    local fw_dos_tcp_burst=$[${fw_dos_tcp_limit} * 5]
+    local fw_dos_udp_burst=$[${fw_dos_upd_limit} * 5]
+    local fw_dos_web_burst=$[${fw_dos_web_limit} * 5]
+
+    fw_dos_tcp_burst=$(min-value ${fw_dos_tcp_burst} 10000)
+    fw_dos_udp_burst=$(min-value ${fw_dos_udp_burst} 10000)
+    fw_dos_web_burst=$(min-value ${fw_dos_web_burst} 10000)
+
+    ingress=$[${USERS_NB} * 5000]
+    ingress=$(max-value ${ingress} 100000)
+    ingress=$(min-value ${ingress} 2000000)
+
+    egress=$[${ingress} / 2]
+
+    cat << EOT > ${TMP_DIR}/${ca_conf_file}
+${service_name}
+${VPNSUBSCR_PRIVATE_KEY_LENGTH}
+${VPNSUBSCR_CERTIFICATE_DAYS}
+${VPNSUBSCR_CERTIFICATE_COUNTRY}
+${VPNSUBSCR_CERTIFICATE_PROVINCE}
+${VPNSUBSCR_CERTIFICATE_LOCALITY}
+${VPNSUBSCR_CERTIFICATE_ORGANISATION}
+${VPNSUBSCR_CERTIFICATE_UNIT}
+EOT
+
+    cat << EOT > ${TMP_DIR}/${tls_conf_file}
+${vpn_address}
+${VPNSUBSCR_PRIVATE_KEY_LENGTH}
+${VPNSUBSCR_CERTIFICATE_DAYS}
+${VPNSUBSCR_CERTIFICATE_COUNTRY}
+${VPNSUBSCR_CERTIFICATE_PROVINCE}
+${VPNSUBSCR_CERTIFICATE_LOCALITY}
+${VPNSUBSCR_CERTIFICATE_ORGANISATION}
+${VPNSUBSCR_CERTIFICATE_UNIT}
+EOT
+
+    su - ${ADMIN_NAME} -c \
+       "
+domainname ${domain_name}
+dns raz
+dns add localhost
+mode vpnipsec on
+mode dns on
+
+vpnipsec network access raz
+vpnipsec network access add local default
+vpnipsec network access add remote ${VPNSUBSCR_NETWORK}
+
+qos bandwidth external ingress ${ingress}
+qos bandwidth external egress ${egress}
+
+firewall dos tcpflood set ${fw_dos_tcp_limit} ${fw_dos_tcp_burst}
+firewall dos udpflood set ${fw_dos_upd_limit} ${fw_dos_udp_burst}
+firewall dos webflood set ${fw_dos_web_limit} ${fw_dos_web_burst}
+firewall vpnipsec add AllowAll allow
+
+tls server add ${VPNSUBSCR_VPN_TLS_ID}
+
+vpnipsec access on ${VPNSUBSCR_IKE_ENCRYPTION} ${VPNSUBSCR_IKE_INTEGRITY} ${VPNSUBSCR_IKE_DIFFIE_HELLMAN} ${VPNSUBSCR_ESP_ENCRYPTION} ${VPNSUBSCR_ESP_INTEGRITY}
+vpnipsec authenticate tls ${VPNSUBSCR_VPN_TLS_ID} fqdn
+vpnipsec access authenticate eaptls
+vpnipsec access access raz
+vpnipsec access access add dummy
+
+__BATCH_MODE=no tls ca system generate < /tmp/${ca_conf_file}
+__BATCH_MODE=no tls server generate ${VPNSUBSCR_VPN_TLS_ID} sign < /tmp/${tls_conf_file}
+" \
+       2> ${error_file} > /dev/null
+    error=$(get-error-text ${error_file})
+
+    rm -f ${ca_conf_file}
+
+    if test -n "${error}" ; then
+	code=41
+	vpnsubscr-log-error ${code} "can't create the first setup. The low level error is: ${error}"
+	return ${code}
+    fi
+
+    if test ${VPNSUBSCR_TEST_MODE} == yes ; then
+	local ntps=$(dig +short ntp.ubuntu.com 2> /dev/null)
+	local ntp=$(get-nth-arg 1 ${ntps})
+	su - ${ADMIN_NAME} -c \
+	   "
+mode qos off
+mode cache off
+mode compress off
+
+access admin add vpnipsec 0.0.0.0/0
+
+ntp raz
+ntp add ${ntp}
+" \
+	   2> ${error_file} > /dev/null
+    else
+	if is-embedded-in-cloud vpnsubscr ; then
+	    su - ${ADMIN_NAME} -c \
+	       "
+mode qos on
+mode cache on
+mode compress on
+mode log off
+
+access web add vpnipsec ${VPNSUBSCR_NETWORK}
+tweb add vpnipsec ${VPNSUBSCR_NETWORK}
+
+access admin raz
+access admin add external 0.0.0.0/0
+access admin add vpnipsec ${VPNSUBSCR_NETWORK}
+access admin add internal ${CURRENT_IP_INTERNAL_IP}/32
+
+ntp raz
+ntp add ntp.ubuntu.com
+" \
+	       2> ${error_file} > /dev/null
+	else
+	    su - ${ADMIN_NAME} -c \
+	       "
+access admin add vpnipsec ${VPNSUBSCR_NETWORK}
+access admin add internal ${CURRENT_IP_INTERNAL_IP}/32
+" \
+	       2> ${error_file} > /dev/null
+	fi
+    fi
+
+    error=$(get-error-text ${error_file})
+    if test -n "${error}" ; then
+	code=43
+	vpnsubscr-log-error ${code} "can't create the first setup. The low level error is: ${error}"
+	return ${code}
+    fi
+
+    set-setup-vpn-address ${ip} 2> ${error_file}
+    local error=$(get-error-text ${error_file})
+
+    if test -n "${error}" ; then
+	code=45
+	vpnsubscr-log-error ${code} "can't set the setup VPN address. The low level error is: ${error}"
+	return ${code}
+    fi
+}
+
+handle-reset-subscribers()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    local service_name=${1}
+    local previous_service_name=${2}
+
+    local subscribers_file=/tmp/vpnsubscr-subscribers.${$}
+    local error
+
+    rm -f ${subscribers_file}
+    get-subscribers > ${subscribers_file} 2> ${error_file}
+    error=$(get-error-text ${error_file})
+
+    if test -n "${error}" ; then
+	rm -f ${subscribers_file}
+	vpnsubscr-log-error 51 "can't get active subscribers. The low level error is: ${error}"
+	return 51
+    fi
+
+    local line rest
+    local username email first last phone device service
+    local name message
+    local profile_file instructions_file
+    local subject="${previous_service_name} Cancelled"
+
+    while read line
+    do
+	username=${line/|*}
+	rest=${line#*|}
+
+	email=${rest/|*} ; rest=${rest#*|}
+	first=${rest/|*} ; rest=${rest#*|}
+	last=${rest/|*} ; rest=${rest#*|}
+	phone=${rest/|*} ; rest=${rest#*|}
+	device=${rest/|*} ; rest=${rest#*|}
+	service=${rest/|*} ; rest=${rest#*|}
+
+	device=$(get-cg-device ${device})
+	profile_file=$(get-profile-filename ${username} ${device} "${previous_service_name}")
+	instructions_file=$(get-instructions-filename ${username})
+
+	rm -f \
+	   ${VPNSUBSCR_PROFILE_DIR}/${profile_file} \
+	   ${VPNSUBSCR_PROFILE_DIR}/${instructions_file}
+
+	if test ${EMAIL_STATE} == ${VPNSUBSCR_EMAIL_STATE_ACTIVATED} -a \
+		${service} -ne ${VPNSUBSCR_SUBSCRIBER_STATE_CANCELLED} -a \
+		${service} -lt ${VPNSUBSCR_SUBSCRIBER_STATE_RESET}; then
+
+	    name=$(get-name "${first}" "${last}")
+            message="Dear ${name}<p>Please note that due to unwanted circumstances beyond our control, the <strong>${previous_service_name}</strong> service will stop working shortly. We will endeavour to replace it by a new service named <strong>${service_name}</strong> as soon as possible. You will receive your credentials to access the new replacement service in a few moment.<p>Best Regards,<br />${ADMINISTRATOR_CONTACT_NAME}"
+
+	    su - ${ADMIN_NAME} -c "TERM=${NOPROGRESS_TERM} CLI_SILENT=yes email send ${email} '${name}' '${subject}' '${message}'" 2> ${error_file}
+	    error=$(get-error-text ${error_file})
+
+	    test -z "${error}" || \
+		vpnsubscr-log-error 53 "can't inform the '${username}' account that her/his account has been reset. The low level error is: ${error}"
+	fi
+    done < ${subscribers_file}
+
+    rm -f ${subscribers_file}
+
+    reset-active-subscribers 2> ${error_file}
+    error=$(get-error-text ${error_file})
+
+    if test -n "${error}" ; then
+	vpnsubscr-log-error 55 "can't reset active subscribers. The low level error is: ${error}"
+	return 55
+    fi
+
+    delete-obsolete-subscribers 2> ${error_file}
+    error=$(get-error-text ${error_file})
+
+    if test -n "${error}" ; then
+	vpnsubscr-log-error 57 "can't delete obsolete subscribers. The low level error is: ${error}"
+	return 57
+    fi
+}
+
+handle-reset-setup()
+{
+    local error_file=/tmp/vpnsubscr-setup-error.${$}
+    local error
+
+    su - ${ADMIN_NAME} -c \
+       "
+vpnipsec authenticate psk auto
+vpnipsec access access raz
+vpnipsec access access add dummy
+
+tls server del ${VPNSUBSCR_VPN_TLS_ID}
+tls client raz
+" \
+       2> ${error_file} > /dev/null
+    error=$(get-error-text ${error_file})
+
+    if test -n "${error}" ; then
+	vpnsubscr-log-error 61 "can't create the first setup. The low level error is: ${error}"
+	return 61
+    fi
+
+    su - ${ADMIN_NAME} -c "apply force wait" 2> ${error_file}
+    error=$(get-error-text ${error_file})
+
+    if test -n "${error}" ; then
+	vpnsubscr-log-error 63 "can't apply the setup reset request. The low level error is: ${error}"
+	return 63
+    fi
+}
+
+handle-modify-setup()
+{
+    test -n "${1}" || return 1
+    local timezone=${1}
+
+    local error_file=/tmp/vpnsubscr-setup-error.${$}
+    local name=$(get-name "${first}" "${last}")
+    local error
+
+    su - ${ADMIN_NAME} -c \
+       "
+timezone ${timezone}
+" \
+       2> ${error_file} > /dev/null
+    error=$(get-error-text ${error_file})
+
+    if test -n "${error}" ; then
+	vpnsubscr-log-error 71 "can't modify the setup. The low level error is: ${error}"
+	return 71
+    fi
+}
+
+reset-ipsec-access-db()
+{
+    apl_create_db ${VPN_IPSEC_ACCESS_DB_SCHEMA} ${RUN_DIR}/${VPN_IPSEC_ACCESS_DB_FILE} || return 11
+}
+
+
+handle-setup()
+{
+    local error_file=/tmp/vpnsubscr-setup-error.${$}
+    local setup=$(get-setup 2> ${error_file})
+    local error=$(get-error-text ${error_file})
+
+    if test -n "${error}" ; then
+	vpnsubscr-log-error 11 "can't get the setup record. The low level error is: ${error}"
+	return 11
+    fi
+
+    local service_name=${setup/|*}
+    local rest=${setup#*|}
+
+    local previous_service_name=${rest/|*} ; rest=${rest#*|}
+    local domain_name=${rest/|*} ; rest=${rest#*|}
+    local timezone=${rest/|*} ; rest=${rest#*|}
+    local vpn_address=${rest/|*} ; rest=${rest#*|}
+    local service=${rest/|*} ; rest=${rest#*|}
+
+    if test -z "${vpn_address}" ; then
+	vpn_address=$(get-my-accessible-public-ip)
+	test -n "${vpn_address}" || vpn_address=${CURRENT_IP_EXTERNAL_IP}
+    fi
+
+    VPNSUBSCR_SERVICE_NAME=${service_name}
+    VPNSUBSCR_DOMAIN_NAME=${domain_name}
+    VPNSUBSCR_SERVICE=${service}
+
+    case ${service} in
+	${VPNSUBSCR_SETUP_STATE_ACTIVATED} | ${VPNSUBSCR_SETUP_STATE_INEXISTANT})
+	    return 0
+	    ;;
+
+	${VPNSUBSCR_SETUP_STATE_INITIALISED} | ${VPNSUBSCR_SETUP_STATE_INIT_FAILED})
+	    handle-first-setup \
+		"${service_name}" \
+		${domain_name} \
+		${vpn_address} || return ${?}
+
+	    handle-modify-setup ${timezone} || return ${?}
+	    ;;
+
+	${VPNSUBSCR_SETUP_STATE_MODIFIED} | ${VPNSUBSCR_SETUP_STATE_FAILED})
+	    handle-modify-setup ${timezone} || return ${?}
+	    ;;
+
+	${VPNSUBSCR_SETUP_STATE_RESET} | ${VPNSUBSCR_SETUP_STATE_RESET_FAILED})
+	    handle-reset-setup || return ${?}
+	    reset-ipsec-access-db || return 13
+
+	    handle-reset-subscribers \
+		"${service_name}" \
+		"${previous_service_name}" || return ${?}
+
+	    reset-setup-service "${service_name}" 2> ${error_file}
+	    error=$(get-error-text ${error_file})
+
+	    if test -n "${error}" ; then
+		vpnsubscr-log-error 15 "can't reset the setup. The low level error is: ${error}"
+		return 15
+	    fi
+
+	    handle-first-setup \
+		"${service_name}" \
+		${domain_name} \
+		${vpn_address} || return ${?}
+	    ;;
+	*)
+	    return 17
+	    ;;
+    esac
+
+    cacheguard-apply || return ${?}
+
+    send-setup-confirmation-email \
+	"${service}" \
+	"${service_name}" \
+	"${previous_service_name}" || return ${?}
+
+    activate-setup || return ${?}
+}
+
+handle-email()
+{
+    local error_file=/tmp/vpnsubscr-email-error.${$}
+    local email=$(get-email 2> ${error_file})
+    local error=$(get-error-text ${error_file})
+
+    if test -n "${error}" ; then
+
+	EMAIL_STATE=${VPNSUBSCR_SETUP_STATE_INEXISTANT}
+	ADMINISTRATOR_CONTACT_NAME=$(get-administrator-name)
+	unset ADMINISTRATOR_CONTACT_EMAIL
+
+	vpnsubscr-log-error 201 "can't get the email record. The low level error is: ${error}"
+	return 201
+    fi
+
+    local first_name=${email/|*}
+    local rest=${email#*|}
+
+    local last_name=${rest/|*} ; rest=${rest#*|}
+    local email_address=${rest/|*} ; rest=${rest#*|}
+    local server=${rest/|*} ; rest=${rest#*|}
+    local port=${rest/|*} ; rest=${rest#*|}
+    local account=${rest/|*} ; rest=${rest#*|}
+    local password=${rest/|*} ; rest=${rest#*|}
+    local service=${rest/|*} ; rest=${rest#*|}
+
+    password=$(decode-string "${password}")
+
+    EMAIL_STATE=${service}
+    ADMINISTRATOR_CONTACT_NAME=${name}
+    ADMINISTRATOR_CONTACT_EMAIL=${email_address}
+
+    case ${service} in
+	${VPNSUBSCR_EMAIL_STATE_ACTIVATED} | ${VPNSUBSCR_EMAIL_STATE_INEXISTANT} | ${VPNSUBSCR_EMAIL_STATE_FAILED})
+	    return 0
+	    ;;
+
+	${VPNSUBSCR_EMAIL_STATE_MODIFIED})
+	    ;;
+	*)
+	    return 203
+	    ;;
+    esac
+
+    local name=$(get-administrator-name "${first_name}" "${last_name}")
+
+    test -n "${password}" || password='*'
+    test -n "${server}" || server='raz'
+
+    local error_file=/tmp/vpnsubscr-email-error.${$}
+    local error
+
+    su - ${ADMIN_NAME} -c \
+       "
+email admin ${email_address} '${name}'
+email account '${server}' '${port}' '${account}' '${password}'
+" \
+       2> ${error_file} > /dev/null
+    error=$(get-error-text ${error_file})
+
+    if test -n "${error}" ; then
+	vpnsubscr-log-error 211 "can't modify the email account. The low level error is: ${error}"
+	fail-email
+	return 211
+    fi
+
+    cacheguard-apply || return ${?}
+
+    if test ${server} == 'raz' -o -z "${port}" -o -z "${account}" ; then
+	reset-email
+	return ${?}
+    fi
+
+    local message="Dear ${ADMINISTRATOR_CONTACT_NAME}<p>We are pleased to inform you that your email account has been successfully connected to your ${EMBEDDED_VPNSUBSCR_COMMERCIAL_NAME} service."
+    local subject="Email Activation"
+
+    message="${message}<p>All the Best,<br />Your CacheGuard Appliance."
+
+    su - ${ADMIN_NAME} -c "TERM=${NOPROGRESS_TERM} CLI_SILENT=yes email send ${ADMINISTRATOR_CONTACT_EMAIL} '${ADMINISTRATOR_CONTACT_NAME}' '${subject}' '${message}'" 2> ${error_file}
+    local error=$(get-error-text ${error_file})
+
+    if test -n "${error}" ; then
+	vpnsubscr-log-error 213 "can't send the email service activation email. The low level error is: ${error}"
+	fail-email
+	return 213
+    fi
+
+    activate-email
+}
+
+get-alive-subscribers()
+{
+    test -f ${RUN_DIR}/${VPN_IPSEC_ACCESS_DB_FILE} || return 0
+    local db_file=${RUN_DIR}/${VPN_IPSEC_ACCESS_DB_FILE}
+
+    sqlite3 ${db_file} << EOFSQL
+SELECT id, alive_date FROM access;
+EOFSQL
+}
+
+refresh-subscribers-alive-date()
+{
+    local subscribers_file=/tmp/vpnsubscr-alive-subscribers.${$}
+    local error
+
+    rm -f ${subscribers_file}
+
+    get-alive-subscribers > ${subscribers_file} 2> ${error_file}
+    error=$(get-error-text ${error_file})
+
+    if test -n "${error}" ; then
+	rm -f ${subscribers_file}
+	vpnsubscr-log-error 111 "can't get alive subscribers. The low level error is: ${error}"
+	return 111
+    fi
+
+    local line rest
+    local id ip date
+    local username
+
+    while read line
+    do
+	id=${line/|*}
+	rest=${line#*|}
+
+	ip=${rest/|*} ; rest=${rest#*|}
+	date=${rest/|*} ; rest=${rest#*|}
+
+	username=${id%.${CURRENT_DOMAIN_NAME}}
+
+	update-subscriber-alive-date ${username} ${date} 2> ${error_file}
+	error=$(get-error-text ${error_file})
+
+	if test -n "${error}" ; then
+	    vpnsubscr-log-error 113 "can't update the alive date for the '${username}' account. The low level error is: ${error}"
+	    continue
+	fi
+	
+    done < ${subscribers_file}
+
+    rm -f ${subscribers_file}
+}
+
+manage-email-modified-subscribers()
+{
+    test ${EMAIL_STATE} == ${VPNSUBSCR_EMAIL_STATE_ACTIVATED} || return 0
+
+    local line rest error to
+    local username email first last device alive_date
+    local name
+
+    local error_file=/tmp/vpnsubscr-account-email-error.${$}
+    local subscribers_file=/tmp/vpnsubscr-email-subscribers.${$}
+
+    rm -f ${subscribers_file}
+    get-email-modified-subscribers > ${subscribers_file} 2> ${error_file}
+    error=$(get-error-text ${error_file})
+
+    if test -n "${error}" ; then
+	rm -f ${subscribers_file}
+	vpnsubscr-log-error 151 "can't get email modified subscribers. The low level error is: ${error}"
+	return 151
+    fi
+
+    while read line
+    do
+	username=${line/|*}
+	rest=${line#*|}
+
+	email=${rest/|*} ; rest=${rest#*|}
+	first=${rest/|*} ; rest=${rest#*|}
+	last=${rest/|*} ; rest=${rest#*|}
+	device=${rest/|*} ; rest=${rest#*|}
+	alive_date=${rest/|*} ; rest=${rest#*|}
+
+	if test ${alive_date} == 0 ; then
+	    device=$(get-cg-device ${device})
+	    name=$(get-name "${first}" "${last}")
+
+	    su - ${ADMIN_NAME} -c \
+	       "TERM=${NOPROGRESS_TERM} vpnipsec access conf ${device} ${username} email ${email} '${name}'" \
+	       2> ${error_file}
+	    error=$(get-error-text ${error_file})
+
+	    if test -n "${error}" ; then
+		to=$(get-to ${email} "${name}")
+		vpnsubscr-log-error 1201 "can't resend the VPN file to ${to}. The low level error is: ${error}"
+		continue
+	    fi
+	fi
+
+	confirm-subscriber-email ${username} ${email} 2> ${error_file}
+	error=$(get-error-text ${error_file})
+	test -z "${error}" || \
+	    vpnsubscr-log-error 1203 "can't confirm the '${username}' email address. The low level error is: ${error}"
+    done < ${subscribers_file}
+
+    rm -f ${subscribers_file}
+}
+
+handle-subscribers()
+{
+    local line rest error to
+    local to_activate to_suspend=0 to_cancel=0 to_reactivate=0 i=0
+    local username email first last phone device service
+
+    local usernames emails names phones devices services
+    declare -a usernames emails names phones devices services
+
+    local name tls_password profile_file instructions_file
+    local domain_name
+
+    local error_file=/tmp/vpnsubscr-account-error.${$}
+    local subscribers_file=/tmp/vpnsubscr-subscribers.${$}
+
+    rm -f ${subscribers_file}
+    get-service-modified-subscribers > ${subscribers_file} 2> ${error_file}
+    error=$(get-error-text ${error_file})
+
+    if test -n "${error}" ; then
+	rm -f ${subscribers_file}
+	vpnsubscr-log-error 81 "can't get service modified subscribers. The low level error is: ${error}"
+	return 81
+    fi
+
+    local suspension_subject="${VPNSUBSCR_SERVICE_NAME} Suspended"
+    local suspension_message="We regret to announce you that your access to the <strong>${VPNSUBSCR_SERVICE_NAME}</strong> service has been suspended. You can contact your administrator for further information by repaying to this email."
+
+    local reactivation_subject="${VPNSUBSCR_SERVICE_NAME} Reactivated"
+    local reactivation_message="We are pleased to announce you that your access to the <strong>${VPNSUBSCR_SERVICE_NAME}</strong> service has been reactivated."
+
+    local deletion_subject="${VPNSUBSCR_SERVICE_NAME} Terminated"
+    local deletion_message="We regret to announce you that your access to the <strong>${VPNSUBSCR_SERVICE_NAME}</strong> service has been definitely terminated. You can contact your administrator for further information by repaying to this email."
+
+    while read line
+    do
+	username=${line/|*}
+	rest=${line#*|}
+
+	email=${rest/|*} ; rest=${rest#*|}
+	first=${rest/|*} ; rest=${rest#*|}
+	last=${rest/|*} ; rest=${rest#*|}
+	phone=${rest/|*} ; rest=${rest#*|}
+	device=${rest/|*} ; rest=${rest#*|}
+	service=${rest/|*} ; rest=${rest#*|}
+
+	name=$(get-name "${first}" "${last}")
+
+	case ${service} in
+
+	    ${VPNSUBSCR_SUBSCRIBER_STATE_INACTIVE} | ${VPNSUBSCR_SUBSCRIBER_STATE_RESET})
+
+		case ${service} in
+
+		    ${VPNSUBSCR_SUBSCRIBER_STATE_INACTIVE})
+			domain_name=${CURRENT_DOMAIN_NAME}
+			;;
+		    ${VPNSUBSCR_SUBSCRIBER_STATE_RESET})
+			domain_name=${VPNSUBSCR_DOMAIN_NAME}
+			;;
+		    *)
+			return 255
+			;;
+		esac
+
+		su - ${ADMIN_NAME} -c \
+		   "
+tls client add ${username}
+tls client generate ${username}
+vpnipsec access access add ${username}.${domain_name}
+" \
+		   2> ${error_file}
+		error=$(get-error-text ${error_file})
+
+		if test -n "${error}" ; then
+		    set-subscriber-operation-status ${username} ${VPNSUBSCR_FAILED_OPERATION}
+		    vpnsubscr-log-error 1001 "can't create the '${username}' account at the CacheGuard Gateway level. The low level error is: ${error}"
+		    continue
+		fi
+
+		usernames[${i}]=${username}
+		emails[${i}]=${email}
+		names[${i}]=${name}
+		phones[${i}]=${phone}
+		devices[${i}]=$(get-cg-device ${device})
+		services[${i}]=${service}
+		((i++))
+		;;
+
+	    ${VPNSUBSCR_SUBSCRIBER_STATE_2SUSPEND})
+		su - ${ADMIN_NAME} -c "vpnipsec access access del ${username}.${CURRENT_DOMAIN_NAME}" 2> ${error_file}
+		error=$(get-error-text ${error_file})
+		if test -n "${error}" ; then
+		    set-subscriber-operation-status ${username} ${VPNSUBSCR_FAILED_OPERATION}
+		    vpnsubscr-log-error 1003 "can't suspend the '${username}' account at the CacheGuard Gateway level. The low level error is: ${error}"
+		    continue
+		fi
+
+		((to_suspend++))
+
+		if test ${EMAIL_STATE} == ${VPNSUBSCR_EMAIL_STATE_ACTIVATED} ; then
+		    message="Dear ${name}<p>${suspension_message}<p>Best Regards,<br />${ADMINISTRATOR_CONTACT_NAME}"
+		    su - ${ADMIN_NAME} -c "TERM=${NOPROGRESS_TERM} CLI_SILENT=yes email send ${email} '${name}' '${suspension_subject}' '${message}'" 2> ${error_file}
+		    error=$(get-error-text ${error_file})
+		    if test -n "${error}" ; then
+			set-subscriber-operation-status ${username} ${VPNSUBSCR_FAILED_OPERATION}
+			vpnsubscr-log-error 1005 "can't inform the '${username}' account that her/his account has been suspended. The low level error is: ${error}"
+			continue
+		    fi
+		fi
+
+		set-subscriber-service-state ${username} ${VPNSUBSCR_SUBSCRIBER_STATE_SUSPENDED} 2> ${error_file}
+		error=$(get-error-text ${error_file})
+		if test -n "${error}" ; then
+		    set-subscriber-operation-status ${username} ${VPNSUBSCR_FAILED_OPERATION}
+		    vpnsubscr-log-error 1007 "can't suspend the '${username}' account. The low level error is: ${error}"
+		    continue
+		fi
+		;;
+
+	    ${VPNSUBSCR_SUBSCRIBER_STATE_2CANCEL})
+		su - ${ADMIN_NAME} -c \
+		   "
+tls client del ${username}
+vpnipsec access access del ${username}.${CURRENT_DOMAIN_NAME}
+" \
+		   2> ${error_file}
+		error=$(get-error-text ${error_file})
+		if test -n "${error}" ; then
+		    set-subscriber-operation-status ${username} ${VPNSUBSCR_FAILED_OPERATION}
+		    vpnsubscr-log-error 1009 "can't suspend the '${username}' account at the CacheGuard Gateway level before deletion. The low level error is: ${error}"
+		    continue
+		fi
+
+		((to_cancel++))
+
+		if test ${EMAIL_STATE} == ${VPNSUBSCR_EMAIL_STATE_ACTIVATED} ; then
+		    message="Dear ${name}<p>${deletion_message}<p>Best Regards,<br />${ADMINISTRATOR_CONTACT_NAME}"
+		    su - ${ADMIN_NAME} -c "TERM=${NOPROGRESS_TERM} CLI_SILENT=yes email send ${email} '${name}' '${deletion_subject}' '${message}'" 2> ${error_file}
+		    error=$(get-error-text ${error_file})
+		    if test -n "${error}" ; then
+			set-subscriber-operation-status ${username} ${VPNSUBSCR_FAILED_OPERATION}
+			vpnsubscr-log-error 1011 "can't inform the '${username}' account that her/his account has been terminated. The low level error is: ${error}"
+			continue
+		    fi
+		fi
+
+		cancel-subscriber ${username} 2> ${error_file}
+		error=$(get-error-text ${error_file})
+		if test -n "${error}" ; then
+		    set-subscriber-operation-status ${username} ${VPNSUBSCR_FAILED_OPERATION}
+		    vpnsubscr-log-error 1015 "can't cancel the '${username}' account. The low level error is: ${error}"
+		    continue
+		fi
+
+		device=$(get-cg-device ${device})
+		profile_file=$(get-profile-filename ${username} ${device} "${VPNSUBSCR_SERVICE_NAME}")
+		instructions_file=$(get-instructions-filename ${username})
+
+		rm -f \
+		   ${VPNSUBSCR_PROFILE_DIR}/${profile_file} \
+		   ${VPNSUBSCR_PROFILE_DIR}/${instructions_file}
+		;;
+
+	    ${VPNSUBSCR_SUBSCRIBER_STATE_2REACTIVATE})
+		su - ${ADMIN_NAME} -c "vpnipsec access access add ${username}.${CURRENT_DOMAIN_NAME}" 2> ${error_file}
+		error=$(get-error-text ${error_file})
+		if test -n "${error}" ; then
+		    set-subscriber-operation-status ${username} ${VPNSUBSCR_FAILED_OPERATION}
+		    set-subscriber-operation-status ${username} ${VPNSUBSCR_FAILED_OPERATION}
+		    vpnsubscr-log-error 1017 "can't reactivate the '${username}' account at the CacheGuard Gateway level. The low level error is: ${error}"
+		    continue
+		fi
+
+		((to_reactivate++))
+
+		if test ${EMAIL_STATE} == ${VPNSUBSCR_EMAIL_STATE_ACTIVATED} ; then
+		    message="Dear ${name}<p>${reactivation_message}<p>Best Regards,<br />${ADMINISTRATOR_CONTACT_NAME}"
+		    su - ${ADMIN_NAME} -c "TERM=${NOPROGRESS_TERM} CLI_SILENT=yes email send ${email} '${name}' '${reactivation_subject}' '${message}'" 2> ${error_file}
+		    error=$(get-error-text ${error_file})
+		    if test -n "${error}" ; then
+			set-subscriber-operation-status ${username} ${VPNSUBSCR_FAILED_OPERATION}
+			vpnsubscr-log-error 1019 "can't inform the '${username}' account that her/his account has been reactivated. The low level error is: ${error}"
+			continue
+		    fi
+		fi
+
+		set-subscriber-service-state ${username} ${VPNSUBSCR_SUBSCRIBER_STATE_ACTIVATED} 2> ${error_file}
+		error=$(get-error-text ${error_file})
+		if test -n "${error}" ; then
+		    set-subscriber-operation-status ${username} ${VPNSUBSCR_FAILED_OPERATION}
+		    vpnsubscr-log-error 1021 "can't reactivate the '${username}' account. The low level error is: ${error}"
+		    continue
+		fi
+		;;
+
+	    *)
+		;;
+	esac
+
+	set-subscriber-operation-status ${username} ${VPNSUBSCR_SUCCESSFUL_OPERATION}
+
+    done < ${subscribers_file}
+
+    to_activate=${i}
+    rm -f ${subscribers_file}
+
+    if test ${to_activate} -gt 0 -o \
+	    ${to_suspend} -gt 0 -o \
+	    ${to_reactivate} -gt 0 -o \
+	    ${to_cancel} -gt 0
+    then
+	su - ${ADMIN_NAME} -c "apply force wait" 2> ${error_file}
+	error=$(get-error-text ${error_file})
+
+	if test -n "${error}" ; then
+	    vpnsubscr-log-error 83 "can't apply the new configuration. The low level error is: ${error}"
+	    return 83
+	fi
+    fi
+
+    for ((i=0 ; i<to_activate ; i++))
+    do
+	username=${usernames[${i}]}
+	device=${devices[${i}]}
+	name=${names[${i}]}
+
+	profile_file=$(get-profile-filename ${username} ${device} "${VPNSUBSCR_SERVICE_NAME}")
+	instructions_file=$(get-instructions-filename ${username})
+
+	su - ${ADMIN_NAME} -c \
+	   "vpnipsec access conf ${device} ${username} show" \
+	   > ${VPNSUBSCR_PROFILE_DIR}/${profile_file}
+	   2> ${error_file}
+	error=$(get-error-text ${error_file})
+
+	if test -n "${error}" ; then
+	    to=$(get-to ${emails[${i}]} "${names[${i}]}")
+	    vpnsubscr-log-error 1101 "can't generate the ${device} VPN file for the '${username}' username. The low level error is: ${error}"
+	    continue
+	fi
+
+	gen-connection-instructions ${username} ${device} ${profile_file} "${name}" > ${VPNSUBSCR_PROFILE_DIR}/${instructions_file}
+
+	if test ${EMAIL_STATE} == ${VPNSUBSCR_EMAIL_STATE_ACTIVATED} ; then
+	    su - ${ADMIN_NAME} -c \
+	       "TERM=${NOPROGRESS_TERM} vpnipsec access conf ${device} ${username} email ${emails[${i}]} '${names[${i}]}'" \
+	       2> ${error_file}
+	    error=$(get-error-text ${error_file})
+
+	    if test -n "${error}" ; then
+		to=$(get-to ${emails[${i}]} "${names[${i}]}")
+		vpnsubscr-log-error 1103 "can't send the ${device} VPN file to ${to} for the '${username}' username. The low level error is: ${error}"
+		continue
+	    fi
+	fi
+
+	email=${emails[${i}]}
+	tls_password=$(cat ${SSL_CLIENT_DIR}/${username}.cur/${username}.password 2> /dev/null)
+
+	activate-subscriber ${username} ${email} "${tls_password}" 2> ${error_file}
+	error=$(get-error-text ${error_file})
+
+	if test -n "${error}" ; then
+	    vpnsubscr-log-error 1105 "can't activate the '${username}' account. The low level error is: ${error}"
+	    continue
+	fi
+    done
+
+    refresh-subscribers-alive-date || return ${?}
+    manage-email-modified-subscribers || return ${?}
+}
+
+main()
+{
+    local service ret1 ret2
+
+    vpnsubscr-lock-script
+    vpnsubscr-reset-log-file
+
+    handle-email
+    handle-setup ; ret1=${?}
+
+    if test ${ret1} -ne 0 ; then
+	fail-setup ${VPNSUBSCR_SERVICE} ; ret2=${?}
+
+	vpnsubscr-unlock-script
+
+	if test ${ret2} -ne 0 ; then
+	    return ${ret2}
+	else
+	    return ${ret1}
+	fi
+    fi
+
+    handle-subscribers ; ret1=${?}
+    if test ${ret1} -ne 0 ; then
+	vpnsubscr-unlock-script
+	return ${ret1}
+    fi
+
+    vpnsubscr-unlock-script
+}
+
+# Main()
+
+main

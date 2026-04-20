@@ -1,0 +1,1527 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       Commands
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+clean-generated-system-ca()
+{
+    rm -f \
+       ${TMP_DIR}/${SYSTEM_CA}.conf \
+       ${TMP_DIR}/${SYSTEM_CA}.cnf \
+       ${TMP_DIR}/${SYSTEM_CA}.key \
+       ${TMP_DIR}/${SYSTEM_CA}.certificate \
+       ${TMP_DIR}/${SYSTEM_CA}.der
+}
+
+clean-loaded-system-ca()
+{
+    rm -f \
+	${TMP_DIR}/${LOADED}.${SYSTEM_CA}.key \
+	${TMP_DIR}/${LOADED}.${SYSTEM_CA}.certificate \
+	${TMP_DIR}/${SYSTEM_CA}.conf \
+	${TMP_DIR}/${SYSTEM_CA}.der
+}
+
+clean-generated-tls-server()
+{
+    test -n "${1}" || return 1
+    local tls=${1}
+
+    rm -f \
+	${TMP_DIR}/${TLS_SERVER}.${tls}.conf \
+	${TMP_DIR}/${TLS_SERVER}.${tls}.2sign \
+	${TMP_DIR}/${TLS_SERVER}.${tls}.cnf \
+	${TMP_DIR}/${TLS_SERVER}.${tls}.key \
+	${TMP_DIR}/${TLS_SERVER}.${tls}.certificate \
+	${TMP_DIR}/${TLS_SERVER}.${tls}.csr
+}
+
+clean-loaded-tls-server()
+{
+    test -n "${1}" || return 1
+    local tls=${1}
+
+    rm -f \
+       ${TMP_DIR}/${LOADED}.${TLS_SERVER}.key.${tls} \
+       ${TMP_DIR}/${LOADED}.${TLS_SERVER}.csr.${tls} \
+       ${TMP_DIR}/${LOADED}.${TLS_SERVER}.certificate.${tls} \
+       ${TMP_DIR}/${LOADED}.${TLS_SERVER}.days.${tls} \
+       ${TMP_DIR}/${LOADED}.${TLS_SERVER}.${tls}.2sign \
+       ${TMP_DIR}/${TLS_SERVER}.${tls}.conf \
+       ${TMP_DIR}/${TLS_SERVER}.${tls}.cnf
+}
+
+clean-generated-tls-client()
+{
+    test -n "${1}" || return 1
+    local id=${1}
+
+    rm -f ${TMP_DIR}/${id}.{conf,cnf,key,csr,days,certificate,password,pkcs12,pfx}
+    rm -f ${SSL_CLIENT_DIR}/${id}.new
+}
+
+clean-loaded-tls-client()
+{
+    test -n "${1}" || return 1
+    local id=${1}
+
+    rm -f \
+       ${TMP_DIR}/${LOADED}.${TLS_CLIENT}.certificate.${id} \
+       ${TMP_DIR}/${TLS_CLIENT}.${id}.conf \
+       ${TMP_DIR}/${TLS_CLIENT}.${id}.cnf
+}
+
+get-revoke-reason()
+{
+    test -n "${1}" || return 1
+    local revoke_file=${1}
+
+    local reason=$(cat ${revoke_file} 2> /dev/null)
+
+    case "${reason}" in
+	unspecified|keyCompromise|CACompromise|affiliationChanged|superseded|cessationOfOperation|certificateHold|removeFromCRL)
+	    ;;
+	*)
+	    reason=unspecified
+	    ;;
+    esac
+
+    echo ${reason}
+}
+
+get-subject-alternative-names()
+{
+    test -n "${1}" || return 1
+    local tls_id=${1}
+
+    local cert_file=$(get-tls-server-component-file ${tls_id} certificate)
+    test -f ${cert_file} || return 11
+
+    local line names extended
+    local tmp_file=/tmp/openssl.san.${$}
+
+    openssl x509 -in ${cert_file} -text -noout 2> /dev/null > ${tmp_file}
+
+    while read line
+    do
+	test -n "${line}" || continue
+	test "${line}" != "X509v3 Extended Key Usage:" || extended=yes
+	    test -n "${extended}" || continue
+	    test "${line:0:4}" == 'DNS:' -o "${line:0:11}" == 'IP Address:' || continue
+
+	    names=${line}
+	    break
+    done < ${tmp_file}
+    rm -f ${tmp_file}
+
+    names=${names//,}
+    names=${names//IP Address:}
+    names=${names//DNS:}
+
+    echo ${names}
+}
+
+get-san-certificate-title()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    local tls_type=${1}
+    local names=${2}
+
+    case ${tls_type} in
+	server)
+	    if test "${names// }" == "${names}" ; then
+		echo ${names}
+	    else
+		echo "${tls_type^} SAN certificate"
+	    fi
+	    ;;
+	client)
+	    echo ${names/ *}
+	    ;;
+	*)
+	    ;;
+    esac
+}
+
+get-tls-end-date()
+{
+    test -n "${1}" || return 1
+    local cert_file=${1}
+    test -f ${cert_file} || return 11
+
+    local end_date end_epoch state
+    end_date=$(openssl x509 -in ${cert_file} -noout -nameopt multiline -enddate 2> /dev/null)
+    end_date=${end_date/notAfter=}
+    end_date=$(date --utc +"%y%m%d%H%M%SZ" --date="${end_date}" 2> /dev/null)
+    
+    echo ${end_date}
+}
+
+get-tls-validity-days()
+{
+    test -n "${1}" || return 1
+    local file=${1}
+
+    if test ! -f ${file} ; then
+	echo 0
+	return 11
+    fi
+
+    local start_date=$(openssl x509 -in ${file} -noout -nameopt multiline -startdate 2> /dev/null)
+    local end_date=$(openssl x509 -in ${file} -noout -nameopt multiline -enddate 2> /dev/null)
+
+    start_date=${start_date/notBefore=}
+    end_date=${end_date/notAfter=}
+
+    local start_epoch=$(date +"%s" --date="${start_date}" 2> /dev/null)
+    local end_epoch=$(date +"%s" --date="${end_date}" 2> /dev/null)
+
+    test -n "${start_epoch}" || start_epoch=0
+    test -n "${end_epoch}" || end_epoch=0
+
+    days=$[(${end_epoch} - ${start_epoch}) / 86400]
+
+    echo ${days}
+}
+
+check-tls-cert-signed-by-ca()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    local cert_file=${1}
+    local ca_file=${2}
+
+    test -f ${ca_file} || return 11
+    test -f ${cert_file} || return 13
+
+    local ca_issuer issuer
+    local ca_key_id key_id
+
+    local tmp_x509_ca_file=${ADMIN_TMP_DIR}/x509.ca.${$}
+    local tmp_x509_cert_file=${ADMIN_TMP_DIR}/x509.crt.${$}
+
+    openssl x509 -in ${ca_file} -text -noout > ${tmp_x509_ca_file} 2> /dev/null
+    openssl x509 -in ${cert_file} -text -noout > ${tmp_x509_cert_file} 2> /dev/null
+
+    ca_issuer=$(grep 'Issuer: ' ${tmp_x509_ca_file} 2> /dev/null)
+    issuer=$(grep 'Issuer: ' ${tmp_x509_cert_file} 2> /dev/null)
+
+    if test "${issuer}" != "${ca_issuer}" ; then
+	rm -f ${tmp_x509_ca_file} ${tmp_x509_cert_file}
+	return 21
+    fi
+
+    ca_key_id=$(grep 'keyid:' ${tmp_x509_ca_file} 2> /dev/null)
+    key_id=$(grep 'keyid:' ${tmp_x509_cert_file} 2> /dev/null)
+
+    rm -f ${tmp_x509_ca_file} ${tmp_x509_cert_file}
+
+    test "${key_id}" == "${ca_key_id}" || return 23
+}
+
+check-tls-cert-signed-by-system-ca()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    local tls_type=${1}
+    local tls_id=${2}
+
+    case ${tls_type} in
+	client)
+	    return 0
+	    ;;
+	server)
+	    if test -f ${TMP_DIR}/${TLS_SERVER}.${tls_id}.2sign ; then
+		return 0
+	    else
+		! tls-tmp-csr-exist ${tls_id} || return 0
+	    fi	    
+	    ;;
+	*)
+	    ;;
+    esac
+
+    local ca_file=$(get-tls-ca-system-component-file certificate)
+    local cert_file=$(get-tls-server-component-file ${tls_id} certificate)
+
+    check-tls-cert-signed-by-ca ${cert_file} ${ca_file}
+}
+
+check-tls-cert-self-signed()
+{
+    test -n "${1}" || return 1
+    local cert_file=${1}
+
+    test -f ${cert_file} || return 11
+
+    local issuer subject
+
+    local tmp_x509_cert_file=${ADMIN_TMP_DIR}/x509.crt.${$}
+
+    openssl x509 -in ${cert_file} -text -noout > ${tmp_x509_cert_file} 2> /dev/null
+
+    issuer=$(grep 'Issuer: ' ${tmp_x509_cert_file} 2> /dev/null)
+    issuer=${issuer/Issuer: }
+
+    subject=$(grep 'Subject: ' ${tmp_x509_cert_file} 2> /dev/null)
+    subject=${subject/Subject: }
+
+    rm -f ${tmp_x509_cert_file}
+
+    test "${issuer}" == "${subject}" || return 21
+}
+
+encrypt-password()
+{
+    test -n "${1}" || return 0
+    test -n "${2}" || return 2
+    local passwd=${1}
+    local file=${2}
+
+    local salt_file=${ROOT_DIR}${PRIVATE_DIR}/.${file}
+    test -f ${salt_file} || return 11
+
+    local ret
+    local key=${passwd/:*/}
+    local value=${passwd##${key}:}
+
+    case "${key}" in
+	encrypted)
+	    ret=0
+	    ;;
+	clear)
+	    test -z "${value}" || value=$(echo "${value}" | openssl enc -A -pbkdf2 -aes-256-cbc -base64 -salt -pass file:${salt_file} 2>/dev/null)
+	    ret=${?}
+	    ;;
+	*)
+	    return 21
+	    ;;
+    esac
+
+    echo "encrypted:${value}"
+    return ${ret}
+}
+
+decrypt-password()
+{
+    test -n "${1}" || return 0
+    test -n "${2}" || return 2
+    local passwd=${1}
+    local file=${2}
+
+    local salt_file=${ROOT_DIR}${PRIVATE_DIR}/.${file}
+    test -f ${salt_file} || return 11
+
+    local key=${passwd/:*/}
+    local value=${passwd##${key}:}
+
+    case "${key}" in
+	clear)
+	    ;;
+	encrypted)
+	     test -z "${value}" || value=$(echo ${value} | openssl enc -d -A -pbkdf2 -aes-256-cbc -base64 -salt -pass file:${salt_file} 2>/dev/null)
+	    ;;
+	*)
+	    value=${passwd}
+	    ;;
+    esac
+
+    echo ${value}
+    return 0
+}
+
+get-tls-ocsp-uri()
+{
+    test -n "${1}" || return 1
+    local file=${1}
+
+    test -f ${file} || return 11
+
+    local ocsp=$(openssl x509 -in ${file} -noout -nameopt multiline -ocsp_uri 2> /dev/null)
+    echo ${ocsp}
+}
+
+gen-extended-key-usage()
+{
+    test -n "${1}" || return 1
+    local tls_type=${1}
+
+    case ${tls_type} in
+	client)
+	    echo "extendedKeyUsage = clientAuth, emailProtection"
+	    ;;
+	server)
+	    echo "extendedKeyUsage = serverAuth"
+	    ;;
+	*)
+	    ;;
+    esac
+}
+
+gen-cert-conf()
+{
+    test -n "${1}" || return 1
+    local names=${1}
+
+    local numbits=${2}
+    local days=${3}
+    local country=${4:0:2}
+    local province=${5}
+    local locality=${6}
+    local organisation=${7}
+    local unit=${8}
+
+    test -n "${numbits}" || numbits="2048"
+    test -n "${days}" || days="365"
+    test -n "${country}" || country="${DEFAULT_COUNTRY_CODE}"
+    test -n "${province}" || province="My Province"
+    test -n "${locality}" || locality="My Locality"
+    test -n "${organisation}" || organisation="My Organisation"
+    test -n "${unit}" || unit="Security"
+
+    echo "numbits ${numbits}"
+    echo "days ${days}"
+    echo "commonName ${names}"
+    echo "countryName ${country}"
+    echo "stateOrProvinceName ${province}"
+    echo "localityName ${locality}"
+    echo "organizationName ${organisation}"
+    echo "organizationalUnitName ${unit}"
+}
+
+gen-tls-conf()
+{
+    test -n "${1}" || return 1
+    local file=${1}
+    local conf_type=${2}
+
+    test -n "${conf_type}" || conf_type='certificate'
+    test -f ${file} || return 11
+    
+    local line variable value
+    local numbits days countryName stateOrProvinceName localityName organizationName organizationalUnitName commonName
+    local subjectFound extensionFound altNameExtensionFound altNameExtensionLine=0
+
+    local tmp_file=${ADMIN_TMP_DIR}/tls-multiline.${$}
+
+    case ${conf_type} in
+	certificate)
+	    numbits=$(openssl x509 -in ${file} -text -noout 2> /dev/null | grep "RSA Public-Key:")
+	    days=$(get-tls-validity-days ${file})
+	    openssl \
+		x509 \
+		-in ${file} \
+		-text \
+		-noout \
+		-nameopt multiline \
+		2> /dev/null > ${tmp_file}
+	    ;;
+	csr)
+	    numbits=$(openssl req -in ${file} -text -noout 2> /dev/null | grep "RSA Public-Key:")
+	    days=365
+	    openssl \
+		req \
+		-in ${file} \
+		-text \
+		-noout \
+		-nameopt multiline \
+		2> /dev/null > ${tmp_file}
+	    ;;
+	*)
+	    return 13
+	    ;;
+    esac
+
+    numbits=${numbits/*RSA Public-Key: \(}
+    numbits=${numbits/ *}
+    test -n "${numbits}" || numbits=2048
+
+    while read line
+    do
+	test "${line}" != "Subject:" || subjectFound=yes
+	test "${line}" != "Subject Public Key Info:" || unset subjectFound
+	test "${line}" != "X509v3 extensions:" || extensionFound=yes
+	test -z "${extensionFound}" || test "${line}" != "X509v3 Subject Alternative Name:" || altNameExtensionFound=yes
+
+	if test -n "${subjectFound}" ; then
+	    variable=${line/ *}
+	    value=${line/*= }
+
+	    case ${variable} in
+                commonName|countryName|stateOrProvinceName|localityName|organizationName|organizationalUnitName)
+		    eval ${variable}='${value}'
+		    ;;
+		*)
+		    ;;
+	    esac
+	fi
+
+	if test -n "${altNameExtensionFound}" ; then
+	    ((altNameExtensionLine++))
+	    test ${altNameExtensionLine} -eq 2 || continue
+
+	    commonName=${line//DNS:}
+	    commonName=${commonName//,}
+	    break
+	fi
+    done < ${tmp_file}
+
+    echo "numbits ${numbits}"
+    echo "days ${days}"
+    echo commonName ${commonName}
+    echo countryName ${countryName}
+    echo stateOrProvinceName ${stateOrProvinceName}
+    echo localityName ${localityName}
+    echo organizationName ${organizationName}
+    echo organizationalUnitName ${organizationalUnitName}
+
+    rm -f ${tmp_file}
+}
+
+gen-tls-cnf()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    local conf_file=${1}
+    local tls_type=${2}
+    local signed=${3}
+    local ocsp=${4}
+    test -f ${conf_file} || return 3
+
+    local var val i=0
+
+    local var_t val_t
+    declare -a var_t val_t
+
+    while read var val
+    do
+	var_t[${i}]=${var}
+	val_t[${i}]=${val}
+	((i++))
+    done < ${conf_file}
+
+    local names=${val_t[2]} san name csr
+
+    case ${tls_type} in
+	ca)
+	    san=False
+	    csr=False
+	    ;;
+	client|server)
+	    san=True
+	    csr=False
+	    ;;
+	server:csr)
+	    san=True
+	    csr=True
+	    ;;
+	*)
+	    san=False
+	    csr=False
+	    ;;
+    esac
+
+    echo "SSLDIR = ${SSL_DIR}"
+
+    cat ${APPLIANCE_DIR}/etc/certificate.cnf-head-constant
+    echo
+    echo "[ v3_req ]"
+    echo "basicConstraints = CA:FALSE"
+    echo "keyUsage = nonRepudiation, digitalSignature, keyEncipherment, keyCertSign"
+    echo "subjectKeyIdentifier = hash"
+
+    if test -n "${signed}" ; then
+	test ${csr} == False ||echo "authorityKeyIdentifier = keyid:always, issuer:always"
+	test -z "${ocsp}" || echo "authorityInfoAccess = OCSP;URI:http://${OCSP_HOST}:${OCSP_PORT}"
+    fi
+
+    gen-extended-key-usage ${tls_type}
+    test ${san} == False || echo "subjectAltName = @alt_names"
+    echo
+    echo "[ v3_x509 ]"
+    echo "basicConstraints = CA:FALSE"
+    echo "keyUsage = nonRepudiation, digitalSignature, keyEncipherment, keyCertSign"
+    echo "subjectKeyIdentifier = hash"
+
+    if test -n "${signed}" ; then
+	echo "authorityKeyIdentifier = keyid:always, issuer:always"
+	test -z "${ocsp}" || echo "authorityInfoAccess = OCSP;URI:http://${OCSP_HOST}:${OCSP_PORT}"
+    fi
+
+    gen-extended-key-usage ${tls_type}
+    test ${san} == False || echo "subjectAltName = @alt_names"
+    echo
+    echo "[ req ]"
+    echo "default_bits = 2048"
+    echo "encrypt_key = yes"
+    echo "distinguished_name = req_distinguished_name"
+    if test "${san}" == False ; then
+	echo "x509_extensions = cert_type"
+    else
+        val_t[2]=$(get-san-certificate-title ${tls_type} "${names}")
+	echo "req_extensions = v3_req"
+	echo "x509_extensions = v3_x509"
+	echo
+	echo "[ alt_names ]"
+	i=0
+	for name in ${names}
+	do
+	    if check-expr-ip ${name} ; then
+		echo "IP.${i} = ${name}"
+	    else
+		echo "DNS.${i} = ${name}"
+	    fi
+	    ((i++))
+	done
+    fi
+    echo
+    cat ${APPLIANCE_DIR}/etc/certificate.cnf-req-dn-constant
+    for ((i=2 ; i<8 ; i++))
+    do
+	echo "${var_t[${i}]}_default = ${val_t[${i}]}"
+    done
+}
+
+update-ssl-serial()
+{
+    test -f ${SSL_CTL_DIR}/serial || return 11
+
+    local initial_serial_hex=$(cat ${SSL_CTL_DIR}/serial 2> /dev/null)
+    local initial_serial_dec=$((16#${initial_serial_hex}))
+
+    local serial_hex=${initial_serial_hex}
+    local serial_dec=${initial_serial_dec}
+
+    while test -L ${SSL_CTL_DIR}/${serial_hex}.pem
+    do
+	serial_dec=$((16#${serial_hex}))
+	((serial_dec++))
+	serial_hex=$(printf '%x' ${serial_dec})
+	serial_hex=${serial_hex^^}
+    done
+
+    test ${serial_dec} -gt ${initial_serial_dec} || return 0
+
+    mv -f ${SSL_CTL_DIR}/serial ${SSL_CTL_DIR}/serial.old
+    echo ${serial_hex} > ${SSL_CTL_DIR}/serial
+}
+
+remove-tls-from-index()
+{
+    test -n "${1}" || return 1
+    local in_id=${1}
+
+    test -s ${SSL_CTL_DIR}/index.txt || return 0
+
+    local state expiration serial unknown fdn
+    local revoke tls_file id found
+
+    while read state expiration serial unknown fdn
+    do
+	if test ${state} == R ; then
+	    revoke=${serial}
+	    serial=${unknown}
+	    fdn=${fdn#unknown*\/}
+	    fdn=/${fdn}
+	fi
+
+	tls_file=$(readlink ${SSL_CTL_DIR}/${serial}.pem 2> /dev/null)
+	id=$(file-basename ${tls_file} .certificate)
+	
+	if test ${id} == ${in_id} ; then
+	    rm -f ${SSL_CTL_DIR}/${serial}.pem
+	    found=yes
+	else
+	    if test ${state} == R ; then
+		echo -e "${state}\t${expiration}\t${revoke}\t${serial}\tunknown\t${fdn}"
+	    else
+		echo -e "${state}\t${expiration}\t\t${serial}\tunknown\t${fdn}"
+	    fi
+	fi
+    done < ${SSL_CTL_DIR}/index.txt > ${SSL_CTL_DIR}/index.txt.new
+
+    if test -z "${found}" ; then
+	rm -f ${SSL_CTL_DIR}/index.txt.new
+    else
+	cp -f ${SSL_CTL_DIR}/index.txt ${SSL_CTL_DIR}/index.txt.old &&
+            mv -f ${SSL_CTL_DIR}/index.txt.new ${SSL_CTL_DIR}/index.txt
+    fi
+}
+
+update-openssl-index()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    local tls_type=${1}
+    local in_id=${2}
+
+    test -s ${SSL_CTL_DIR}/index.txt || return 0
+
+    local ssl_dir ssl_rdir ssl_cert_dir cert_file
+
+    case ${tls_type} in
+	server)
+	    ssl_dir=${SSL_SERVER_DIR}
+	    ssl_cert_dir=${ssl_dir}
+	    ssl_rdir=$(file-basename ${SSL_SERVER_RDIR})
+	    cert_file=${TMP_DIR}/${LOADED}.${TLS_SERVER}.certificate.${in_id}
+	    ;;
+	client)
+	    ssl_dir=${SSL_CLIENT_DIR}
+	    ssl_cert_dir=${ssl_dir}/${in_id}.cur
+	    ssl_rdir=$(file-basename ${SSL_CLIENT_RDIR})
+	    ssl_rdir=${ssl_rdir}/${in_id}.cur
+	    cert_file=${TMP_DIR}/${LOADED}.${TLS_CLIENT}.certificate.${in_id}
+	    ;;
+	*)
+	    return 255
+	    ;;
+    esac
+
+    local in_expiration=$(get-tls-end-date ${cert_file})
+    local in_serial=$(get-tls-serial ${cert_file})
+    local in_fdn=$(get-tls-fdn ${cert_file})
+
+    local state expiration serial unknown fdn
+    local revoke tls_file id found
+
+    while read state expiration serial unknown fdn
+    do
+	if test ${state} == R ; then
+	    revoke=${serial}
+	    serial=${unknown}
+	    fdn=${fdn#unknown*\/}
+	    fdn=/${fdn}
+	fi
+
+	tls_file=$(readlink ${SSL_CTL_DIR}/${serial}.pem 2> /dev/null)
+	id=$(file-basename ${tls_file} .certificate)
+
+	if test ${id} == ${in_id} ; then
+	    echo -e "V\t${in_expiration}\t\t${in_serial}\tunknown\t${in_fdn}"
+	    rm -f ${SSL_CTL_DIR}/${serial}.pem
+	    rm -f ${ssl_dir}/${id}.revoked
+	    found=yes
+	else
+	    if test ${state} == R ; then
+		echo -e "${state}\t${expiration}\t${revoke}\t${serial}\tunknown\t${fdn}"
+	    else
+		echo -e "${state}\t${expiration}\t\t${serial}\tunknown\t${fdn}"
+	    fi
+	fi
+    done < ${SSL_CTL_DIR}/index.txt > ${SSL_CTL_DIR}/index.txt.new
+
+    if test -z "${found}" ; then
+	echo -e "V\t${in_expiration}\t\t${in_serial}\tunknown\t${in_fdn}" >> ${SSL_CTL_DIR}/index.txt.new
+    fi
+
+    ln -sf ../${ssl_rdir}/${in_id}.certificate ${SSL_CTL_DIR}/${in_serial}.pem &&
+	echo ${in_serial} > ${ADMIN_TMP_DIR}/${in_id}.serial.${$} &&
+	install -m 644 -o ${ADMIN_NAME} -g ${GROUP_NAME} ${ADMIN_TMP_DIR}/${in_id}.serial.${$} ${ssl_cert_dir}/${in_id}.serial &&
+	rm -f ${ADMIN_TMP_DIR}/${in_id}.serial.${$}
+
+    cp -f ${SSL_CTL_DIR}/index.txt ${SSL_CTL_DIR}/index.txt.old &&
+        mv -f ${SSL_CTL_DIR}/index.txt.new ${SSL_CTL_DIR}/index.txt
+}
+
+get-tls-subject()
+{
+    test -n "${1}" || return 1
+    local cert_file=${1}
+
+    local fdn=$(openssl x509 -in ${cert_file} -text -noout 2> /dev/null | grep 'Subject: ')
+    fdn=${fdn/*Subject: }
+
+    echo ${fdn}
+}
+
+get-tls-fdn()
+{
+    test -n "${1}" || return 1
+    local cert_file=${1}
+
+    local fdn=$(get-tls-subject ${cert_file})
+
+    fdn=${fdn//, /\/}
+    fdn=/${fdn}
+
+    echo ${fdn}
+}
+
+get-tls-canonical-name-from-dn()
+{
+    test -n "${1}" || return 1
+    local dn=${1}
+
+    local cn=${dn/*CN=}
+
+    echo ${cn}
+}
+
+get-tls-canonical-name()
+{
+    test -n "${1}" || return 1
+    local cert_file=${1}
+
+    local tmp_x509_cert_file=${ADMIN_TMP_DIR}/x509.crt.${$}
+
+    openssl x509 -in ${cert_file} -text -noout > ${tmp_x509_cert_file} 2> /dev/null
+
+    local subject=$(grep 'Subject: ' ${tmp_x509_cert_file} 2> /dev/null)
+    local cname=$(get-tls-canonical-name-from-dn "${subject}")
+
+    rm -f ${tmp_x509_cert_file}
+
+    echo ${cname}
+}
+
+get-tls-serial()
+{
+    test -n "${1}" || return 1
+    local cert_file=${1}
+
+    local serial=$(openssl x509 -in ${cert_file} -noout -nameopt multiline -serial 2> /dev/null)
+    serial=${serial/serial=}
+
+    echo ${serial}
+}
+
+get-numbits-days-from-conf-file()
+{
+    local numbits=2048
+    local days=365
+
+    if test -z "${1}" ; then
+	echo ${numbits} ${days}
+	return 1
+    fi
+
+    local conf_file=${1}
+
+    if test ! -f ${conf_file} ; then
+	echo ${numbits} ${days}
+	return 11
+    fi
+
+    local var val i=0
+    local numbits days
+
+    while read var val
+    do
+	test -n "${val}" || continue
+
+	case ${i} in
+	    0)
+		numbits=${val}
+		;;
+	    1)
+		days=${val}
+		;;
+	    *)
+		break
+		;;
+	esac
+	((i++))
+    done < ${conf_file}
+
+    echo ${numbits} ${days}
+}
+
+generate-system-ca()
+{
+    gen-tls-cnf ${TMP_DIR}/${SYSTEM_CA}.conf ca > ${TMP_DIR}/${SYSTEM_CA}.cnf
+    if test ${?} -ne 0 ; then clean-generated-system-ca ; return 11 ; fi
+
+    local numbits_days=$(get-numbits-days-from-conf-file ${TMP_DIR}/${SYSTEM_CA}.conf)
+    local numbits=${numbits_days/ *}
+    local days=${numbits_days/* }
+
+    openssl genrsa \
+	    ${numbits} \
+	    2> /dev/null > ${TMP_DIR}/${SYSTEM_CA}.key &&
+	chmod 600 ${TMP_DIR}/${SYSTEM_CA}.key
+    if test ${?} -ne 0 ; then clean-generated-system-ca ; return 13 ; fi
+
+    openssl req \
+	    -batch \
+	    -new \
+	    -x509 \
+	    -extensions v3_ca \
+	    -days ${days} \
+	    -sha256 \
+	    -key ${TMP_DIR}/${SYSTEM_CA}.key \
+	    -config ${TMP_DIR}/${SYSTEM_CA}.cnf \
+	    -out ${TMP_DIR}/${SYSTEM_CA}.certificate \
+	    > /dev/null 2>&1
+    if test ${?} -ne 0 ; then clean-generated-system-ca ; return 15 ; fi
+
+    openssl x509 \
+	    -in ${TMP_DIR}/${SYSTEM_CA}.certificate \
+	    -outform DER \
+	    -out ${TMP_DIR}/${SYSTEM_CA}.der
+    if test ${?} -ne 0 ; then clean-generated-system-ca ; return 17 ; fi
+
+    find ${SSL_LOCAL_CA_DIR} -lname ${SYSTEM_CA_ID}.certificate -exec rm -f {} \; > /dev/null 2>&1
+    local hash_value=$(openssl x509 -noout -hash -in ${SSL_CA_DIR}/${SYSTEM_CA}.certificate 2> /dev/null)
+
+    ln -sf ${SYSTEM_CA_ID}.certificate ${SSL_LOCAL_CA_DIR}/${hash_value}.0 2> /dev/null
+    if test ${?} -ne 0 ; then clean-generated-system-ca ; return 19 ; fi
+
+    rm -f \
+       ${SSL_CLIENT_DIR}/*.revoked \
+       ${SSL_SERVER_DIR}/*.revoked \
+       ${SSL_CTL_DIR}/index.txt.old \
+       ${SSL_CTL_DIR}/serial.old \
+       ${SSL_CTL_DIR}/index.txt.attr.old \
+       ${SSL_CTL_DIR}/*.pem &&
+	echo 1000 > ${SSL_CTL_DIR}/serial &&
+	echo -n > ${SSL_CTL_DIR}/index.txt
+    if test ${?} -ne 0 ; then clean-generated-system-ca ; return 21 ; fi
+
+    return 0
+}
+
+install-generated-system-ca()
+{
+    install -m 644 -o ${ADMIN_NAME} -g ${GROUP_NAME} ${TMP_DIR}/${SYSTEM_CA}.conf ${SSL_CA_DIR}/${SYSTEM_CA}.conf
+    if test ${?} -ne 0 ; then clean-generated-system-ca ; return 61 ; fi
+
+    install -m 644 -o ${ADMIN_NAME} -g ${GROUP_NAME} ${TMP_DIR}/${SYSTEM_CA}.cnf ${SSL_CA_DIR}/${SYSTEM_CA}.cnf
+    if test ${?} -ne 0 ; then clean-generated-system-ca ; return 63 ; fi
+
+    install -m 640 -o ${ADMIN_NAME} -g ${GROUP_NAME} ${TMP_DIR}/${SYSTEM_CA}.key ${SSL_CA_DIR}/${SYSTEM_CA}.key
+    if test ${?} -ne 0 ; then clean-generated-system-ca ; return 65 ; fi
+
+    install -m 644 -o ${ADMIN_NAME} -g ${GROUP_NAME} ${TMP_DIR}/${SYSTEM_CA}.certificate ${SSL_CA_DIR}/${SYSTEM_CA}.certificate
+    if test ${?} -ne 0 ; then clean-generated-system-ca ; return 67 ; fi
+
+    install -m 644 -o ${ADMIN_NAME} -g ${GROUP_NAME} ${TMP_DIR}/${SYSTEM_CA}.der ${SSL_CA_DIR}/${SYSTEM_CA}.der
+    if test ${?} -ne 0 ; then clean-generated-system-ca ; return 69 ; fi
+
+    return 0
+}
+
+install-loaded-system-ca()
+{
+    local file=${TMP_DIR}/${LOADED}.${SYSTEM_CA}
+    test -f ${file}.certificate || return 0
+
+    local key_file conf_file
+
+    if test -f ${file}.key ; then
+	key_file=${file}.key
+    else
+	key_file=${SSL_CA_DIR}/${SYSTEM_CA}.key
+    fi
+
+    conf_file=${TMP_DIR}/${SYSTEM_CA}.conf
+    gen-tls-conf ${file}.certificate > ${conf_file}
+    if test ${?} -ne 0 ; then clean-loaded-system-ca ; return 21 ; fi
+
+    openssl x509 \
+	    -in ${file}.certificate \
+	    -outform DER \
+	    -out ${TMP_DIR}/${SYSTEM_CA}.der
+    if test ${?} -ne 0 ; then clean-loaded-system-ca ; return 31 ; fi
+
+    install -m 644 -o ${ADMIN_NAME} -g ${GROUP_NAME} ${conf_file} ${SSL_CA_DIR}/${SYSTEM_CA}.conf
+    if test ${?} -ne 0 ; then clean-loaded-system-ca ; return 61 ; fi
+
+    test ! -f ${file}.key || install -m 640 -o ${ADMIN_NAME} -g ${GROUP_NAME} ${key_file} ${SSL_CA_DIR}/${SYSTEM_CA}.key
+    if test ${?} -ne 0 ; then clean-loaded-system-ca ; return 65 ; fi
+
+    install -m 644 -o ${ADMIN_NAME} -g ${GROUP_NAME} ${file}.certificate ${SSL_CA_DIR}/${SYSTEM_CA}.certificate
+    if test ${?} -ne 0 ; then clean-loaded-system-ca ; return 67 ; fi
+
+    find ${SSL_LOCAL_CA_DIR} -lname ${SYSTEM_CA_ID}.certificate -exec rm -f {} \; > /dev/null 2>&1
+    local hash_value=$(openssl x509 -noout -hash -in ${SSL_CA_DIR}/${SYSTEM_CA}.certificate 2> /dev/null)
+
+    ln -sf ${SYSTEM_CA_ID}.certificate ${SSL_LOCAL_CA_DIR}/${hash_value}.0 2> /dev/null
+    if test ${?} -ne 0 ; then clean-loaded-system-ca ; return 69 ; fi
+
+    test ! -f ${TMP_DIR}/${SYSTEM_CA}.der || install -m 644 -o ${ADMIN_NAME} -g ${GROUP_NAME} ${TMP_DIR}/${SYSTEM_CA}.der ${SSL_CA_DIR}/${SYSTEM_CA}.der
+    if test ${?} -ne 0 ; then clean-loaded-system-ca ; return 71 ; fi
+
+    clean-loaded-system-ca
+
+    return 0
+}
+
+generate-tls-server()
+{
+    test -n "${1}" || return 1
+    local tls=${1}
+
+    local sign ocsp
+
+    if test -f ${TMP_DIR}/${TLS_SERVER}.${tls}.2sign ; then
+	sign='sign'
+	ocsp=$(cat ${TMP_DIR}/${TLS_SERVER}.${tls}.2sign 2> /dev/null)
+	if test -n "${ocsp}" ; then
+	    ocsp=http://${OCSP_HOST}:${OCSP_PORT}
+	else
+	    unset ocsp
+	fi
+    fi
+
+    gen-tls-cnf ${TMP_DIR}/${TLS_SERVER}.${tls}.conf server ${sign} ${ocsp} > ${TMP_DIR}/${TLS_SERVER}.${tls}.cnf
+    if test ${?} -ne 0 ; then clean-generated-tls-server ${tls} ; return 11 ; fi
+
+    local numbits_days=$(get-numbits-days-from-conf-file ${TMP_DIR}/${TLS_SERVER}.${tls}.conf)
+    local numbits=${numbits_days/ *}
+    local days=${numbits_days/* }
+
+    openssl genrsa \
+	    ${numbits} \
+	    2> /dev/null > ${TMP_DIR}/${TLS_SERVER}.${tls}.key &&
+	chmod 600 ${TMP_DIR}/${TLS_SERVER}.${tls}.key
+    if test ${?} -ne 0 ; then clean-generated-tls-server ${tls} ; return 13 ; fi
+
+    openssl req \
+	    -batch \
+	    -new \
+	    -sha256 \
+	    -key ${TMP_DIR}/${TLS_SERVER}.${tls}.key \
+	    -config ${TMP_DIR}/${TLS_SERVER}.${tls}.cnf \
+	    -out ${TMP_DIR}/${TLS_SERVER}.${tls}.csr \
+	    > /dev/null 2>&1
+    if test ${?} -ne 0 ; then clean-generated-tls-server ${tls} ; return 15 ; fi
+
+    remove-tls-from-index ${tls}
+    if test ${?} -ne 0 ; then clean-generated-tls-server ${tls} ; return 17 ; fi
+
+    if test -n "${sign}" ; then
+
+	rm -f ${TMP_DIR}/${TLS_SERVER}.${tls}.2sign
+
+	update-ssl-serial
+	if test ${?} -ne 0 ; then clean-generated-tls-server ${tls} ; return 19 ; fi
+
+	openssl ca \
+		-batch \
+		-notext \
+		-extensions v3_x509 \
+		-days ${days} \
+		-cert ${SSL_CA_DIR}/${SYSTEM_CA}.certificate \
+		-keyfile ${SSL_CA_DIR}/${SYSTEM_CA}.key \
+		-out ${TMP_DIR}/${TLS_SERVER}.${tls}.certificate \
+		-config ${TMP_DIR}/${TLS_SERVER}.${tls}.cnf \
+		-infiles ${TMP_DIR}/${TLS_SERVER}.${tls}.csr \
+		> /dev/null 2>&1
+	if test ${?} -ne 0 ; then clean-generated-tls-server ${tls} ; return 21 ; fi
+    else
+	openssl req \
+		-batch \
+		-new \
+		-x509 \
+		-days ${days} \
+		-sha256 \
+		-key ${TMP_DIR}/${TLS_SERVER}.${tls}.key \
+		-config ${TMP_DIR}/${TLS_SERVER}.${tls}.cnf \
+		-out ${TMP_DIR}/${TLS_SERVER}.${tls}.certificate \
+		> /dev/null 2>&1
+	if test ${?} -ne 0 ; then clean-generated-tls-server ${tls} ; return 21 ; fi
+    fi
+
+    if test -n "${sign}" ; then
+ 	local serial=$(cat ${SSL_CTL_DIR}/serial.old 2> /dev/null)
+	if test -n "${serial}" ; then
+	    local ssl=$(file-basename ${SSL_SERVER_DIR})
+	    ln -sf ../${ssl}/${tls}.certificate ${SSL_CTL_DIR}/${serial}.pem &&
+		install -m 644 -o ${ADMIN_NAME} -g ${GROUP_NAME} ${SSL_CTL_DIR}/serial.old ${SSL_SERVER_DIR}/${tls}.serial
+	    if test ${?} -ne 0 ; then clean-generated-tls-server ${tls} ; return 23 ; fi
+	fi
+    fi
+
+    install -m 644 -o ${ADMIN_NAME} -g ${GROUP_NAME} ${TMP_DIR}/${TLS_SERVER}.${tls}.conf ${SSL_SERVER_DIR}/${tls}.conf
+    if test ${?} -ne 0 ; then clean-generated-tls-server ${tls} ; return 61 ; fi
+
+    install -m 644 -o ${ADMIN_NAME} -g ${GROUP_NAME} ${TMP_DIR}/${TLS_SERVER}.${tls}.cnf ${SSL_SERVER_DIR}/${tls}.cnf
+    if test ${?} -ne 0 ; then clean-generated-tls-server ${tls} ; return 63 ; fi
+
+    install -m 640 -o ${ADMIN_NAME} -g ${GROUP_NAME} ${TMP_DIR}/${TLS_SERVER}.${tls}.key ${SSL_SERVER_DIR}/${tls}.key
+    if test ${?} -ne 0 ; then clean-generated-tls-server ${tls} ; return 65 ; fi
+
+    install -m 644 -o ${ADMIN_NAME} -g ${GROUP_NAME} ${TMP_DIR}/${TLS_SERVER}.${tls}.certificate ${SSL_SERVER_DIR}/${tls}.certificate
+    if test ${?} -ne 0 ; then clean-generated-tls-server ${tls} ; return 67 ; fi
+
+    install -m 644 -o ${ADMIN_NAME} -g ${GROUP_NAME} ${TMP_DIR}/${TLS_SERVER}.${tls}.csr ${SSL_SERVER_DIR}/${tls}.csr
+    if test ${?} -ne 0 ; then clean-generated-tls-server ${tls} ; return 69 ; fi
+
+    rm -f ${SSL_SERVER_DIR}/${tls}.revoked
+    clean-generated-tls-server ${tls}
+
+    return 0
+}
+
+generate-tls-server-from-csr()
+{
+    test -n "${1}" || return 1
+    local tls=${1}
+
+    test -f ${TMP_DIR}/${LOADED}.${TLS_SERVER}.csr.${tls} || return 0
+
+    local days ocsp ret
+
+    if test -f ${TMP_DIR}/${LOADED}.${TLS_SERVER}.${tls}.2sign ; then
+	ocsp=$(cat ${TMP_DIR}/${LOADED}.${TLS_SERVER}.${tls}.2sign 2> /dev/null)
+	if test -n "${ocsp}" ; then
+	    ocsp=http://${OCSP_HOST}:${OCSP_PORT}
+	else
+	    unset ocsp
+	fi
+    fi
+
+    gen-tls-conf ${TMP_DIR}/${LOADED}.${TLS_SERVER}.csr.${tls} csr > ${TMP_DIR}/${TLS_SERVER}.${tls}.conf &&
+	gen-tls-cnf ${TMP_DIR}/${TLS_SERVER}.${tls}.conf server:csr sign ${ocsp} > ${TMP_DIR}/${TLS_SERVER}.${tls}.cnf
+    if test ${?} -ne 0 ; then clean-loaded-tls-server ${tls} ; return 101 ; fi
+
+    remove-tls-from-index ${tls}
+    if test ${?} -ne 0 ; then clean-loaded-tls-server ${tls} ; return 103 ; fi
+
+    if test -f ${TMP_DIR}/${LOADED}.${TLS_SERVER}.days.${tls} ; then
+	days=$(cat ${TMP_DIR}/${LOADED}.${TLS_SERVER}.days.${tls} 2> /dev/null)
+    else
+	days=${TLS_SERVER_DAYS}
+    fi
+
+    update-ssl-serial
+    if test ${?} -ne 0 ; then clean-loaded-tls-server ${tls} ; return 105 ; fi
+
+    openssl ca \
+	    -batch \
+	    -notext \
+	    -extensions v3_req \
+	    -days ${days} \
+	    -cert ${SSL_CA_DIR}/${SYSTEM_CA}.certificate \
+	    -keyfile ${SSL_CA_DIR}/${SYSTEM_CA}.key \
+	    -out ${TMP_DIR}/${TLS_SERVER}.${tls}.certificate \
+	    -config ${TMP_DIR}/${TLS_SERVER}.${tls}.cnf \
+	    -infiles ${TMP_DIR}/${LOADED}.${TLS_SERVER}.csr.${tls} \
+	    > /dev/null 2>&1
+    if test ${?} -ne 0 ; then clean-loaded-tls-server ${tls} ; clean-generated-tls-server ${tls} ; return 107 ; fi
+
+    local serial=$(cat ${SSL_CTL_DIR}/serial.old 2> /dev/null)
+    if test -n "${serial}" ; then
+	local ssl=$(file-basename ${SSL_SERVER_DIR})
+	ln -sf ../${ssl}/${tls}.certificate ${SSL_CTL_DIR}/${serial}.pem &&
+	    install -m 644 -o ${ADMIN_NAME} -g ${GROUP_NAME} ${SSL_CTL_DIR}/serial.old ${SSL_SERVER_DIR}/${tls}.serial
+	if test ${?} -ne 0 ; then clean-generated-tls-server ${tls} ; return 23 ; fi
+    fi
+
+    install -m 644 -o ${ADMIN_NAME} -g ${GROUP_NAME} ${TMP_DIR}/${TLS_SERVER}.${tls}.conf ${SSL_SERVER_DIR}/${tls}.conf
+    if test ${?} -ne 0 ; then clean-generated-tls-server ${tls} ; return 61 ; fi
+
+    install -m 644 -o ${ADMIN_NAME} -g ${GROUP_NAME} ${TMP_DIR}/${TLS_SERVER}.${tls}.cnf ${SSL_SERVER_DIR}/${tls}.cnf
+    if test ${?} -ne 0 ; then clean-generated-tls-server ${tls} ; return 63 ; fi
+
+    test -f ${TMP_DIR}/${TLS_SERVER}.${tls}.certificate || return 109
+
+    install -m 644 -o ${ADMIN_NAME} -g ${GROUP_NAME} ${TMP_DIR}/${TLS_SERVER}.${tls}.certificate ${SSL_SERVER_DIR}/${tls}.certificate
+    if test ${?} -ne 0 ; then clean-loaded-tls-server ${tls} ; clean-generated-tls-server ${tls} ; return 109 ; fi
+
+    install -m 644 -o ${ADMIN_NAME} -g ${GROUP_NAME} ${TMP_DIR}/${LOADED}.${TLS_SERVER}.csr.${tls} ${SSL_SERVER_DIR}/${tls}.csr
+    if test ${?} -ne 0 ; then clean-loaded-tls-server ${tls} ; clean-generated-tls-server ${tls} ; return 111 ; fi
+
+    clean-loaded-tls-server ${tls} &&
+	clean-generated-tls-server ${tls} &&
+	rm -f ${SSL_SERVER_DIR}/${tls}.key
+}
+
+install-tls-server()
+{
+    test -n "${1}" || return 1
+    local id=${1}
+
+    local cert_file=${TMP_DIR}/${LOADED}.${TLS_SERVER}.certificate.${id}
+    local conf_file=${TMP_DIR}/${TLS_SERVER}.${id}.conf
+
+    gen-tls-conf ${cert_file} > ${conf_file}
+    if test ${?} -ne 0 ; then clean-loaded-tls-server ${id} ; return 13 ; fi
+    
+    local cnf_file=${TMP_DIR}/${TLS_SERVER}.${id}.cnf
+    gen-tls-cnf ${conf_file} server sign > ${cnf_file}
+    if test ${?} -ne 0 ; then clean-loaded-tls-server ${id} ; return 15 ; fi
+
+    install -m 644 -o ${ADMIN_NAME} -g ${GROUP_NAME} ${conf_file} ${SSL_SERVER_DIR}/${id}.conf
+    if test ${?} -ne 0 ; then clean-loaded-tls-server ${id} ; return 61 ; fi
+
+    install -m 644 -o ${ADMIN_NAME} -g ${GROUP_NAME} ${cnf_file} ${SSL_SERVER_DIR}/${id}.cnf
+    if test ${?} -ne 0 ; then clean-loaded-tls-server ${id} ; return 63 ; fi
+
+    test ! -f ${TMP_DIR}/${LOADED}.${TLS_SERVER}.key.${id} || install -m 640 -o ${ADMIN_NAME} -g ${GROUP_NAME} ${TMP_DIR}/${LOADED}.${TLS_SERVER}.key.${id} ${SSL_SERVER_DIR}/${id}.key
+    if test ${?} -ne 0 ; then clean-loaded-tls-server ${id} ; return 65 ; fi
+
+    test ! -f ${cert_file} || install -m 644 -o ${ADMIN_NAME} -g ${GROUP_NAME} ${cert_file} ${SSL_SERVER_DIR}/${id}.certificate
+    if test ${?} -ne 0 ; then clean-loaded-tls-server ${id} ; return 67 ; fi
+
+    if check-tls-cert-signed-by-system-ca server ${id} ; then
+	update-openssl-index server ${id}
+	if test ${?} -ne 0 ; then clean-loaded-tls-server ${id} ; return 11 ; fi
+    fi
+
+    rm -f ${SSL_SERVER_DIR}/${id}.{csr,revoked} && clean-loaded-tls-server ${id}
+}
+
+revoke-tls-server()
+{
+    test -n "${1}" || return 1
+    local tls=${1}
+
+    test -f ${TMP_DIR}/${TLS_SERVER}.${tls}.2rev || return 0
+    test -f ${SSL_SERVER_DIR}/${tls}.certificate -a ${SSL_SERVER_DIR}/${tls}.cnf || return 0
+
+    local reason=$(get-revoke-reason ${TMP_DIR}/${TLS_SERVER}.${tls}.2rev)
+    rm -f ${TMP_DIR}/${TLS_SERVER}.${tls}.2rev
+    local ret
+
+    openssl ca \
+	    -revoke ${SSL_SERVER_DIR}/${tls}.certificate \
+	    -config ${SSL_SERVER_DIR}/${tls}.cnf \
+	    -crl_reason ${reason} > /dev/null 2>&1
+    ret=${?}
+
+    if test ${ret} -eq 0 ; then
+	echo ${reason} > ${SSL_SERVER_DIR}/${tls}.revoked || ret=11
+    fi
+
+    return ${ret}
+}
+
+install-tls-client()
+{
+    test -n "${1}" || return 1
+    local id=${1}
+
+    local cert_file=${TMP_DIR}/${LOADED}.${TLS_CLIENT}.certificate.${id}
+    local conf_file=${TMP_DIR}/${TLS_CLIENT}.${id}.conf
+
+    gen-tls-conf ${cert_file} > ${conf_file}
+    if test ${?} -ne 0 ; then clean-loaded-tls-client ${id} ; return 13 ; fi
+
+    local cnf_file=${TMP_DIR}/${TLS_CLIENT}.${id}.cnf
+    gen-tls-cnf ${conf_file} client sign > ${cnf_file}
+    if test ${?} -ne 0 ; then clean-loaded-tls-client ${id} ; return 15 ; fi
+
+    install -d -m 755 -o ${ADMIN_NAME} -g ${GROUP_NAME} ${id}.cur
+
+    install -m 644 -o ${ADMIN_NAME} -g ${GROUP_NAME} ${conf_file} ${id}.cur/${id}.conf
+    if test ${?} -ne 0 ; then clean-loaded-tls-client ${id} ; return 61 ; fi
+
+    install -m 644 -o ${ADMIN_NAME} -g ${GROUP_NAME} ${cnf_file} ${id}.cur/${id}.cnf
+    if test ${?} -ne 0 ; then clean-loaded-tls-client ${id} ; return 63 ; fi
+
+    install -m 644 -o ${ADMIN_NAME} -g ${GROUP_NAME} ${cert_file} ${id}.cur/${id}.certificate
+    if test ${?} -ne 0 ; then clean-loaded-tls-client ${id} ; return 67 ; fi
+
+    update-openssl-index client ${id}
+    if test ${?} -ne 0 ; then clean-loaded-tls-client ${id} ; return 11 ; fi
+
+    rm -f ${id}.cur/${id}.{key,pkcs12,password,pfx} && clean-loaded-tls-client ${id}
+}
+
+gen-tls-client-password()
+{
+    local array=(a b c d e f g h i j k m n p q r s t u v w x y z A B C D E F G H J K L M N P Q R S T U V W X Y Z 2 3 4 5 6 7 8 9)
+    local len_array=${#array[*]}
+
+    local len=32
+    local i=0 pos key
+    while test ${i} -lt ${len}
+    do
+        pos=$[${RANDOM} % ${len_array}]
+        key="${key}${array[${pos}]}"
+	((i++))
+	test $((i % 8)) -ne 0 || key="${key}-"
+    done
+
+    len=${#key}
+    ((len--))
+    key=${key:0:${len}}
+
+    echo -n "${key}"
+}
+
+generate-tls-client()
+{
+    test -n "${1}" || return 1
+    local new=${1}
+
+    local numbits days ocsp
+    local id=${new%\.new}
+    local name=${id}.${DOMAIN_NAME}
+    local line i=0
+
+    if test -f ${id}.numbits ; then
+	    numbits=$(cat ${id}.numbits 2> /dev/null)
+	    rm -f ${id}.numbits
+	else
+	    numbits=2048
+    fi
+
+    if test -d ${id}.cur ; then
+	days=$(get-tls-validity-days ${id}.cur/${id}.certificate)
+	ocsp=$(get-tls-ocsp-uri ${id}.cur/${id}.certificate)
+    else
+	if test -f ${id}.days ; then
+	    days=$(cat ${id}.days 2> /dev/null)
+	    rm -f ${id}.days
+	else
+	    days=${TLS_CLIENT_DAYS}
+	fi
+	ocsp=$(cat ${new} 2> /dev/null)
+	test -z "${ocsp}" || ocsp=http://${OCSP_HOST}:${OCSP_PORT}
+    fi
+
+    echo "numbits ${numbits}" > ${TMP_DIR}/${id}.conf
+    echo "days ${days}" >> ${TMP_DIR}/${id}.conf
+    echo "commonName ${name,,}" >> ${TMP_DIR}/${id}.conf
+
+    while read line
+    do
+	((i++))
+	test ${i} -gt 3 || continue
+	echo ${line}
+    done < ${SSL_CA_DIR}/${SYSTEM_CA}.conf >> ${TMP_DIR}/${id}.conf
+
+    gen-tls-cnf ${TMP_DIR}/${id}.conf client sign ${ocsp} > ${TMP_DIR}/${id}.cnf
+    if test ${?} -ne 0 ; then clean-generated-tls-client ${id} ; return 11 ; fi
+
+    openssl genrsa \
+	    ${numbits} \
+	    2> /dev/null > ${TMP_DIR}/${id}.key &&
+	chmod 600 ${TMP_DIR}/${id}.key
+    if test ${?} -ne 0 ; then clean-generated-tls-client ${id} ; return 13 ; fi
+
+    openssl req \
+	    -batch \
+	    -new \
+	    -sha256 \
+	    -key ${TMP_DIR}/${id}.key \
+	    -config ${TMP_DIR}/${id}.cnf \
+	    -out ${TMP_DIR}/${id}.csr \
+	    > /dev/null 2>&1
+    if test ${?} -ne 0 ; then clean-generated-tls-client ${id} ; return 15 ; fi
+
+    remove-tls-from-index ${id}
+    if test ${?} -ne 0 ; then clean-generated-tls-client ${id} ; return 17 ; fi
+
+    update-ssl-serial
+    if test ${?} -ne 0 ; then clean-generated-tls-client ${id} ; return 19 ; fi
+
+    openssl ca \
+	    -batch \
+	    -notext \
+	    -extensions v3_x509 \
+	    -days ${days} \
+	    -cert ${SSL_CA_DIR}/${SYSTEM_CA}.certificate \
+	    -keyfile ${SSL_CA_DIR}/${SYSTEM_CA}.key \
+	    -out ${TMP_DIR}/${id}.certificate \
+	    -config ${TMP_DIR}/${id}.cnf \
+	    -infiles ${TMP_DIR}/${id}.csr \
+	    > /dev/null 2>&1
+    if test ${?} -ne 0 ; then clean-generated-tls-client ${id} ; return 21 ; fi
+
+    local password=$(gen-tls-client-password)
+    echo "${password}" > ${TMP_DIR}/${id}.password
+
+    openssl pkcs12 \
+	    -export \
+	    -certfile ${SSL_CA_DIR}/${SYSTEM_CA}.certificate \
+	    -in ${TMP_DIR}/${id}.certificate \
+	    -inkey ${TMP_DIR}/${id}.key \
+	    -name "${name}" -password pass:${password} \
+	    2> /dev/null > ${TMP_DIR}/${id}.pkcs12
+    if test ${?} -ne 0 ; then clean-generated-tls-client ${id} ; return 23 ; fi
+
+    base64 ${TMP_DIR}/${id}.pkcs12 > ${TMP_DIR}/${id}.pfx 2> /dev/null
+    if test ${?} -ne 0 ; then clean-generated-tls-client ${id} ; return 25 ; fi
+
+    rm -f ${new} &&
+	rm -rf ${id}.cur &&
+	install -d -m 755 -o ${ADMIN_NAME} -g ${GROUP_NAME} ${id}.cur &&
+	install -m 644 -o ${ADMIN_NAME} -g ${GROUP_NAME} ${TMP_DIR}/${id}.conf ${id}.cur/${id}.conf &&
+	install -m 644 -o ${ADMIN_NAME} -g ${GROUP_NAME} ${TMP_DIR}/${id}.cnf ${id}.cur/${id}.cnf &&
+	install -m 644 -o ${ADMIN_NAME} -g ${GROUP_NAME} ${TMP_DIR}/${id}.certificate ${id}.cur/${id}.certificate &&
+	install -m 640 -o ${ADMIN_NAME} -g ${GROUP_NAME} ${TMP_DIR}/${id}.key ${id}.cur/${id}.key &&
+	install -m 640 -o ${ADMIN_NAME} -g ${GROUP_NAME} ${TMP_DIR}/${id}.password ${id}.cur/${id}.password &&
+	install -m 644 -o ${ADMIN_NAME} -g ${GROUP_NAME} ${TMP_DIR}/${id}.pkcs12 ${id}.cur/${id}.pkcs12 &&
+	install -m 644 -o ${ADMIN_NAME} -g ${GROUP_NAME} ${TMP_DIR}/${id}.pfx ${id}.cur/${id}.pfx &&
+	rm -f ${id}.revoked
+    if test ${?} -ne 0 ; then clean-generated-tls-client ${id} ; return 27 ; fi
+
+    local serial=$(cat ${SSL_CTL_DIR}/serial.old 2> /dev/null)
+    if test -n "${serial}" ; then
+        local client_ssl=$(file-basename ${SSL_CLIENT_DIR})
+	ln -sf ../${client_ssl}/${id}.cur/${id}.certificate ${SSL_CTL_DIR}/${serial}.pem &&
+	    install -m 644 -o ${ADMIN_NAME} -g ${GROUP_NAME} ${SSL_CTL_DIR}/serial.old ${id}.cur/${id}.serial
+	if test ${?} -ne 0 ; then clean-generated-tls-client ${id} ; return 29 ; fi
+    fi
+
+    clean-generated-tls-client ${id}
+}
+
+revoke-tls-client()
+{
+    test -n "${1}" || return 1
+    local rev_file=${1}
+
+    local ret
+    local id=$(file-basename ${rev_file} .2rev)
+
+    id=${id/${TLS_CLIENT}\.}
+    test -f ${id}.cur/${id}.certificate -a -f ${id}.cur/${id}.cnf || return 11
+
+    local reason=$(get-revoke-reason ${rev_file})
+    rm -f ${rev_file}
+
+    openssl ca \
+	    -revoke ${id}.cur/${id}.certificate \
+	    -config ${id}.cur/${id}.cnf \
+	    -crl_reason ${reason} > /dev/null 2>&1
+    ret=${?}
+	
+    if test ${ret} -eq 0 ; then
+	echo ${reason} > ${id}.revoked || ret=13
+    fi
+
+    return ${ret}
+}
+
+remove-arch-tls-server-components()
+{
+    test -n "${1}" || return 1
+    local tls=${1}
+
+    remove-tls-from-index ${tls} &&
+	rm -f \
+	   ${SSL_SERVER_DIR}/${tls}.conf \
+	   ${SSL_SERVER_DIR}/${tls}.cnf \
+	   ${SSL_SERVER_DIR}/${tls}.key \
+	   ${SSL_SERVER_DIR}/${tls}.certificate \
+	   ${SSL_SERVER_DIR}/${tls}.serial \
+	   ${SSL_SERVER_DIR}/${tls}.csr \
+	   ${SSL_SERVER_DIR}/${tls}.revoked
+}
+
+remove-tmp-tls-server-components()
+{
+    test -n "${1}" || return 1
+    local tls=${1}
+
+    rm -f ${TMP_DIR}/${LOADED}.${TLS_SERVER}.*.${tls}
+}
+
+delete-tls-server-components()
+{
+    :
+}
+
+clean-all-deleted-tls-server()
+{
+    local files=$(ls -1 ${SSL_SERVER_DIR}/*.certificate 2> /dev/null) file
+    local ret=0
+
+    for file in ${files}
+    do
+	tls=$(file-basename ${file} .certificate)
+	test ${tls} != default || continue
+	member "${TLS_SERVER_LIST}" ${tls} || delete-tls-server-components ${tls} ${@} || ((ret++))
+    done
+
+    return ${ret}
+}
+
+delete-third-ca-components()
+{
+    :
+}
+
+clean-all-deleted-runtime-third-ca()
+{
+    :
+}
+
+clean-all-deleted-third-ca()
+{
+    local cur_dir=${PWD}
+    cd ${SSL_LOCAL_CA_DIR}
+
+    local ca_list ca browsing purge
+    local files=$(ls -1 *.certificate 2> /dev/null) file 
+    
+    for file in ${files}
+    do
+	test ${file} != ${SYSTEM_CA_ID}.certificate || continue
+	ca=${file%\.certificate}
+	ca_list="${ca_list} ${ca}"
+    done
+    ca_list=${ca_list:1}
+
+    for ca in ${ca_list}
+    do
+	browsing=$(tls-ca-object-exist ${ca})
+	test ${?} -ne 0 || continue
+
+	delete-third-ca-components ${ca} ${@}
+	purge=yes
+    done
+
+    if test -z "${purge}" ; then
+	cd ${cur_dir}
+	return 0
+    fi
+
+    clean-all-deleted-runtime-third-ca
+}
+
+delete-tls-server()
+{
+    test -n "${1}" || return 1
+    local id=${1}
+
+    remove-tls-from-index ${id} &&
+	rm -f ${SSL_SERVER_DIR}/${id}.*
+}
+
+delete-tls-client()
+{
+    test -n "${1}" || return 1
+    local id=${1}
+    local private=${2}
+
+    rm -f ${id}.2del
+
+    if test -n "${private}" ; then
+	rm -f ${id}.cur/${id}.{password,key,pfx,pkcs12}
+    else
+	remove-tls-from-index ${id} &&
+	    rm -rf ${id}.cur ${id}.revoked
+    fi
+}
+
+get-md5sum()
+{
+    local md5=$(echo -n "${1}" | openssl dgst -md5)
+    echo ${md5/*= }
+}

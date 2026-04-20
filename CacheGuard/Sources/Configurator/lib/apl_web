@@ -1,0 +1,457 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       Configurator
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+set-web-parameters()
+{
+    if test ${TRANSPARENT_MODE} == False ; then
+	WEB_SERVER=${WEB_SERVER_DENY_NAME}
+    else
+	WEB_SERVER=${IP_WEB_IP}
+    fi
+}
+
+gen-rweb-audit-vhost()
+{
+    test -n "${1}" || return 1
+    local ip=${1}
+
+    local tls_id=${ADMIN_TLS/:*}
+
+    echo "Listen ${ip}:${WAUDIT_PORT}"
+
+    echo "<VirtualHost ${ip}:${WAUDIT_PORT}>"
+    echo "DirectoryIndex /${GUI_DIR_NAME}/${GUI_HOME_PAGE}.${GUI_EXT_NAME}"
+    echo "DocumentRoot /${WAUDIT_NAME}"
+    echo "ServerName ${SHOSTNAME}.${DOMAIN_NAME}:${WAUDIT_PORT}"
+
+    gen-waf-rules ${WAUDIT_NAME}
+
+    echo "SSLEngine On"
+    test ! -f ${WEB_SERVER_DIR}/etc/${tls_id}.chain || echo "SSLCertificateChainFile etc/${tls_id}.chain"
+    echo "SSLCertificateFile etc/${tls_id}.certificate"
+    echo "SSLCertificateKeyFile etc/${tls_id}.key"
+
+    echo "RewriteEngine On"
+    echo "RewriteCond %{HTTPS} off"
+    echo "RewriteRule (.*) https://%{SERVER_NAME}:%{SERVER_PORT} [R=307,L]"
+
+    echo "</VirtualHost>"
+}
+
+gen-web-server-conf()
+{
+    test ${WEB_MODE} == True -o ${TRANSPARENT_MODE} == True || return 0
+
+    local ip mk
+    local elt i range
+    local network networks
+
+    echo "<Directory \"${WEB_SERVER_DIR}/${WWW_DIR_NAME}\">"
+    echo "Options -Indexes +FollowSymLinks"
+    echo "AllowOverride None"
+    echo "Order allow,deny"
+    
+    if test -z "${ACCESS_IF_IP_MK_WEB_LIST}" -o -z "${TRANSPARENT_IF_IP_MK_LIST}" ; then
+	echo "Allow from all"
+    else
+	i=0
+	echo "Allow from ${IP_WEB_IP}/255.255.255.255"
+	
+	for elt in ${TRANSPARENT_IF_IP_MK_LIST}
+	do
+	    range=$[${i} % 4]
+	    case ${range} in
+		0)
+		    ;;
+		1)
+		    ip=${elt}
+		    ;;
+		2)
+		    mk=${elt}
+		    ;;
+		3)
+		    member "${networks}" "${ip}/${mk}" || networks="${networks} ${ip}/${mk}"
+		    ;;
+		*)
+		    return 1
+		    ;;
+	    esac
+	    ((i++))
+	done
+
+	for elt in ${ACCESS_IF_IP_MK_WEB_LIST}
+	do
+	    range=$[${i} % 4]
+	    case ${range} in
+		0)
+		    ;;
+		1)
+		    ip=${elt}
+		    ;;
+		2)
+		    mk=${elt}
+		    ;;
+		3)
+		    member "${networks}" "${ip}/${mk}" || networks="${networks} ${ip}/${mk}"
+		    ;;
+		*)
+		    return 1
+		    ;;
+	    esac
+	    ((i++))
+	done
+    fi
+    networks=${networks:1}
+
+    for network in ${networks}
+    do
+	echo "Allow from ${network}"
+    done
+
+    echo "</Directory>"
+
+    local email=${ADMINISTRATOR_EMAIL/@/(at)}
+    local name=${ADMINISTRATOR_NAME// /%20}
+    local ip_list
+
+    test "${IP_WEB_IP}" == "0.0.0.0" || ip_list="${IP_WEB_IP}"
+
+    if test ${HA_MODE} == True -a ${WEB_MODE} == True ; then
+	for ip in ${VRRP_WEB_IP_LIST}
+	do
+	    test "${ip}" ==  "0.0.0.0" || ip_list="${ip_list} ${ip}"
+	done
+    fi
+    
+    for ip in ${ip_list}
+    do
+	echo "Listen ${ip}:${WWW_PORT}"
+	echo "<VirtualHost ${ip}:${WWW_PORT}>"
+	echo "DocumentRoot /${WWW_DIR_NAME}"
+	echo "DirectoryIndex /${WEB_GATEWAY_URI}?email=${name}<${email}>"
+	echo "ServerAdmin ${ADMINISTRATOR_EMAIL}"
+	echo "ServerName ${SHOSTNAME}.${DOMAIN_NAME}:${WWW_PORT}"	
+
+	gen-waf-rules webserver
+
+	echo "</VirtualHost>"
+    done
+}
+
+gen-web-server-ssl-conf()
+{
+    test ${RWEB_HTTPS_MODE} == True -a ${RWEB_MODE} == True -a ${PROXY2_MODE} == True -o ${ADMIN_WAUDIT} == True || return 0
+
+    echo "Mutex file:${WEB_SERVER_DIR}/var/run"
+    echo "SSLProtocol TLSv1.3 TLSv1.2"
+    echo "SSLPassPhraseDialog builtin"
+    echo "SSLSessionCacheTimeout 4500"
+    echo "SSLCipherSuite \"ALL:+HIGH:!ADH:!EXP:!SSLv2:!SSLv3:!MEDIUM:!LOW:!NULL:!aNULL\""
+    echo "SSLHonorCipherOrder on"
+    echo "SSLRandomSeed startup file:/dev/urandom 512"
+    echo "SSLRandomSeed connect builtin"
+    echo "SSLSessionCache shmcb:${WEB_SERVER_DIR}/var/run/ssl_scache(524288)"
+}
+
+gen-web-server-waudit-conf()
+{
+    test ${ADMIN_WAUDIT} == True || return 0
+
+    gen-directory-admin-access ${WAUDIT_NAME}
+
+    if test "${IP_ADMIN_IP}" != "0.0.0.0" ; then
+	local waudit
+	test ${ADMIN_INTERNAL} == False || waudit='yes'
+	test ${VPN_IPSEC_MODE} == False -o ${ADMIN_VPN_IPSEC} == False || waudit='yes'
+	test -z "${waudit}" || gen-rweb-audit-vhost ${IP_ADMIN_IP}
+    fi
+
+    test "${IP_EXTERNAL_IP}" == "0.0.0.0" || test ${ADMIN_EXTERNAL} == False || gen-rweb-audit-vhost ${IP_EXTERNAL_IP}
+    test -z "${IF_AUXILIARY}" || test "${IP_AUXILIARY_IP}" == "0.0.0.0" || test ${ADMIN_AUXILIARY} == False || gen-rweb-audit-vhost ${IP_AUXILIARY_IP}
+}
+
+gen-httpd-noproxy-conf()
+{
+    cat httpd-noproxy.conf-tuned
+}
+
+gen-httpd-hosts()
+{
+    local name
+    
+    echo "# Begin /etc/hosts"
+    echo
+    echo "127.0.0.1 localhost localhost.localdomain"
+    echo "${IP_WEB_IP} ${WEB_SERVER_DENY_NAME}"
+
+    if test ${WEB_MODE} == True ; then
+	echo "${IP_WEB_IP} ${SHOSTNAME} ${SHOSTNAME}.${DOMAIN_NAME}"
+    else
+    	echo "${IP_RWEB_IP} ${SHOSTNAME} ${SHOSTNAME}.${DOMAIN_NAME}"
+    fi
+
+    echo "${IP_WEB_IP} internal-side.gateway"
+    echo "${IP_EXTERNAL_IP} external-side.gateway"
+
+    test ${PROXY2_MODE} == False || gen-rweb-hosts
+    gen-ldap-ip-name
+    gen-name-ip-hosts
+
+    echo
+    echo "# End /etc/hosts"
+}
+
+gen-ha-pac()
+{
+    test ${WEB_MODE} == True || return 0
+
+    local ip i=0
+
+    cat wpad.pac-1-constant
+
+    echo -e "\tswitch (URLhash(url) % ${VRRP_WEB_IP_LIST_NB}) {"
+
+    for ip in ${VRRP_WEB_IP_LIST}
+    do
+	echo -e "\tcase ${i}:"
+	echo -e "\t\treturn \"PROXY ${ip}:${PROXY_PORT} ; DIRECT\";"
+	echo -e "\t\tbreak;"
+	((i++))
+    done
+
+    echo -e "\tdefault:"
+    echo -e "\t\treturn \"PROXY ${IP_WEB_IP}:${PROXY_PORT} ; DIRECT\";"
+    echo -e "\t\tbreak;"
+    echo -e "\t}"
+
+    cat wpad.pac-3-constant
+}
+
+gen-httpd-log-level()
+{
+    local log_level=$(get-apache-log-level)
+    echo "LogLevel ${log_level}"
+}
+
+gen-httpd-load-modules()
+{
+    local condition=0
+
+    cat httpd-modules.conf-constant
+
+    if test ${PROXY2_MODE} == True ; then
+
+        echo "LoadModule proxy_module ${WEB_SERVER_DIR}/libexec/mod_proxy.so"
+	echo "LoadModule proxy_http_module ${WEB_SERVER_DIR}/libexec/mod_proxy_http.so"
+	echo "LoadModule proxy_balancer_module ${WEB_SERVER_DIR}/libexec/mod_proxy_balancer.so"
+	echo "LoadModule slotmem_shm_module ${WEB_SERVER_DIR}/libexec/mod_slotmem_shm.so"
+	echo "LoadModule lbmethod_bybusyness_module ${WEB_SERVER_DIR}/libexec/mod_lbmethod_bybusyness.so"
+	echo "LoadModule lbmethod_byrequests_module ${WEB_SERVER_DIR}/libexec/mod_lbmethod_byrequests.so"
+	echo "LoadModule lbmethod_bytraffic_module ${WEB_SERVER_DIR}/libexec/mod_lbmethod_bytraffic.so"
+
+	if test ${CACHE_MODE} == True -a ${RWEB_CACHE_SZ} -gt 0 ; then
+	    echo "LoadModule cache_module ${WEB_SERVER_DIR}/libexec/mod_cache.so"
+	    echo "LoadModule cache_disk_module ${WEB_SERVER_DIR}/libexec/mod_cache_disk.so"
+	fi
+
+	if test ${COMPRESS_MODE} == True ; then
+	    echo "LoadModule deflate_module ${WEB_SERVER_DIR}/libexec/mod_deflate.so"
+	    echo "LoadModule filter_module ${WEB_SERVER_DIR}/libexec/mod_filter.so"
+	fi
+
+	if test ${AUTHENTICATE_MODE} == True -a ${AUTHENTICATE_RWEB} == True ; then
+
+	    echo "LoadModule authn_core_module ${WEB_SERVER_DIR}/libexec/mod_authn_core.so"
+	    echo "LoadModule auth_basic_module ${WEB_SERVER_DIR}/libexec/mod_auth_basic.so"
+	    echo "LoadModule authz_user_module ${WEB_SERVER_DIR}/libexec/mod_authz_user.so"
+
+	    if test ${AUTHENTICATE_LDAP} == True ; then
+		echo "LoadModule ldap_module ${WEB_SERVER_DIR}/libexec/mod_ldap.so"
+		echo "LoadModule authnz_ldap_module ${WEB_SERVER_DIR}/libexec/mod_authnz_ldap.so"
+	    fi
+
+	    if test ${AUTHENTICATE_KERBEROS} == True ; then
+		echo "LoadModule auth_gssapi_module ${WEB_SERVER_DIR}/libexec/mod_auth_gssapi.so"
+	    fi
+	fi
+    fi
+
+    if test ${RWEB_HTTPS_MODE} == True -a ${RWEB_MODE} == True -a ${PROXY2_MODE} == True ; then
+	echo "LoadModule proxy_connect_module ${WEB_SERVER_DIR}/libexec/mod_proxy_connect.so"
+	condition=1
+    else
+	if test ${ADMIN_WAUDIT} == True ; then
+	    condition=1
+	fi
+    fi
+
+    if test ${condition} -eq 1 ; then
+	echo "LoadModule ssl_module ${WEB_SERVER_DIR}/libexec/mod_ssl.so"
+    fi
+
+    test "${GUARD_MODE}" == False -a "${AV_MODE}" == False || echo "LoadModule env_module ${WEB_SERVER_DIR}/libexec/mod_env.so"
+
+    echo "LoadFile /usr/lib/libxml2.so"
+    echo "LoadFile /usr/lib/libpcre.so"
+    echo "LoadFile /usr/lib/libcurl.so"
+}
+
+gen-httpd-conf()
+{
+    gen-httpd-load-modules
+
+    cat httpd.conf-constant
+
+    gen-httpd-log-level
+    gen-waf-common-conf
+
+    echo "SecDebugLogLevel 0"
+
+    gen-web-server-conf
+    gen-web-server-ssl-conf
+    gen-web-server-waudit-conf
+
+    if test ${PROXY2_MODE} == True ; then
+	gen-httpd-proxy-conf
+    else
+	gen-httpd-noproxy-conf
+    fi
+
+    echo "ServerName ${SHOSTNAME}.${DOMAIN_NAME}"
+    echo "Listen 127.0.0.2:${WWW_PORT}"
+
+    test ${EMBEDDED_VPNSUBSCR_IS_ACTIVE} == False || echo "include ${WEB_SERVER_DIR}/etc/${EMBEDDED_VPNSUBSCR_NAME}.conf"
+}
+
+gen-embedded-vpnsubscr-web-conf()
+{
+    test ${EMBEDDED_VPNSUBSCR_IS_ACTIVE} == True || return 0
+    
+    cat << EOT
+Listen ${EMBEDDED_APPLICATION_IP}:${EMBEDDED_VPNSUBSCR_PORT}
+
+<IfModule !php_module>
+LoadModule php_module ${WEB_SERVER_DIR}/libexec/libphp.so
+AddType application/x-httpd-php .php
+</IfModule>
+
+<VirtualHost ${EMBEDDED_APPLICATION_IP}:${EMBEDDED_VPNSUBSCR_PORT}>
+ServerName ${EMBEDDED_VPNSUBSCR_RWEB_SITE_NAME}:${EMBEDDED_VPNSUBSCR_PORT}
+DocumentRoot /${EMBEDDED_APPLICATIONS_NAME}/${EMBEDDED_VPNSUBSCR_NAME}
+DirectoryIndex /index.php
+
+<Directory /${EMBEDDED_APPLICATIONS_NAME}/${EMBEDDED_VPNSUBSCR_NAME}${IMAGE_DIR}>
+    AllowOverride All
+</Directory>
+
+<Directory /${EMBEDDED_APPLICATIONS_NAME}/${EMBEDDED_VPNSUBSCR_NAME}/${EMBEDDED_VPNSUBSCR_PROFILE_DIR_NAME}>
+    AllowOverride All
+</Directory>
+
+</VirtualHost>
+EOT
+}
+
+get-embedded-sitename()
+{
+    test -n "${1}" || return 1
+    local in_port=${1}
+
+    local name_port name port
+
+    for name_port in ${EMBEDDED_APPLICATIONS_NAME_PORT}
+    do
+	name=${name_port/:*}
+	port=${name_port/*:}
+
+	if test ${port} == ${in_port} ; then
+	    echo ${name}
+	    break
+	fi
+    done
+}
+
+gen-embedded-vpnsubscr-php-constant()
+{
+    local embedded_vpnsubscr=${EMBEDDED_VPNSUBSCR_MODE^^}
+    local log_file=/var/log/${EMBEDDED_VPNSUBSCR_NAME}.log
+    local ca_file=/var/${SSL_CA_RDIR}/${SYSTEM_CA_ID}.certificate
+    local db_file=/var/db/${EMBEDDED_APPLICATIONS_NAME}/${EMBEDDED_VPNSUBSCR_NAME}.db
+    local sslmediate=${SSLMEDIATE_MODE^^}
+    local email=${ADMINISTRATOR_EMAIL}
+    local domain=${email/*@}
+    local max=$((2 * USERS_NB))
+    local appliance_link="https://${IP_ADMIN_IP}:${WADMIN_PORT}/"
+    local vpn_name=$(get-tls-canonical-name ${WEB_SERVER_DIR}${ca_file})
+    local cur_os_version=$(get-os-cur-version)
+    local new_os_version=$(get-os-new-version)
+
+    echo '<?php'
+    cat constant.php-constant
+    cat << EOT
+
+define( 'APP_VERSION', "${EMBEDDED_VPNSUBSCR_VERSION}" );
+define( 'EMBEDDED_VPNSUBSCR', ${embedded_vpnsubscr} );
+
+define( 'SSL_MEDIATION_MODE', ${sslmediate} );
+define( 'VPN_NAME', "${vpn_name}" );
+define( 'MAX_SUBSCRIBERS', ${max} );
+define( 'APPLIANCE_LINK', "${appliance_link}" );
+define( 'LOG_FILE', "${log_file}" );
+
+define( 'CA_FILE', "${ca_file}" );
+define( 'DB_FILE', "${db_file}" );
+
+define( 'GOOGLE_RECAPTCHA_PUBLIC_KEY',  "" );
+define( 'GOOGLE_RECAPTCHA_PRIVATE_KEY', "" );
+
+define( 'PUBLIC_DOMAIN_NAME', "${domain}" );
+define( 'FROM_EMAIL', "${email}" );
+
+define( 'PROFILE_DIR', '${EMBEDDED_VPNSUBSCR_PROFILE_DIR_NAME}' );
+
+define( 'OS_NAME', '${COMMERCIAL_NAME}' );
+define( 'OS_GENERATION', '${OS_GENERATION}' );
+define( 'OS_CUR_VERSION', '${cur_os_version}' );
+define( 'OS_NEW_VERSION', '${new_os_version}' );
+define( 'OS_UPGRADE_LINK', '${appliance_link}${GUI_DIR_NAME}/system-patch.${GUI_EXT_NAME}' );
+
+if (!EMBEDDED_VPNSUBSCR) exit( 0 );
+
+EOT
+    echo '?>'
+}
+
+gen-sysconfig-vpnsubscr()
+{
+    if test ${EMBEDDED_VPNSUBSCR_IS_ACTIVE} == True ; then
+	echo "EMBEDDED_VPNSUBSCR=yes"
+    else
+	echo "EMBEDDED_VPNSUBSCR=no"
+    fi
+
+    echo "EMBEDDED_VPNSUBSCR_SITE_NAME=${EMBEDDED_VPNSUBSCR_RWEB_SITE_NAME}"
+}
+
+LIB_APL_WEB=Yes

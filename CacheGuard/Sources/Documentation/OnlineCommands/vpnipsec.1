@@ -1,0 +1,268 @@
+Manage IPsec VPN tunnels and networks
+.SH SYNOPSIS
+
+[1] \fBvpnipsec\fR [\fBauthenticate\fR [\fBpsk\fR (\fI<pre-shared-key>\fR | \fBauto\fR) | (\fBtls\fR | \fBeaptls\fR) \fI<tls-id>\fR [(\fBdn\fR | \fBfqdn\fR)]]]
+
+[2] \fBvpnipsec\fR [\fBaccess\fR [(\fBoff\fR | \fBon\fR) [\fI<ike-encryption\fR [\fI<ike-integrity>\fR [\fI<ike-diffie-hellman>\fR [\fI<esp-encryption>\fR [\fI<esp-integrity>\fR]]]]]]]
+
+[3] \fBvpnipsec\fR [\fBaccess\fR [\fBconf\fR (\fBandroid\fR | \fBapple\fR | \fBlinux\fR | \fBwindows\fR) (\fI<client-tls-id>\fR | \fBany\fR) (\fBshow\fR | \fBsave\fR (\fBftp\fR | \fBsftp\fR | \fBtftp\fR) \fI<file-server>\fR \fI<file-path>\fR | \fBemail\fR \fI<email-address>\fR) [\fI<name>\fR]]]
+
+[4] \fBvpnipsec\fR [\fBaccess\fR [\fBauthenticate\fR [(\fBpsk\fR | \fBtls\fR | \fBeaptls\fR)]]]
+
+[5] \fBvpnipsec\fR [\fBaccess\fR [\fBaccess\fR [\fBraz\fR | (\fBadd\fR | \fBdel\fR) \fI<ike-id>\fR]]]
+
+[6] \fBvpnipsec\fR [\fBsite\fR [\fBadd\fR \fI<site-id>\fR \fI<peer-vpn-address>\fR (\fBpsk\fR \fI<pre-shared-key>\fR | \fBtls\fR (\fBcertificate\fR \fI<tls-id>\fR | \fBdn\fR '\fI<distinguished-name>\fR' | \fBfqdn\fR \fI<domain-name>\fR)) [\fI<ike-encryption\fR] [\fI<ike-integrity>\fR [\fI<diffie-hellman>\fR [\fI<esp-encryption>\fR [\fI<esp-integrity>\fR [\fI<remote-isakmp-port>\fR [\fI<remote-nat-transversal-port>\fR]]]]]]]]]
+
+[7] \fBvpnipsec\fR [\fBsite\fR [\fBraz\fR | \fBdel\fR \fI<site-id>\fR]]
+
+[8] \fBvpnipsec\fR [\fBnetwork\fR [(\fBaccess\fR | \fBsite\fR \fI<site-id>\fR) [(\fBraz\fR | ((\fBadd\fR | \fBdel\fR) (\fBlocal\fR | \fBremote\fR) \fI<network-ip>\fR [\fI<network-mask>\fR]))]]]
+
+[9] \fBvpnipsec\fR [\fBvia\fR [(\fBaccess\fR | \fBsite\fR \fI<site-id>\fR) [\fBraz\fR | (\fBadd\fR | \fBdel\fR) \fI<gateway-ip>\fR (\fBmaster\fR \fBbackup\fR) [\fI<priority>\fR]]]]
+
+[10] \fBvpnipsec\fR [\fBto\fR [\fI<site-id>\fR [\fBraz\fR | (\fBadd\fR | \fBdel\fR) \fI<peer-vpn-address>\fR]]]
+
+[11] \fBvpnipsec\fR [\fBnat\fR (\fBpublic\fR [\fBraz\fR | (\fBadd\fR | \fBdel\fR) \fI<local-public-ip>\fR]) | (\fBrole\fR [\fI<site-id>\fR [(\fBactive\fR | \fBpassive\fR | \fBraz\fR)]])]
+
+[12] \fBvpnipsec\fR [\fBreport\fR]
+
+.SH DESCRIPTION
+
+VPN stands for Virtual Private Network and IPsec for Internet Protocol Security. An IPsec VPN allows you to authenticate and encrypt the data packets between private networks over a public IP network (ie internet) to provide secure encrypted communications. You can build a persistent IPsec VPN between 2 sites or allow remote workers to access your internal infrastructures via an IPsec VPN server. To use the IPsec VPN server on the present system you should activate it first (use the command \fBmode\fR). Then the \fBvpnipsec\fR command can be used to create and manage IPsec VPNs.
+
+We distinguish two IPsec VPN modes: site to site VPNs and remote access VPNs. A site to site (or inter site) VPN allows you to build a permanent secure tunnel between two sites. With such a tunnel, computers in both sites can communicate with each other in a secure way as they were on the same location whereas in reality they can be separated by several thousands of kilometers. To build a site to site IPsec tunnel you need two VPN servers: a local VPN server and the remote (or peer) VPN server. As IPsec is a standard protocol, you can build a site to site VPN using VPN servers provided by distinct manufacturers/editors.
+
+A remote access VPN is a central VPN server to which remote workers can connect via secure tunnels built on top of the internet. With such tunnels remote workers can access computers protected by the VPN server in a secure way as they were on the same location. To build a remote access IPsec VPN you need a central IPsec VPN server while each remote worker connect the central VPN server using an IPsec VPN client. This system supports native IPsec VPN clients provided by most devices and OS in the market. In case where native VPN clients would not work, alternative third party IPsec VPN clients such as strongSwan\[rg] can be used. The \fBvpnipsec\fR command allows you to build site to site as well as remote access IPsec VPNs.
+
+The \fBvpnipsec\fR command allows you to build IPsec VPNs without having extensive knowledge in cryptography and IPsec protocols. However having some basic knowledge on IPsec principals can help to better understand the configuration to set. The \fBIPSEC VPN IN SHORT\fR section below aims to explain IPsec in short. Please note that you should chose between the site mode and the remote accesse mode: if you activate the remote access mode you can no longer use site to site IPsec VPNs. To use site to site IPsec VPNs the remote access mode should be deactivated.
+
+The present system use its external interface to establish IPsec VPN with peers or remote clients. That's why there is no need to specify the local IP address to set an IPsec VPN on this system. You can set the system's external network interface and IP address using the commands \fBlink\fR and \fBip\fR.
+
+The first [1] usage form allows you to configure the authentication method used on the local IPsec VPN server. To connect to the local IPsec VPN server, remote peers/clients must then use the authentication method configured with this usage form. Currently three authentication methods are supported: the PSK (Pre Shared Key) method (\fBpsk\fR), the SSL certificate based method (\fBtls\fR) and the EAP-TLS (Extensible Authentication Protocol TLS) method (\fBeaptls\fR). To activate the pre shared key method use the keyword \fBpsk\fR followed by a word composed by a mix of at least 32 alphabetic, numeric or the dash (-) characters. To automatically generate a strong pre-shared-key you can use the keyword \fBauto\fR. To activate the SSL or EAP-TLS based methods use respectively the keyword \fBtls\fR or \fBeaptls\fR followed by the TLS identifier of the SSL certificate to use (refer to the \fBtls\fR command to import, export or generate SSL certificates). Please note that only one authentication method can be activated at the same time. When using the \fBtls\fR or \fBeaptls\fR authentication methods, remote peers/clients must identify the local IPsec VPN server by using the \fBdn\fR (distinguished name) or \fBfqdn\fR (fully qualified domain name) of the specified SSL certificate. The last argument of this usage form allows you to specify the identifier type that should be used by remote IPsec VPN peers/clients. If no identifier type is specified the distinguished name (\fBdn\fR) is used.
+
+It is important to note that:
+
+  \(bu In case where the \fBfqdn\fR based identification is used, remote peers/clients should connect the IPsec VPN server using its \fBfqdn\fR and not its IP address (which is the appliance external IP address). Otherwise, the connection won't establish.
+
+  \(bu The \fBdn\fR to use by remote IPsec VPN peers/clients should be the local SSL certificate subject. You can get the subject of an SSL certificate using the \fBtls\fR command.
+
+  \(bu The \fBfqdn\fR to use by remote IPsec VPN peers/clients should be a subject alternative name of the local SSL certificate. This means that when using the \fBfqdn\fR, the local SSL certificate should be a SAN certificate. You can get the subject alternative name of an SSL certificate using the \fBtls\fR command.
+
+The second [2] usage form (\fBvpnipsec access\fR...) allows you to deactivate, activate and configure the remote access mode. To deactivate the remote access mode use the keyword \fBoff\fR. To activate the remote access mode use the keyword \fBon\fR followed by optional IPsec settings. A brief description of these settings is given in the \fBIPSEC VPN IN SHORT\fR section below.
+
+The third [3] usage form (\fBvpnipsec access conf\fR...) allows you to automatically generate configuration profiles (or connection scripts) to use on remote IPsec VPN client systems. The generated configuration can be displayed (\fBshow\fR keyword), saved (\fBsave\fR keyword) on a trusted file server or be sent to an email address. Trusted file servers are defined with the \fBaccess\fR command. The email account used to send the email is configured using the \fBemail\fR command. Supported IPsec VPN client systems are as follows (for each system, a brief description on how to use them is given):
+
+  \(bu The strongSwan\[rg] App on Android\[rg] (\fBandroid\fR keyword): save the generated profile on a file having the \fI.sswan\fR extension, place it on Web server and then import it into the strongSwan\[rg] App from that Web server. Please refer to the strongSwan\[rg] App documentation for further information.
+
+  \(bu Apple\[rg] (MacOS\[rg] or iPhone\[rg] / iOS\[rg]) (use the \fBapple\fR keyword): save the generated profile on a file having the \fI.mobileconfig\fR extension and then import it into the Apple\[rg] device. Please refer to the Apple\[rg] documentation for further information.
+
+  \(bu Microsoft\[rg] Windows\[rg] (\fBwindows\fR keyword): run the generated PowerShell script a Windows\[rg] system. With Windows\[rg], the client certificate should be imported separately as a machine certificate into the Windows\[rg] system. Please refer to the Windows\[rg] documentation for further information.
+
+In case where the runtime authentication method is based on a PSK, the IPsec VPN server address used in the generated configuration is set as follows (in order of priority):
+
+  \(bu The first IP address in the NAT public IP address list (see the eleventh [11] usage form below).
+
+  \(bu If the HA mode is enabled (see the \fBmode\fR and \fBvrrp\fR commands), the external master VRRP IP address having the highest priority. If no master VRRP IP address is defined, the external backup VRRP IP address having the highest priority.
+
+  \(bu If the HA mode is disabled, the appliance external IP address (see the \fBip\fR command).
+
+In case where the runtime authentication method is based on a certificate (\fBtls\fR or \fBeaptls\fR authentication methods), the IPsec VPN server address used in the generated configuration is set to canonical name (CN) part of the subject in that certificate.
+
+The fourth [4] usage form is used to specify the client side authentication method to use in remote access mode. Allowed authentication methods at the client side are \fBpsk\fR, \fBtls\fR and \fBeaptls\fR. When using the \fBpsk\fR method , the pre shared key to use at the client side should be the same as the pre shared key at the server side. When using the \fBtls\fR or the \fBeaptls\fR methods, the IKE (or EAP) identifier to use by the client should be the canonical name (CN=) part of the subject specified in its SSL certificate
+
+In remote access mode, when remote clients use the \fBtls\fR or \fBeaptls\fR authentication methods at their side, you have the possibility to limit client accesses to IKE (or EAP) identifiers that are explicitly allowed. The fifth [5] usage form is used at that end. In case where the access list defined with this usage form is empty, all authenticated clients are allowed to connect to the IPsec VPN server. Otherwise, only IKE (or EAP) identifiers that are part of that access list are allowed to connect. Normally, the IKE (or EAP) identifier is the CN part of the client certificate subject. In case where the remote client is a Windows\[rg] machine and the used authentication method at its side is \fBtls\fR, the IKE identifier is the complete client certificate subject (and not only its CN part).
+
+The sixth [6] usage form (\fBvpnipsec site\fR...) allows you to create site to site IPsec VPNs. A site to site IPsec VPN is identified by a VPN identifier (\fI<site-id>\fR). A \fI<site-id>\fR must begin with an alpha character and may contains alpha numeric characters as well as the characters "_" and "-". To establish an IPsec tunnel between two IPsec VPN servers each peer should authenticate the other first. Currently two authentication methods are supported: \fBpsk\fR and \fBtls\fR. To add a site to site IPsec VPN use the keyword \fBadd\fR followed a VPN identifier (\fI<site-id>\fR), the remote VPN server address (\fI<peer-vpn-address>\fR (IP address or network name) and an authentication method required from the remote IPsec peer. In case where the remote VPN server IP is set to 0.0.0.0 (or the keyword \fBany\fR), any authenticated remote VPN server would be allowed to establish a site to site IPsec VPN with the local system. Each authentication method required from a remote peer needs its specific parameters to specify. Those parameters are described below.
+
+In case where the authentication method required from the remote peer is \fBpsk\fR, the used pre shared key must be between 32 and 64 characters.
+
+In case where the authentication method required by the peer is based on an SSL certificate (\fBtls\fR authentication method), the SSL certificate advertised by the remote peer should be a SAN certificate and must be trusted by the local system. To trust an SSL certificate, the CA certificate that has been used to sign it should be present on the local system. The remote peer can also advertise a self signed certificate. In this case that SSL certificate should be present as a server certificate on the local system. You can import and trust CA and server SSL certificates using the \fBtls\fR command. The remote peer identification can be either DN (Distinguished Name) based, FQDN (Fully Qualified Domain Name) based or self signed certificate based:
+
+  \(bu For a DN based identification, use the \fBdn\fR keyword followed by the distinguished name of the advertised SSL certificate. The distinguished name to use should be the subject part of the SSL certificate. It's a list of assertions (\fIkey\fR = \fIvalue\fR) separated by a comma (the whole distinguished name should be placed between quotes).
+
+  \(bu For an FQDN based identification, use the keyword \fBfqdn\fR followed by the fully qualified domain name of the advertised SSL certificate. The \fBfqdn\fR of an SSL certificate is the last assertion part of its subject and should also be specified as a subject alternative name in the SSL certificate.
+
+  \(bu For a self signed certificate based identification, use the \fBcertificate\fR keyword followed by the \fI<tls-id>\fR of that self signed certificate. It is important to note\fR that if the identification method required by the remote peer is FQDN, the remote peer address must be specified as network name and not an IP address. In this case, the specified network name should match the FQDN of the self signed certificate. Otherwise, the IPsec tunnel won't establish.
+
+With the sixth [6] usage form, some optional arguments can be specified. In case where they are not specified default values are used. Default values for optional arguments are given below.
+
+Default values for optional arguments are as follows:
+
+  \(bu \fI<ike-encryption\fR used by the remote peer: \fBaes256\fR
+
+  \(bu \fI<ike-integrity>\fR used by the remote peer: \fBsha256\fR
+
+  \(bu \fI<diffie-hellman>\fR used by the remote peer: \fBmodp2048\fR
+
+  \(bu \fI<esp-encryption>\fR used by the remote peer: \fBaes256\fR
+
+  \(bu \fI<esp-integrity>\fR used by the remote peer: \fBsha256\fR
+
+  \(bu \fI<remote-isakmp-port>\fR used by the remote peer: 500
+
+  \(bu \fI<remote-nat-transversal-port>\fR used by the remote peer: 4500
+
+The seventh [7] usage form is used to delete a site to site IPsec VPN or completely erase all site to site IPsec VPNs in the system.
+
+With an IPsec VPN a local network can SECURELY communicate with a remote network via an untrusted public network such as the internet. The eighth [8] usage form allows you to specify the local and remote networks to automatically route via the IPsec tunnel. With a site to site IPsec VPN at least one remote network should be specified. In remote access mode if no remote network is specified the default 172.17.0.0/16 network is used. This means that remote workers will get a virtual IP address in the 172.17.0.0/16 network. In all cases, if no local network is specified, the internal connected network (connected to the \fBinternal\fR interface (or the \fBweb\fR interface in VLAN mode)) is routed via the IPsec tunnel. If no \fI<network-mask>\fR is specified the default network mask \fI255.255.255.0\fR is used. To specify the default route you can either use the network "0.0.0.0 0.0.0.0" or the keyword \fBdefault\fR.
+
+When the appliance is configured to use multiple external gateways (connected to the external interface), each potentially having a distinct public IP address (with each gateway performing source NAT on all outgoing traffic to the Internet using its own public IP), the IPsec VPN configuration requires some tweaks in order to allow the system to properly establish a VPN tunnel. The ninth [9] usage form allows you to explicitly specify (via) gateways to use for a given IPsec VPN. Via gateways can have two roles: the \fBmaster\fR role and the \fBbackup\fR role. Please note that specifying backup via gateways is meaningful only if the external gateways share the same public IP address.
+
+During the first IPsec VPN establishment, a master gateway with the highest priority is elected to route IPsec VPN traffic for a given IPsec VPN (specified by its \fI<site-id>\fR). The elected gateway is then activated for that IPsec VPN. Please note that at a given point, one and only one gateway is considered as active for a given IPsec VPN. In case of a failure on the active gateway, a backup gateway (with the highest priority) is then elected to be activated. In case where a faulty gateway becomes operational again, the process of electing and activating a new gateway is performed again.
+
+To add a master via gateway to a given site to site IPsec VPN, use the keyword \fBvia site\fR followed by the given IPsec VPN identifier (\fI<site-id>\fR), the keyword \fBadd\fR, the gateway IP address to use, the keyword \fBmaster\fR and optionally the priority associated to the specified gateway. To add a backup gateway, use the keyword \fBbackup\fR instead of the \fBmaster\fR keyword. To delete a gateway, use the keyword \fBdel\fR instead of \fBadd\fR. To erase the list of all \fBvia\fR gateways for a given IPSec VPN, use the keywords \fBraz\fR. To add or delete gateways in IPsec access mode, replace the couple "\fBsite\fR \fI<site-id>\fR" by the keyword \fBaccess\fR. The priority is a numeric value between 0 and 255. If no priority is specified, the priority is set to 110 for a master gateway and to 100 for a backup gateway.
+
+For a site to site IPsec tunnel where the remote IPsec peer is accessible via multiple gateways (with distinct public IP addresses), remote backup IP addresses or network names should be specified on the local system. Otherwise, in case of a failure on the remote master address (IP or network name), the IPsec tunnel can't be established. The tenth [10] usage form allows you to manage remote backup addresses for a site to site IPsec tunnel. To add a remote backup address to a site to site IPsec tunnel, use the keyword \fBto\fR followed by VPN identifier (\fI<site-id>\fR), the  keyword \fBadd\fR and the remote peer backup address. To delete a remote peer backup address, use the keyword \fBdel\fR (instead of the \fBadd\fR keyword). To erase the list of all  remote peer backup addresses associated to a site to site IPsec tunnel, use the keyword \fBto\fR followed by the VPN identifier (\fI<site-id>\fR) and the keyword \fBraz\fR.
+
+In a configuration where the appliance is behind NAT (its external IP address is translated into one or more public IP addresses) and the used authentication method (on the local appliance) is PSK, all public NAT IP addresses should be specified on the local system in order to allow remote \fBactive\fR (see below) peers to be properly authenticated. The eleventh [11] usage form allows you to manage those NAT IP addresses. To add a NAT IP address use the keywords \fBnat public add\fR followed by the NAT IP address. To delete a NAT IP address, use the keyword \fBdel\fR (instead of the \fBadd\fR keyword). To erase the list of all public NAT IP addresses use the keywords \fBnat public raz\fR.
+
+In a site to site IPsec VPN configuration where both local and remote peers are behind NAT, one peer should take the passive role while the other should act as active (the one that initiates first the connection). In a Hub and Spoke architecture, where the central hub and spokes are all behind NAT, the central hub must act as passive while spokes should take the active role. The eleventh [11] usage form allows you to configure the role of remote peers. To configure a remote peer as passive for a site to site IPsec VPN, use the keywords \fBnat role\fR followed by its identifier (\fI<site-id>\fR) and the keyword \fBpassive\fR (in this case the local peer takes the \fBactive\fR role). To configure a remote peer as active for a site to site IPsec VPN, use the keywords \fBnat role\fR followed by its identifier (\fI<site-id>\fR) and the keyword \fBactivee\fR (in this case the local peer takes the \fBpassive\fR role). When configuring such a site to site IPsec VPN, please take care to do not select the same roles for both peers. If no NAT role is specified for a site to site IPsec VPN, the active role is assumed for it. Using the keyword \fBraz\fR allows you to restore the default behaviour for a NAT role.
+
+The twelfth [12] usage form allows you to display a report on the status of configured IPsec VPNs. To display the report use the keyword \fBreport\fR.
+
+.SH IPSEC VPN ROUTING
+The \fBvpnipsec\fR command automatically adds required routes for IPsec VPN traffic (and you shouldn't add them with the \fBip\fR command). The \fBapply\fR command checks the compatibility of all routes to install and in case of conflicts it refuses to apply the new configuration. When managing routes and networks with the \fBip\fR and \fBvpnipsec\fR commands please carefully consider the following rules:
+
+  \(bu IPsec VPN remote networks and networks in the main routing table (created using the \fBip\fR command) should be distinct (this is also valid for the default network).
+
+  \(bu An IPsec VPN local network can be either the default network, a network connected to the internal or auxiliary interface or a non connected network on condition that a route is manually added (using the \fBip\fR command) for that network via a gateway connected to the internal or auxiliary interface.
+
+  \(bu At least one remote network should be specified for a site to site IPsec VPN.
+
+  \(bu An IPsec VPN remote network can't be a network connected to the internal, external or auxiliary interface.
+
+.SH IPSEC VPN, ACCESS POLICIES AND THE FIREWALL
+IPsec VPN remote networks are subject to security policies as follows:
+
+  \(bu In case where the internal network is routed in an IPsec tunnel, remote networks can ping the system's \fBinternal\fR network interface (\fBweb\fR network interface in \fBvlan\fR mode) via that that tunnel.
+
+  \(bu In case where the internal network is routed in an IPsec tunnel, remote networks can potentially access the system's embedded proxy, transparent proxy, DNS server and the antivirus. Accesses are controlled by the \fBaccess\fR command (see the the \fBaccess\fR command for further information).
+
+  \(bu In case where no rule is defined in the \fBvpnipsec\fR firewall rule set, all new connections incoming from the \fBvpnipsec\fR zone and destined to the \fBinternal\fR zone (the \fBweb\fR zone in \fBvlan\fR mode) are allowed (see the the \fBfirewall\fR command for further information).
+
+.SH IPSEC VPN IN SHORT
+An Ipsec VPN tunnel between two peers is built in two phases: in the phase 1, the two participants negotiate the security mechanisms to use in order to establish the VPN tunnel in the phase 2. Negotiation phases use a protocol called IKE (Internet Key Exchange). Please note that the system supports IKE version 2 only. One of the most important step in the phase 1 is the authentication of a peer by the other. With IKEv2 the two peers can use distinct authentication methods. Currently the system supports three authentication methods: the pre shared key (\fBpsk\fR), the X.509 SSL certificate based (\fBtls\fR) and the EAP-TLS (\fBeaptls\fR).
+
+Once the two peers has authenticated each other, they should agree on the encryption algorithm,  the integrity algorithm and the strength of the key to use in the DH (Diffie Hellman) key exchange process in phase 1. At the end of the phase 1 the two peers will have a shared key that they can use in phase 2 to securely communicate with each other to agree on the encryption algorithm,  the integrity algorithm and the strength of the key to use in the DH key exchange process for future transited data between the two peers. With the present system the DH to use in phase 2 is the same as the DH in phase 1.
+
+The present system supports the following encryption algorithms:
+
+  \(bu \fBaes128\fR: 128 bit AES-CBC
+
+  \(bu \fBaes192\fR: 192 bit AES-CBC
+
+  \(bu \fBaes256\fR: 256 bit AES-CBC
+
+  \(bu \fBaes128ctr\fR: 128 bit AES-COUNTER
+
+  \(bu \fBaes192ctr\fR: 192 bit AES-COUNTER
+
+  \(bu \fBaes256ctr\fR: 256 bit AES-COUNTER
+
+Supported integrrity algorithms are as follows:
+
+  \(bu \fBsha1\fR: SHA1 160 160 HMAC
+
+  \(bu \fBsha256\fR: SHA2 256 128 HMAC
+
+  \(bu \fBsha384\fR: SHA2 384 192 HMAC
+
+  \(bu \fBsha512\fR: SHA2 512 256 HMAC
+
+The Diffie-Hellman key-exchange groups that you can use with the present system are as follows:
+
+\(bu \fIRegular Modular Prime Groups:\fR
+
+  \(bu \fBmodp1536\fR: group 5 (1536 bits)
+
+  \(bu \fBmodp2048\fR: group 14 (2048 bits)
+
+  \(bu \fBmodp3072\fR: group 15 (3072 bits)
+
+  \(bu \fBmodp4096\fR: group 16 (4096 bits)
+
+  \(bu \fBmodp6144\fR: group 17 (6144 bits)
+
+  \(bu \fBmodp8192\fR: group 18 (8192 bits)
+
+
+\(bu \fINIST Elliptic Curve Groups:\fR
+
+  \(bu \fBecp192\fR: group 25 (192 bits)
+
+  \(bu \fBecp224\fR: group 26 (224 bits)
+
+  \(bu \fBecp256\fR: group 19 (256 bits)
+
+  \(bu \fBecp384\fR: group 20 (384 bits)
+
+  \(bu \fBecp521\fR: group 21 (521 bits)
+
+
+\(bu \fIBrainpool Elliptic Curve Groups:\fR
+
+  \(bu \fBecp224bp\fR: group 27 (224 bits)
+
+  \(bu \fBecp256bp\fR: group 28 (256 bits)
+
+  \(bu \fBecp384bp\fR: group 29 (384 bits)
+
+  \(bu \fBecp512bp\fR: group 30 (512 bits)
+
+
+Algorithms are ordered from the weakest to the strongest from the security perspective. Please note that the stronger the algorithm is, the more computation it requires and hence a more powerful CPU.  
+
+IKE uses ISAKMP (an UDP protocol) for the key exchange so an IPsec VPN client or peer should know the IPsec VPN server IP address an ISAKMP port to connect to. Because an IPsec VPN server may use a NATed IP address, IPsec packets can be encapsulated in UDP packets. In IKE this is called NAT-Traversal. The default ISAKMP and NAT-Traversal ports are respectively 500 and 4500. In most cases you do not need to modify default ports but because some internet providers may block those ports you have the possibility to modify them. ISAKMP and NAT-Traversal ports for a remote IPsec VPN peer can be set when adding an IPsec VPN while local ISAKMP and NAT-Traversal ports can be modified using the command \fBport\fR.
+
+An IPsec VPN uses the AH (Authentication Header) or the ESP (Encapsulating Security Payload) protocols. AH provides a mechanism for authentication only while ESP provides data encryption in addition. The present system supports the ESP protocol only.
+
+.SH CLIENT DEVICES IN ACCESS MODE SPECIAL NOTES
+At the time of writing, in remote access mode, the following restrictions are applied regarding Apple\[rg] & Android\[rg] devices:
+
+  \(bu The Android\[rg] native IPsec VPN client is not compatible with the present system. To establish IPsec tunnels between Android\[rg] devices and the present system we suggest to use an IPsec VPN client such as strongSwan\[rg] App (www.strongswan.org).
+
+  \(bu To establish IPsec tunnels between Apple\[rg] devices and the present system, the authentication method to use can be "\fBpsk\fR" or "\fBtls\fR \fBfqdn\fR" (\fBdn\fR identifier based is not supported). Also please note that only SAN certificates are supported with Apple\[rg] devices.
+
+  \(bu The Windows\[rg] native IPsec VPN client supports the \fBtls\fR based authentication method only (\fBpsk\fR based authentication authentication is not supported).
+
+.SH UDP FRAGMENTATION ISSUE
+If the CacheGuard appliance is deployed behind a firewall that blocks UDP fragmentation and TLS/EAP-TLS authentication is selected, the security mechanism negotiation phases may fail due to an insufficient MTU (Maximum Transmission Unit). For the negotiation to complete successfully, the entire TLS certificate must be transmitted within a single transmission unit.
+
+To resolve this issue, either disable UDP fragmentation blocking on the upstream firewall or increase the MTU on the network device (firewall or router) directly connected to the external NIC of the CacheGuard appliance. Typically, the MTU may be configured as follows:
+
+  \(bu 2000 bytes for TLS-based authentication
+
+  \(bu 4500 bytes for EAP-TLS-based authentication
+
+These values generally ensure that the complete TLS certificate is transmitted within a single transmission unit, thereby preventing negotiation failures when UDP fragmentation is blocked.
+
+.SH SEE ALSO
+.B access
+(1)
+.B apply
+(1)
+.B domainname
+(1)
+.B dynamicdns
+(1)
+.B email
+(1)
+.B firewall
+(1)
+.B ip
+(1)
+.B link
+(1)
+.B mode
+(1)
+.B port
+(1)
+.B qos
+(1)
+.B system
+(1)
+.B tls
+(1)
+.B vlan
+(1)
+.B vrrp
+(1)

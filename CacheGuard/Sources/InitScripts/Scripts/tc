@@ -1,0 +1,189 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       InitScript
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+source /lib/lsb/init-functions
+
+CACHEGUARD_DIR=/etc/sysconfig/cacheguard
+source ${CACHEGUARD_DIR}/constant
+source ${APPLIANCE_DIR}/etc/role
+
+TC_CONFIG=/etc/sysconfig/tc
+
+test -x /sbin/tc || exit
+test -L ${TC_CONFIG} || exit
+
+TC_CMD=tc
+IP_CMD=ip
+SERV=QoS
+
+cd /sys/class/net
+IFBS=$(ls -d ifb* 2> /dev/null)
+
+RETVAL=0
+
+file-basename()
+{
+    test -n "${1}" || return 1
+    local name=${1}
+
+    local base=${name##*/}
+    if test -n "${2}" ; then
+	base=${base/${2}/}
+    fi
+    echo ${base}
+}
+
+link-bond-stop()
+{
+    test -n "${1}" || return 1
+    local interface=${1}
+
+    test -f /etc/sysconfig/ifconfig.${interface} || return 2
+    unset BONDING
+    source /etc/sysconfig/ifconfig.${interface}
+    test -n "${BONDING}" || return 0
+
+    local bond
+
+    for bond in ${BONDING}
+    do
+	${TC_CMD} qdisc del dev ${bond} root
+	${TC_CMD} qdisc del dev ${bond} ingress
+    done
+}
+
+link-ifb()
+{
+    local ifb
+
+    case "${1}" in
+	start)
+	    for ifb in ${IFBS}
+	    do
+		${IP_CMD} link set up dev ${ifb} 2> /dev/null 1>&2
+	    done
+	    ;;
+	stop)
+	    for ifb in ${IFBS}
+	    do
+		${IP_CMD} link set down dev ${ifb} 2> /dev/null 1>&2
+	    done
+	    ;;
+	*)
+    esac
+}
+
+show-tc-status()
+{
+    local ret
+
+    if test -z "${1}" ; then
+	${TC_CMD} -s -d qdisc show
+	ret=${?}
+    else
+	local dev=${1}
+	if test -z "${2}" ; then
+	    ${TC_CMD} -s -d qdisc show dev ${dev}
+	    ret=${?}
+	else
+	    local in_handle=${2}
+	    local dummy qdisc handle rest
+	    local found=0
+	    ${TC_CMD} -s -d qdisc show dev ${dev} | \
+		while read dummy qdisc handle rest
+		do
+		    if test ${handle} == ${in_handle} ; then
+			echo ${dummy} ${qdisc} ${handle} ${rest}
+			found=1
+		    elif test ${found} -eq 1 ; then
+			echo ${dummy} ${qdisc} ${handle} ${rest}
+			break
+		    fi
+		done
+	    ret=${PIPESTATUS[0]}
+	fi
+    fi
+
+    return ${ret}
+}
+
+case "${1}" in
+    start)
+	log_info_msg "Starting ${SERV}..."
+	RETVAL=0
+	while read line ; do
+	    test -n "${line}" || continue
+	    test "${line:0:1}" != "#" || continue
+
+	    ${TC_CMD} ${line} 2> /dev/null 1>&2
+	    [ ${?} -eq 0 ] || ((RETVAL++))
+	done < ${TC_CONFIG}
+
+	link-ifb ${1}
+	[ ${?} -eq 0 ] || ((RETVAL++))
+	[ ${RETVAL} -eq 0 ]
+	evaluate_retval
+	exit ${RETVAL}
+	;;
+
+    stop)
+	log_info_msg "Stopping ${SERV}... "
+	for file in /etc/sysconfig/ifconfig.*
+	do
+	    interface=$(file-basename ${file})
+	    interface=${interface/ifconfig\./}
+	    test ${interface:0:5} != "route" || continue
+            test ${interface/\:*} == ${interface} || continue
+	    ls ${file}.* > /dev/null 2>&1
+	    test ${?} -ne 0 || continue
+
+	    ${TC_CMD} qdisc del dev ${interface} root 2> /dev/null 1>&2
+	    ${TC_CMD} qdisc del dev ${interface} ingress 2> /dev/null 1>&2
+	done
+	for ifb in ${IFBS}
+	do
+	    ${TC_CMD} qdisc del dev ${ifb} root 2> /dev/null 1>&2
+	done
+	link-ifb ${1}
+	RETVAL=${?}
+	[ ${RETVAL} -eq 0 ]
+	evaluate_retval
+	exit ${RETVAL}
+	;;
+
+    restart)
+	${0} stop
+	${0} start
+	;;
+
+    status)
+	shift ; show-tc-status "${@}"
+	RETVAL=${?}
+	exit ${RETVAL}
+	;;
+    *)
+	echo "Usage: ${0} {start|stop|restart|status}"
+	exit 1
+	;;
+esac

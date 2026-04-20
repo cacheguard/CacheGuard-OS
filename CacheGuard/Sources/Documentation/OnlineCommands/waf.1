@@ -1,0 +1,217 @@
+Configure the Web Application Firewall (WAF)
+.SH SYNOPSIS
+
+[1] \fBwaf\fR [(\fBscore\fR [(\fBresponse\fR | \fBrequest\fR) [\fI<score-nb>\fR]]) | \fBlevel\fR [\fI<level-nb>\fR]]
+
+[2] \fBwaf\fR [\fBgeneric\fR [(\fBdliis\fR | \fBdljava\fR | \fBdlphp\fR | \fBdlsql\fR | \fBjava\fR | \fBlfi\fR | \fBnodejs\fR | \fBphp\fR | \fBrce\fR | \fBrfi\fR | \fBsf\fR | \fBsqli\fR | \fBxss\fR) (\fBon\fR | \fBoff\fR )]]
+
+[3] \fBwaf\fR [\fBreputation\fR [(\fBcountry\fR [\fBraz\fR | (\fBadd\fR | \fBdel\fR) (\fI<country-code>\fR)+]) | (\fBrbl\fR [\fBset\fR \fI<api-key>\fR])]]
+
+[4] \fBwaf\fR [\fBlimit\fR [(\fBresponse\fR | \fBrequest\fR | \fBassertions\fR | \fBname\fR | \fBvalue\fR | \fBarguments\fR | \fBfiles\fR) \fI<limit-value>\fR]]
+
+[5] \fBwaf\fR [(\fBerrors\fR | \fBimethods\fR) [(\fBallow\fR | \fBdeny\fR)]]
+
+[6] \fBwaf\fR [\fBrweb\fR [\fBgeneric\fR [\fI<site-name>\fR \fI<generic-filter>\fR (\fBon\fR | \fBoff\fR)]]]
+
+[7] \fBwaf\fR [\fBrweb\fR [\fBcustom\fR [\fI<site-name>\fR [\fBclear\fR | (\fBload\fR | \fBsave\fR) (\fBftp\fR | \fBsftp\fR | \fBtftp\fR) \fI<file-server>\fR \fI<file-path>\fR [\fBnew\fR]]]]]
+
+[8] \fBwaf\fR [\fBrweb\fR [\fBaudit\fR [\fI<site-name>\fR [\fBon\fR | \fBoff\fR]]]]
+
+[9] \fBwaf\fR [\fBrweb\fR [\fBdenyurl\fR [(\fBset\fR \fI<site-name>\fR [\fI<url>\fR]) | \fBraz\fR [\fI<site-name>\fR]]]]
+
+[10] \fBwaf\fR [\fBrweb\fR [\fBerrors\fR [\fBraz\fR | \fBadd\fR \fI<site-name>\fR (\fBallow\fR | \fBdeny\fR) | \fBdel\fR \fI<site-name>\fR | \fBshow\fR [\fI<site-name>\fR]]]]
+
+[11] \fBwaf\fR [\fBbypass\fR \fBrule\fR [\fBraz\fR] | \fBrweb\fR \fBbypass\fR [\fBrule\fR [\fI<site-name>\fR [\fBraz\fR | (\fBadd\fR | \fBdel\fR) (\fI<rule-id>\fR)+]]]]
+
+[12] \fBwaf\fR [\fBbypass\fR \fBapplication\fR [\fBraz\fR] | \fBrweb\fR \fBbypass\fR [\fBapplication\fR [\fI<site-name>\fR [\fBraz\fR | \fBset\fR (\fBcpanel\fR | \fBdokuwiki\fR | \fBdrupal\fR | \fBnextcloud\fR | \fBwordpress\fR | \fBxenforo\fR)]]]]
+
+[13] \fBwaf\fR [\fBdos\fR [\fI<requests-limit>\fR \fI<duration-period>\fR \fI<blocking-period>\fR]]
+
+.SH DESCRIPTION
+The WAF (Web Application Firewall) blocks malicious requests and prevent data leakages to protect Web applications against unwanted or threatening accesses. This command is used to manage the WAF to protect websites cloaked by the reverse proxy in \fBrweb\fR mode (see the \fBrweb\fR command). To protect Web applications, you can use generic WAF rules or design your own customised WAF rules.
+
+Generic WAF rules are classified by groups called filters (a filter is composed of WAF rules). Each blocking rule in a generic filter has a score point (an integer) and whenever a rule is matched in a Web traffic, its score point is added to a global score. Once a threshold score is reached for a given Web traffic, the Web traffic is blocked by the WAF. The WAF distinguish two types of traffic: requests and responses. The first [1] usage form allows you to configure the scoring system: use the keyword \fBscore\fR followed by the keywords \fBrequest\fR or \fBresponse\fR to set score thresholds for Web requests and responses. A valid score threshold is an integer between 1 and 25.
+
+In order to eliminate potential false positive matches (see below), you can temporarily set score thresholds to their highest values and audit all possible requests and responses using the Auditing module (see the\fBadmin\fR command). Once all false positive matches have been eliminated, you can restore score thresholds to acceptable values in your environment. Recommended score thresholds are 5 and 4 respectively for Web requests and responses.
+
+Rules in generic filters are classified by levels. The higher the WAF level, the more restrictive (paranoic) rules are activated. When you activate the WAF for the first time, it is recommended to use the lowest WAF level (1) in order to avoid false positive matches (see below). The first [1] usage form allows you to configure the WAF level. To configure the WAF level, use the keyword \fBlevel\fR followed by the required level. A valid level is an integer between 1 and 4.
+
+The second [2] usage form allows you to activate or deactivate global generic WAF filters applicable to all websites. Generic rules are provided by OWASP (https://owasp.org/). Please note that generic rules may produce false positive matching. In this case, you can review your Web application for adjustment instead of deactivating the related generic rule. You can use the Auditing module to inspect Web requests and rule matching (see below).
+
+Here is a brief description of generic WAF rules:
+
+\(bu \fBdliis\fR: rules to prevent from IIS applications Data Leakage.
+
+\(bu \fBdljava\fR: rules to prevent from Java applications Data Leakage
+
+\(bu \fBdlphp\fR: rules to prevent from PHP applications Data Leakage.
+
+\(bu \fBdlsql\fR: rules to prevent from SQL requests Data Leakage.
+
+\(bu \fBjava\fR: rules to protect Java Applications.
+
+\(bu \fBlfi\fR: rules to protect against Local File Inclusion attacks.
+
+\(bu \fBnodejs\fR: rules to protect Node.js Applications.
+
+\(bu \fBphp\fR: rules to protect PHP Applications.
+
+\(bu \fBrce\fR: rules to protect against Remote Code Execution attacks.
+
+\(bu \fBrfi\fR: rules to protect against Remote File Inclusion attacks.
+
+\(bu \fBsf\fR: rules to protect against Session Fixation attacks.
+
+\(bu \fBsqli\fR: rules to protect against SQL Injection attacks.
+
+\(bu \fBxss\fR: rules to protect against Cross-site Scripting attacks.
+
+You can find more information about OWASP CRS at https://owasp.org/
+
+The third [3] usage form allows you to block Web requests according to the client reputation. Two types of reputation are available: reputation based on countries and reputation based on IP Real Time Blacklists (RBL). RBL are provided by the Project Honey Pot. To benefit from IP blacklists you must have an API key. Please refer to \fIhttps://www.projecthoneypot.org/\fR to get a free API key. Country based reputation use data provided by MaxMind (\fIhttps://www.maxmind.com/\fR). Country data are automatically updated on a monthly basis.
+
+To block all Web requests coming from a particular country use the keywords \fBreputation country add\fR followed by the ISO 3166-1 alpha-2 code of that country. To block multiple countries you can specify a list of country code separated by a blank or use this command usage form several times. You can use the keyword \fBdel\fR to disable the blocking for countries. The keyword \fBraz\fR allows you to disable all country based blockings. To activate the reputation based on RBL use the keywords \fBreputation rbl set\fR followed by your private API key. You can deactivate this feature by using an ampty string as the API key.
+
+The fourth [4] usage form allows you to specify limits for all Web requests and responses. These limits are applied globally to all responses and requests. The following limits can be configured:
+
+\(bu \fBresponse\fR: maximum response body size in KB.
+
+\(bu \fBrequest\fR: maximum request body size in KB, excluding the size of any files being transported in the request.
+
+\(bu \fBassertions\fR: maximum number of assertions (attributes=values) or arguments in a request (the separator should be '&').
+
+\(bu \fBname\fR: maximum length for an argument name in a request.
+
+\(bu \fBvalue\fR: maximum length for an argument value in a request.
+
+\(bu \fBarguments\fR: total arguments (names and values) length limit in a request.
+
+\(bu \fBfiles\fR: maximum size in KB for combined uploaded files. This value can't be greater than the value given during the installation for uploaded files.
+
+The fifth [5] usage form allows you to globally configure some WAF policies. The keyword \fBerrors\fR allows you to expose or rewrite original error pages sent by websites. By an error page we mean a page sent with an HTTP status code other than 200. To allow the exposure of original error pages use the keyword \fBallow\fR. To rewrite original error pages use the keyword \fBdeny\fR. The keyword \fBimethods\fR allows you to allow or deny insecure HTTP methods. Insecure HTTP methods are "PUT", "PATCH", "DELETE", "CONNECT" and "TRACE". To allow insecure HTTP methods use the keyword \fBallow\fR. To deny insecure HTTP methods use the keyword \fBdeny\fR.
+
+For security reasons, even if you globally allow insecure HTTP methods, you should bypass some OWASP rules using the \fBwaf rweb bypass\fR usage form and then create custom rules to allow them. Please note that by default, insecure HTTP methods are not allowed and if you decide to globally allow them, you should know what you are doing. Otherwise you expose your Web applications to severe threats.
+
+The sixth [6] usage form allows you to activate or deactivate generic filters for a specific website. A website that no specific generic filters are defined for inherits global filters.
+
+The seventh [7] usage form allows you to load/save custom rule files from/to a file server. Custom rules allow you to have restrictive controls on allowed or denied requests on a website. The "GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "CONNECT", "OPTIONS" and "TRACE", HTTP methods can be filtered by defining regular expressions for allowed or denied requests.
+
+The process of custom rule definition is very easy. To do so, just create your rule file for a specific website and then load it into the system. Because regular expressions may be complex, this process allows you to use your favourite text editor (vi, emacs...) to edit the rules file.
+
+In the custom rule file, each rule definition begins with a line having the following syntax:
+
+\fBrule\fR \fI<rule-name>\fR (\fBallow\fR | \fBdeny\fR) \fI<method>\fR
+
+Where \fI<method>\fR is a valid HTTP method (\fBget\fR, \fBhead\fR, \fBpost\fR, \fBput\fR, \fBpatch\fR, \fBdelete\fR, \fBconnect\fR, \fBoptions\fR, \fBtrace\fR) in lower-case or a list of valid HTTP methods separated by the pipe charcter.
+
+Followed by optionnal lines having the following syntax:
+
+(\fBuri\fR | \fBbody\fR | \fBip\fR) "\fI<regular-rexpression>\fR"
+
+Keywords and arguments must be separated with blanks or tabulations delimiters.
+
+If a line begins with the \fBrule\fR statement, three mandatory arguments must be specified:
+
+The first argument is the rule identifier. It allows you to identify the rule in the Auditing module (see below). A rule identifier must be a combination of alphanumeric characters and the characters "_", "-" or "." (the dot) and begin with an alphanumeric character.
+
+The second argument specifies the action (\fBallow\fR \fBdeny\fR) and finally the third argument is the HTTP method in lowercase. Optional lines begins with the following keywords:
+
+\(bu \fBuri\fR: The part after the "/" character in a URL (can be used with POST and GET methods)
+
+\(bu \fBbody\fR: Arguments in the body of a POST (can be used only in conjunction with a \fBuri\fR statement and POST method)
+
+\(bu \fBip\fR: the source IP address of the client making the Web request
+
+followed by a regular expression between quotation marks. Note that a quotation mark in a regular expression \fBshould not\fR be preceded by a back slash character here. Regular expressions are based on PCRE (Perl Compatible Regular Expression).
+
+For instance to allow only the GET on "/" and the POST on "/cgi-bin/set-phone.cgi" with arguments "name=<string> phone=<numbers>" the custom rule file looks like:
+
+rule r10 allow get
+.br
+uri "^/$"
+
+rule r20 allow get
+.br
+uri "^/cgi-bin/get-phone\\.cgi"
+
+rule r30 allow post
+.br
+uri "^/cgi-bin/set-phone\\.cgi$"
+.br
+body "^name=[[:print:]]*\e&phone=[[:digit:]]*$"
+.br
+ip "^192\\.168\\.155\\.254$"
+
+rule r40 deny get|post
+.br
+uri "^/cgi-bin/set-phone\\.cgi$"
+
+rule r1000 deny get|head|post|put|patch|delete|connect|options|trace
+
+After a custom rule file is loaded, its syntax is verified and the loading is confirmed only if no errors are detected. Note that generic filters are always applied (when activated)
+.ul 1
+before
+custom rules.
+
+The eighth [8] usage form allows you to manage the \fBaudit\fR mode for a website. Auditing allows you to inspect HTTP/S request contents and facilitate the filtering rule design process. To activate the audit mode for a website use the keyword \fBon\fR. To deactivate the audit mode use the keyword \fBoff\fR. Without specifying a state (\fBon\fR or \fBoff\fR), this command prints the audit mode for a website (or for all websites if no website is specified).
+
+.B Caution: Note that the auditing feature is for debugging purpose only and in normal circumstances, it should not be activated.
+
+When the audit mode is activated for a website and when the administration audit mode is turned on (see the \fBadmin\fR command), all related Web request contents can be inspected at the URL \fIhttps://<admin-ip>:<wadmin-port>\fR.
+
+In audit mode, an HTTP request header and body (for the POST method), the matched filtering rule and the resulting state (allowed or denied) are logged. In this way, the security staff can easily design custom filtering rules for managed websites.
+
+Note that the audit mode is helpful during the filtering rule design process and should not be activated on a production appliance. Auditing consumes lots of hardware resources and, in terms of security, is not recommended for production appliances.
+
+When the audit mode is deactivated for a website, all auditing data for that website is lost.
+
+By default when access is denied, a generic deny page is displayed. The ninth [9] usage form allows you to set a custom deny page to redirect to a website. To set a deny URL page for a website, use the keyword \fBdenyurl\fR followed by the keyword \fBset\fR, the website name and the URL you want to redirect to. To reset to the default behaviour use the keyword \fBraz\fR followed by the website name. To reset to the default behaviour for all websites give no website name. When no optional arguments are used, this usage form displays the current settings. If a URL is given it should be in the form: (http|https|ftp)://<domain-name>[/<URI>] where an URI may contain an alphanumeric or any of the following characters: \fI-._~:/?#[]@!$&()*+,;=\fR. Any other character needs to be encoded with the percent-encoding. A percent-encoding is in the form \fI%(a-fA-F0-9)(a-fA-F0-9)\fR (use %27 for the quote character).
+
+.B Note:
+When both the \fBwaf\fR and the \fBantivirus\fR modes are activated, the system filters all attempts to upload malware files on protected Web servers (usually files are uploaded using the post method and the \fImultipart/form-data\fR encryption type).
+
+The tenth [10] usage form allows you specifically set the exposure or rewriting of original error pages for a website. If no specific rule is defined for a website the global behaviour is used (see the fifth usage form). Keywords \fBadd\fR, \fBdel\fR, \fBshow\fR and \fBraz\fR allows you respectively add a rule, delete a rule, show a rule and erase all rules. To allow the exposure of original error pages use the keyword \fBallow\fR. To rewrite original error pages use the keyword \fBdeny\fR.
+
+OWASP CRS may generate false positive matches. The term false positive refers to legitimate Web traffic denied by the WAF. To avoid this situation you can review your Web application source code in order to bypass false positive matches. But in most cases this is not an option because you don't own the application or just don't want to modify things. In this case you have the possibility to bypass the rule causing the false positive match. To do so you can use the eleventh [11] and twelfth [12] usage forms. To bypass an OWASP rule for a given website use the keywords \fBrweb bypass rule\fR followed by the website name, the keyword \fBadd\fR and one or more rule IDs to bypass. To remove a bypass statement use the keyword \fBdel\fR instead of the keyword \fBadd\fR. To remove all bypass statements for a given website use the keyword \fBraz\fR. To remove all bypass statements for all websites use the keyword \fBbypass rule\fR followed by the keyword \fBraz\fR. Please note that the rule ID is a numerical value and is different than the rule name given for custom rules. You can find the ID of the rule causing false positive match by using the Auditing module. See the command  \fBadmin waudit\fR for further information on the Auditing module.
+
+Some well-known applications such as WordPress or Drupal are known to produce false positive matches. To bypass all known rules that produce false positive matches for a given application you can use the twelfth [12] usage form. Supported applications are as follows:
+
+\(bu cPanel
+
+\(bu DokuWiki
+
+\(bu Drupal
+
+\(bu Nextcloud
+
+\(bu WordPress
+
+\(bu XenForo
+
+The WAF has the ability to protect Web applications against DoS (Denial of Service) by blocking clients that make requests (excluding static files) above a certain limit. The thirteenth [13] usage form allows you to tune the DoS protection by specifying how many requests is allowed by a client (\fI<requests-limit>\fR) in a given duration (\fI<duration-period>\fR) and how long block (\fI<blocking-period>\fR) that client. Periods should be specified in seconds. For instance values \fI120 300 180fR would mean that if a client makes more than 300 requests in 120 seconds, he will no longer be able to submit requests for 180 seconds. Allowed values for arguments are as follows: \fI<requests-limit>\fR is an integer between 1 and 1000000, \fI<duration-period>\fR is an integer value between 1 and 86400 and \fI<blocking-period>\fR is an integer value between 1 and 604800.
+
+.SH SEE ALSO
+.B admin
+(1)
+.B antivirus
+(1)
+.B apply
+(1)
+.B countrylist
+(1)
+.B domainname
+(1)
+.B file
+(1)
+.B hostname
+(1)
+.B ip
+(1)
+.B mode
+(1)
+.B port
+(1)
+.B rweb
+(1)
+.B vlan
+(1)

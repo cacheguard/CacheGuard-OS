@@ -1,0 +1,104 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       Scripts
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+CACHEGUARD_DIR=/etc/sysconfig/cacheguard
+source ${CACHEGUARD_DIR}/constant
+source ${APPLIANCE_DIR}/etc/role
+source ${LOCAL_DIR}/lib/apl_common
+
+get-grub-files()
+{
+    if is-efi-system ; then
+	local arch=$(uname -m 2> /dev/null)
+	test ${arch} == x86_64 || arch=i386
+	local grub_files=${arch}-efi
+    else
+	local grub_files=i386-pc
+    fi
+
+    grub_files="locale ${grub_files}"
+
+    echo ${grub_files}
+}
+
+switch-grub-writable()
+{
+    test -n "${1}" || return 1
+    local mode=${1}
+
+    local grub_files=$(get-grub-files) grub_file
+
+    for grub_file in ${grub_files}
+    do
+	case ${mode} in
+	    on)
+		chattr -R +i /boot/grub/${grub_file}
+		;;
+	    off)
+		chattr -R -i /boot/grub/${grub_file}
+		;;
+	    *)
+		;;
+	esac
+    done
+}
+
+raid-bootable()
+{
+    test -n "${1}" || return 11
+    local hd=${1}
+
+    local efi ret
+
+    local grub_options="--recheck --root-directory=/ --boot-directory=/boot --efi-directory=/boot/efi --modules=part_gpt"
+    local pp=$(get-partition-prefix ${hd})
+
+    is-efi-system
+    efi=${?}
+
+    switch-grub-writable off
+    dd if=/dev/zero of=${hd} bs=446 count=1 > /dev/null 2>&1
+    test ${efi} -ne 0 || mount -t vfat ${hd}${pp}${EFI_PARTITION_NB} /boot/efi
+
+    grub-install ${grub_options} ${hd} > /dev/null 2>&1
+    ret=${?}
+
+    test ${efi} -ne 0 || umount /boot/efi
+    switch-grub-writable on
+
+    return ${ret}
+}
+
+main()
+{
+    test -n "${1}" || return 11
+    local hd=${1}
+    test ${hd:0:5} == "/dev/" || hd="/dev/${hd}"
+
+    raid-bootable ${hd}
+}
+
+# Main()
+
+main "${@}"

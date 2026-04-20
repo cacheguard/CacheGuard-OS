@@ -1,0 +1,207 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       Scripts
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+CACHEGUARD_DIR=/etc/sysconfig/cacheguard
+source ${CACHEGUARD_DIR}/constant
+source ${APPLIANCE_DIR}/etc/role
+source ${HARD_DIR}/cloud.conf
+source ${LOCAL_DIR}/lib/apl_common
+source ${LOCAL_DIR}/lib/apl_device
+
+set-environment()
+{
+    case ${1} in
+	grub)
+	    UPDATE_GRUB='yes'
+	    ;;
+	*)
+	    unset UPDATE_GRUB
+	    ;;
+    esac
+
+    local old_release=$(uname -r 2> /dev/null)
+    local new_release=$(get-other-kernel-release ${old_release})
+
+    test -n "${old_release}" || exit 0
+    test -n "${new_release}" || exit 0
+
+    OLD_RELEASE=${old_release}
+    NEW_RELEASE=${new_release}
+    ARCHITECTURE=$(uname -m 2> /dev/null)
+}
+
+get-raid-level()
+{
+    test -s ${RUN_DIR}/${RAID_HEALTH_FILENAME} || return 0
+
+    local key value
+
+    while read key value
+    do
+	case ${key} in
+	    Raid_Level)
+		value=${value/ *}
+		break
+		;;
+	    *)
+		;;
+	esac
+    done < ${RUN_DIR}/${RAID_HEALTH_FILENAME}
+
+    echo ${value}
+}
+
+detect-hardware()
+{
+    local prefix=initrd
+    local raid_level=$(get-raid-level)
+
+    find-modules ${NEW_RELEASE} ${prefix}
+
+    TERMINAL=$(get-console)
+    STORAGE_MODULES=$(find-storage-modules ${NEW_RELEASE} ${prefix} /dev/null)
+    RAID_MODULES=$(find-raid-modules ${NEW_RELEASE} ${raid_level})
+    HID_MODULES=$(find-hid-modules ${NEW_RELEASE})
+
+    clean-device-tmp-files ${prefix}
+}
+
+update-grub-cfg()
+{
+    test -n "${NEW_RELEASE}" || return 0
+
+    sed -e "s/${OLD_RELEASE}/${NEW_RELEASE}/g" /boot/grub/grub.cfg > /tmp/grub.cfg.${$}
+
+    if test ${?} -ne 0 ; then
+	rm -f /tmp/grub.cfg.${$}
+	return 11
+    fi
+
+    chattr -i /boot/grub /boot/grub/grub.cfg
+    install -m 644 -o root -g root /tmp/grub.cfg.${$} /boot/grub/grub.cfg
+    chattr +i /boot/grub /boot/grub/grub.cfg
+
+    rm -f /tmp/grub.cfg.${$}
+}
+
+update-initrd()
+{
+    test -f /boot/initrd-${OLD_RELEASE}.img || return 3
+
+    local tmp_old_initrd=/tmp/initrd.old.${$}
+    local tmp_new_initrd=/tmp/initrd.new.${$}
+    local tmp_load_modules=/tmp/load-modules.${$}
+    local tmp_unload_modules=/tmp/unload-modules.${$}
+
+    local old_initrd=/boot/initrd-${OLD_RELEASE}.img
+    local new_initrd=/boot/initrd-${NEW_RELEASE}.img
+    local old_initrd_dir=/mnt/initrd.old
+    local new_initrd_dir=/mnt/initrd.new
+
+    mkdir -p ${old_initrd_dir} ${new_initrd_dir}
+
+    cp -f ${old_initrd} ${tmp_old_initrd}.xz || return 11
+    rm -f ${tmp_old_initrd}
+    unxz --quiet ${tmp_old_initrd}.xz || return 13
+    test -f ${tmp_old_initrd} || return 15
+
+    cd /root
+
+    umount ${old_initrd_dir} 2>/dev/null
+    mount -o loop ${tmp_old_initrd} ${old_initrd_dir} 2> /dev/null || return 21
+
+    local azure_modules=$(get-azure-storage-modules ${ARCHITECTURE} ${NEW_RELEASE} /dev/null)
+    local aws_modules=$(get-aws-storage-modules ${ARCHITECTURE} ${NEW_RELEASE} /dev/null)
+    local modules="${STORAGE_MODULES} ${RAID_MODULES} ${HID_MODULES}" module
+    test -z "${azure_modules}" || modules="${modules} ${azure_modules}"
+    test -z "${aws_modules}" || modules="${modules} ${aws_modules}"
+
+    modules=$(uniq-elt ${modules})
+
+    local binkeymap_files=$(find /usr/share/${BINKEYMAP_DIR_NAME} -type f 2>/dev/null)
+    local all_files="/usr/bin/busybox ${modules} ${binkeymap_files}"
+    test -z "${RAID_MODULES}" || all_files="${all_files} /usr/sbin/mdadm.static"
+
+    local ramdisk_sz=$(get-files-size ${all_files})
+    ((ramdisk_sz += 1024))
+
+    local loopdev=/dev/loop5
+    dd if=/dev/zero of=${tmp_new_initrd} bs=1k count=${ramdisk_sz} 2> /dev/null || return 31
+    losetup ${loopdev} ${tmp_new_initrd} || return 33
+    mke2fs -q ${loopdev} ${ramdisk_sz} > /dev/null 2>&1 || return 35
+    tune2fs -i0 -c0 ${loopdev} > /dev/null 2>&1 || return 37
+    mount -t ext2 ${loopdev} ${new_initrd_dir} || return 39
+    rm -rf ${new_initrd_dir}/lost+found
+
+    local file
+    for file in ${old_initrd_dir}/*
+    do
+	test ${file} != ${old_initrd_dir}/lib || continue
+	cp -a ${file} ${new_initrd_dir} || return 51
+    done
+
+    mkdir -p ${new_initrd_dir}/lib/modules || return 53
+    cp -a /bin/busybox ${new_initrd_dir}/bin || return 55
+    test -z "${RAID_MODULES}" || cp -a /sbin/mdadm.static ${new_initrd_dir}/bin/mdadm || return 57
+
+    gen-initrd-load-modules-script / ${new_initrd_dir} "${modules}" > ${tmp_load_modules} || return 59
+    gen-initrd-unload-modules-script / ${new_initrd_dir} "${modules}" > ${tmp_unload_modules} || return 61
+
+    install -m 744 -o root -g root ${tmp_load_modules} ${new_initrd_dir}/bin/loadmodules
+    install -m 744 -o root -g root ${tmp_unload_modules} ${new_initrd_dir}/bin/unloadmodules
+
+    rm -f \
+       ${tmp_load_modules} \
+       ${tmp_unload_modules}
+
+    umount ${old_initrd_dir} 2> /dev/null || return 63
+    umount ${new_initrd_dir} 2> /dev/null || return 65
+    losetup -d ${loopdev} || return 65
+    rmdir ${old_initrd_dir} ${new_initrd_dir}
+    rm -f ${tmp_old_initrd}
+    xz --quiet --check=crc32 ${tmp_new_initrd} || return 69
+    test -f ${tmp_new_initrd}.xz || return 71
+
+    chattr -i /boot || return 81
+    if test -f ${new_initrd} ; then
+	chattr -i ${new_initrd}
+	rm -f ${new_initrd}
+    fi
+    mv -f ${tmp_new_initrd}.xz ${new_initrd} || return 83
+    chattr +i ${new_initrd} /boot || return 85
+
+    test -n "${UPDATE_GRUB}" || return 0
+    update-grub-cfg
+}
+
+main()
+{
+    set-environment "${@}"
+    detect-hardware
+    update-initrd "${@}"
+}
+
+# Main
+
+main "${@}"

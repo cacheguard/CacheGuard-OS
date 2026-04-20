@@ -1,0 +1,83 @@
+<a name='main' class='doc-title'></a>
+<h1>Using a Manager</h1>
+
+If you deploy several CacheGuard Gateways in your organisation, you have the option to configure them separately, one by one. However, in most cases, Gateways deployed within the same organisation share similar configurations, requiring you to repeat the same configuration process for each device. A CacheGuard Manager system enables you to centrally configure and manage multiple remote Gateways from a single point. With a Manager, you can create configuration templates and build Gateway configurations based on those templates. These configurations can then be pushed in parallel to several Gateways with just a few commands or clicks.
+<center><img width='600' src="/doc/image/manager.png" class="schema" /></center>
+If you also need to automatically update data such as URL lists, the Manager allows you to download them once and push them simultaneously to all managed Gateways. The Manager provides a uniform and optimised method to manage your Gateways efficiently.
+
+<a name='gateway' class='doc-title'></a><h2>Gateway Access</h2>
+
+Before being able to manage Gateways from a Manager, the Gateways must permit management access from that Manager. The Manager uses the SSH protocol and SSH keys to connect to Gateways. Therefore, Gateways must allow the Manager’s IP address SSH access and authorise the Manager’s SSH public key (so that a password is not required for each SSH session). A Gateway can be managed by one master Manager and, optionally, by a backup Manager. The backup Manager always maintains a hot copy of all Gateway configurations stored on the master Manager and can be activated in the event of a failure on the master Manager.
+<p>
+A Manager system has only one logical network interface, called <strong>internal</strong>. To obtain the Manager’s IP address and its SSH public key, use the following commands on the Manager:
+<ul>
+  <li><i>ip internal</i></li>
+  <li><i>manager ssh show</i></li>
+</ul>
+
+To allow a master Manager with the IP address <i>192.168.1.22</i> and the SSH public key <i>'ssh-rsa AAAAB3Nza...'</i> to manage a Gateway via its external network interface, use the following commands on the Gateway:
+<ul>
+  <li><i>manager add master external 192.168.1.22 'ssh-rsa AAAAB3Nza...'</i></li>
+  <li><i>apply</i></li>
+</ul>
+
+<a name='enrol' class='doc-title'></a><h2>Gateway Enrolment</h2>
+
+Once a Manager is authorised to access a Gateway, the first step is to enrol that Gateway on the Manager and, optionally, pull its current configuration to store it on the Manager. Gateway configurations on the Manager are identified by unique identifiers that must be defined during enrolment. In addition, Gateways are organised into groups known as <i>domains</i>, and each Gateway must belong to exactly one domain. This enables you to push or pull configurations in parallel across all Gateways within the same domain.
+<p>
+To enrol and pull the configuration of a Gateway with the IP address <i>10.0.10.254</i>, use the following commands on the Manager:
+<ul>
+  <li><i>manager gateway add my-company gateway-1 10.0.10.254</i></li>
+  <li><i>manager gateway pull my-company gateway-1</i></li>
+</ul>
+In this example, <i>my-company</i> and <i>gateway-1</i> are the domain name and identifier respectively for the enrolled Gateway. The pull operation runs in the background. To obtain a report on the latest pull operation, use the following command:
+<ul>
+  <li><i>manager gateway report pull</i></li>
+</ul>
+
+<a name='conf' class='doc-title'></a><h2>Gateway Configuration</h2>
+
+Gateway configurations can be modified on the Manager and then pushed to remote Gateways. To begin editing a Gateway configuration on the Manager, use the following command:
+<ul>
+  <li><i>manager gateway begin conf gateway-1</i></li>
+</ul>
+This command takes you inside the Gateway configuration context, where you can use the same commands normally available on a Gateway system. Once configuration is complete, use the <strong>apply</strong> command to verify and validate the configuration’s integrity, and then use the <strong>end</strong> command to return to the Manager configuration level. At this stage, you can push the new configuration to the remote Gateway with the following command:
+<ul>
+  <li><i>manager gateway push my-company gateway-1</i></li>
+</ul>
+The push operation runs in the background. To obtain a report on the latest push operation, use the following command:
+<ul>
+  <li><i>manager gateway report push</i></li>
+</ul>
+
+<a name='template' class='doc-title'></a><h2>Working with Templates</h2>
+
+The main strength of the Manager lies in its ability to work with templates. A template is a special Gateway configuration that can be applied to multiple Gateways. This allows you to quickly configure several Gateways with similar configurations, customising only the elements that differ between them (such as IP addresses). To create a template named <i>my-template</i> on a Manager system and begin configuring it, use the following commands:
+<ul>
+  <li><i>manager template add my-template</i></li>
+  <li><i>manager template begin conf my-template</i></li>
+</ul>
+Once the template configuration is complete, use the <strong>apply</strong> command to verify and validate its integrity, and then use the <strong>end</strong> command to return to the Manager configuration level.
+<p>
+Now that you have created a template, you can apply it to a Gateway configuration. To do this, you must be within a Gateway configuration context. To configure a managed Gateway using a template named <i>my-template</i>, use the following command:
+<ul>
+  <li><i>conf manager template my-template</i></li>
+</ul>
+
+<a name='sync' class='doc-title'></a><h2>Master &amp; Slave Managers</h2>
+
+To ensure high availability and service continuity, a slave Manager can be configured to maintain a hot copy of all data stored on the master Manager. In this way, if the master Manager fails, the slave Manager can be activated to continue managing the Gateways. To enable communication between the master and slave Managers, both must know each other’s IP address. Additionally, the slave Manager must be aware of the master Manager’s SSH public key to allow SSH connections.
+
+Assuming the master Manager has the IP address <i>192.168.1.22</i> and the slave Manager has <i>192.168.1.33</i>, use the following commands on the master Manager:
+<ul>
+  <li><i>manager sync role master</i></li>
+  <li><i>manager sync peer 192.168.1.33</i></li>
+  <li><i>apply</i></li>
+</ul>
+Then, use the following commands on the slave Manager:
+<ul>
+  <li><i>manager sync role slave</i></li>
+  <li><i>manager sync peer 192.168.1.22 'ssh-rsa AAAAB3Nza...'</i></li>
+  <li><i>apply</i></li>
+</ul>
+Here, <i>'ssh-rsa AAAAB3Nza...'</i> represents the SSH public key of the master Manager.

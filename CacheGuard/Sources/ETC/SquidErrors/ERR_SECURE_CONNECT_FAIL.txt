@@ -1,0 +1,3 @@
+Failed to establish a secure connection
+This Web Gateway and the remote host failed to negotiate a mutually acceptable security settings for handling your request
+Complementary information: [<strong>Error %x</strong>] %D

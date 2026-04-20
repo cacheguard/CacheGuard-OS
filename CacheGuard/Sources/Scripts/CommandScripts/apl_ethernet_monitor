@@ -1,0 +1,80 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       Scripts
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+CACHEGUARD_DIR=/etc/sysconfig/cacheguard
+source ${CACHEGUARD_DIR}/constant
+source ${APPLIANCE_DIR}/etc/role
+source ${ABASE_DIR}/${ENV_RDIR}/${ENV_CURRENT_NAME}
+
+ethernet-notification()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    test -n "${3}" || return 3
+    local action=${1}
+    local dev_type=${2}
+    local dev_name=${3}
+    
+    local event event_description description
+
+    case ${action} in
+	add)
+	    event=Plugged
+            event_description="The network device has been plugged."
+	    ;;
+        del)
+	    event=Unplugged
+            event_description="The network device has been unplugged."
+	    ;;
+	*)
+	    event=Changed
+	    event_description="The description is unknown."
+	    ;;
+    esac
+
+    case ${dev_type} in
+	eth)
+	    description="Ethernet NIC ${dev_name} ${event}: ${event_description}"
+	    ;;
+	usb)
+	    description="New USB network adapter ${dev_name} ${event}: ${event_description}"
+	    ;;
+	nic)
+	    description="Ethernet device ${dev_name} ${event}: ${event_description}"
+	    ;;
+	*)
+	    description="Unknown type network adapter ${dev_name} ${event}: ${event_description}"
+	    ;;
+    esac
+
+
+    logger -p daemon.alert -t apl_ethernet_monitor -- "${description}"
+    ${LOCAL_DIR}/bin/apl_rlogger "${description}"
+    test "${CURRENT_ADMIN_SNMP}" == True || return 0
+    ${LOCAL_DIR}/bin/apl_snmp_trap 15 "${event}" "${dev_name}" "${description}" > /dev/null 2>&1
+}
+
+# Main()
+
+ethernet-notification "${@}"

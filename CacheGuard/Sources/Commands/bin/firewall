@@ -1,0 +1,1049 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       Commands
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+source functions
+
+check-fw-rule-set-name()
+{
+    case "${1}" in
+	external|web|rweb|antivirus|admin|mon|file|peer|auxiliary|vpnipsec)
+	    return 0
+	    ;;
+	*)
+	    return 1
+	    ;;
+    esac
+}
+
+check-fw-dev-name()
+{
+    test -n "${1}" || return 1
+    local dev=${1}
+
+    check-fw-rule-set-name ${dev}
+}
+
+check-fw-protocol()
+{
+    test -n "${1}" || return 1
+
+    case "${1}" in
+	any)
+	    return 0
+	    ;;
+	icmp|igmp|udp|tcp|gre)
+	    return 0
+	    ;;
+	ftp_passive|ftp_active|ftp_trivial|sip)
+	    return 0
+	    ;;
+	esp|ah|tlsp|cftp|visa)
+	    return 0
+	    ;;
+	ipv6|vrrp|"fc"|ospfigp|mtp|etherip)
+	    ;;
+	*)
+	    return 1
+	    ;;
+    esac
+}
+
+check-fw-dynamic-ports-protocol()
+{
+    test -n "${1}" || return 1
+    protocol=${1}
+    
+    case ${protocol} in
+	ftp_active|ftp_passive|ftp_trivial|sip)
+	    return 0
+	    ;;
+	*)
+	    return 1
+	    ;;
+    esac
+
+    return 255
+}
+
+check-fw-protocol-port()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    protocol=${1}
+    port=${2}
+    
+    case ${protocol} in
+	tcp|udp|ftp_active|ftp_passive|ftp_trivial|sip)
+	    return 0
+	    ;;
+	*)
+	    test ${port} == any || return 1
+	    return 0
+	    ;;
+    esac
+
+    return 0
+}
+
+check-fw-protocol-pat()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    protocol=${1}
+    port=${2}
+    
+    case ${protocol} in
+	tcp|udp|ftp_active|ftp_passive|ftp_trivial|sip)
+	    return 0
+	    ;;
+	*)
+	    test ${port} == nil || return 1
+	    return 0
+	    ;;
+    esac
+
+    return 0
+}
+
+check-fw-port-range()
+{
+    test -n "${1}" || return 1
+    local ports=${1}
+
+    [[ "${ports}" =~ (^[1-9][0-9]{0,4}|^0)[:]([1-9][0-9]{0,4}|0)$ ]] || return 2
+
+    local port1=${ports/:*}
+    local port2=${ports/*:}
+
+    test ${port1} -ge 0 || return 3
+    test ${port1} -le 65535 || return 4
+
+    test ${port2} -ge 0 || return 5
+    test ${port2} -le 65535 || return 6
+
+    test ${port1} -le ${port2} || return 7
+
+    return 0
+}
+
+check-fw-port()
+{
+    test -n "${1}" || return 1
+    local ports=${1}
+
+    test ${ports} != any || return 0
+    check-port-nb ${ports} || check-fw-port-range ${ports} || return 1
+}
+
+show-fw-rules1()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    local mode=${1}
+    local rset=${2}
+    local rules=${3}
+
+    echo-command-form "firewall ${rset}"
+    if test "${mode}" == "new" ; then
+	echo-mark-new
+    else
+	echo-mark-cur
+    fi
+
+    if test -z "${rules}" ; then
+	echo-value-null
+	return 0
+    fi
+    
+    local id state action protocol src_ip dst_dev dst_ip dst_ports
+    local src_nat_ip dst_nat_ip dst_pat_port
+
+    local elt range i=0 n=0
+    local rule
+
+    for elt in ${rules}
+    do
+	range=$[${i} % 11]
+	case ${range} in
+	    0)
+		id=${elt}
+		;;
+	    1)
+		state=${elt}
+		;;
+	    2)
+		action=${elt}
+		;;
+	    3)
+		protocol=${elt}
+		;;
+	    4)
+		src_ip=${elt}
+		;;
+	    5)
+		dst_dev=${elt}
+		;;
+	    6)
+		dst_ip=${elt}
+		;;
+	    7)
+		dst_ports=${elt}
+		;;
+	    8)
+		src_nat_ip=${elt}
+		;;
+	    9)
+		dst_nat_ip=${elt}
+		;;
+	    10)
+		dst_pat_port=${elt}
+
+		rule="${id} [${state}] ${action} ${protocol} ${src_ip} ${dst_dev} ${dst_ip}"
+		
+		if test "${src_nat_ip}" != "nil" ; then
+		    if test "${dst_nat_ip}" != "nil" ; then
+			if test "${dst_pat_port}" != "nil" ; then
+			    rule="${rule} ${dst_ports} snat:${src_nat_ip} dnat:${dst_nat_ip} dpat:${dst_pat_port}"
+			else
+			    rule="${rule} ${dst_ports} snat:${src_nat_ip} dnat:${dst_nat_ip}"
+			fi
+		    else
+			rule="${rule} ${dst_ports} snat:${src_nat_ip}"
+		    fi
+		else
+		    if test "${dst_nat_ip}" != "nil" ; then
+			if test "${dst_pat_port}" != "nil" ; then
+			    rule="${rule} ${dst_ports} snat:${src_nat_ip} dnat:${dst_nat_ip} dpat:${dst_pat_port}"
+			else
+			    rule="${rule} ${dst_ports} snat:${src_nat_ip} dnat:${dst_nat_ip}"
+			fi
+		    fi
+		fi
+		test ${n} -eq 0 || echo-blank-command
+		echo-value "${rule}"
+		((n++))
+		;;
+	    *)
+		return 255
+		;;
+	esac
+	((i++))
+    done
+}
+
+show-fw-external-rules()
+{
+    show-fw-rules1 cur external "${CURRENT_FW_EXTERNAL_RULE_LIST}"
+    if test "${CURRENT_FW_EXTERNAL_RULE_LIST}" != "${FW_EXTERNAL_RULE_LIST}" ; then
+	show-fw-rules1 new external "${FW_EXTERNAL_RULE_LIST}"
+    fi
+}
+
+show-fw-web-rules()
+{
+    show-fw-rules1 cur web "${CURRENT_FW_WEB_RULE_LIST}"
+    if test "${CURRENT_FW_WEB_RULE_LIST}" != "${FW_WEB_RULE_LIST}" ; then
+	show-fw-rules1 new web "${FW_WEB_RULE_LIST}"
+    fi
+}
+
+show-fw-rweb-rules()
+{
+    show-fw-rules1 cur rweb "${CURRENT_FW_RWEB_RULE_LIST}"
+    if test "${CURRENT_FW_RWEB_RULE_LIST}" != "${FW_RWEB_RULE_LIST}" ; then
+	show-fw-rules1 new rweb "${FW_RWEB_RULE_LIST}"
+    fi
+}
+
+show-fw-antivirus-rules()
+{
+    show-fw-rules1 cur antivirus "${CURRENT_FW_AV_RULE_LIST}"
+    if test "${CURRENT_FW_AV_RULE_LIST}" != "${FW_AV_RULE_LIST}" ; then
+	show-fw-rules1 new antivirus "${FW_RWEB_RULE_LIST}"
+    fi
+}
+
+show-fw-admin-rules()
+{
+    show-fw-rules1 cur admin "${CURRENT_FW_ADMIN_RULE_LIST}"
+    if test "${CURRENT_FW_ADMIN_RULE_LIST}" != "${FW_ADMIN_RULE_LIST}" ; then
+	show-fw-rules1 new admin "${FW_ADMIN_RULE_LIST}"
+    fi
+}
+
+show-fw-mon-rules()
+{
+    show-fw-rules1 cur mon "${CURRENT_FW_MON_RULE_LIST}"
+    if test "${CURRENT_FW_MON_RULE_LIST}" != "${FW_MON_RULE_LIST}" ; then
+	show-fw-rules1 new mon "${FW_MON_RULE_LIST}"
+    fi
+}
+
+show-fw-file-rules()
+{
+    show-fw-rules1 cur file "${CURRENT_FW_FILE_RULE_LIST}"
+    if test "${CURRENT_FW_FILE_RULE_LIST}" != "${FW_FILE_RULE_LIST}" ; then
+	show-fw-rules1 new file "${FW_FILE_RULE_LIST}"
+    fi
+}
+
+show-fw-peer-rules()
+{
+    show-fw-rules1 cur peer "${CURRENT_FW_PEER_RULE_LIST}"
+    if test "${CURRENT_FW_PEER_RULE_LIST}" != "${FW_PEER_RULE_LIST}" ; then
+	show-fw-rules1 new peer "${FW_PEER_RULE_LIST}"
+    fi
+}
+
+show-fw-auxiliary-rules()
+{
+    show-fw-rules1 cur auxiliary "${CURRENT_FW_AUXILIARY_RULE_LIST}"
+    if test "${CURRENT_FW_AUXILIARY_RULE_LIST}" != "${FW_AUXILIARY_RULE_LIST}" ; then
+	show-fw-rules1 new auxiliary "${FW_AUXILIARY_RULE_LIST}"
+    fi
+}
+
+show-fw-vpnipsec-rules()
+{
+    show-fw-rules1 cur vpnipsec "${CURRENT_FW_VPN_IPSEC_RULE_LIST}"
+    if test "${CURRENT_FW_VPN_IPSEC_RULE_LIST}" != "${FW_VPN_IPSEC_RULE_LIST}" ; then
+	show-fw-rules1 new vpnipsec "${FW_VPN_IPSEC_RULE_LIST}"
+    fi
+}
+
+show-fw-rules()
+{
+    local rset=${1}
+
+    echo-begin-show
+    case "${rset}" in
+	external|web|rweb|antivirus|admin|mon|file|peer|auxiliary|vpnipsec)
+	    show-fw-${rset}-rules
+	    ;;
+	"")
+	    for rset in external web rweb antivirus admin mon file peer auxiliary vpnipsec
+	    do
+		show-fw-${rset}-rules
+	    done
+	    ;;
+	*)
+	    return 1
+	    ;;
+    esac
+    echo-end-show
+}
+
+manage-bulk-fw-states()
+{
+    test -n "${1}" || return 0
+    local in_rules=${1}
+
+    local id state action protocol src_ip dst_dev dst_ip dst_ports
+    local src_nat_ip dst_nat_ip dst_pat_port
+
+    local i elt range j nb=0
+    local rule id_array state_array index
+    local out_rules
+
+    declare -a id_array state_array
+
+    for ((i=1 ; i<${ARGS_NB} ; i+=2))
+    do
+	state=${ARGS[${i}]}
+	id=${ARGS[$[${i}+1]]}
+	check-boolean "${state}" || return 18
+	check-id-length "${id}" || return 127
+	check-id "${id}" || return 35
+	state_array[${nb}]=${state}
+	id_array[${nb}]=${id}
+	((nb++))
+    done
+
+    i=0
+    for elt in ${in_rules}
+    do
+	range=$[${i} % 11]
+	case ${range} in
+	    0)
+		id=${elt}
+		;;
+	    1)
+		state=${elt}
+		;;
+	    2)
+		action=${elt}
+		;;
+	    3)
+		protocol=${elt}
+		;;
+	    4)
+		src_ip=${elt}
+		;;
+	    5)
+		dst_dev=${elt}
+		;;
+	    6)
+		dst_ip=${elt}
+		;;
+	    7)
+		dst_ports=${elt}
+		;;
+	    8)
+		src_nat_ip=${elt}
+		;;
+	    9)
+		dst_nat_ip=${elt}
+		;;
+	    10)
+		dst_pat_port=${elt}
+
+		unset index
+		for ((j=0 ; j<nb ; j++))
+		do
+		    if test "${id}" == "${id_array[${j}]}" ; then
+			index=${j}
+			break
+		    fi
+		done
+		test -z "${index}" || state=${state_array[${index}]}
+		rule="${id} ${state} ${action} ${protocol} ${src_ip} ${dst_dev} ${dst_ip} ${dst_ports} ${src_nat_ip} ${dst_nat_ip} ${dst_pat_port}"
+		out_rules="${out_rules} ${rule}"
+		;;
+	    *)
+		return 255
+		;;
+	esac
+	((i++))
+    done
+
+    out_rules="${out_rules:1}"
+    echo ${out_rules}
+    return 0
+}
+
+show-fw-dos-tcpflood()
+{
+    echo-command-form "firewall dos tcpflood"
+    echo-mark-cur
+    if test -z "${CURRENT_FW_DOS_TCP_FLOOD}" ; then
+	echo-value "default [$(get-default-tcp-flood-limit) $(get-default-tcp-flood-burst)]"
+    else
+	echo-value "${CURRENT_FW_DOS_TCP_FLOOD}"
+    fi
+
+    if test "${CURRENT_FW_DOS_TCP_FLOOD}" != "${FW_DOS_TCP_FLOOD}" ; then
+	echo-command-form "firewall dos tcpflood"
+	echo-mark-new
+	if test -z "${FW_DOS_TCP_FLOOD}" ; then
+	    echo-value "default [$(get-default-tcp-flood-limit) $(get-default-tcp-flood-burst)]"
+	else
+	    echo-value "${FW_DOS_TCP_FLOOD}"
+	fi
+    fi
+
+}
+
+show-fw-dos-udpflood()
+{
+    echo-command-form "firewall dos udpflood"
+    echo-mark-cur
+    if test -z "${CURRENT_FW_DOS_UDP_FLOOD}" ; then
+	echo-value "default [$(get-default-udp-flood-limit) $(get-default-udp-flood-burst)]"
+    else
+	echo-value "${CURRENT_FW_DOS_UDP_FLOOD}"
+    fi
+
+    if test "${CURRENT_FW_DOS_UDP_FLOOD}" != "${FW_DOS_UDP_FLOOD}" ; then
+	echo-command-form "firewall dos udpflood"
+	echo-mark-new
+	if test -z "${FW_DOS_UDP_FLOOD}" ; then
+	    echo-value "default [$(get-default-udp-flood-limit) $(get-default-udp-flood-burst)]"
+	else
+	    echo-value "${FW_DOS_UDP_FLOOD}"
+	fi
+    fi
+}
+
+show-fw-dos-webflood()
+{
+    echo-command-form "firewall dos webflood"
+    echo-mark-cur
+    if test -z "${CURRENT_FW_DOS_WEB_FLOOD}" ; then
+	echo-value "default [$(get-default-web-flood-limit) $(get-default-web-flood-burst)]"
+    else
+	echo-value "${CURRENT_FW_DOS_WEB_FLOOD}"
+    fi
+
+    if test "${CURRENT_FW_DOS_WEB_FLOOD}" != "${FW_DOS_WEB_FLOOD}" ; then
+	echo-command-form "firewall dos webflood"
+	echo-mark-new
+	if test -z "${FW_DOS_WEB_FLOOD}" ; then
+	    echo-value "default [$(get-default-web-flood-limit) $(get-default-web-flood-burst)]"
+	else
+	    echo-value "${FW_DOS_WEB_FLOOD}"
+	fi
+    fi
+}
+
+show-fw-dos-rwebflood()
+{
+    echo-command-form "firewall dos rwebflood"
+    echo-mark-cur
+    if test -z "${CURRENT_FW_DOS_RWEB_FLOOD}" ; then
+	echo-value "default [$(get-default-rweb-flood-limit) $(get-default-rweb-flood-burst)]"
+    else
+	echo-value "${CURRENT_FW_DOS_RWEB_FLOOD}"
+    fi
+
+    if test "${CURRENT_FW_DOS_RWEB_FLOOD}" != "${FW_DOS_RWEB_FLOOD}" ; then
+	echo-command-form "firewall dos rwebflood"
+	echo-mark-new
+	if test -z "${FW_DOS_RWEB_FLOOD}" ; then
+	    echo-value "default [$(get-default-rweb-flood-limit) $(get-default-rweb-flood-burst)]"
+	else
+	    echo-value "${FW_DOS_RWEB_FLOOD}"
+	fi
+    fi
+}
+
+show-fw-dos-piptcp()
+{
+    echo-command-form "firewall dos piptcp"
+    echo-mark-cur
+    if test -z "${CURRENT_FW_DOS_TCP_LIMIT}" ; then
+	echo-value "default [$(get-default-piptcp)]"
+    else
+	echo-value "${CURRENT_FW_DOS_TCP_LIMIT}"
+    fi
+
+    if test "${CURRENT_FW_DOS_TCP_LIMIT}" != "${FW_DOS_TCP_LIMIT}" ; then
+	echo-command-form "firewall dos piptcp"
+	echo-mark-new
+	if test -z "${FW_DOS_TCP_LIMIT}" ; then
+	    echo-value "default [$(get-default-piptcp)]"
+	else
+	    echo-value "${FW_DOS_TCP_LIMIT}"
+	fi
+    fi
+}
+
+show-fw-dos-pipweb()
+{
+    echo-command-form "firewall dos pipweb"
+    echo-mark-cur
+    if test -z "${CURRENT_FW_DOS_WEB_LIMIT}" ; then
+	echo-value "default [$(get-default-pipweb)]"
+    else
+	echo-value "${CURRENT_FW_DOS_WEB_LIMIT}"
+    fi
+
+    if test "${CURRENT_FW_DOS_WEB_LIMIT}" != "${FW_DOS_WEB_LIMIT}" ; then
+	echo-command-form "firewall dos pipweb"
+	echo-mark-new
+	if test -z "${FW_DOS_WEB_LIMIT}" ; then
+	    echo-value "default [$(get-default-pipweb)]"
+	else
+	    echo-value "${FW_DOS_WEB_LIMIT}"
+	fi
+    fi
+}
+
+show-fw-dos-piprweb()
+{
+    echo-command-form "firewall dos piprweb"
+    echo-mark-cur
+    if test -z "${CURRENT_FW_DOS_RWEB_LIMIT}" ; then
+	echo-value "default [$(get-default-piprweb)]"
+    else
+	echo-value "${CURRENT_FW_DOS_RWEB_LIMIT}"
+    fi
+
+    if test "${CURRENT_FW_DOS_RWEB_LIMIT}" != "${FW_DOS_RWEB_LIMIT}" ; then
+	echo-command-form "firewall dos piprweb"
+	echo-mark-new
+	if test -z "${FW_DOS_RWEB_LIMIT}" ; then
+	    echo-value "default [$(get-default-piprweb)]"
+	else
+	    echo-value "${FW_DOS_RWEB_LIMIT}"
+	fi
+    fi
+}
+
+show-fw-dos-pipdns()
+{
+    echo-command-form "firewall dos pipdns"
+    echo-mark-cur
+    if test -z "${CURRENT_FW_DOS_DNS_LIMIT}" ; then
+	echo-value "default [$(get-default-pipdns)]"
+    else
+	echo-value "${CURRENT_FW_DOS_DNS_LIMIT}"
+    fi
+
+    if test "${CURRENT_FW_DOS_DNS_LIMIT}" != "${FW_DOS_DNS_LIMIT}" ; then
+	echo-command-form "firewall dos pipdns"
+	echo-mark-new
+	if test -z "${FW_DOS_DNS_LIMIT}" ; then
+	    echo-value "default [$(get-default-pipdns)]"
+	else
+	    echo-value "${FW_DOS_DNS_LIMIT}"
+	fi
+    fi
+}
+
+show-fw-dos-pipocsp()
+{
+    echo-command-form "firewall dos pipocsp"
+    echo-mark-cur
+    if test -z "${CURRENT_FW_DOS_OCSP_LIMIT}" ; then
+	echo-value "default [$(get-default-pipocsp)]"
+    else
+	echo-value "${CURRENT_FW_DOS_OCSP_LIMIT}"
+    fi
+
+    if test "${CURRENT_FW_DOS_OCSP_LIMIT}" != "${FW_DOS_OCSP_LIMIT}" ; then
+	echo-command-form "firewall dos pipocsp"
+	echo-mark-new
+	if test -z "${FW_DOS_OCSP_LIMIT}" ; then
+	    echo-value "default [$(get-default-pipocsp)]"
+	else
+	    echo-value "${FW_DOS_OCSP_LIMIT}"
+	fi
+    fi
+}
+
+show-fw-dos()
+{
+    echo-begin-show
+
+    case "${1}" in
+	tcpflood|udpflood|webflood|rwebflood|piptcp|pipweb|piprweb|pipdns|pipocsp)
+	    show-fw-dos-${1}
+	    ;;
+	"")
+	    show-fw-dos-tcpflood
+	    show-fw-dos-udpflood
+	    show-fw-dos-webflood
+	    show-fw-dos-rwebflood
+	    show-fw-dos-piptcp
+	    show-fw-dos-pipweb
+	    show-fw-dos-piprweb
+	    show-fw-dos-pipdns
+	    show-fw-dos-pipocsp
+	    ;;
+	*)
+	    return 255
+	    ;;
+    esac
+
+    echo-end-show
+}
+
+manage-fw-dos()
+{
+    if test -z "${1}" ; then show-fw-dos ; return 0 ; fi
+
+    local dos=${1}
+
+    case ${dos} in
+	tcpflood|udpflood|webflood|rwebflood|piptcp|pipweb|piprweb|pipdns|pipocsp)
+	    if test -z "${2}" ; then show-fw-dos-${dos} ; return 0 ; fi
+	    ;;
+	*)
+	    return 249
+	    ;;
+    esac
+
+    local act=${2}
+
+    case ${act} in
+	'set')
+	    local limit=${3}
+	    check-digit ${limit} || return 190
+
+	    case ${dos} in
+		tcpflood|udpflood|webflood|rwebflood)
+		    test ${limit} -ge 1 -a ${limit} -le 10000 || return 250
+
+		    local burst=${4}
+		    if test -z "${burst}" ; then
+			burst=${limit}
+		    else
+			check-digit ${burst} || return 190
+		    fi
+
+		    test ${burst} -ge 1 -a ${burst} -le 10000 || return 250
+		    ;;
+		piptcp|pipweb|piprweb|pipdns|pipocsp)
+		    test ${limit} -ge 0 -a ${limit} -le 1000000000 || return 251
+		    ;;
+	    esac
+
+	    case ${dos} in
+		tcpflood)
+		    if test "$(get-default-flood-limit ${dos})" == ${limit} -a "$(get-default-flood-burst ${dos})" == ${burst} ; then
+			unset FW_DOS_TCP_FLOOD
+		    else
+			FW_DOS_TCP_FLOOD="${limit} ${burst}"
+		    fi
+		    ;;
+		udpflood)
+		    if test "$(get-default-flood-limit ${dos})" == ${limit} -a "$(get-default-flood-burst ${dos})" == ${burst} ; then
+			unset FW_DOS_UDP_FLOOD
+		    else
+			FW_DOS_UDP_FLOOD="${limit} ${burst}"
+		    fi
+		    ;;
+		webflood)
+		    if test "$(get-default-flood-limit ${dos})" == ${limit} -a "$(get-default-flood-burst ${dos})" == ${burst} ; then
+			unset FW_DOS_WEB_FLOOD
+		    else
+			FW_DOS_WEB_FLOOD="${limit} ${burst}"
+		    fi
+		    ;;
+		rwebflood)
+		    if test "$(get-default-flood-limit ${dos})" == ${limit} -a "$(get-default-flood-burst ${dos})" == ${burst} ; then
+			unset FW_DOS_RWEB_FLOOD
+		    else
+			FW_DOS_RWEB_FLOOD="${limit} ${burst}"
+		    fi
+		    ;;
+		piptcp)
+		    if test "$(get-default-pip ${dos})" == ${limit} ; then
+			unset FW_DOS_TCP_LIMIT
+		    else
+			FW_DOS_TCP_LIMIT=${limit}
+		    fi
+		    ;;
+		pipweb)
+		    if test "$(get-default-pip ${dos})" == ${limit} ; then
+			unset FW_DOS_WEB_LIMIT
+		    else
+			FW_DOS_WEB_LIMIT=${limit}
+		    fi
+		    ;;
+		piprweb)
+		    if test "$(get-default-pip ${dos})" == ${limit} ; then
+			unset FW_DOS_RWEB_LIMIT
+		    else
+			FW_DOS_RWEB_LIMIT=${limit}
+		    fi
+		    ;;
+		pipdns)
+		    if test "$(get-default-pip ${dos})" == ${limit} ; then
+			unset FW_DOS_DNS_LIMIT
+		    else
+			FW_DOS_DNS_LIMIT=${limit}
+		    fi
+		    ;;
+		pipocsp)
+		    if test "$(get-default-pip ${dos})" == ${limit} ; then
+			unset FW_DOS_OCSP_LIMIT
+		    else
+			FW_DOS_OCSP_LIMIT=${limit}
+		    fi
+		    ;;
+
+		*)
+		    return 255
+		    ;;
+	    esac
+	    ;;
+
+	default)
+	    case ${dos} in
+		tcpflood)
+		    unset FW_DOS_TCP_FLOOD
+		    ;;
+		udpflood)
+		    unset FW_DOS_UDP_FLOOD
+		    ;;
+		webflood)
+		    unset FW_DOS_WEB_FLOOD
+		    ;;
+		rwebflood)
+		    unset FW_DOS_RWEB_FLOOD
+		    ;;
+		piptcp)
+		    unset FW_DOS_TCP_LIMIT
+		    ;;
+		pipweb)
+		    unset FW_DOS_WEB_LIMIT
+		    ;;
+		piprweb)
+		    unset FW_DOS_RWEB_LIMIT
+		    ;;
+		pipdns)
+		    unset FW_DOS_DNS_LIMIT
+		    ;;
+		pipocsp)
+		    unset FW_DOS_OCSP_LIMIT
+		    ;;
+		*)
+		    return 255
+		    ;;
+	    esac
+	    ;;
+	*)
+	    return 1
+	    ;;
+    esac
+
+    SAVENV=1
+}
+
+run()
+{
+    contextual-command-is-allowed || return 207
+
+    if test -z "${ARGS[1]}" ; then show-fw-rules ; return 0 ; fi
+    if test "${ARGS[1]}" == dos ; then shift-args ; manage-fw-dos ${ALLARGS} ; return ${?} ; fi
+
+    local rset=${ARGS[1]}
+    
+    if test -z "${ARGS[2]}" ; then show-fw-rules ${rset} ; return 0 ; fi
+
+    case "${rset}" in
+	external)
+	    local rules=${FW_EXTERNAL_RULE_LIST}
+	    ;;
+	web)
+	    local rules=${FW_WEB_RULE_LIST}
+	    ;;
+	rweb)
+	    local rules=${FW_RWEB_RULE_LIST}
+	    ;;
+	antivirus)
+	    local rules=${FW_AV_RULE_LIST}
+	    ;;
+	admin)
+	    local rules=${FW_ADMIN_RULE_LIST}
+	    ;;
+	mon)
+	    local rules=${FW_MON_RULE_LIST}
+	    ;;
+	file)
+	    local rules=${FW_FILE_RULE_LIST}
+	    ;;
+	peer)
+	    local rules=${FW_PEER_RULE_LIST}
+	    ;;
+	auxiliary)
+	    local rules=${FW_AUXILIARY_RULE_LIST}
+	    ;;
+	vpnipsec)
+	    local rules=${FW_VPN_IPSEC_RULE_LIST}
+	    ;;
+	*)
+	    return 65
+	    ;;
+    esac
+    
+    local operation=${ARGS[2]} position_id position_nb position
+
+    case "${operation}" in
+	add|del|raz|on|off)
+	    ;;
+	*)
+	    if test "${operation:0:7}" == "insert:" ; then
+		position_id=${operation:7}
+		operation=insert
+		position=before
+	    elif test "${operation:0:4}" == "add:" ; then
+		position_id=${operation:4}
+		operation=insert
+		position=after
+	    elif test "${operation:0:5}" == "move:" ; then
+		if check-digit ${operation:5} ; then
+		    position_nb=${operation:5}
+		else
+		    position_id=${operation:6}
+		    case "${operation:5:1}" in
+			+)
+			    position=after
+			    ;;
+			-)
+			    position=before
+			    ;;
+			*)
+			    return 1
+			    ;;
+		    esac
+		fi
+		operation=move
+	    else
+		return 1
+	    fi
+	    check-id-length "${position_id}" || return 127
+	    test -n "${position_nb}" || check-id "${position_id}" || return 35
+
+	    ;;
+    esac
+
+    case "${operation}" in
+	add|insert|del|move|on|off)
+	    test -n "${ARGS[3]}" || return 1
+
+	    local id=${ARGS[3]}
+	    check-id-length "${id}" || return 127
+	    check-id "${id}" || return 35
+
+	    case ${operation} in
+		move)
+		    if test -n "${position_nb}" ; then
+			rules=$(move-record-at-position-in-list 11 1 "${id}" "${rules}" ${position_nb})
+		    else
+			rules=$(move-record-in-list 11 1 "${id}" "${rules}" "${position_id}" ${position})
+		    fi
+		    test ${?} -eq 0 || return 152
+		    ;;
+
+		add|insert)
+		    test -n "${ARGS[4]}" || return 1
+
+		    local len=$(record11-length-list "${rules}")
+		    test ${len} -lt ${MAX_FW_RULES_NB} || return 90
+
+		    local action=${ARGS[4]}
+		    check-rule-action ${action} || return 36
+		    
+		    local protocol=${ARGS[5]}
+		    test -n "${protocol}" || protocol=any
+		    check-fw-protocol ${protocol} || return 59
+
+		    local src_ip=${ARGS[6]}
+		    test -n "${src_ip}" || src_ip=any
+		    test ${src_ip} != 0.0.0.0/0 || src_ip=any
+		    check-rule-ip-address ${src_ip} || return ${?}
+
+		    local src_dev=${rset}
+		    local dst_dev=${ARGS[7]}
+		    test -n "${dst_dev}" || dst_dev=any
+		    if test ${dst_dev} != any ; then
+			check-fw-dev-name ${dst_dev} || return 56
+			test ${dst_dev} != ${src_dev} || return 56
+		    fi
+
+		    local dst_ip=${ARGS[8]}
+		    test -n "${dst_ip}" || dst_ip=any
+		    test ${dst_ip} != 0.0.0.0/0 || dst_ip=any
+		    check-rule-ip-address ${dst_ip} || return ${?}
+
+		    local dst_ports=${ARGS[9]}
+		    test -n "${dst_ports}" || dst_ports=any
+		    check-fw-port ${dst_ports} || return 60
+		    check-fw-protocol-port ${protocol} ${dst_ports} || return 67
+
+		    if test ${action} == allow ; then
+
+			local src_nat_ip=${ARGS[10]}
+			test -n "${src_nat_ip}" || src_nat_ip=nil
+
+			if test ${src_nat_ip} != nil ; then
+			    check-ip ${src_nat_ip} || return 149
+			    ! check-fw-dynamic-ports-protocol ${protocol} || return 178
+			fi
+
+			local dst_nat_ip=${ARGS[11]}
+			test -n "${dst_nat_ip}" || dst_nat_ip=nil
+			test ${dst_nat_ip} == nil || check-ip ${dst_nat_ip} || return 150
+
+			local dst_pat_port=${ARGS[12]}
+			test -n "${dst_pat_port}" || dst_pat_port=nil
+			check-fw-protocol-pat ${protocol} ${dst_pat_port} || return 67
+			test ${dst_pat_port} == nil || check-port-nb ${dst_pat_port} || return 151
+		    else
+			src_nat_ip=nil
+			dst_nat_ip=nil
+			dst_pat_port=nil
+		    fi
+
+		    local rule="${id} on ${action} ${protocol} ${src_ip} ${dst_dev} ${dst_ip} ${dst_ports} ${src_nat_ip} ${dst_nat_ip} ${dst_pat_port}"
+		    rules=$(insert-record-in-list 11 1 "${rule}" "${rules}" "${position_id}" ${position})
+		    test ${?} -eq 0 -o ${operation} != insert || return 152
+		    ;;
+
+		del)
+		    rules=$(remove-record-from-list 11 1 ${id} "${rules}")
+		    test ${?} -eq 0 || return 152
+		    ;;
+
+		on|off)
+		    shift-args
+		    rules=$(manage-bulk-fw-states "${rules}")
+		    local ret=${?}
+		    test ${ret} -eq 0 || return ${ret}
+		    ;;
+		*)
+		    return 255
+		    ;;
+	    esac
+	    ;;
+	raz)
+	    unset rules
+	    ;;
+	*)
+	    return 1
+	    ;;
+    esac
+
+    case "${rset}" in
+	external)
+	    export FW_EXTERNAL_RULE_LIST=${rules}
+	    ;;
+	web)
+	    export FW_WEB_RULE_LIST=${rules}
+	    ;;
+	rweb)
+	    export FW_RWEB_RULE_LIST=${rules}
+	    ;;
+	antivirus)
+	    export FW_AV_RULE_LIST=${rules}
+	    ;;
+	admin)
+	    export FW_ADMIN_RULE_LIST=${rules}
+	    ;;
+	mon)
+	    export FW_MON_RULE_LIST=${rules}
+	    ;;
+	file)
+	    export FW_FILE_RULE_LIST=${rules}
+	    ;;
+	peer)
+	    export FW_PEER_RULE_LIST=${rules}
+	    ;;
+	auxiliary)
+	    export FW_AUXILIARY_RULE_LIST=${rules}
+	    ;;
+	vpnipsec)
+	    export FW_VPN_IPSEC_RULE_LIST=${rules}
+	    ;;
+	*)
+	    return 255
+	    ;;
+    esac
+
+    SAVENV=1
+}
+
+main "${@}"

@@ -1,0 +1,107 @@
+:root {
+    --menu-selected-color:#555555;
+}
+
+.chromestyle{
+font-weight: bold;
+font-family:arial,helvetica,sans-serif;
+font-size:Inherit;
+color:var(--menu-selected-color);
+margin:0;
+margin-left:3px;
+margin-right:3px;
+padding:0;
+cursor:pointer;
+}
+
+.chromestyle:after{ /*Add margin between menu and rest of content in Firefox*/
+content: "."; 
+display: block; 
+height: 0; 
+clear: both; 
+visibility: hidden;
+margin:0;
+padding:0;
+}
+
+.chromestyle ul{
+border: 0 solid #BBB;
+width: 100%;
+background: url(/image/menubg.png) center center repeat-x; /*THEME CHANGE HERE*/
+padding: 15px 0;
+margin: 0;
+text-align: left; /*set value to "left", "center", or "right"*/
+}
+
+.chromestyle ul li{
+display: inline;
+color:var(--menu-selected-color);
+}
+
+.chromestyle ul li a{
+color: var(--menu-selected-color);
+padding: 15px 15px;
+margin: 0;
+text-decoration: none;
+border-right: 0 solid #DADADA;
+font-weight:normal;
+}
+
+.chromestyle ul li a:hover, .chromestyle ul li a.selected{ /*script dynamically adds a class of "selected" to the current active menu item*/
+background: url(/image/menubgover.png) center center repeat-x; /*THEME CHANGE HERE*/
+color:var(--menu-selected-color);
+text-decoration:none;
+font-weight:normal;
+}
+
+.chromestyle ul li a:visited {
+color:var(--menu-selected-color);
+text-decoration:none;
+font-weight:normal;
+}
+
+/* ######### Style for Drop Down Menu ######### */
+
+.dropmenudiv{
+position:absolute;
+top: 0;
+border: 1px solid lavender; /*THEME CHANGE HERE*/
+border-bottom-width: 1px;
+font:normal 12px Verdana;
+line-height:40px;
+z-index:10000;
+font-family:arial,helvetica,sans-serif;
+font-size:Inherit;
+background-color: lavender;
+width: 170px;
+visibility: hidden;
+}
+
+
+.dropmenudiv a{
+width: auto;
+display: block;
+text-indent: 3px;
+border-bottom: 0 solid #BBB; /*THEME CHANGE HERE*/
+padding: 2px 0;
+font-family:arial,helvetica,sans-serif;
+font-size:Inherit;
+font-weight:normal;
+color:var(--menu-selected-color);
+text-decoration: none;
+}
+
+.dropmenudiv a:hover{ /*THEME CHANGE HERE*/
+background-color: #babadb;
+color:var(--menu-selected-color);
+margin:0;
+text-decoration:none;
+font-weight:normal;
+}
+
+.dropmenudiv a:link, .dropmenudiv a:visited { /*THEME CHANGE HERE*/
+color:var(--menu-selected-color);
+margin:0;
+text-decoration:none;
+font-weight:normal;
+}

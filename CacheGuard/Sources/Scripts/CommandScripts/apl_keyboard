@@ -1,0 +1,95 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       Scripts
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+CACHEGUARD_DIR=/etc/sysconfig/cacheguard
+source ${CACHEGUARD_DIR}/constant
+source ${APPLIANCE_DIR}/etc/role
+source /usr/local/lib/apl_common
+
+gen-console()
+{
+    test -n "${1}" || return 1
+    local keymap=${1}
+
+    grep -v KEYMAP /etc/sysconfig/console
+    echo "KEYMAP=${keymap}"
+}
+
+print-help()
+{
+    cd /usr/share/keymaps/i386
+    local files=$(find . -type f | sort) keyboard
+
+    echo
+    echo "Usage: apl_keyboard <keyboard>"
+    echo "Where <keyboard> is one of the following:"
+    for keyboard in ${files}
+    do
+	keyboard=${keyboard:2}
+	! [[ "${keyboard}" =~ ^.*include/.* ]] || continue
+	keyboard=$(file-basename "${keyboard}" .map.gz)
+	echo -e "\t${keyboard}"
+    done
+    echo
+}
+
+update-grub-conf()
+{
+    test -n "${1}" || return 1
+    local keymap=${1}
+
+    local old_keymap=$(cat ${ETC_DIR}/keymap 2> /dev/null)
+
+    sed -e "s/keyboard=${old_keymap}/keyboard=${keymap}/g" /boot/grub/grub.cfg > /tmp/grub.cfg.${$} 2> /dev/null
+    if test ${?} -ne 0 ; then
+	rm -f /tmp/grub.cfg.${$}
+	return 11
+    fi
+
+    chattr -i /boot/grub/grub.cfg /boot/grub
+    install -m 644 -o root -g root /tmp/grub.cfg.${$} /boot/grub/grub.cfg
+    chattr +i /boot/grub/grub.cfg /boot/grub
+    rm -f /tmp/grub.cfg.${$}
+}
+
+kbd-conf()
+{
+    local keymap=${1}
+
+    if test -z "${keymap}" ; then
+	print-help
+	return 0
+    fi
+
+    loadkeys --quiet ${keymap} > /dev/null 2>&1 || return 11
+    gen-console ${keymap} > /tmp/console.${$}
+    install -m 644 -o root -g root /tmp/console.${$} /etc/sysconfig/console
+    rm -f /tmp/console.${$}
+    update-grub-conf ${keymap}
+    echo ${keymap} > ${ETC_DIR}/keymap
+}
+
+# Main()
+
+kbd-conf "${@}"

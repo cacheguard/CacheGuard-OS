@@ -1,0 +1,738 @@
+---------------------------------------------------------------------------
+--
+-- MODULE:       ETC
+-- AUTHOR(S):    CacheGuard Development Team
+-- COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+-- COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+--
+-- This program is free software: you can redistribute it and/or modify
+-- it under the terms of the GNU General Public License as published by
+-- the Free Software Foundation, either version 3 of the License, or
+-- (at your option) any later version.
+--
+-- This program is distributed in the hope that it will be useful,
+-- but WITHOUT ANY WARRANTY; without even the implied warranty of
+-- MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+-- GNU General Public License for more details.
+--
+-- You should have received a copy of the GNU General Public License
+-- along with this program. If not, see <http://www.gnu.org/licenses/>.
+--
+---------------------------------------------------------------------------
+
+CACHEGUARD-MIB DEFINITIONS ::= BEGIN
+
+--
+-- CacheGuard Web Gateway Appliance MIB description
+--
+
+IMPORTS
+    MODULE-COMPLIANCE, OBJECT-GROUP, NOTIFICATION-GROUP FROM SNMPv2-CONF
+    TEXTUAL-CONVENTION FROM SNMPv2-TC
+    MODULE-IDENTITY, OBJECT-TYPE, NOTIFICATION-TYPE, Integer32 FROM SNMPv2-SMI
+    SnmpAdminString FROM SNMP-FRAMEWORK-MIB
+;
+
+cgMIB MODULE-IDENTITY
+LAST-UPDATED "202007170000Z" -- April 17, 2020
+ORGANIZATION "CacheGuard Technologies Ltd"
+CONTACT-INFO "E-mail: iana&cacheguard.com WWW: https://www.cacheguard.com Country: UK"
+DESCRIPTION "The MIB module to describe functional objects for CacheGuard Web Gateway Appliance."
+
+REVISION "202007170000Z" -- April 17, 2020
+DESCRIPTION "Modifying the cgDiskAverageIOOverOneMinute OBJECT to cgDiskAverageIOSinceLastCheck."
+
+REVISION "202004110000Z" -- April 11, 2020
+DESCRIPTION "Adding cgFailedLoginNotification NOTIFICATION-TYPE."
+
+REVISION "201805020000Z" -- May 02, 2018
+DESCRIPTION "Adding cgSSDLifetime OBJECT-TYPE."
+
+REVISION "201707200000Z" -- July 20, 2017
+DESCRIPTION "Adding cgCacheReconfigureNotification NOTIFICATION-TYPE, Adding cgCacheMeanObjectSize and cgCacheMeanObjectReferenceSize OBJECT-TYPE."
+
+REVISION "201704100000Z" -- April 1O, 2017
+DESCRIPTION "Adding cgAntiVirusExtendedNotification and cgKerberosKeyTabUpdateNotification NOTIFICATION-TYPE"
+
+REVISION "201601150000Z" -- January 15, 2016
+DESCRIPTION "NIC (Network Interface Card) addition/removal notifications have been added. Gateway unavailability notifications have been added. cgGuard* objects have been renamed cgURLList*"
+
+REVISION "201410310000Z" -- October 31, 2014
+DESCRIPTION "Creation"
+::= { iso(1) org(3) dod(6) internet(1) private(4) enterprises(1) 26083 }
+
+--
+-- Top level structure
+--
+
+cgMIBConformance OBJECT IDENTIFIER ::= { cgMIB 0 }
+cgMIBCompliances OBJECT IDENTIFIER ::= { cgMIBConformance 0 }
+cgMIBGroups OBJECT IDENTIFIER ::= { cgMIBConformance 1 }
+
+cgObjects OBJECT IDENTIFIER ::= { cgMIB 1 }
+cgSystem OBJECT IDENTIFIER ::= { cgObjects 0 }
+cgCache OBJECT IDENTIFIER ::= { cgObjects 1 }
+cgDisk OBJECT IDENTIFIER ::= { cgObjects 2 }
+cgRAID OBJECT IDENTIFIER ::= { cgObjects 3 }
+cgVRRP OBJECT IDENTIFIER ::= { cgObjects 4 }
+
+cgNotification OBJECT IDENTIFIER ::= { cgMIB 2 }
+cgNotificationsPrefix OBJECT IDENTIFIER ::= { cgNotification 0 }
+cgNotificationObjects OBJECT IDENTIFIER ::= { cgNotification 1 }
+cgTestObjects OBJECT IDENTIFIER ::= { cgNotificationObjects 0 }
+cgHealthCheckObjects OBJECT IDENTIFIER ::= { cgNotificationObjects 1 }
+cgSMARTObjects OBJECT IDENTIFIER ::= { cgNotificationObjects 2 }
+cgRAIDObjects OBJECT IDENTIFIER ::= { cgNotificationObjects 3 }
+cgVRRPObjects OBJECT IDENTIFIER ::= { cgNotificationObjects 4 }
+cgNICObjects OBJECT IDENTIFIER ::= { cgNotificationObjects 5 }
+cgGatewayObjects OBJECT IDENTIFIER ::= { cgNotificationObjects 6 }
+cgURLListObjects OBJECT IDENTIFIER ::= { cgNotificationObjects 7 }
+cgAntiVirusObjects OBJECT IDENTIFIER ::= { cgNotificationObjects 8 }
+cgKerberosObjects OBJECT IDENTIFIER ::= { cgNotificationObjects 9 }
+cgCacheObjects OBJECT IDENTIFIER ::= { cgNotificationObjects 10 }
+cgLoginObjects OBJECT IDENTIFIER ::= { cgNotificationObjects 11 }
+
+cgMIBCompliance MODULE-COMPLIANCE
+STATUS current
+DESCRIPTION "To be completed"
+MODULE -- this module
+MANDATORY-GROUPS {
+  cgObjectGroup,
+  cgNotificationGroup
+}
+::= { cgMIBCompliances 1 }
+
+cgObjectGroup OBJECT-GROUP
+OBJECTS {
+  cgOSVersion,
+  cgEndUsers,
+  cgReverseWebSites,
+
+  cgCacheSize,
+  cgCacheUsed,
+  cgBigCacheSize,
+  cgRCacheSize,
+  cgRCacheUsed,
+  cgCacheHitRequest,
+  cgCacheHitVolume,
+  cgCacheMeanObjectSize,
+  cgCacheMeanObjectReferenceSize,
+  
+  cgDiskAverageIO,
+  cgDiskAverageIOSinceLastCheck,
+  cgSSDLifetime,
+  
+  cgRAIDState,
+  cgRAIDBuildStatus,
+  
+  cgTestEvent,
+  cgTestEventDescription,
+
+  cgHealthCheckEvent,
+  cgHealthCheckServiceName,
+  cgHealthCheckEventDescription,
+
+  cgSMARTEvent,
+  cgSMARTDevice,
+  cgSMARTEventDescription,
+
+  cgRAIDEvent,
+  cgRAIDDevice,
+  cgRAIDEventDescription,
+
+  cgVRRPEvent,
+  cgVRRPDevice,
+  cgVRRPEventDescription,
+  
+  cgNICEvent,
+  cgNICDevice,
+  cgNICEventDescription,
+  
+  cgGatewayEvent,
+  cgGatewayIP,
+  cgGatewayEventDescription,
+
+  cgURLListEvent,
+  cgURLListAutoLoadFailures,
+  cgURLListEventDescription,
+  
+  cgAntiVirusEvent,
+  cgAntiVirusFreshnessDate,
+  cgAntiVirusUpdateErrorCode,
+  cgAntiVirusEventDescription,
+
+  cgKerberosEvent,
+  cgKerberosKeyTabUpdateErrorCode,
+  cgKerberosEventDescription,
+
+  cgCacheEvent,
+  cgCacheEventStatusCode,
+  cgCacheEventDescription,
+
+  cgLoginEvent,
+  cgLoginInterface,
+  cgLoginRemoteIP,
+  cgLoginEventDescription
+}
+
+STATUS current
+DESCRIPTION "A collection of objects providing monitoring information for CacheGuard appliance"
+::= { cgMIBGroups 1 }
+
+cgNotificationGroup NOTIFICATION-GROUP
+NOTIFICATIONS {
+  cgTestNotification,
+  cgHealthCheckNotification,
+  cgSMARTNotification,
+  cgRAIDNotification,
+  cgVRRPNotification,
+  cgNICNotification,
+  cgGatewayNotification,
+  cgURLListNotification,
+  cgAntiVirusNotification,
+  cgAntiVirusExtendedNotification,
+  cgKerberosKeyTabUpdateNotification,
+  cgCacheReconfigureNotification,
+  cgLoginNotification
+}
+STATUS current
+DESCRIPTION "A collection of notifications providing monitoring information for CacheGuard appliance"
+::= { cgMIBGroups 2 }
+
+--
+-- System information
+--
+
+cgOSVersion OBJECT-TYPE
+SYNTAX SnmpAdminString
+MAX-ACCESS read-only
+STATUS current
+DESCRIPTION "This object gives the Operating System version."
+::= { cgSystem 1 }
+
+cgEndUsers OBJECT-TYPE
+SYNTAX Integer32
+MAX-ACCESS read-only
+STATUS current
+DESCRIPTION "This object gives the end-users capacity for the installed appliance.
+The end-users capacity is a number given during the installation procedure."
+::= { cgSystem 2 }
+
+cgReverseWebSites OBJECT-TYPE
+SYNTAX Integer32
+MAX-ACCESS read-only
+STATUS current
+DESCRIPTION "This object gives the number of Web site names to protect by the installed appliance.
+The reverse Web sites capacity is a number given during the installation procedure."
+::= { cgSystem 3 }
+
+--
+-- Persistent cache volume on HDDs
+--
+
+cgCacheSize OBJECT-TYPE
+SYNTAX Integer32
+MAX-ACCESS read-only
+STATUS current
+DESCRIPTION "Gives the total amount of the main persistent cache in MB"
+::= { cgCache 1 }
+
+cgCacheUsed OBJECT-TYPE
+SYNTAX Integer32
+MAX-ACCESS read-only
+STATUS current
+DESCRIPTION "Gives the percentage of the main cache volume used to store objects."
+::= { cgCache 2 }
+
+cgRCacheSize OBJECT-TYPE
+SYNTAX Integer32
+MAX-ACCESS read-only
+STATUS current
+DESCRIPTION "Gives the total amount of the persistent cache for reverse website in MB"
+::= { cgCache 3 }
+
+cgBigCacheSize OBJECT-TYPE
+SYNTAX Integer32
+MAX-ACCESS read-only
+STATUS current
+DESCRIPTION "Gives the size of the persistent cache reserved for very big objects in MB"
+::= { cgCache 4 }
+
+cgRCacheUsed OBJECT-TYPE
+SYNTAX Integer32
+MAX-ACCESS read-only
+STATUS current
+DESCRIPTION "Gives the percentage of the cache volume used to store reverse website objects."
+::= { cgCache 5 }
+
+--
+-- Persistent cache HITs
+--
+
+cgCacheHitRequest OBJECT-TYPE
+SYNTAX Integer32
+MAX-ACCESS read-only
+STATUS current
+DESCRIPTION "Gives the percentage of requests receiving responses retrieved from the cache."
+::= { cgCache 6 }
+
+cgCacheHitVolume OBJECT-TYPE
+SYNTAX Integer32
+MAX-ACCESS read-only
+STATUS current
+DESCRIPTION "Gives the percentage of the cache volume used to send responses to requests."
+::= { cgCache 7 }
+
+cgCacheMeanObjectSize OBJECT-TYPE
+SYNTAX Integer32
+MAX-ACCESS read-only
+STATUS current
+DESCRIPTION "Gives the current mean object size of a cached object in KB."
+::= { cgCache 8 }
+
+cgCacheMeanObjectReferenceSize OBJECT-TYPE
+SYNTAX Integer32
+MAX-ACCESS read-only
+STATUS current
+DESCRIPTION "Gives the mean object reference size of a cached object in KB. This value combined with the available RAM are used to calculate the persistent cache volume."
+::= { cgCache 9 }
+
+--
+-- Disk(s) performances
+--
+
+cgDiskAverageIO OBJECT-TYPE
+SYNTAX Integer32
+MAX-ACCESS read-only
+STATUS current
+DESCRIPTION "Gives hard drive disk(s) average i/o time in ms"
+::= { cgDisk 1 }
+
+cgDiskAverageIOSinceLastCheck OBJECT-TYPE
+SYNTAX Integer32
+MAX-ACCESS read-only
+STATUS current
+DESCRIPTION "Givs hard drive disk(s) average i/o time in ms since the last check"
+::= { cgDisk 2 }
+
+cgSSDLifetime OBJECT-TYPE
+SYNTAX Integer32
+MAX-ACCESS read-only
+STATUS current
+DESCRIPTION "Givs the lowest SSD storage lifetime in percentage. 100 means the SSD has 100% life."
+::= { cgDisk 3 }
+
+--
+-- RAID state
+--
+
+cgRAIDState OBJECT-TYPE
+SYNTAX Integer32
+MAX-ACCESS read-only
+STATUS current
+DESCRIPTION "Actually a boolean value giving the status of the RAID. 0 means false and 1 means true. This has been implemented as an integer because the used tool to extend the SNMP agent does not support the boolean type."
+::= { cgRAID 1 }
+
+cgRAIDBuildStatus OBJECT-TYPE
+SYNTAX Integer32
+MAX-ACCESS read-only
+STATUS current
+DESCRIPTION "This gives the percentage of the RAID build after initialising the RAID or in case of a failure on a disk and its replacement by another disk."
+::= { cgRAID 2 }
+
+--
+-- Test notifications
+--
+
+cgTestEvent OBJECT-TYPE
+SYNTAX SnmpAdminString
+MAX-ACCESS accessible-for-notify
+STATUS current
+DESCRIPTION "Gives the Test event key"
+::= { cgTestObjects 1 }
+
+cgTestEventDescription OBJECT-TYPE
+SYNTAX SnmpAdminString
+MAX-ACCESS accessible-for-notify
+STATUS current
+DESCRIPTION "Gives the Test event description"
+::= { cgTestObjects 2 }
+
+cgTestNotification NOTIFICATION-TYPE
+OBJECTS { cgTestEvent, cgTestEventDescription }
+STATUS current
+DESCRIPTION "This is a notification for testing purpose"
+::= { cgNotificationsPrefix 1 }
+
+--
+-- Health Checking notifications
+--
+
+cgHealthCheckEvent OBJECT-TYPE
+SYNTAX HealthCheckEventType
+MAX-ACCESS accessible-for-notify
+STATUS current
+DESCRIPTION "This object gives the status of a service verified by the Health Checker"
+::= { cgHealthCheckObjects 1 }
+
+HealthCheckEventType ::= TEXTUAL-CONVENTION
+STATUS current
+DESCRIPTION "A value that represents the status of the health checker"
+SYNTAX INTEGER {
+  triedToRestartTheService (1),
+  restartedTheService (2),
+  failedToRestartTheService (3),
+  forcedAFailOverInHAMode (4)
+}
+
+cgHealthCheckServiceName OBJECT-TYPE
+SYNTAX SnmpAdminString
+MAX-ACCESS accessible-for-notify
+STATUS current
+DESCRIPTION "Gives the checked service name"
+::= { cgHealthCheckObjects 2 }
+
+cgHealthCheckEventDescription OBJECT-TYPE
+SYNTAX SnmpAdminString
+MAX-ACCESS accessible-for-notify
+STATUS current
+DESCRIPTION "Gives the Health check service event description"
+::= { cgHealthCheckObjects 3 }
+
+cgHealthCheckNotification NOTIFICATION-TYPE
+OBJECTS { cgHealthCheckEvent, cgHealthCheckServiceName, cgHealthCheckEventDescription }
+STATUS current
+DESCRIPTION "This notification gives the status of the health checker for a given service"
+::= { cgNotificationsPrefix 2 }
+
+--
+-- SMART HDD notifications
+--
+
+cgSMARTEvent OBJECT-TYPE
+SYNTAX SnmpAdminString
+MAX-ACCESS accessible-for-notify
+STATUS current
+DESCRIPTION "Gives the SMART event type on a HDD"
+::= { cgSMARTObjects 1 }
+
+cgSMARTDevice OBJECT-TYPE
+SYNTAX SnmpAdminString
+MAX-ACCESS accessible-for-notify
+STATUS current
+DESCRIPTION "Gives the SMART HDD device name"
+::= { cgSMARTObjects 2 }
+
+cgSMARTEventDescription OBJECT-TYPE
+SYNTAX SnmpAdminString
+MAX-ACCESS accessible-for-notify
+STATUS current
+DESCRIPTION "Gives the SMART event description on a HDD"
+::= { cgSMARTObjects 3 }
+
+cgSMARTNotification NOTIFICATION-TYPE
+OBJECTS { cgSMARTEvent, cgSMARTDevice, cgSMARTEventDescription }
+STATUS current
+DESCRIPTION "This notification gives the status of a SMART HDD"
+::= { cgNotificationsPrefix 3 }
+
+--
+-- RAID HDD notifications
+--
+
+cgRAIDEvent OBJECT-TYPE
+SYNTAX SnmpAdminString
+MAX-ACCESS accessible-for-notify
+STATUS current
+DESCRIPTION "Gives the RAID event type on a HDD"
+::= { cgRAIDObjects 1 }
+
+cgRAIDDevice OBJECT-TYPE
+SYNTAX SnmpAdminString
+MAX-ACCESS accessible-for-notify
+STATUS current
+DESCRIPTION "Gives the HDD component in the RAID"
+::= { cgRAIDObjects 2 }
+
+cgRAIDEventDescription OBJECT-TYPE
+SYNTAX SnmpAdminString
+MAX-ACCESS accessible-for-notify
+STATUS current
+DESCRIPTION "Gives the RAID event description on a HDD"
+::= { cgRAIDObjects 3 }
+
+cgRAIDNotification NOTIFICATION-TYPE
+OBJECTS { cgRAIDEvent, cgRAIDDevice, cgRAIDEventDescription }
+STATUS current
+DESCRIPTION "This notification gives the status of a RAID"
+::= { cgNotificationsPrefix 4 }
+
+--
+-- VRRP notifications
+--
+
+cgVRRPEvent OBJECT-TYPE
+SYNTAX SnmpAdminString
+MAX-ACCESS accessible-for-notify
+STATUS current
+DESCRIPTION "Gives the VRRP transition event type on a VRRP network interface device"
+::= { cgVRRPObjects 1 }
+
+cgVRRPDevice OBJECT-TYPE
+SYNTAX SnmpAdminString
+MAX-ACCESS accessible-for-notify
+STATUS current
+DESCRIPTION "Gives the VRRP network interface device"
+::= { cgVRRPObjects 2 }
+
+cgVRRPEventDescription OBJECT-TYPE
+SYNTAX SnmpAdminString
+MAX-ACCESS accessible-for-notify
+STATUS current
+DESCRIPTION "Gives the VRRP event description on a network interface device"
+::= { cgVRRPObjects 3 }
+
+cgVRRPNotification NOTIFICATION-TYPE
+OBJECTS { cgVRRPEvent, cgVRRPDevice, cgVRRPEventDescription }
+STATUS current
+DESCRIPTION "This notification gives the transition status on a VRRP network interface device"
+::= { cgNotificationsPrefix 5 }
+
+--
+-- NIC (Network Interface Card) notifications
+--
+
+cgNICEvent OBJECT-TYPE
+SYNTAX SnmpAdminString
+MAX-ACCESS accessible-for-notify
+STATUS current
+DESCRIPTION "Gives the network transition event type on a NIC"
+::= { cgNICObjects 1 }
+
+cgNICDevice OBJECT-TYPE
+SYNTAX SnmpAdminString
+MAX-ACCESS accessible-for-notify
+STATUS current
+DESCRIPTION "Gives the NIC name"
+::= { cgNICObjects 2 }
+
+cgNICEventDescription OBJECT-TYPE
+SYNTAX SnmpAdminString
+MAX-ACCESS accessible-for-notify
+STATUS current
+DESCRIPTION "Gives the event description on a NIC"
+::= { cgNICObjects 3 }
+
+cgNICNotification NOTIFICATION-TYPE
+OBJECTS { cgNICEvent, cgNICDevice, cgNICEventDescription }
+STATUS current
+DESCRIPTION "This notification gives the transition status on a NIC"
+::= { cgNotificationsPrefix 6 }
+
+--
+-- Gateway unavailability notifications
+--
+
+cgGatewayEvent OBJECT-TYPE
+SYNTAX SnmpAdminString
+MAX-ACCESS accessible-for-notify
+STATUS current
+DESCRIPTION "Gives the network transition event type on a Gateway"
+::= { cgGatewayObjects 1 }
+
+cgGatewayIP OBJECT-TYPE
+SYNTAX SnmpAdminString
+MAX-ACCESS accessible-for-notify
+STATUS current
+DESCRIPTION "Gives the Gateway IP address"
+::= { cgGatewayObjects 2 }
+
+cgGatewayEventDescription OBJECT-TYPE
+SYNTAX SnmpAdminString
+MAX-ACCESS accessible-for-notify
+STATUS current
+DESCRIPTION "Gives the event description on a Gateway"
+::= { cgGatewayObjects 3 }
+
+cgGatewayNotification NOTIFICATION-TYPE
+OBJECTS { cgGatewayEvent, cgGatewayIP, cgGatewayEventDescription }
+STATUS current
+DESCRIPTION "This notification gives the transition status on a Gateway"
+::= { cgNotificationsPrefix 7 }
+
+--
+-- Guard notifications
+--
+
+cgURLListEvent OBJECT-TYPE
+SYNTAX SnmpAdminString
+MAX-ACCESS accessible-for-notify
+STATUS current
+DESCRIPTION "Gives the urllist event type"
+::= { cgURLListObjects 1 }
+
+cgURLListAutoLoadFailures OBJECT-TYPE
+SYNTAX Integer32
+MAX-ACCESS accessible-for-notify
+STATUS current
+DESCRIPTION "Gives the number of failed downloads"
+::= { cgURLListObjects 2 }
+
+cgURLListEventDescription OBJECT-TYPE
+SYNTAX SnmpAdminString
+MAX-ACCESS accessible-for-notify
+STATUS current
+DESCRIPTION "Gives the Guard event description"
+::= { cgURLListObjects 3 }
+
+cgURLListNotification NOTIFICATION-TYPE
+OBJECTS { cgURLListEvent, cgURLListAutoLoadFailures, cgURLListEventDescription }
+STATUS current
+DESCRIPTION "This notification gives the status of a Guard"
+::= { cgNotificationsPrefix 8 }
+
+--
+-- AntiVirus notifications
+--
+
+cgAntiVirusEvent OBJECT-TYPE
+SYNTAX SnmpAdminString
+MAX-ACCESS accessible-for-notify
+STATUS current
+DESCRIPTION "Gives the antivirus event type"
+::= { cgAntiVirusObjects 1 }
+
+cgAntiVirusFreshnessDate OBJECT-TYPE
+SYNTAX SnmpAdminString
+MAX-ACCESS accessible-for-notify
+STATUS current
+DESCRIPTION "Gives the last antivirus update date"
+::= { cgAntiVirusObjects 2 }
+
+cgAntiVirusUpdateErrorCode OBJECT-TYPE
+SYNTAX Integer32
+MAX-ACCESS accessible-for-notify
+STATUS current
+DESCRIPTION "Gives the failed antivirus update error code"
+::= { cgAntiVirusObjects 3 }
+
+cgAntiVirusEventDescription OBJECT-TYPE
+SYNTAX SnmpAdminString
+MAX-ACCESS accessible-for-notify
+STATUS current
+DESCRIPTION "Gives the antivirus event description"
+::= { cgAntiVirusObjects 4 }
+
+cgAntiVirusNotification NOTIFICATION-TYPE
+OBJECTS { cgAntiVirusEvent, cgAntiVirusFreshnessDate, cgAntiVirusEventDescription }
+STATUS current
+DESCRIPTION "This notification gives the status of the AntiVirus"
+::= { cgNotificationsPrefix 9 }
+
+cgAntiVirusExtendedNotification NOTIFICATION-TYPE
+OBJECTS { cgAntiVirusEvent, cgAntiVirusUpdateErrorCode, cgAntiVirusEventDescription }
+STATUS current
+DESCRIPTION "This notification gives the status of the AntiVirus"
+::= { cgNotificationsPrefix 10 }
+
+--
+-- Kerberos notifications
+--
+
+cgKerberosEvent OBJECT-TYPE
+SYNTAX SnmpAdminString
+MAX-ACCESS accessible-for-notify
+STATUS current
+DESCRIPTION "Gives the Kerberos event type"
+::= { cgKerberosObjects 1 }
+
+cgKerberosKeyTabUpdateErrorCode OBJECT-TYPE
+SYNTAX Integer32
+MAX-ACCESS accessible-for-notify
+STATUS current
+DESCRIPTION "Gives the Kerberos KeyTab file update status error code"
+::= { cgKerberosObjects 2 }
+
+cgKerberosEventDescription OBJECT-TYPE
+SYNTAX SnmpAdminString
+MAX-ACCESS accessible-for-notify
+STATUS current
+DESCRIPTION "Gives the Kerberos KeyTab file update status description"
+::= { cgKerberosObjects 3 }
+
+cgKerberosKeyTabUpdateNotification NOTIFICATION-TYPE
+OBJECTS { cgKerberosEvent, cgKerberosKeyTabUpdateErrorCode, cgKerberosEventDescription }
+STATUS current
+DESCRIPTION "This notification gives the status of the Kerberos KeyTab file update"
+::= { cgNotificationsPrefix 11 }
+
+--
+-- Cache Reconfigure notifications
+--
+
+cgCacheEvent OBJECT-TYPE
+SYNTAX SnmpAdminString
+MAX-ACCESS accessible-for-notify
+STATUS current
+DESCRIPTION "Gives the Cache event type"
+::= { cgCacheObjects 1 }
+
+cgCacheEventStatusCode OBJECT-TYPE
+SYNTAX Integer32
+MAX-ACCESS accessible-for-notify
+STATUS current
+DESCRIPTION "Gives the Cache op code"
+::= { cgCacheObjects 2 }
+
+cgCacheEventDescription OBJECT-TYPE
+SYNTAX SnmpAdminString
+MAX-ACCESS accessible-for-notify
+STATUS current
+DESCRIPTION "Gives the Cache Reconfigure status description"
+::= { cgCacheObjects 3 }
+
+cgCacheReconfigureNotification NOTIFICATION-TYPE
+OBJECTS { cgCacheEvent, cgCacheEventStatusCode, cgCacheEventDescription }
+STATUS current
+DESCRIPTION "This notification gives the status of the Cache Reconfigure operation"
+::= { cgNotificationsPrefix 12 }
+
+--
+-- Administration Login notifications
+--
+
+cgLoginEvent OBJECT-TYPE
+SYNTAX SnmpAdminString
+MAX-ACCESS accessible-for-notify
+STATUS current
+DESCRIPTION "Gives the login result"
+::= { cgLoginObjects 1 }
+
+cgLoginInterface OBJECT-TYPE
+SYNTAX SnmpAdminString
+MAX-ACCESS accessible-for-notify
+STATUS current
+DESCRIPTION "Gives the login interface"
+::= { cgLoginObjects 2 }
+
+cgLoginRemoteIP OBJECT-TYPE
+SYNTAX SnmpAdminString
+MAX-ACCESS accessible-for-notify
+STATUS current
+DESCRIPTION "Gives the remote client IP"
+::= { cgLoginObjects 3 }
+
+cgLoginEventDescription OBJECT-TYPE
+SYNTAX SnmpAdminString
+MAX-ACCESS accessible-for-notify
+STATUS current
+DESCRIPTION "Gives the login attempt description"
+::= { cgLoginObjects 4 }
+
+cgLoginNotification NOTIFICATION-TYPE
+OBJECTS { cgLoginEvent, cgLoginInterface, cgLoginRemoteIP, cgLoginEventDescription }
+STATUS current
+DESCRIPTION "This notification gives the status of the Cache Reconfigure operation"
+::= { cgNotificationsPrefix 13 }
+
+END

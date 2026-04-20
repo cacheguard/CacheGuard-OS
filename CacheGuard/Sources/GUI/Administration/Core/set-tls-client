@@ -1,0 +1,117 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       GUI
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+set-tls()
+{
+    local not_available_label='n/a'
+    local pos=0 entry_pos tls_pos days_pos ocsp_pos numbits_pos status_pos generate_pos del_private_pos del_pos offset
+    local days ocsp numbits generate del_private
+
+    local transaction=/tmp/${TRANSACTION_FILE}.wadmin.${REMOTE_USER}.${$}
+    rm -f ${transaction}
+
+    while test ${pos} -lt ${ATTRIBUTE_NB}
+    do
+	offset=0
+	entry_pos=${pos}
+	tls_pos=$[${pos} + ${offset} + 1]
+	days_pos=$[${pos} + ${offset} + 2]
+	ocsp_pos=$[${pos} + ${offset} + 3]
+	numbits_pos=$[${pos} + ${offset} + 4]
+	status_pos=$[${pos} + ${offset} + 5]
+	generate_pos=$[${pos} + ${offset} + 6]
+
+	[[ "${ATTRIBUTES[${generate_pos}]}" =~ ^generate_[0-9]+$ ]]
+	if test ${?} -eq 0 ; then
+	    generate=yes
+	else
+	    unset generate
+	    ((offset--))
+	fi
+
+	del_private_pos=$[${pos} + ${offset} + 7]
+
+	[[ "${ATTRIBUTES[${del_private_pos}]}" =~ ^del_private_[0-9]+$ ]]
+	if test ${?} -eq 0 ; then
+	    del_private=yes
+	else
+	    unset del_private
+	    ((offset--))
+	fi
+	
+	del_pos=$[${pos} + ${offset} + 8]
+
+	[[ "${ATTRIBUTES[${del_pos}]}" =~ ^del_[0-9]+$ ]]
+	if test ${?} -ne 0 ; then
+	    if test -n "${VALUES[${tls_pos}]}" ; then
+		case "${VALUES[${entry_pos}]}" in
+		    anew)
+			days=${VALUES[${days_pos}]}
+			numbits=${VALUES[${numbits_pos}]}
+
+			test -n "${days}" -a "${days}" != ${not_available_label} || days='default'
+			test -n "${numbits}" -a "${numbits}" != ${not_available_label} || numbits='2048'
+
+			if test "${VALUES[${ocsp_pos}]}" == 'yes' ; then
+			    ocsp='ocsp'
+			else
+			    ocsp='noocsp'
+			fi
+
+			echo "tls client add '${VALUES[${tls_pos}]}' '${days}' '${ocsp}' '${numbits}'" >> ${transaction}
+
+			if test "${VALUES[${status_pos}]}" == cancelRevocation ; then
+			    echo "tls client revoke '${VALUES[${tls_pos}]}' cancel" >> ${transaction}
+			elif test "${VALUES[${status_pos}]}" != '' ; then
+			    echo "tls client revoke '${VALUES[${tls_pos}]}' '${VALUES[${status_pos}]}'" >> ${transaction}
+			fi
+			;;
+		    old)
+			;;
+		    *)
+			;;
+		esac
+		if test -n "${generate}" ; then
+		    echo "tls client generate '${VALUES[${tls_pos}]}'" >> ${transaction}
+		else
+		    if test -n "${del_private}" ; then
+			echo "tls client del '${VALUES[${tls_pos}]}' private" >> ${transaction}
+		    else
+			echo "tls client del '${VALUES[${tls_pos}]}' private cancel" >> ${transaction}
+		    fi
+		fi
+	    fi
+	    pos=$[${pos} + ${offset} + 8]
+	else
+	    if test -n "${VALUES[${tls_pos}]}" ; then
+		echo "tls client del '${VALUES[${tls_pos}]}'" >> ${transaction}
+	    fi
+	    pos=$[${pos} + ${offset} + 9]
+	fi
+    done
+    
+    execute-transaction ${transaction}
+}
+
+set-tls

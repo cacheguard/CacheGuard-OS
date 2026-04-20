@@ -1,0 +1,141 @@
+Manage administration services and accesses
+.SH SYNOPSIS
+
+[1] \fBadmin\fR [(\fBsnmp\fR | \fBssh\fR | \fBssh password\fR | \fBwadmin\fR | \fBwaudit\fR) [\fBon\fR | \fBoff\fR]]
+
+[2] \fBadmin\fR \fBtls\fR [\fI<tls-id>\fR[:\fI<ca-id>\fR]]
+
+[3] \fBadmin\fR [\fBssh\fR [\fBfingerprint\fR | \fBgenerate\fR [\fBon\fR | \fBoff\fR] | (\fBkey\fR [\fBraz\fR | (\fBadd\fR | \fBdel\fR | \fBshow\fR) \fI<key-id>\fR | \fBload\fR \fI<key-id>\fR (\fBftp\fR | \fBsftp\fR | \fBtftp\fR) \fI<file-server>\fR \fI<file-path>\fR])]]
+
+[4] \fBadmin\fR \fBtopology\fR (\fBinternal\fR | \fBexternal\fR | \fBauxiliary\fR | \fBvpnipsec\fR) [\fBon\fR | \fBoff\fR]
+
+[5] \fBadmin\fR \fBuser\fR [\fBraz\fR | (\fBadd\fR | \fBdel\fR) \fI<admin-name>\fR [\fI<admin-password>\fR]]
+
+[6] \fBadmin\fR \fBsnmp\fR [(\fBuser\fR [\fI<user-name>\fR]) | (\fBcommunity\fR [\fI<community-password>\fR]) | (\fBprivacy\fR [\fI<privacy-password>\fR]) | (\fBudp\fR | \fBtcp\fR | \fBtls\fR [(\fBon\fR | \fBoff\fR)]) | \fBengine\fR | (\fBmode\fR [(\fBon\fR | \fBoff\fR)])]
+
+[7] \fBadmin\fR \fBsnmp\fR \fBcertificate\fR [\fBraz\fR | \fBload\fR (\fBftp\fR | \fBsftp\fR | \fBtftp\fR) \fI<file-server>\fR \fI<file-path>\fR]
+
+[8] \fBadmin\fR \fBsnmp\fR [\fBtrap\fR [\fBraz\fR | \fBadd\fR (\fBv1\fR | \fBv2c\fR) \fI<receiver-server>\fR [\fI<port>\fR [\fI<community>\fR]] | \fBdel\fR (\fBv1\fR | \fBv2c\fR) \fI<receiver-server>\fR [\fI<port>\fR] | \fBtest\fR]]
+
+[9] \fBadmin\fR \fBsnmp\fR [\fBtrap\fR [\fBraz\fR | \fBadd\fR \fBv3\fR \fI<receiver-server>\fR \fI<port>\fR \fI<user-name>\fR (\fBsha256\fR | \fBsha384\fR | \fBsha512\fR) (\fBdes\fR | \fBaes\fR) [\fI<auth-password>\fR [\fI<privacy-password>\fR]] | \fBdel\fR \fBv3\fR \fI<receiver-server>\fR \fI<port>\fR \fI<user-name>\fR]]
+
+[10] \fBadmin\fR [\fB2fa\fR [\fBon\fR | \fBoff\fR]]
+
+.SH DESCRIPTION
+The first [1] usage form allows you to activate or deactivate administration and management services. To activate a service, use its name (\fBsnmp\fR, \fBssh\fR, \fBwadmin\fR or \fBwaudit\fR) followed by the \fBon\fR keyword. Use the \fBoff\fR keyword to deactivate it. Available services are as follows:
+
+  \(bu \fBsnmp\fR: the SNMP agent with the possibility to send SNMP traps.
+
+  \(bu \fBssh\fR: the SSH server.
+
+  \(bu \fBwadmin\fR: the Web administration GUI
+
+  \(bu \fBwaudit\fR: the Web auditing GUI
+
+The usage form \fBssh password\fR allows you to activate or deactivate the SSH password authentication.
+
+Web administration and auditing GUI allow you to configure and audit the system using a Web browser. The auditing service allows you to have a live summary view of different available logs (virus, access...) and inspect Web requests on reverse websites (only for reverse websites when the \fBwaf\fR mode is activated. The Web auditing service is for debugging purpose only and should not be activated in normal circumstances with the risk of weakening the system. The auditing is available at the URL \fIhttps://<admin-ip>:<wadmin-port>\fR where \fI<admin-ip>\fR and \fI<waudit-port>\fR are respectively the administration IP address and the \fBwaudit\fR port number. The administration IP address maybe be the internal, external or auxiliary IP address of the appliance according to the configured administration topology (see below). When the \fBvlan\fR mode is activated the native internal IP address can no longer be used. Instead of that, the IP address associated to the administration 802.1q pseudo device can be used (see the command \fBvlan\fR for further information).
+
+The second [2] usage form allows you set the TLS certificate to use for the Web GUI and the SNMP agent over TLS. The TLS certificate is specified by a giving a TLS server identifier. You can optionally specify an intermediate CA certificate by giving its identifier separated by a colon from the TLS server identifier. In this case the specified  intermediate CA certificate will be used for the Web GUI.
+
+The third [3] usage form allows you to:
+
+\(bu Show the fingerprint of the RSA and DSA keys used by the SSH server.
+
+\(bu Regenerate those RSA/DSA keys.
+
+\(bu Manage public SSH keys.
+
+By importing a public SSH key, the owner of the private SSH key associated to the imported public SSH key, can login to the system as the admin (or restricted administrator) user without having to enter a password.
+
+To show the SSH server fingerprints, use the keywords \fBadmin\fR \fBssh\fR \fBfingerprint\fR. To arm the regeneration of the SSH server keys, use the keywords \fBadmin\fR \fBssh\fR \fBgenerate on\fR. Use the keyword \fBoff\fR (instead of \fBon\fR) to cancel the regeneration.
+
+The keywords \fBssh key\fR without any additional arguments allows you to display the list of defined public SSH keys (each key is identified by an identifier). The keywords \fBkey raz\fR allows you to reset that list. Importing a public SSH key is done in two steps. First and empty public SSH key should be added using the keywords \fBssh key add\fR followed by an identifier associated to that public SSH key. In a second step, the public SSH key content can be loaded from a trusted file server (refer to the \fBaccess\fR command to define trusted file servers). To load a public SSH key use the keywords \fBssh key load\fR followed by the public SSH key identifier to load and the public SSH key location. The public SSH key location is specified by three arguments: the protocol to use (\fBftp\fR, \fBsftp\fR, \fBtftp\fR) to load the public SSH key file, the IP address (or name) of the file server on which the public SSH key file is located and the public SSH key file name. The specified file must contain a valid RSA (or DSA) public key. To remove a public SSH key use the keywords \fBssh key del\fR followed by the public SSH key identifier to delete. Finally the usage form \fBssh key show\fR followed by an SSH key identifier allows you to show the content of a public key. Note that the system supports the SSH protocol version 2 only. Public SSH keys are activated after using the \fBapply\fR command. Also if you try to load an SSH key that already exists in the system, the loading is simply ignored.
+
+Please note that SSH keys are not part of the configuration thus they are not saved when the configuration is saved with the \fBconf\fR command. To save SSH keys and all other loaded files  you cane make a backup of the system using the \fBsystem\fR command. You have also the possibility to load/save SSH keys among other files related to the configuration using the \fBfile\fR command.
+
+The fourth [4] usage form allows you to define the access topology for administration services. The access topology defines logical network interfaces to which administrators (or SNMP manager systems) can connect. To allow administration on a logical network interface, use its name (\fBinternal\fR, \fBexternal\fR, \fBauxiliary\fR or \fBvpnipsec\fR) followed by the keyword \fBon\fR. To deny the administration, use the keyword \fBoff\fR instead. Activating the administration on the \fBvpnipsec\fR virtual network interface allows the administration on the internal network interface via an IPsec VPN tunnel.
+
+The fifth [5] usage form allows you to add or remove unprivileged administrator users. Unprivileged administrators have read rights only (ie. they can only consult the configuration). Without any arguments, this command displays the list of unprivileged administrators. To add an unprivileged administrator use the keyword \fBadd\fR followed by its user name. To delete an unprivileged administrator use the keyword \fBdel\fR followed by the name of the unprivileged administrator to remove. A valid administrator name must begin with an alphabetic character followed by alpha numeric characters as well as the characters "_" and "-". To erase all unprivileged administrators, use the keyword \fBraz\fR.
+
+In interactive mode, when a new unprivileged administrator is added, the privileged administrator (\fIadmin\fR user) is invited to define a password for the added unprivileged administrator. The first time an unprivileged administrator is logged in, she/he is invited to modify her/hist password. The new defined password is then applied to the console as well as to the Web GUI interfaces. Please note that administrator passwords are not part of the configuration. Hence, they are not saved when the configuration is saved.
+
+In a non interactive mode (for instance when a configuration file is loaded from a file server), if the added unprivileged administrator does not exist, a password is automatically generated for the added unprivileged administrator as follows: the admin user name (\fI<admin-name>\fR) followed by the character \fI@\fR (at), the string "appliance", the the character \fI-\fR (dash) and the current year. As an example for the an unprivileged administrator added during the 2023 year and called \fIfoo\fR, the automatically generated password would be \fIfoo@appliance-2023\fR.
+
+The sixth [6] usage form of the \fBadmin\fR command allows you to configure the internal SNMP (Simple Network Management Protocol) agent. The keyword \fBcommunity\fR allows you to set the community string for SNMP-v1 and SNMP-v2c. With SNMP-v3 the community string takes the role of the authentication password using SHA-256 hash function. The keyword \fBuser\fR allows you to set the SNMP-v3 user name. When using SNMP-v3 the data portion of the message being sent could be encrypted using AES (Advanced Encryption Standard). The keyword \fBprivacy\fR allows you to set the encryption password for the encryption algorithm. Note that the privacy encryption is not mandatory and the agent accepts requests without encryption. The keywords \fBudp\fR, \fBtcp\fR and \fBtls\fR allow you to activate or deactivate respectively SNMP over UDP, TCP and TCP tunnelled over TLS (for encryption). Please note that the SNMP agent listens on the following ports:
+
+  \(bu SNMP over UDP: port 161
+
+  \(bu SNMP over TCP: port 161
+
+  \(bu SNMP TCP tunneled over TLS: port 10161
+
+Please note that only trusted monitoring managers are allowed to access the SNMP agnet. Use the \fBaccess\fR command to define allowed SNMP managers to access the SNMP agent.
+
+The SNMP agent supports TLS over TCP connections using mandatory client and server SSL certificates. The SSL server certificate is the same as the SSL server certificate used for the Web GUI (see the second usage form above). The seventh [7] usage form allows you to associate the defined SNMP-v3 user name (see above) to a client SSL certificate. The client certificate can be loaded from a file server. Only trusted file servers are allowed. Trusted file servers are defined with the \fBaccess\fR command.
+
+The eighth [8] and ninth [9] usage forms allow you to configure SNMP managers (SNMP trap receivers) to which SNMP traps and notifications are sent. The system uses TCP to send SNMP notifications (\fBand not UDP\fR). The system is able to send different SNMP versions traps and notifications. Supported version are: \fIv1\fR, \fIv2c\fR and \fIv3\fR respectively for SNMP-v1 traps, SNMP-v2c inform notifications and SNMP-v3 inform notifications. SNMP traps and notifications are sent to receivers specified by its IP addresses (or network names) and port numbers. For SNMP-v1 and SNMP-v2c if the port number is omitted, the port number is set to 162 (SNMP trap default port). To send SNMP-v1 traps and SNMP-v2c inform notifications a community string should be specified (a community string acts as a password for SNMP versions prior to v3). To send SNMP-v3 inform notifications the user name, the authentication hash function (\fBsha256\fR, \fBsha384\fR and \fBsha512\fR) and the encryption algorithm (\fBdes\fR or \fBaes\fR) should be specified. According to the security level required by the SNMP-v3 receiver, an authentication password and possibly a privacy encryption password should be specified. If the receiver does not require those security levels just omit related parameters in the command. Please note that when passwords are specified they must be at least 8 characters long.
+
+To check the connectivity with SNMP receivers you can send testing traps to all configured receivers by using the \fBadmin snmp trap test\fR command. Please note that the new configuration should be applied using the command \fBapply\fR before being able to send testing traps.
+
+The following is a brief description of some notifications sent by the system:
+
+  \(bu During the installation, the system reserves the required space on HDDs to store different logs based mainly on users number and reverse websites. If a log file abnormally grows too quickly (maybe because the system is under a DoS attack) an SNMP trap is sent to notify that misbehaviour.
+
+  \(bu During the installation, the system reserves required space for different filesystems according to the HDDs capacities so the system should never have a lack of space on disks. If for any reason (maybe an introduced bug) a filesystem's free disk space falls below the threshold of 5%, an SNMP trap is sent to notify that misbehaviour.
+
+  \(bu All network links are monitored so in case of a link up or down an SNMP trap is sent to notify that change.
+
+  \(bu The  load  average  of  the system is continuously monitored and average loads for the past 5 and 15 minutes are calculated. If averages exceed the thresholds of 99% and 95% respectively for the past 5-minutes and  15-minutes, an SNMP trap is sent to notify that overload.
+
+  \(bu All essential services are monitored so in case of a failure, disruption or lack of hardware resources to start enough related system processes to support the load an SNMP trap is sent to notify the disruption.
+
+  \(bu A health checker service continuously examines all vital services and in case of a service failure, tries to restart it. In that case an SNMP trap is sent to notify that action. After the attempt to restart the service, another SNMP trap is sent to notify the result of that operation (failure or success). Finally if the High Availability mode is activated (see the command "mode ha") and the attempt to restart the service fails, an SNMP trap is sent to notify the failure. In this case all VRRP interfaces are shut down to explicitly remove the failed node from the pool of HA nodes.
+
+  \(bu During URL lists auto loading if one or more URL list files can't be loaded an SNMP trap is sent to notify the failure.
+
+  \(bu If the antivirus mode is activated and the virus signature data base is outdated by more the one day an SNMP trap is sent to notify the dysfunction.
+
+  \(bu If the hardware hosting system have HDDs with SMART (Self-Monitoring, Analysis and Reporting Technology) capapabilities, they are monitored and in case of failures on HDDs notifications are sent.
+
+  \(bu If the system has been installed with software RAID capabilites, the RAID is monitored and in case of failures on HDDs notifications are sent.
+
+  \(bu If a USB Ethernet adapter is plugged or unplugged the system sends an SNMP trap. A similar SNMP trap is sent during the appliance startup if a NIC is added to or removed from the system.
+
+  \(bu If the IP routing table contains multi gateways routes, the system sends an SNMP trap in case of unavailability of those gateway.
+
+The system supports known MIBs used to monitor Linux systems and also a dedicated MIB called CACHEGUARD-MIB. You can find the ASN.1 MIB description of the CacheGuard MIB on the original installation CDROM or on the official CacheGuard website.
+
+The tenth [10] usage form allows you to activate or deactivate the 2FA (2 Factor Authentication) mode for remote logins (SSH and Web Administration GUI). The 2FA is a method in which the administrator is granted administration access only after successfully presenting two types of evidence to the authentication. The 2FA in the present system works in conjunction with Authenticator App such as Google\[rg] Authenticator available on Apple\[rg] and Android\[rg] based devices.
+
+When the 2FA mode is activated, whenever you want to login as an administrator, you must provide an verification code in addition to your usual credentials (login/password). The verification code is time based and you must get it from your Authenticator App.
+
+The first time you activate the 2FA mode as a privileged administrator, your secret key is displayed in order to enter it in your Authenticator App. An equivalent QR code related to that secret key will be available in the Web GUI at the '[GENERAL] > [Administration Settings] > [Administration Services]' location. Finally some emergency scratch codes are displayed allowing you to login in case where you do not have access to your Authenticator App. It's important that you save those codes in a safe place. The secret key and emergency scratch codes will no longer be available after having applied the new configuration with the \fBapply\fR command.
+
+To activate the 2FA, use the \fB2fa\fR keyword followed by the \fBon\fR keyword. Use the \fBoff\fR keyword to deactivate it. \fBIT IS IMPORTANT TO NOTE\fR that when you use the 2FA the system clock must be set to the current time in the right time zone. Please refer to the \fBclock\fR, \fBntp\fR and \fBtimezone\fR commands for further information about setting the system clock.
+
+.SH SEE ALSO
+.B access
+(1)
+.B apply
+(1)
+.B clock
+(1)
+.B file
+(1)
+.B mode
+(1)
+.B ntp
+(1)
+.B password
+(1)
+.B system
+(1)
+.B timezone
+(1)
+.B tls
+(1)
+.B vlan
+(1)
+.B vrrp
+(1)

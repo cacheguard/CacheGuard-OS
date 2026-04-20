@@ -1,0 +1,4 @@
+These libraries are:
+ - Some required libraries that are not found with the "ldd" command
+ - libe2p and libcom_err are related to "chattr" command
+ - libclamunrar_iface and libclamunrar are related to "clamd" program

@@ -1,0 +1,1271 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       Commands
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+shift-args()
+{
+    local n=${1}
+    test -n "${n}" || n=1
+
+    local i j k
+
+    for ((k=0 ; k<${n} ; k++))
+    do
+	for ((i=1 ; i<${ARGS_NB} ; i++))
+	do
+	    j=i
+	    ((j++))
+	    ARGS[${i}]=${ARGS[${j}]}
+	done
+
+	unset ARGS[${j}]
+
+	((ARGS_NB--))
+	ALLARGS=${ARGS[@]}
+	ALLARGS=${ALLARGS/${ARGS[0]}}
+    done
+}
+
+set-working-variables()
+{
+    local set_col="\e[1D"
+
+    export WORKING_STOP_SIGN="${set_col} ${set_col}"
+    export WORKING_STATE=0
+
+    WORKING_SIGN[0]="${set_col}/"
+    WORKING_SIGN[1]="${set_col}-"
+    WORKING_SIGN[2]="${set_col}\\"
+    WORKING_SIGN[3]="${set_col}|"
+
+    export WORKING_SIGN
+    export WORKING_SIGN_NB=${#WORKING_SIGN[@]}
+}
+
+working-sign()
+{
+    test ${TERM} != ${WADMIN_TERM} || return 0
+    test "${__BATCH_MODE}" != yes || return 0
+
+    local state=$[${WORKING_STATE} % ${WORKING_SIGN_NB}]
+    >&2 echo -ne "${WORKING_SIGN[${state}]}"
+    ((WORKING_STATE++))
+}
+
+stop-working()
+{
+    test ${TERM} != ${WADMIN_TERM} || return 0
+    test "${__BATCH_MODE}" != yes || return 0
+
+    >&2 echo -ne "${WORKING_STOP_SIGN}"
+}
+
+init-global-variables()
+{
+    export PRINT_COL=28
+
+    export TXT_STATE_OK="OK"
+    export TXT_STATE_KO="KO"
+    export TXT_STATE_OO="??"
+    export TXT_MARK_CUR="RUN"
+    export TXT_MARK_NEW="NEW"
+    export TXT_MARK_DEL="DEL"
+    export TXT_MARK_REV="REV"
+    export TXT_MARK_DIF="DIF"
+
+    if test "${TERM}" == "${WADMIN_TERM}" ; then
+	export STATE_OK="${TXT_STATE_OK}"
+	export STATE_KO="${TXT_STATE_KO}"
+	export STATE_OO="${TXT_STATE_OO}"
+	export MARK_CUR="${TXT_MARK_CUR}"
+	export MARK_NEW="${TXT_MARK_NEW}"
+	export MARK_DEL="${TXT_MARK_DEL}"
+	export MARK_REV="${TXT_MARK_REV}"
+	export MARK_DIF="${TXT_MARK_DIF}"
+    else
+	local normal="\e[0m"
+	local highlight="\e[1m"
+	local blink="\e[5m"
+
+	export STATE_OK="${highlight}${TXT_STATE_OK}${normal}"
+	export STATE_KO="${blink}${TXT_STATE_KO}${normal}"
+	export STATE_OO="${blink}${TXT_STATE_OO}${normal}"
+	export MARK_CUR="${normal}${TXT_MARK_CUR}${normal}"
+	export MARK_NEW="${highlight}${TXT_MARK_NEW}${normal}"
+	export MARK_DEL="${highlight}${TXT_MARK_DEL}${normal}"
+	export MARK_REV="${highlight}${TXT_MARK_REV}${normal}"
+	export MARK_DIF="${highlight}${TXT_MARK_DIF}${normal}"
+	set-working-variables
+    fi
+}
+
+get-highlight-text()
+{
+	local normal="\e[0m"
+	local blink="\e[5m"
+
+	echo "${blink}${1}${normal}"
+}
+
+clean-command-exit()
+{
+    trap "" INT QUIT TERM
+
+    clean-loaded-files
+    clean-env || error 104
+    clean-configuration-db || error 104
+    stty echo
+
+    exit 100
+}
+
+initialise()
+{
+    test -z "${TRANSACTION}" || return 0
+
+    unset ROOT_DIR
+    SAVENV=0
+    NEWENV=0
+    FILEENV=0
+    init-global-variables
+    init-env "${@}" || error ${?}
+    trap "clean-command-exit" INT QUIT TERM
+}
+
+echo-mark-cur()
+{
+    if test "${TERM}" == "${WADMIN_TERM}" ; then
+	echo -n "<td align='center'>${MARK_CUR}</td>"
+    fi
+}
+
+echo-mark-new()
+{
+    if test "${TERM}" == "${WADMIN_TERM}" ; then
+	echo -n "<td align='center'><div style='color:firebrick; margin:0; padding:0;'>${MARK_NEW}</div></td>"
+    else
+	local print_col=${1}
+	if test -z "${print_col}" ; then
+	    echo -ne " [${MARK_NEW}]"
+	else
+	    local mark_new=" [${TXT_MARK_NEW}]"
+	    local len=${#mark_new}
+	    ((print_col -= len))
+	    echo -ne "\e[${COLUMNS}D\e[${print_col}C[${MARK_NEW}]"
+	fi
+    fi
+}
+
+echo-mark-del()
+{
+    if test "${TERM}" == "${WADMIN_TERM}" ; then
+	echo -n "<td align='center'><span style='color:firebrick;'>${MARK_DEL}</span></td>"
+    else
+	echo -ne " [${MARK_DEL}]"
+    fi
+}
+
+echo-mark-rev()
+{
+    if test "${TERM}" == "${WADMIN_TERM}" ; then
+	echo -n "<td align='center'><span style='color:firebrick;'>${MARK_REV}</span></td>"
+    else
+	echo -ne " [${MARK_REV}]"
+    fi
+}
+
+echo-mark-dif()
+{
+    if test "${TERM}" == "${WADMIN_TERM}" ; then
+	echo -n "<td align='center'><span style='color:blue;'>${MARK_DIF}</span></td>"
+    else
+	echo -ne " [${MARK_DIF}]"
+    fi
+}
+
+echo-mark-message()
+{
+    if test "${TERM}" == "${WADMIN_TERM}" ; then
+	echo "<td><i>Extra changes</i></td><td><div style='color:firebrick; font-style:italic; margin:0; padding:0;'><center>${MARK_NEW}</center></div></td><td><i>${1}</i></td>"
+    else
+	echo "${1}"
+    fi
+}
+
+echo-begin-show()
+{
+    test "${TERM}" == "${WADMIN_TERM}" || echo
+}
+
+echo-end-show()
+{
+    test "${TERM}" == "${WADMIN_TERM}" || echo
+}
+
+echo-value-inherit()
+{
+    if test "${TERM}" == "${WADMIN_TERM}" ; then
+	echo "<td><i>&lt;inherit&gt;</i></td>"
+    else
+	echo-value "<inherit>" ${1}
+    fi
+}
+
+get-null-value()
+{
+    if test "${TERM}" == "${WADMIN_TERM}" ; then
+	echo -n "&lt;null&gt;"
+    else
+	echo -n "<null>"
+    fi
+}
+
+echo-value-null()
+{
+    local value=$(get-null-value)
+
+    if test "${TERM}" == "${WADMIN_TERM}" ; then
+	echo "<td><i>${value}</i></td>"
+    else
+	local print_col=${1}
+	local options=${2}
+
+	test -n "${COLUMNS}" || COLUMNS=80
+	test -n "${print_col}" || print_col=${PRINT_COL}
+	echo -e ${options} "\e[${COLUMNS}D\e[${print_col}C${value}"
+    fi
+}
+
+echo-value()
+{
+    test -n "{1}" || return 1
+    local values=${1}
+    local print_col=${2}
+    local options=${3}
+
+    if test "${TERM}" == "${WADMIN_TERM}" ; then
+        echo ${options} "<td><span style='color:green;'>${values}</span></td>"
+    elif test "${__BATCH_MODE}" == yes ; then
+	echo " ${values}"
+    else
+	if test "${print_col}" == 1 ; then
+	    echo ${options} "${values}"
+	else
+	    test -n "${COLUMNS}" || COLUMNS=80
+	    test -n "${print_col}" || print_col=${PRINT_COL}
+	    echo -e ${options} "\e[${COLUMNS}D\e[${print_col}C${values}"
+	fi
+    fi
+}
+
+echo-highlighted-value()
+{
+    test -n "{1}" || return 1
+    local label=${1}
+    local print_col=${2}
+
+    if test "${TERM}" == "${WADMIN_TERM}" ; then
+        echo "<td><span style='color:green; font-weight:bold'>${label}</span>:</td>"
+    elif test "${__BATCH_MODE}" == yes ; then
+	echo " ${label}"
+    else
+	if test "${print_col}" == 1 ; then
+	    echo "${label}"
+	else
+	    test -n "${COLUMNS}" || COLUMNS=80
+	    test -n "${print_col}" || print_col=${PRINT_COL}
+	    echo -e "\e[${COLUMNS}D\e[${print_col}C\e[1m${label}\e[0m:"
+	fi
+    fi
+}
+
+get-command-form-gui-page()
+{
+    test -n "{1}" || return 1
+    local in_command_form=${1}
+
+    local command_form gui_page
+    local found
+
+    while read command_form gui_page
+    do
+	test -n "${gui_page}" || continue
+
+	if test ${command_form} == ${in_command_form} ; then
+	    found=yes
+	    break
+	fi
+    done < ${APPLIANCE_DIR}/etc/gui-page-command-index
+
+    if test -n "${found}" ; then
+	echo ${gui_page}
+    else
+	if test ${in_command_form:0:13} == 'email_account' ; then
+	    echo 'email'
+	elif test ${in_command_form:0:12} == 'ip_internal.' ; then
+	    echo 'ip'
+	elif test ${in_command_form/_*} == 'port' ; then
+	    echo 'port'
+	elif test ${in_command_form} == 'qos_shape_router' ; then
+	    echo ${in_command_form//_/-}
+	elif test ${in_command_form:0:10} == 'qos_shape_' ; then
+	    echo 'qos-shape-gateway'
+	elif test ${in_command_form:0:9} == 'log_type_' ; then
+	    echo 'log-type'
+	elif test ${in_command_form:0:10} == 'waf_limit_' ; then
+	    echo 'waf-limit'
+	elif test ${in_command_form:0:13} == 'firewall_dos_' ; then
+	    echo 'firewall-dos'
+	elif test ${in_command_form:0:28} == 'vpnipsec_access_authenticate' ; then
+	    echo 'vpnipsec-access'
+	elif test ${in_command_form:0:19} == 'dynamicdns_interval' ; then
+	    echo 'dynamicdns'
+	else
+	    case ${in_command_form} in
+		mode_dhcp|mode_dns|mode_ha|mode_ftppassive|mode_qos|mode_router|mode_snat|mode_transparent|mode_tweb|mode_tnat|mode_vlan)
+		    echo 'mode-network'
+		    ;;
+		mode_anonymous|mode_antivirus|mode_authenticate|mode_firewall|mode_forward|mode_web|mode_compress|mode_ocsp|mode_rweb|mode_reverse|mode_sslmediate|mode_log|mode_guard|mode_vpnipsec|mode_waf|mode_cache)
+		    echo 'mode-feature'
+		    ;;
+		*)
+		    echo ${in_command_form//_/-}
+		    ;;
+	    esac
+	fi
+    fi
+}
+
+echo-command-form()
+{
+    test -n "{1}" || return 1
+    local command_form=${1}
+
+    if test "${TERM}" == "${WADMIN_TERM}" ; then
+	local command=${command_form/ *} size=20
+	local page=$(get-command-form-gui-page ${command_form// /_})
+        echo -n "<td style='line-height:${size}px;'><a href='${DOC_COMMAND_DIR}/${command}.html' target='_blank'><img style='margin:0; margin-right:10px;' src='${IMAGE_DIR}/help.png' alt='Get Help' title='Get Help' /></a> <a href='/${GUI_DIR_NAME}/${page}.${GUI_EXT_NAME}'><img style='margin:0; margin-right:10px;' src='${IMAGE_DIR}/${page}.png' alt='' title='Go to GUI page' /></a>${command_form}</td>"
+    else
+        echo -n ${command_form}
+    fi
+}
+
+echo-command-form-blank()
+{
+    if test "${TERM}" == "${WADMIN_TERM}" ; then
+	echo -n "<td></td>"
+    else
+	local print_col=${1}
+	test -n "${COLUMNS}" || COLUMNS=80
+	test -n "${print_col}" || print_col=${PRINT_COL}
+	echo -en "\e[${COLUMNS}D\e[${print_col}C"
+    fi
+}
+
+echo-blank-command()
+{
+    test "${TERM}" != "${WADMIN_TERM}" || echo -n "<td></td><td></td>"
+}
+
+file-size()
+{
+    # Compute in KB
+
+    test -n "${1}" || return 1
+    local file=${1}
+    
+    local size=$(ls -s --block-size=1024 ${file} 2>/dev/null)
+    size=${size/ */}
+
+    check-integer ${size}
+
+    if test ${?} -eq 0 ; then
+	echo ${size}
+    else
+	echo 0
+    fi
+}
+
+trusted-tty()
+{
+    local tty=$(tty)
+    tty=$(file-basename ${tty})
+
+    member "${TRUSTED_TTY}" ${tty}
+}
+
+get-last-byte()
+{
+    test -n "${1}" || return 1
+    local value=${1}
+
+    value=${value:$(expr index ${value} .)}
+    value=${value:$(expr index ${value} .)}
+    value=${value:$(expr index ${value} .)}
+
+    echo ${value}
+}
+
+request-confirmation()
+{
+    test "${TERM}" != "${WADMIN_TERM}" || exit 0
+    test "${__BATCH_MODE}" != yes || error 111
+
+    local response
+    echo -n "Do you confirm this operation (Y/N) [N]? "
+    read response
+    test "${response:0:1}" != "Y" -a "${response:0:1}" != "y" || return 0
+    exit 0
+}
+
+apl-man()
+{
+    test -n "{1}" || return 1
+    local apl_command=${1}
+
+    man 1 ${apl_command}
+}
+
+echo-state()
+{
+    test -n "{1}" || return 1
+    local state=${1}
+
+    local ext_state
+
+    if test "${TERM}" == "${WADMIN_TERM}" ; then
+	case ${state} in
+	    OK)
+		ext_state="[ ${state} ]"
+		;;
+	    KO)
+		ext_state="[ ${state} ]"
+		;;
+	    *)
+		ext_state="[ ?? ]"
+	esac
+    else
+	case ${state} in
+	    OK)
+		ext_state="[ ${STATE_OK} ]"
+		;;
+	    KO)
+		ext_state="[ ${STATE_KO} ]"
+		;;
+	    *)
+		ext_state="[ ${STATE_OO} ]"
+	esac
+    fi
+    echo ${ext_state}
+}
+
+update-dynamic-log-value()
+{
+    test -n "${1}" || return 1
+    local tag=${1}
+
+    case ${tag} in
+	${LOG_TAG_AV_REGULAR})
+	    update-report update-av-regular-downloaded-sz
+	    ;;
+	${LOG_TAG_AV_EXTENDED_CREATE})
+	    update-report update-av-extended-create-downloaded-sz
+	    ;;
+	*)
+	    ;;
+    esac
+}
+
+display-log-line()
+{
+    test -n "${1}" || return 1
+    local tag=${1}
+    local date=${2}
+    shift 2 ; local rest=${@}
+
+    update-dynamic-log-value ${tag}
+
+    test "${TERM}" != "${WADMIN_TERM}" || return 0
+
+    local line1 message state ext_state set_col len
+    
+    local ok="[ OK ]"
+    local columns=${COLUMNS}
+    test -n "${columns}" || columns=80
+    
+    local len=${#ok}
+    local print_col=$[${columns} - ${len}]
+
+    set_col="\e[${columns}D\e[${print_col}C"
+
+    line1="${rest/\[*/}"
+    if test "${rest}" == "${line1}" ; then
+	message=${rest}
+	state="??"
+    else
+	message="${line1}"
+	state="${rest/*\[/[}"
+	state=${state:1:2}
+    fi
+
+    local ext_state=$(echo-state ${state})
+
+    local dynamic_value=$(get-dynamic-log-value ${tag})
+    echo -e "${date} ${message}${dynamic_value}${set_col}${ext_state}"
+}
+
+display-log()
+{
+    test -n "${1}" || return 1
+    local log=${1}
+
+    test -s ${log} || return 0
+
+    echo-begin-show
+    display-raw-log ${log}
+    echo-end-show
+}
+
+local-log()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    local log_file=${1}
+    local message=${2}
+
+    local tag=0
+    local date=$(date +"%Y/%m/%d-%T" 2> /dev/null)
+
+    echo -ne "${tag} ${date} ${message}" >> ${log_file}
+}
+
+local-log-ret()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    local log_file=${1}
+    local err_code=${2}
+
+    local ok="[OK]"
+    local ko="[KO]"
+
+    if test ${err_code} -eq 0 ; then
+	echo -ne "${ok}\n" >> ${log_file}
+    else
+	echo -ne "${ko}\n" >> ${log_file}
+    fi
+}
+
+local-log-result()
+{
+    test -n "${1}" || return 1
+    local log_file=${1}
+    local code=${2}
+
+    if test -n "${code}" ; then
+	if test ${code} -eq 0 ; then
+	    local-log-ret ${log_file} ${code}
+	else
+	    echo -ne " (${code})" >> ${log_file}
+	    local-log-ret ${log_file} ${code}
+	fi
+    else
+	code=255
+	local-log-ret ${log_file} ${code}
+    fi
+
+    return ${code}
+}
+
+display-command-output-in-log()
+{
+    echo ${@}
+}
+
+display-raw-log()
+{
+    test -n "${1}" || return 1
+    local log=${1}
+
+    test -f ${log} || error 104
+
+    while read line
+    do
+	test -n "${line}" || continue
+	test "${line:0:1}" != "#" || continue
+	display-log-line ${line}
+    done < ${log}
+
+    test -z "${line}" || display-log-line ${line}
+}
+
+display-manager-gateway-pull-report()
+{
+    test -s ${MANAGER_PULL_OPERATION_LOG} || return 0
+
+    local id ip code date message
+    local tag=0
+
+    echo-begin-show
+
+    while read id ip code date message
+    do
+	display-log-line ${tag} ${date} ${message}
+	test ${code} -eq 0 || continue
+	test -s ${MANAGER_PULL_OPERATION_LOG}.${id} || continue
+	display-raw-log ${MANAGER_PULL_OPERATION_LOG}.${id}
+	display-log-line ${tag} ${date} Pulling from \'${id}\' - End[OK]
+    done < ${MANAGER_PULL_OPERATION_LOG}
+
+    echo-end-show
+}
+
+display-manager-gateway-push-report()
+{
+    test -s ${MANAGER_PUSH_OPERATION_LOG} || return 0
+
+    local id ip code date message
+    local tag=0
+
+    echo-begin-show
+
+    while read id ip code date message
+    do
+	display-log-line ${tag} ${date} ${message}
+	test ${code} -eq 0 || continue
+	test -s ${MANAGER_PUSH_OPERATION_LOG}.${id} || continue
+	display-raw-log ${MANAGER_PUSH_OPERATION_LOG}.${id}
+	display-log-line ${tag} ${date} Pushing to \'${id}\' - End[OK]
+    done < ${MANAGER_PUSH_OPERATION_LOG}
+
+    echo-end-show
+}
+
+get-cut-log-message()
+{
+    local message=${1}
+
+    if test ${TERM} == ${WADMIN_TERM} ; then
+	echo ${message}
+	return 0
+    fi
+
+    local date=1111/11/11-11:11:11
+    local columns=${COLUMNS}
+    test -n "${columns}" || columns=80
+    local max_len=$[${columns} - ${#date} - 2 - 5]
+    local cut_len=$[${max_len} - 4]
+
+    test ${#message} -le ${max_len} || message=${message:0:${cut_len}}...
+
+    echo ${message}
+}
+
+get-run-command-on-gateway-message()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    local code_type=${1}
+    local code=${2}
+
+    local message
+
+    case ${code_type,,} in
+	error)
+	    message="${code_type} ${code}: ${Errors[${code}],}"
+	    message=$(get-cut-log-message "${message}")
+	    ;;
+	warning)
+	    message="${code_type} ${code}: ${Warnings[${code}],}"
+	    message=$(get-cut-log-message "${message}")
+	    ;;
+	information)
+	    message="${code_type} ${code}: ${Informations[${code}],}"
+	    message=$(get-cut-log-message "${message}")
+	    ;;
+	*)
+	    ;;
+    esac
+
+    echo ${message}
+}
+
+display-manager-exec-report()
+{
+    test -n "${1}" || return 1
+    local context=${1}
+
+    local log place
+
+    case ${context} in
+	gateway)
+
+	    test -n "${2}" || return 2
+	    place=${2}
+
+	    case ${place} in
+		local)
+		    log=${MANAGER_LOCAL_EXEC_OPERATION_LOG}
+		    ;;
+		remote)
+		    log=${MANAGER_REMOTE_EXEC_OPERATION_LOG}
+		    ;;
+		*)
+		    return 255
+		    ;;
+	    esac
+	    ;;
+	template)
+	    place=local
+	    local log=${MANAGER_TEMPLATE_EXEC_OPERATION_LOG}
+	    ;;
+	*)
+	    return 255
+	    ;;
+    esac
+
+    test -s ${log} || return 0
+
+    local id ip code date message
+    local stars code_type rest
+    local message state date tag=0
+    local line
+
+    echo-begin-show
+
+    while read id ip code date message
+    do
+	display-log-line ${tag} ${date} ${message}
+
+	test ${place} == local || test -f ${log}.${id}.remote-batch || continue
+
+	if test -s ${log}.${id}.err ; then
+	    while read stars code_type code rest
+	    do
+		test -n "${code}" || continue
+		check-digit ${code} || code=255
+
+		message=$(get-run-command-on-gateway-message ${code_type} ${code})
+		if test -n "${message}" ; then
+		    if test ${code_type,,} == error ; then
+			state='[KO]'
+		    else
+			state='[OK]'
+		    fi
+
+		    display-log-line ${tag} ${date} ${message}${state}
+		fi
+
+	    done < ${log}.${id}.err
+
+	elif test -s ${log}.${id}.out ; then
+	    while read line
+	    do
+		test -n "${line}" || continue
+		display-command-output-in-log ${line}
+	    done < ${log}.${id}.out
+	else
+	    if test ${place} == remote ; then
+		fuser --silent ${log}.${id}.remote-batch > /dev/null 2>&1
+		test ${?} -ne 0 || continue
+		if test ! -s ${log}.${id}.remote-batch ; then
+		    message="can't connect to '${id}' (IP ${ip})"
+		    display-log-line ${tag} ${date} ${message}[KO]
+		fi
+	    fi
+	fi
+
+	display-log-line ${tag} ${date} End of execution on \'${id}\'[OK]
+    done < ${log}
+
+    echo-end-show
+}
+
+echo-formated-state()
+{
+    test -n "${1}" || return 1
+    local state=${1}
+
+    case ${state} in
+	OK)
+	    echo "[${STATE_OK}]"
+	    ;;
+	KO)
+	    echo "[${STATE_KO}]"
+	    ;;
+	*)
+	    echo "[${STATE_OO}]"
+	    ;;
+    esac
+}
+
+request-object()
+{
+    test ${TERM} != ${WADMIN_TERM} || return 0
+    test -n "${1}" || return 1
+    local object=${1}
+
+    echo -n "Enter the ${object}: "
+}
+
+termination-message()
+{
+    test -n "${1}" || return 1
+    local action=${1}
+    local wait4=${2}
+
+    test "${TERM}" != "${WADMIN_TERM}" || return 0
+    test "${__BATCH_MODE}" != yes -o -n "${wait4}" || return 0
+
+    local lock_file=${ADMIN_LOCK_DIR}/apl_${action//-/_}
+    local operation=${action//-/ }
+
+    while true
+    do
+	usleep 2500000
+	test -f ${lock_file} || break
+    done
+
+    test "${__BATCH_MODE}" == yes -o -n "${wait4}" || echo -e "\n\nThe '${operation}' operation has been terminated.\n"
+}
+
+supervisor-action()
+{
+    test -n "${1}" || return 1
+    local action=${1}
+    local inform=${2}
+    local wait4=${3}
+
+    test -p ${RUN_DIR}/${SUPERVISOR_FIFO} || return 11
+    echo "${action} ${USER} ${$}" > ${RUN_DIR}/${SUPERVISOR_FIFO} 2> /dev/null
+
+    test -n "${inform}" || return 0
+
+    if test -n "${wait4}" ; then
+	termination-message ${action} ${wait4}
+    else
+	termination-message ${action} &
+    fi
+}
+
+supervisor-push-args()
+{
+    local arg
+
+    for arg in "${@}"
+    do
+	echo "${arg}"
+    done > ${RUN_DIR}/${SUPERVISOR_ARGS}/${USER} 2> /dev/null
+}
+
+supervisor-wait4-report()
+{
+    local loops=${1}
+    local total_timeout=${2}
+
+    if test -z ${loops} ; then
+	loops=5
+	total_timeout=500000
+    elif test -z ${total_timeout} ; then
+	total_timeout=500000
+    fi
+
+    local i=0
+    local step_time=$[${total_timeout} / ${loops}]
+
+    while true
+    do
+	usleep ${step_time}
+	test ${i} -lt ${loops} || break
+	test -f ${RUN_DIR}/${WAITING_PROCESS}.${$} || break
+	((i++))
+    done
+}
+
+update-report()
+{
+    test -n "${1}" || return 1
+    local action=${1}
+    local loops=${2}
+    local total_timeout=${3}
+
+    supervisor-action ${action}
+    test ${?} -eq 0 || return 3
+    
+    supervisor-wait4-report ${loops} ${total_timeout}
+}
+
+manager-report()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    test -n "${3}" || return 3
+    test -n "${4}" || return 4
+    test -n "${5}" || return 5
+    local log_file=${1}
+    local id=${2}
+    local ip=${3}
+    local code=${4}
+    local message=${5}
+
+    local date=$(date +"%Y/%m/%d-%T")
+    echo -n "${id} ${ip} ${code} ${date} ${message}" >> ${log_file}
+
+    if test ${code} -eq 0 ; then
+	echo "[OK]" >> ${log_file}
+    else
+	echo " (${code})[KO]" >> ${log_file}
+    fi
+}
+
+get-template-numbers()
+{
+    local dir=$(get-manager-context-rdir template)
+    local templates=$(ls -1 ${dir} 2> /dev/null) template i=0
+
+    for template in ${templates}
+    do
+	((i++))
+    done
+
+    echo ${i}
+}
+
+push-args-1()
+{
+    export ARGS_NB=0
+    local arg
+
+    for arg in "${@}"
+    do
+	ARGS[${ARGS_NB}]=${arg}
+	((ARGS_NB++))
+    done
+
+    export ALLARGS=${ARGS[@]}
+    ALLARGS=${ALLARGS/${ARGS[0]}}
+}
+
+push-args()
+{
+    test -z "${TRANSACTION}" || return 0
+
+    unset ARGS
+    export ARGS
+
+    push-args-1 "${0}" "${@}"
+}
+
+get-percent-value()
+{
+    test -n "${1}" || return 1
+    local value=${1}
+
+    local len=${#value} ; ((len--))
+    if test ${value:${len}} == '%' ; then
+	echo "${value:0:${len}}"
+    else
+	echo "${value}"
+    fi
+}
+
+internal-form()
+{
+    test -n "${1}" || return 1
+    
+    case "${1}" in
+	on)
+	    echo "True"
+	    return 0
+	    ;;
+	off)
+	    echo "False"
+	    return 0
+	    ;;
+	*)
+	    echo "Error"
+	    return 1
+	    ;;
+    esac
+}
+
+external-form()
+{
+    test -n "${1}" || return 1
+    
+    case "${1}" in
+	True)
+	    echo -n "on"
+	    return 0
+	    ;;
+	False)
+	    echo -n "off"
+	    return 0
+	    ;;
+	*)
+	    echo -n "error"
+	    return 1
+	    ;;
+    esac
+}
+
+external-forms()
+{
+    local bool value values
+
+    for bool in ${@}
+    do
+	value=$(external-form ${bool})
+	values="${values} ${value}"
+    done
+    values="${values:1}"
+    echo -n ${values}
+}
+
+remove-quotes()
+{
+    test -n "${1}" || return 0
+    local value=${1}
+
+    local len=${#value} ; ((len--))
+    local first=${value:0:1}
+    local last=${value:${len}:1}
+
+    if test ${first} == "'" -a ${last} == "'" ; then
+	((len--))
+	echo -n ${value:1:${len}}
+    elif test ${first} == '"' -a ${last} == '"' ; then
+	((len--))
+	echo -n ${value:1:${len}}
+    else
+	echo -n ${value}
+    fi
+}
+
+remove-leading-zeros()
+{
+    test -n "${1}" || return 0
+    local value=${1}
+
+    while test "${value:0:1}" == '0'
+    do
+	value=${value:1}
+    done
+
+    test -n "${value}" || value=0
+    echo ${value}
+}
+
+load-whitelist-signature-commit()
+{
+    local wl_file=${TMP_DIR}/work.${LOADED}.${AV_WHITELIST_SIG}
+    test -f ${wl_file} || return 0
+
+    if test -f ${AV_VAR_DIR}/${AV_WHITELIST_SIG} ; then
+	diff --brief ${wl_file} ${AV_VAR_DIR}/${AV_WHITELIST_SIG} > /dev/null 2>&1
+	if test ${?} -eq 0 ; then
+	    rm -f ${wl_file}
+	else
+	    mv -f ${wl_file} ${TMP_DIR}/${LOADED}.${AV_WHITELIST_SIG}
+	fi
+    else
+	mv -f ${wl_file} ${TMP_DIR}/${LOADED}.${AV_WHITELIST_SIG}
+    fi
+}
+
+validate-load-admin-snmp-certificate-commit()
+{
+    local tmp_file=${TMP_DIR}/work.${LOADED}.${SNMP_SSL}.certificate
+    test -f ${tmp_file} || return 0
+
+    if test -f ${SSL_SNMP_DIR}/${SNMP_SSL}.crt ; then
+	diff --brief ${SSL_SNMP_DIR}/${SNMP_SSL}.crt ${tmp_file} > /dev/null 2>&1
+	if test ${?} -eq 0 ; then
+	    rm -f ${tmp_file}
+	    return 0
+	fi
+    fi
+    
+    mv -f ${tmp_file} ${TMP_DIR}/${LOADED}.${SNMP_SSL}.certificate
+    SNMP_CLIENT_CERTIFICATE=True
+    SAVENV=1
+    NEWENV=1
+}
+
+load-ssh-public-key-commit()
+{
+    test -n "${1}" || return 1
+    local tmp_file=${1}
+
+    test -f ${tmp_file} || return 0
+
+    local base=$(file-basename ${tmp_file})
+    local key_id=${base/work\.${LOADED}\.${SSH_KEY}\.}
+
+    if test -f ${SSH_PUBLIC_KEY_DIR}/${key_id} ; then
+	diff --brief ${tmp_file} ${SSH_PUBLIC_KEY_DIR}/${key_id} > /dev/null 2>&1
+	if test ${?} -eq 0 ; then
+	    rm -f ${tmp_file}
+	else
+	    mv -f ${tmp_file} ${TMP_DIR}/${LOADED}.${SSH_KEY}.${key_id}
+	    NEWENV=1
+	fi
+    else
+	mv -f ${tmp_file} ${TMP_DIR}/${LOADED}.${SSH_KEY}.${key_id}
+	NEWENV=1
+    fi
+}
+
+run-command-on-gateway()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 0
+    local ip=${1}
+    local commands=${2}
+    local mode=${3}
+
+    if test -z "${mode}" ; then
+	ssh -q4at -l ${ADMIN_NAME} ${ip} "${commands}"
+    else
+	case ${mode} in
+	    background)
+		ssh -q4atnf -l ${ADMIN_NAME} ${ip} "${commands}" &
+		;;
+	    noinput)
+		ssh -q4atn -l ${ADMIN_NAME} ${ip} "${commands}"
+		;;
+	    *)
+		ssh -q4at -l ${ADMIN_NAME} ${ip} "${commands}"
+		;;
+	esac
+    fi
+}
+
+run()
+{
+    :
+}
+
+main()
+{
+    local first=${1}
+
+    if test ${APL_ROLE} == manager ; then
+
+	if test -z "${MANAGER_CONTEXT_ENV}" ; then
+
+	    if is-in-manager-exec-context ; then
+
+		local command=$(file-basename ${0})
+
+		case ${command} in
+		    clear|countrylist|help|license|ping|setup|timezonelist|traceroute|transaction)
+			info 2
+			return 0
+			;;
+		    end)
+			;;
+		    *)
+			if test -n "${first}" ; then
+			    test ${first} != __noenv || shift
+			    echo "${command} ${@}" >> ${HOME}/${MANAGER_EXEC_COMMANDS_FILE}
+			else
+			    echo "${command}" >> ${HOME}/${MANAGER_EXEC_COMMANDS_FILE}
+			fi
+			
+			return 0
+			;;
+		esac
+	    fi
+	fi
+    fi
+
+    if test "${first}" == __noenv ; then
+	shift
+	run "${@}" || error ${?}
+    else
+	push-args "${@}"
+	initialise ${MANAGER_CONTEXT_ENV}
+	run || error ${?}
+	test -z "${TRANSACTION}" || return 0
+	commit-env
+    fi
+}
+
+get-email-mx()
+{
+    test -n "${1}" || return 1
+    local email=${1}
+
+    local tmp_file=/tmp/email.dig.${$}
+    local domainname=${email/*@}
+    local mx prio len
+
+    dig +noall \
+	+short \
+	+ignore \
+	+timeout=3 \
+	+tries=1 \
+	${domainname} mx > ${tmp_file} 2> /dev/null
+
+    while read prio mx
+    do
+	break
+    done < ${tmp_file}
+
+    len=${#mx}
+    ((len--))
+    mx=${mx:0:${len}}
+
+    echo ${mx}
+
+    rm -f ${tmp_file}
+}
+
+get-dynamic-dns-report()
+{
+    local ip
+
+    ip=$(dig +noall \
+	     +short \
+	     +ignore \
+	     +timeout=3 \
+	     +tries=1 \
+	     ${CURRENT_DYNAMIC_DNS_HOSTNAME} 2> /dev/null)
+
+    test ${?} -eq 0 || return 11
+    test -n "${ip}" || return 13
+    test -s ${RUN_DIR}/${DYNAMIC_DNS_STATE_FILENAME} || return 15
+
+    local report=$(cat ${RUN_DIR}/${DYNAMIC_DNS_STATE_FILENAME} 2>/dev/null)
+    local code=${report/:*}
+
+    if test ${code} == '0' ; then
+	report=${report#*:}
+	echo "${ip}:${report}"
+    else
+	report="internal error ${code}"
+	echo "${ip}:${report}"
+	return 21
+    fi
+}

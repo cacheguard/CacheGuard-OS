@@ -1,0 +1,274 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       Commands
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+source functions
+
+check-nid()
+{
+    test -n "${1}" || return 1
+
+    local local nid=${1}
+    test ${nid:0:3} == "eth" || return 1
+    local match_len=$(expr match "${nid:3}" "[0-9]*" 2> /dev/null)
+    local len=$(expr length "${nid:3}" 2> /dev/null)
+    test ${len} -eq ${match_len} || return 1
+    member "${NETWORK_DEVICES}" ${nid}
+}
+
+check-bond-nb()
+{
+    test -n "${1}" || return 1
+
+    local ni=${1}
+    local list len
+
+    case ${ni} in
+	internal)
+	    list=${BOND_INTERNALS}
+	    ;;
+	external)
+	    list=${BOND_EXTERNALS}
+	    ;;
+	auxiliary)
+	    list=${BOND_AUXILIARIES}
+	    ;;
+	*)
+	    error 255
+	    ;;
+    esac
+
+    len=$(length-list "${list}")
+    test ${len} -lt ${MAX_BOND_NB}
+}
+
+show-bond-internal()
+{
+    local list="${CURRENT_BOND_INTERNALS}"
+    echo-command-form "bond internal"
+    echo-mark-cur
+    if test -z "${list}" ; then
+	echo-value-null
+    else
+	echo-value "${list}"
+    fi
+
+    if test "${CURRENT_BOND_INTERNALS}" != "${BOND_INTERNALS}" ; then
+	list="${BOND_INTERNALS}"
+	echo-command-form "bond internal"
+	echo-mark-new
+	if test -z "${list}" ; then
+	    echo-value-null
+	else
+	    echo-value "${list}"
+	fi
+    fi
+}
+
+show-bond-external()
+{
+    local list="${CURRENT_BOND_EXTERNALS}"
+    echo-command-form "bond external"
+    echo-mark-cur
+    if test -z "${list}" ; then
+	echo-value-null
+    else
+	echo-value "${list}"
+    fi
+
+    if test "${CURRENT_BOND_EXTERNALS}" != "${BOND_EXTERNALS}" ; then
+	list="${BOND_EXTERNALS}"
+	echo-command-form "bond external"
+	echo-mark-new
+	if test -z "${list}" ; then
+	    echo-value-null
+	else
+	    echo-value "${list}"
+	fi
+    fi
+}
+
+show-bond-auxiliary()
+{
+    local list="${CURRENT_BOND_AUXILIARIES}"
+    echo-command-form "bond auxiliary"
+    echo-mark-cur
+    if test -z "${list}" ; then
+	echo-value-null
+    else
+	echo-value "${list}"
+    fi
+
+    if test "${CURRENT_BOND_AUXILIARIES}" != "${BOND_AUXILIARIES}" ; then
+	list="${BOND_AUXILIARIES}"
+	echo-command-form "bond auxiliary"
+	echo-mark-new
+	if test -z "${list}" ; then
+	    echo-value-null
+	else
+	    echo-value "${list}"
+	fi
+    fi
+}
+
+show-bond()
+{
+    echo-begin-show
+    case ${1} in
+	internal)
+	    show-bond-internal
+	    ;;
+	external)
+	    ! contextual-command-is-allowed || show-bond-external
+	    ;;
+	auxiliary)
+	    ! contextual-command-is-allowed || show-bond-auxiliary
+	    ;;
+	"")
+	    ! contextual-command-is-allowed || show-bond-external
+	    show-bond-internal
+	    ! contextual-command-is-allowed || show-bond-auxiliary
+	    ;;
+	*)
+	    error 255
+	    ;;
+    esac
+    echo-end-show
+}
+
+manage-bonding()
+{
+    if test -z "${1}" ; then show-bond ; return 0 ; fi
+    local interface=${1}
+
+    test ${interface} != vpnipsec || return 43
+    check-interface ${interface} || return 43
+    contextual-command-is-allowed || check-manager-interface ${interface} || return 209
+
+    if test -z "${2}" ; then
+	show-bond ${interface}
+	return 0
+    fi
+
+    local action=${2}
+    check-action ${action} || return 122
+
+    case ${action} in
+	raz)
+	    case ${interface} in
+		internal)
+		    export BOND_INTERNALS=""
+		    ;;
+		external)
+		    export BOND_EXTERNALS=""
+		    ;;
+		auxiliary)
+		    export BOND_AUXILIARIES=""
+		    ;;
+		*)
+		    error 255
+		    ;;
+	    esac
+	    ;;
+	
+	add|del)
+	    if test ${action} == add ; then
+		check-bond-nb ${interface} || return 90
+	    fi
+	    
+	    test -n "${3}" || return 1
+	    nid=${3}
+	    check-nid ${nid} || return 40
+	    
+	    case ${interface} in
+		internal)
+		    export BOND_INTERNALS=$(remove "${BOND_INTERNALS}" "${nid}")
+		    test ${action} != add || export BOND_INTERNALS="${BOND_INTERNALS} ${nid}"
+		    ;;
+		external)
+		    export BOND_EXTERNALS=$(remove "${BOND_EXTERNALS}" "${nid}")
+		    test ${action} != add || export BOND_EXTERNALS="${BOND_EXTERNALS} ${nid}"
+		    ;;
+		auxiliary)
+		    export BOND_AUXILIARIES=$(remove "${BOND_AUXILIARIES}" "${nid}")
+		    test ${action} != add || export BOND_AUXILIARIES="${BOND_AUXILIARIES} ${nid}"
+		    ;;
+		*)
+		    error 255
+		    ;;
+	    esac
+	    ;;
+	*)
+	    return 1
+	    ;;
+    esac
+
+    SAVENV=1
+}
+
+display-nic()
+{
+    local eth mac info
+    echo-begin-show
+    while read eth mac info
+    do
+	echo -n "${eth}:"
+	echo-value "${info:0:48}..."
+    done < ${HARD_DIR}/hw-links
+    echo-end-show
+}
+
+display-nic-mac()
+{
+    local eth mac info
+    echo-begin-show
+    while read eth mac info
+    do
+	echo -n "${eth}:"
+	echo-value "${mac}"
+    done < ${HARD_DIR}/hw-links
+    echo-end-show
+}
+
+run()
+{
+    local feat=${ARGS[1]}
+    
+    case ${feat} in
+	"")
+	    display-nic
+	    ;;
+	mac)
+	    display-nic-mac
+	    ;;
+	bond)
+	    shift-args
+	    manage-bonding ${ALLARGS}
+	    ;;
+	*)
+	    return 1
+	    ;;
+    esac
+}
+
+main "${@}"

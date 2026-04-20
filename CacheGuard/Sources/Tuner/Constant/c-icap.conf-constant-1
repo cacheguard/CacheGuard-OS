@@ -1,0 +1,18 @@
+PidFile /var/run/c-icap/c-icap.pid
+CommandsSocket /var/run/c-icap/c-icap.ctl
+MaxKeepAliveRequests 100
+MaxRequestsPerChild 10000
+TmpDir /var/tmp
+DebugLevel 0
+ModulesDir /usr/local/lib/c_icap
+ServicesDir /usr/local/lib/c_icap
+TemplateDir /usr/local/share/c_icap/templates/
+TemplateDefaultLanguage en
+LoadMagicFile /usr/local/etc/c-icap.magic
+RemoteProxyUsers on
+RemoteProxyUserHeader X-Authenticated-User
+RemoteProxyUserHeaderEncoded on
+ServerLog /var/log/icap.log
+
+acl localnet src 127.0.0.0/255.255.255.248
+acl all src 0.0.0.0/0.0.0.0

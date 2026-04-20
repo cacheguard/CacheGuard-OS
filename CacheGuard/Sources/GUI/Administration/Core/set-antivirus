@@ -1,0 +1,74 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       GUI
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+set-antivirus()
+{
+    local full_configuration
+    local transaction=/tmp/${TRANSACTION_FILE}.wadmin.${REMOTE_USER}.${$}
+    rm -f ${transaction}
+
+    test -z "${VALUES[0]}" || echo "antivirus auto '${VALUES[0]}'" >> ${transaction}
+    test -z "${VALUES[1]}" || echo "antivirus extended method ${VALUES[1]}" >> ${transaction}
+
+    if test -n "${VALUES[2]}" -a -n "${VALUES[3]}" ; then
+	local url=${VALUES[2]:1}://${VALUES[3]}
+	echo "antivirus extended url '${url}'" >> ${transaction}
+    fi
+
+    case ${APL_ROLE} in
+	gateway)
+	    full_configuration=yes
+	    ;;
+	manager)
+	    if gui-is-in-contextual-role ; then
+		full_configuration=yes
+	    fi
+	    ;;
+	*)
+	    ;;
+    esac
+
+    if test -n "${full_configuration}" ; then
+
+	local pua=off i=4
+	local modifier
+
+	test -z "${VALUES[${i}]}" || echo "antivirus maxobject '${VALUES[${i}]}'" >> ${transaction}
+	((i++))
+
+	local pua=off
+
+	if test "${ATTRIBUTES[${i}]}" == pua ; then
+	    modifier=${ATTRIBUTES[${i}]}
+	    local ${modifier}=on
+	    ((i++))
+	fi
+
+	echo "antivirus pua ${pua}" >> ${transaction}
+    fi
+
+    execute-transaction ${transaction}
+}
+
+set-antivirus

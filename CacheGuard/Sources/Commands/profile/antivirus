@@ -1,0 +1,405 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       Commands
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+__complete-antivirus()
+{
+    test -n "${COMP_CWORD-1}" || return 1
+
+    case ${COMP_CWORD} in
+	1)
+	    case ${COMP_WORDS[1]} in
+		a|au|aut|auto)
+		    COMPREPLY=(auto)
+		    ;;
+		m|ma|max|maxo|maxob|maxobj|maxobje|maxobjec|maxobject)
+		    COMPREPLY=(maxobject)
+		    ;;
+		p|pu|pua)
+		    COMPREPLY=(pua)
+		    ;;
+		u|up|upd|upda|updat|update)
+		    COMPREPLY=(update)
+		    ;;
+		c|cr|cre|crea|creat|create)
+		    COMPREPLY=(create)
+		    ;;
+		e|ex|ext|exte|exten|extend|extende|extended)
+		    COMPREPLY=(extended)
+		    ;;
+		r|re|rep|repo|repor|report)
+		    COMPREPLY=(report)
+		    ;;
+		t|to|top|topo|topol|topolo|topolog|topology)
+		    COMPREPLY=(topology)
+		    ;;
+		w|wh|whi|whit|white|whitel|whiteli|whitelis|whitelist)
+		    COMPREPLY=(whitelist)
+		    ;;
+		'')
+		    COMPREPLY=('' '<RET>' auto create maxobject pua update extended report topology whitelist)
+		    ;;
+		*)
+		    COMPREPLY=()
+		    ;;
+	    esac
+	    ;;
+	2)
+	    case ${COMP_WORDS[1]} in
+		auto)
+		    COMPREPLY=('' '<RET>' '<country-code>')
+		    ;;
+		pua)
+		    case ${COMP_WORDS[2]} in
+			o)
+			    COMPREPLY=('' on off)
+			    ;;
+			of|off)
+			    COMPREPLY=(off)
+			    ;;
+			on)
+			    COMPREPLY=(on)
+			    ;;
+			'')
+			    COMPREPLY=('' '<RET>' on off)
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		update|create)
+		    case ${COMP_WORDS[2]} in
+			r|re|rep|repo|repor|report)
+			    COMPREPLY=(report)
+			    ;;
+			f|fo|'for'|forc|force)
+			    COMPREPLY=(force)
+			    ;;
+
+			'')
+			    COMPREPLY=('' '<RET>' force report)
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		maxobject)
+		    COMPREPLY=('' '<RET>' '<file-size>')
+		    ;;
+		extended)
+		    case ${COMP_WORDS[2]} in
+			m|me|met|meth|metho|method)
+			    COMPREPLY=(method)
+			    ;;
+
+			u|ur|url)
+			    COMPREPLY=(url)
+			    ;;
+			'')
+			    COMPREPLY=('' '<RET>' method url)
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		topology)
+		    case ${COMP_WORDS[2]} in
+			i|'in'|int|inte|inter|intern|interna|internal)
+			    COMPREPLY=(internal)
+			    ;;
+			e|ex|ext|exte|exter|extern|externa|external)
+			    COMPREPLY=(external)
+			    ;;
+			a|au|aux|auxi|auxil|auxili|auxilia|auxiliar|auxiliary)
+			    COMPREPLY=(auxiliary)
+			    ;;
+			v|vp|vpn|vpni|vpnip|vpnips|vpnipse|vpnipsec)
+			    COMPREPLY=(vpnipsec)
+			    ;;
+			'')
+			    COMPREPLY=('' '<RET>' internal external auxiliary vpnipsec)
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		whitelist)
+		    case ${COMP_WORDS[2]} in
+			s|si|sig|sign|signa|signat|signatu|signatur|signature)
+			    COMPREPLY=(signature)
+			    ;;
+			d|'do'|dom|doma|domai|domain|domainn|domainna|domainnam|domainname)
+			    COMPREPLY=(domainname)
+			    ;;
+			'')
+			    COMPREPLY=('' domainname signature)
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		*)
+		    COMPREPLY=()
+		    ;;
+	    esac
+	    ;;
+	3)
+	    case ${COMP_WORDS[1]} in
+		whitelist)
+		    case ${COMP_WORDS[2]} in
+			signature)
+			    case ${COMP_WORDS[3]} in
+				cl|cle|clea|clear)
+				    COMPREPLY=(clear)
+				    ;;
+				l|lo|loa|load)
+				    COMPREPLY=(load)
+				    ;;
+				'')
+				    COMPREPLY=('' clear load)
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			domainname)
+			    case ${COMP_WORDS[3]} in
+				a|ad|add)
+				    COMPREPLY=(add)
+				    ;;
+				d|de|del)
+				    COMPREPLY=(del)
+				    ;;
+				r|ra|raz)
+				    COMPREPLY=(raz)
+				    ;;
+				'')
+				    COMPREPLY=('' '<RET>' add del raz)
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		extended)
+		    case ${COMP_WORDS[2]} in
+			url)
+			    COMPREPLY=('' '<RET>' '<URL>')
+			    ;;
+			method)
+			    case ${COMP_WORDS[3]} in
+				l|lo|loa|load)
+				    COMPREPLY=(load)
+				    ;;
+				p|pu|pus|push)
+				    COMPREPLY=(push)
+				    ;;
+				v|vl|vlo|vloa|vload)
+				    COMPREPLY=(vload)
+				    ;;
+				'')
+				    COMPREPLY=('' '<RET>' load push vload)
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		topology)
+		    case ${COMP_WORDS[2]} in
+			internal|external|auxiliary|vpnipsec)
+			    case ${COMP_WORDS[3]} in
+				o)
+				    COMPREPLY=('' on off)
+				    ;;
+				of|off)
+				    COMPREPLY=(off)
+				    ;;
+				on)
+				    COMPREPLY=(on)
+				    ;;
+				'')
+				    COMPREPLY=('' '<RET>' on off)
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		update|create)
+		    case ${COMP_WORDS[2]} in
+			force)
+			    case ${COMP_WORDS[3]} in
+				w|wa|wai|wait)
+				    COMPREPLY=(wait)
+				    ;;
+				'')
+				    COMPREPLY=('' '<RET>' wait)
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		*)
+		    COMPREPLY=()
+		    ;;
+	    esac
+	    ;;
+	4)
+	    case ${COMP_WORDS[1]} in
+		whitelist)
+		    case ${COMP_WORDS[2]} in
+			signature)
+			    case ${COMP_WORDS[3]} in
+				load)
+				    case ${COMP_WORDS[4]} in
+					f|ft|ftp)
+					    COMPREPLY=(ftp)
+					    ;;
+					s|sf|sft|sftp)
+					    COMPREPLY=(sftp)
+					    ;;
+					t|tf|tft|tftp)
+					    COMPREPLY=(tftp)
+					    ;;
+					'')
+					    COMPREPLY=('' ftp sftp tftp)
+					    ;;
+					*)
+					    COMPREPLY=()
+					    ;;
+				    esac
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			domainname)
+			    case ${COMP_WORDS[3]} in
+				add|del)
+				    COMPREPLY=('' '<RET>' '<domain-name>')
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		*)
+		    COMPREPLY=()
+		    ;;
+	    esac
+	    ;;
+	5)
+	    case ${COMP_WORDS[1]} in
+		whitelist)
+		    case ${COMP_WORDS[2]} in
+			signature)
+			    case ${COMP_WORDS[3]} in
+				load)
+				    case ${COMP_WORDS[4]} in
+					ftp|sftp|tftp)
+					    COMPREPLY=('' '<file-server>')
+					    ;;
+					*)
+					    COMPREPLY=()
+					    ;;
+				    esac
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+	    esac
+	    ;;
+	6)
+	    case ${COMP_WORDS[1]} in
+		whitelist)
+		    case ${COMP_WORDS[2]} in
+			signature)
+			    case ${COMP_WORDS[3]} in
+				load)
+				    case ${COMP_WORDS[4]} in
+					ftp|sftp|tftp)
+					    COMPREPLY=('' '<file-path>')
+					    ;;
+					*)
+					    COMPREPLY=()
+					    ;;
+				    esac
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+	    esac
+	    ;;
+	*)
+	    COMPREPLY=()
+	    ;;
+    esac
+}

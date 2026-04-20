@@ -1,0 +1,48 @@
+acl http proto http
+acl https proto https
+acl ftp proto ftp
+
+acl http-status-ok http_status 200
+acl transfer-encoding-chunked rep_header Transfer-Encoding -i chunked
+acl compressible-mime rep_mime_type -i (text\/|application\/ecmascript|application\/javascript|application\/x-javascript|application\/x-protobuf|application\/rss\+xml|application\/xml)
+
+acl snmp_string snmp_community cacheguard
+
+acl from-localnet src 127.0.0.0/8
+acl from-localhost-1 src 127.0.0.1/32
+acl from-localhost-2 src 127.0.0.2/32
+acl from-localhost-3 src 127.0.0.3/32
+acl to-localhost-1 dst 127.0.0.1/32
+acl to-localhost-2 dst 127.0.0.2/32
+acl to-localhost-3 dst 127.0.0.3/32
+acl to-localnet dst 127.0.0.0/8
+acl to-ms-windows-update dstdomain -n .microsoft.com .windows.com .windowsupdate.com
+
+acl purge method PURGE
+acl connect method CONNECT
+acl valid_methods method OPTIONS GET HEAD POST PUT PATCH DELETE TRACE CONNECT
+acl safe_methods method OPTIONS GET HEAD POST CONNECT
+acl options_method method OPTIONS
+acl working_time time MTWHF 08:00-20:00
+acl we_time time AS
+
+acl rweb_port port 80
+acl ssl_rweb_port port 443
+acl ssl_ports port 443
+acl ssl_ports port 1024-49151
+acl safe_ports port 21
+acl safe_ports port 80
+acl safe_ports port 443
+acl safe_ports port 1024-49151
+
+acl squid-icons urlpath_regex /squid-internal-static/icons/silk/.*\.png
+acl squid-internal urlpath_regex ^/squid-internal-dynamic/netdb$
+
+acl sslmediate-cert-not-yet-valid ssl_error X509_V_ERR_CERT_NOT_YET_VALID
+acl sslmediate-cert-has-expired ssl_error X509_V_ERR_CERT_HAS_EXPIRED
+acl sslmediate-crl-not-yet-valid ssl_error X509_V_ERR_CRL_NOT_YET_VALID
+acl sslmediate-crl-has-expired ssl_error X509_V_ERR_CRL_HAS_EXPIRED
+acl sslmediate-depth-zero-self-signed-cert ssl_error X509_V_ERR_DEPTH_ZERO_SELF_SIGNED_CERT
+acl sslmediate-self-signed-cert-in-chain ssl_error X509_V_ERR_SELF_SIGNED_CERT_IN_CHAIN
+
+acl fetch_intermediate_certificate transaction_initiator certificate-fetching

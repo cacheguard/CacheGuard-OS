@@ -1,0 +1,3 @@
+505
+HTTP Version Not Supported
+The requested HTTP version is not supported by the Web Gateway

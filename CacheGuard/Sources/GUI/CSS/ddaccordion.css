@@ -1,0 +1,56 @@
+.arrowlistmenu{
+line-height: 16px;
+width: 220px; /*width of accordion menu*/
+float:left;
+margin:0;
+padding:0;
+border-right: 1px solid #cccccc;
+clear:left;
+}
+
+.arrowlistmenu .menuheader{ /*CSS class for menu headers in general (expanding or not!)*/
+font: normal 14px Arial;
+color: white;
+background: var(--itembg);
+margin:0;
+margin-bottom: 1px; /*bottom spacing between header and rest of content*/
+padding: 0;
+padding: 7px 0 7px 10px; /*header text is indented 10px*/
+cursor: pointer;
+border: 1px solid #778;
+}
+
+.arrowlistmenu .openheader{ /*CSS class to apply to expandable header when it's expanded*/
+background: var(--itemactivebg);
+}
+
+.arrowlistmenu ul{ /*CSS for UL of each sub menu*/
+list-style-type: none;
+margin: 0;
+padding: 0;
+margin-bottom: 2px; /*bottom spacing between each UL and rest of content*/
+}
+
+.arrowlistmenu ul li{
+padding-bottom: 0; /*bottom spacing between menu items*/
+}
+
+.arrowlistmenu ul li a{
+font: normal 14px Arial;
+color: var(--itemcolor);
+background: url(/image/arrowbullet-right.png) no-repeat center left; /*custom bullet list image*/
+display: block;
+padding: 7px 0;
+padding-left: 19px; /*link text is indented 19px*/
+text-decoration: none;
+border-bottom: 1px solid #dadada;
+}
+
+.arrowlistmenu ul li a:visited{
+color: var(--itemcolor);
+}
+
+.arrowlistmenu ul li a:hover{ /*hover state CSS*/
+color: var(--itemcolor);
+background-color: #cccccc;
+}

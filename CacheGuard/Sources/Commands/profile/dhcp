@@ -1,0 +1,198 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       Commands
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+__complete-dhcp()
+{
+    test -n "${COMP_CWORD-1}" || return 1
+
+    case ${COMP_CWORD} in
+	1)
+	    case ${COMP_WORDS[1]} in
+		f|"fi"|fix|fixe|fixed)
+		    COMPREPLY=(fixed)
+		    ;;
+		r)
+		    COMPREPLY=('' '<RET>' range report)
+		    ;;
+		ra|ran|rang|range)
+		    COMPREPLY=(range)
+		    ;;
+		re|rep|repo|repor|report)
+		    COMPREPLY=(report)
+		    ;;
+		p|pe|pee|peer)
+		    COMPREPLY=(peer)
+		    ;;
+		'')
+		    COMPREPLY=('' '<RET>' fixed range peer report)
+		    ;;
+		*)
+		    COMPREPLY=()
+		    ;;
+	    esac
+	    ;;
+	2)
+	    case ${COMP_WORDS[1]} in
+		fixed|range|peer)
+		    case ${COMP_WORDS[2]} in
+			a|ad|add)
+			    COMPREPLY=(add)
+			    ;;
+			d|de|del)
+			    COMPREPLY=(del)
+			    ;;
+			r|ra|raz)
+			    COMPREPLY=(raz)
+			    ;;
+			'')
+			    COMPREPLY=('' '<RET>' add del raz)
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		*)
+		    COMPREPLY=()
+		    ;;
+	    esac
+	    ;;
+	3)
+	    case ${COMP_WORDS[1]} in
+		range)
+		    case ${COMP_WORDS[2]} in
+			add|del)
+			    COMPREPLY=('' '<lowest-ip>')
+			    ;;
+			raz)
+			    COMPREPLY=()
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		fixed)
+		    case ${COMP_WORDS[2]} in
+			add|del)
+			    COMPREPLY=('' '<hostname>')
+			    ;;
+			raz)
+			    COMPREPLY=()
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		peer)
+		    case ${COMP_WORDS[2]} in
+			add|del)
+			    case ${COMP_WORDS[3]} in
+				m|ma|mas|mast|maste|master)
+				    COMPREPLY=(master)
+				    ;;
+				s|sl|sla|slav|slave)
+				    COMPREPLY=(slave)
+				    ;;
+				'')
+				    COMPREPLY=('' master slave)
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			raz)
+			    COMPREPLY=()
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		*)
+		    COMPREPLY=()
+		    ;;
+	    esac
+	    ;;
+	4)
+	    case ${COMP_WORDS[1]} in
+		range)
+		    case ${COMP_WORDS[2]} in
+			add|del)
+			    COMPREPLY=('' '<highest-ip>')
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		fixed)
+		    case ${COMP_WORDS[2]} in
+			add)
+			    COMPREPLY=('' '<mac-address>')
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		peer)
+		    case ${COMP_WORDS[2]} in
+			add|del)
+			    COMPREPLY=('' '<peer-ip>')
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		*)
+		    COMPREPLY=()
+		    ;;
+	    esac
+	    ;;
+	5)
+	    case ${COMP_WORDS[1]} in
+		fixed)
+		    case ${COMP_WORDS[2]} in
+			add)
+			    COMPREPLY=('' '<ip>')
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		*)
+		    COMPREPLY=()
+		    ;;
+	    esac
+	    ;;
+	*)
+	    COMPREPLY=()
+	    ;;
+    esac
+}

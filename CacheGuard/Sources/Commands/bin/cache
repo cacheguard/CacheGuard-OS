@@ -1,0 +1,323 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       Commands
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+source functions
+
+show-cache-report-hit()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 1
+    local hit_request=${1}
+    local hit_volume=${2}
+
+    echo-command-form "cache report hit request"
+    echo-value "${hit_request}%"
+
+    echo-command-form "cache report hit volume"
+    echo-value "${hit_volume}%"
+}
+
+show-cache-report-size()
+{
+    test -n "${1}" || return 1
+    local size=${1}
+
+    echo-command-form "cache report size"
+    echo-value "${size}M"
+}
+
+show-bigcache-report-size()
+{
+    test -n "${1}" || return 1
+    local size=${1}
+
+    echo-command-form "cache report bigsize"
+    echo-value "${size}M"
+}
+
+show-rcache-report-size()
+{
+    test -n "${1}" || return 1
+    local size=${1}
+
+    echo-command-form "cache report rsize"
+    echo-value "${size}M"
+}
+
+show-mean-object-size()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    local real_size=${1}
+    local ref_size=${2}
+
+    local value=$(get-external-mean-object-size ${real_size} ${ref_size})
+
+    echo-command-form "cache report meanobject"
+    echo-value "${value}"
+}
+
+show-cache-report-used()
+{
+    test -n "${1}" || return 1
+    local used=${1}
+
+    echo-command-form "cache report used"
+    echo-value "${used}%"
+}
+
+show-rcache-report-used()
+{
+    test -n "${1}" || return 1
+    local used=${1}
+
+    echo-command-form "cache report rused"
+    echo-value "${used}%"
+}
+
+show-cache-object1()
+{
+    echo-command-form "cache object"
+    echo-mark-cur
+    echo-value "${CURRENT_CACHE_MIN_OBJECT_SZ}KB ${CURRENT_CACHE_MAX_OBJECT_SZ}KB"
+    if test "${CURRENT_CACHE_MAX_OBJECT_SZ}" != "${CACHE_MAX_OBJECT_SZ}" -o "${CURRENT_CACHE_MIN_OBJECT_SZ}" != "${CACHE_MIN_OBJECT_SZ}" ; then
+	echo-command-form "cache object"
+	echo-mark-new
+	echo-value "${CACHE_MIN_OBJECT_SZ}KB ${CACHE_MAX_OBJECT_SZ}KB"
+    fi
+}
+
+show-cache-object()
+{
+    echo-begin-show
+    show-cache-object1
+    echo-end-show
+}
+
+echo-value-cache-bigobject()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 1
+    test -n "${3}" || return 1
+    local state=${1}
+    local min=${2}
+    local max=${3}
+
+    if test ${state} == False ; then
+	echo-value "off"
+    else
+	echo-value "on ${min}KB ${max}KB"
+    fi
+}
+
+show-cache-bigobject1()
+{
+    echo-command-form "cache bigobject"
+    echo-mark-cur
+    echo-value-cache-bigobject ${CURRENT_CACHE_BIG_OBJECT} ${CURRENT_CACHE_BIG_MIN_OBJECT_SZ} ${CURRENT_CACHE_BIG_MAX_OBJECT_SZ}
+
+    if test \
+	"${CURRENT_CACHE_BIG_OBJECT}" != "${CACHE_BIG_OBJECT}" -o \
+	"${CURRENT_CACHE_BIG_MIN_OBJECT_SZ}" != "${CACHE_BIG_MIN_OBJECT_SZ}" -o \
+	"${CURRENT_CACHE_BIG_MAX_OBJECT_SZ}" != "${CACHE_BIG_MAX_OBJECT_SZ}" ; then
+	echo-command-form "cache object"
+	echo-mark-new
+	echo-value-cache-bigobject ${CACHE_BIG_OBJECT} ${CACHE_BIG_MIN_OBJECT_SZ} ${CACHE_BIG_MAX_OBJECT_SZ}
+    fi
+}
+
+show-cache-bigobject()
+{
+    echo-begin-show
+    show-cache-bigobject1
+    echo-end-show
+}
+
+show-cache()
+{
+    echo-begin-show
+    show-cache-object1
+    show-cache-bigobject1
+    echo-end-show
+}
+
+display-clear-cache-log()
+{
+    display-log ${CACHE_CLEAR_LOG}
+}
+
+run()
+{
+    contextual-command-is-allowed || return 207
+
+    local action=${ARGS[1]}
+
+    case ${action} in
+	loadurl)
+	    test -n "${ARGS[2]}" || return 1
+	    local url=${ARGS[2]}
+	    check-url "${url}" || return 21
+	    local proxy=127.0.0.1
+	    squidclient -s -r -h ${proxy} -p ${CURRENT_PROXY_PORT} -m GET -T 0 ${url} 2> /dev/null > /dev/null || return 101
+	    ;;
+	object)
+	    if test -z "${ARGS[2]}" ; then
+		show-cache-object
+		return 0
+	    fi
+	    local min_size=${ARGS[2]}
+	    local max_size=${ARGS[3]}
+	    check-integer ${min_size} || return 159
+	    check-integer ${max_size} || return 159
+	    test ${min_size} -ge ${CACHE_MIN_OBJECT_SZ_MIN} || return 181
+	    test ${max_size} -ge ${CACHE_MAX_OBJECT_SZ_MIN} -a ${max_size} -le ${CACHE_MAX_OBJECT_SZ_MAX} || return 97
+	    test ${min_size} -le ${max_size} || return 169
+	    test ${min_size} -ge 0 || return 170
+	    export CACHE_MIN_OBJECT_SZ=${min_size}
+	    export CACHE_MAX_OBJECT_SZ=${max_size}
+	    SAVENV=1
+	    ;;
+
+	bigobject)
+	    if test -z "${ARGS[2]}" ; then
+		show-cache-bigobject
+		return 0
+	    fi
+	    local state=${ARGS[2]}
+	    case ${state} in
+		off)
+		    export CACHE_BIG_OBJECT=False
+		    ;;
+		on)
+		    local min_size=${ARGS[3]}
+		    local max_size=${ARGS[4]}
+		    check-integer ${min_size} || return 159
+		    check-integer ${max_size} || return 159
+		    test ${max_size} -ge ${CACHE_MAX_OBJECT_SZ_MIN} -a ${max_size} -le ${PROXY_CACHE_UNIT_SZ} || return 171
+		    test ${min_size} -le ${max_size} || return 169
+		    test ${min_size} -ge 0 || return 170
+		    export CACHE_BIG_OBJECT=True
+		    export CACHE_BIG_MIN_OBJECT_SZ=${min_size}
+		    export CACHE_BIG_MAX_OBJECT_SZ=${max_size}
+		    ;;
+		*)
+		    return 1
+		    ;;
+	    esac
+	    SAVENV=1
+	    ;;
+
+	clear)
+	    test ${APL_ROLE} == 'gateway' || return 232
+
+	    case "${ARGS[2]}" in
+		""|force)
+		    user-has-admin-rights || return 31
+		    check-lock || return 123
+		    test "${ARGS[2]}" == force || request-confirmation
+		    test -z "${ARGS[3]}" || test ${ARGS[3]} == wait || return 1
+		    supervisor-action "cache-clear" inform ${ARGS[3]}
+		    test ${?} -eq 0 || return 104
+		    return 0
+		    ;;
+		report)
+		    display-clear-cache-log
+		    return 0
+		    ;;
+		*)
+		    return 1
+		    ;;
+	    esac
+	    ;;
+	report)
+	    echo
+	    case "${ARGS[2]}" in
+		size)
+		    local cache_size=$(get-cache-size)
+		    show-cache-report-size ${cache_size}
+		    ;;
+		bigsize)
+		    local bigcache_size=$(get-bigcache-size)
+		    show-bigcache-report-size ${bigcache_size}
+		    ;;
+		rsize)
+		    local rcache_size=$(get-rcache-size)
+		    show-rcache-report-size ${rcache_size}
+		    ;;
+		meanobject)
+		    local real_mean_object_size=$(get-cache-real-mean-object-sz)
+		    local mean_object_reference_size=$(get-cache-reference-mean-object-sz)
+		    show-mean-object-size ${real_mean_object_size} ${mean_object_reference_size}
+		    ;;
+		used)
+		    local cache_used=$(get-cache-used)
+		    show-cache-report-used ${cache_used}
+		    ;;
+		rused)
+		    update-report health-rcache || return 104
+		    if test "${TERM}" != "${WADMIN_TERM}" ; then
+			local rcache_used=$(get-rcache-used)
+			show-rcache-report-used ${rcache_used}
+		    fi
+		    ;;
+		hit)
+		    local cache_hit=$(get-cache-hit)
+		    show-cache-report-hit ${cache_hit}
+		    ;;
+		"")
+		    update-report health-rcache || return 104
+
+		    local cache_size=$(get-cache-size)
+		    local bigcache_size=$(get-bigcache-size)
+		    local cache_used=$(get-cache-used)
+		    local rcache_size=$(get-rcache-size)
+		    local real_mean_object_size=$(get-cache-real-mean-object-sz)
+		    local mean_object_reference_size=$(get-cache-reference-mean-object-sz)
+		    local rcache_used=$(get-rcache-used)
+		    local cache_hit=$(get-cache-hit)
+
+		    show-cache-report-size ${cache_size}
+		    show-bigcache-report-size ${bigcache_size}
+		    show-rcache-report-size ${rcache_size}
+		    show-mean-object-size ${real_mean_object_size} ${mean_object_reference_size}
+		    show-cache-report-used ${cache_used}
+		    show-rcache-report-used ${rcache_used}
+		    show-cache-report-hit ${cache_hit}
+		    ;;
+		*)
+		    return 1
+		    ;;
+	    esac
+	    echo
+	    ;;
+	'')
+	    show-cache
+	    ;;
+	*)
+	    return 1
+	    ;;
+    esac
+}
+
+main "${@}"

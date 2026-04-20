@@ -1,0 +1,81 @@
+kernel.msgmax = 8192
+kernel.msgmni = 2048
+kernel.msgmnb = 32768
+kernel.shmmni = 4096
+kernel.shmall = 2097152
+kernel.shmmax = 33554432
+
+net.core.rmem_max = 33554432
+net.core.wmem_max = 33554432
+net.ipv4.tcp_window_scaling = 1
+net.ipv4.tcp_timestamps = 1
+net.ipv4.tcp_sack = 1
+net.ipv4.tcp_rmem = 4096 87380 33554432
+net.ipv4.tcp_wmem = 4096 65536 33554432
+
+net.ipv4.conf.default.accept_redirects = 0
+net.ipv4.conf.default.accept_source_route = 0
+net.ipv4.conf.default.bootp_relay = 0
+net.ipv4.conf.default.proxy_arp = 0
+net.ipv4.conf.default.secure_redirects = 1
+net.ipv4.conf.default.send_redirects = 1
+net.ipv4.conf.default.shared_media = 1
+net.ipv4.conf.default.tag = 0
+
+net.ipv4.neigh.default.anycast_delay = 100
+net.ipv4.neigh.default.app_solicit = 0
+net.ipv4.neigh.default.delay_first_probe_time = 5
+net.ipv4.neigh.default.gc_stale_time = 60
+net.ipv4.neigh.default.locktime = 100
+net.ipv4.neigh.default.mcast_solicit = 3
+net.ipv4.neigh.default.proxy_delay = 80
+net.ipv4.neigh.default.proxy_qlen = 64
+net.ipv4.neigh.default.ucast_solicit = 3
+net.ipv4.neigh.default.unres_qlen = 3
+
+net.ipv4.icmp_echo_ignore_broadcasts = 1
+net.ipv4.icmp_echo_ignore_all = 0
+net.ipv4.icmp_ignore_bogus_error_responses = 1
+
+net.ipv4.ip_default_ttl = 65
+net.ipv4.ip_dynaddr = 0
+net.ipv4.ip_no_pmtu_disc = 0
+net.ipv4.ip_local_port_range = 1024 65535
+
+net.ipv4.ipfrag_time = 30
+
+net.ipv4.tcp_fin_timeout = 30
+net.ipv4.tcp_abort_on_overflow = 1
+net.ipv4.tcp_keepalive_time = 7200
+net.ipv4.tcp_keepalive_intvl = 75
+net.ipv4.tcp_keepalive_probes = 9
+net.ipv4.tcp_orphan_retries = 0
+net.ipv4.tcp_max_syn_backlog = 1024
+net.ipv4.tcp_retrans_collapse = 0
+net.ipv4.tcp_retries1 = 3
+net.ipv4.tcp_retries2 = 15
+net.ipv4.tcp_rfc1337 = 0
+net.ipv4.tcp_stdurg = 0
+net.ipv4.tcp_syn_retries = 5
+net.ipv4.tcp_synack_retries = 5
+net.ipv4.tcp_syncookies = 1
+net.ipv4.tcp_max_orphans = 4096
+net.ipv4.tcp_max_tw_buckets = 4096
+
+net.ipv4.route.error_cost = 200
+net.ipv4.route.error_burst = 1000
+net.ipv4.route.gc_elasticity = 8
+net.ipv4.route.gc_min_interval = 5
+net.ipv4.route.gc_thresh = 2048
+net.ipv4.route.gc_timeout = 300
+net.ipv4.route.max_size = 32768
+net.ipv4.route.min_adv_mss = 256
+net.ipv4.route.min_pmtu = 552
+net.ipv4.route.mtu_expires = 600
+net.ipv4.route.redirect_load = 2
+net.ipv4.route.redirect_number = 9
+net.ipv4.route.redirect_silence = 2048
+
+net.ipv6.conf.all.disable_ipv6 = 1
+net.ipv6.conf.default.disable_ipv6 = 1
+net.ipv6.conf.lo.disable_ipv6 = 1

@@ -1,0 +1,128 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       Scripts
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+CACHEGUARD_DIR=/etc/sysconfig/cacheguard
+source ${CACHEGUARD_DIR}/constant
+source ${APPLIANCE_DIR}/etc/role
+source ${ABASE_DIR}/${ENV_RDIR}/${ENV_CURRENT_NAME}
+
+set-connecting-vpnipsec-down()
+{
+    test -f ${RUN_DIR}/${VPN_IPSEC_STATUS_FILENAME} || return 11
+
+    local connection status remote_address duration
+
+    while read connection status remote_address duration
+    do
+	case ${status} in
+	    CONNECTING)
+		ipsec down ${connection} > /dev/null 2>&1
+		;;
+	    *)
+		;;
+	esac
+    done < ${RUN_DIR}/${VPN_IPSEC_STATUS_FILENAME}
+}
+
+manage-vpnipsec-ha()
+{
+    test ${CURRENT_VPN_IPSEC_MODE} == True || return 0
+
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    test -n "${3}" || return 3
+    local vrrp_device=${1}
+    local vrrp_ip=${2}
+    local vrrp_state=${3}
+
+    test ${vrrp_device} == external || return 0
+
+    /etc/rc.d/init.d/health stop  > /dev/null 2>&1
+    /etc/rc.d/init.d/iked restart > /dev/null 2>&1
+    /etc/rc.d/init.d/health start > /dev/null 2>&1
+
+    sleep 5
+
+    apl_vpnipsec_report
+
+    case ${vrrp_state} in
+	MASTER)
+	    ;;
+	BACKUP|FAULT)
+	    set-connecting-vpnipsec-down
+	    ;;
+	*)
+	    return 11
+	    ;;
+    esac
+}
+
+vrrp-notification()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    test -n "${3}" || return 3
+    local vrrp_type=${1}
+    local vrrp_name=${2}
+    local vrrp_state=${3}
+
+    test ${vrrp_type} == INSTANCE || return 0
+
+    local vrrp_machine=${vrrp_name/:*}
+    local rest=${vrrp_name/*:}
+    local vrrp_device=${rest/_*}
+    local vrrp_ip=${rest#*_}
+
+    local event event_description
+
+    case ${vrrp_state} in
+	MASTER)
+	    event=Master
+	    event_description="The ${vrrp_device} VRRP interface on ${vrrp_machine} has been activated with the ${event} state. This appliance is now publicly reachable at the VRRP IP address ${vrrp_ip}."
+	    manage-vpnipsec-ha ${vrrp_device} ${vrrp_ip} ${vrrp_state} &
+	    ;;
+	BACKUP)
+	    event=Backup
+	    event_description="The ${vrrp_device} VRRP interface on ${vrrp_machine} has been deactivated and went to ${event} state. This appliance is no longer publicly reachable at the VRRP IP address ${vrrp_ip}."
+	    manage-vpnipsec-ha ${vrrp_device} ${vrrp_ip} ${vrrp_state} &
+	    ;;
+	FAULT)
+	    event=Fault
+	    event_description="The ${vrrp_device} VRRP interface on ${vrrp_machine} has failed and went to ${event} state. This appliance is no longer publicly reachable at the VRRP IP address ${vrrp_ip}."
+	    manage-vpnipsec-ha ${vrrp_device} ${vrrp_ip} ${vrrp_state} &
+	    ;;
+	*)
+	    return 11
+	    ;;
+    esac
+
+    if test -n "${event}" ; then
+	logger -p daemon.alert -t apl_vrrp_monitor -- "${event_description}"
+	${LOCAL_DIR}/bin/apl_rlogger "${event_description}"
+	test "${CURRENT_ADMIN_SNMP}" == True || return 0
+	${LOCAL_DIR}/bin/apl_snmp_trap 14 "${event}" "${vrrp_device}" "${event_description}" > /dev/null 2>&1
+    fi
+}
+
+vrrp-notification "${@}"

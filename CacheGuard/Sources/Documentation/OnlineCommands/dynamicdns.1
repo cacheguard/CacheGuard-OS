@@ -1,0 +1,41 @@
+Set or get the dynamic DNS configuration
+.SH SYNOPSIS
+
+[1] \fBdynamicdns\fR [\fBoff\fR | \fBon\fR \fI<provider-id>\fR \fI<hostname>\fR (\fI<username>\fR \fI<password>\fR | \fI<password>\fR | \fI<secret-token>\fR)]
+
+[2] \fBdynamicdns\fR [\fBinterval\fR \fI<minutes>\fR]
+
+[3] \fBdynamicdns\fR [\fBreport\fR]
+
+.SH DESCRIPTION
+In cases where the public IP address associated with the external interface of the appliance (or simply forwarded to it) is dynamic (i.e. not fixed) and there is a requirement to expose services such as a website or a VPN server to the Internet, it is possible to use a Dynamic DNS (DDNS) provider.
+
+By configuring the appliance to work with a DDNS provider, the appliance can automatically update its public hostname whenever its public IP address changes. This ensures that external users can consistently access the hosted services using a stable domain name, even though the underlying IP address is subject to change.
+
+The first [1] form of this command is used to configure Dynamic DNS. To deactivate Dynamic DNS updating, use the keyword \fBoff\fR. To enable Dynamic DNS updating, use the keyword \fBon\fR followed by the Dynamic DNS provider identifier, the public domain name, and either a username and password or an authentication token or a password, depending on the requirements of the selected Dynamic DNS provider.
+
+Supported Dynamic DNS providers and assocated identifiers are as follow:
+
+  \(bu \fBchangeip\fR: ChangeIP (\fIhttps://www.changeip.com\fR)
+
+  \(bu \fBdnshome\fR: DNSHome (\fIhttps://www.dnshome.de\fR)
+
+  \(bu \fBfreemyip\fR: FreeMyIP (\fIhttps://freemyip.com\fR)
+
+  \(bu \fBmyonlineportal\fR: MyOnlinePortal (\fIhttps://myonlineportal.net\fR)
+
+  \(bu \fBnoip\fR: No-IP (\fIhttps://www.noip.com\fR)
+
+By default, the system calls the Dynamic DNS provider API every 5 minutes to update its records with the current appliance public IP address. The second [2] usage form allows you to modify the update interval. Please note that most Dynamic DNS providers do not tolerate intervals that are too short. Please refer to your Dynamic DNS provider's documentation to determine the minimum permitted interval. To modify the update interval, use the \fBinterval\fR keyword followed by a time value expressed in minutes. The permitted range is between 1 and 30 minutes.
+
+The third usage form [3] allows testing of Dynamic DNS resolution based on the current running configuration. To test name resolution against the current public IP address, use the \fBreport\fR keyword.
+
+.SH SEE ALSO
+.B apply
+(1)
+.B rweb
+(1)
+.B tls
+(1)
+.B vpnipsec
+(1)

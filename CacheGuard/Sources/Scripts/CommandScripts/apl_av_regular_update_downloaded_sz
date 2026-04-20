@@ -1,0 +1,47 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       Scripts
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+CACHEGUARD_DIR=/etc/sysconfig/cacheguard
+source ${CACHEGUARD_DIR}/constant
+source ${APPLIANCE_DIR}/etc/role
+
+apl-update-av-regular-downloaded-sz()
+{
+    local tmp_file=/tmp/av-clamav-files.${$}
+    local rights links user group sz rest
+    local regular_sz=0
+
+    ls -l ${AV_DB_DIR}/{main.cvd,main.cld,daily.cvd,daily.cld,${CLAMAV_TMP_DIR_PREFIX}*/*} > ${tmp_file} 2> /dev/null
+    while read rights links user group sz rest
+    do
+	((regular_sz += sz))
+    done < ${tmp_file}
+    rm -f ${tmp_file}
+    
+    echo -n ${regular_sz} > ${RUN_DIR}/${AV_REGULAR_DB_DOWNLOADED_SZ_FILENAME}
+}
+
+# Main()
+
+apl-update-av-regular-downloaded-sz "${@}"

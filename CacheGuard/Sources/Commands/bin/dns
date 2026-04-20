@@ -1,0 +1,141 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       Commands
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+source functions
+
+check-dns-nb()
+{
+    local len=$(length-list "${NAME_SERVER_LIST}")
+    test ${len} -lt ${MAX_NAME_SERVER_NB}
+}
+
+show-dnss1()
+{
+    test -n "${1}" || return 1
+    local ver=${1}
+    local dnss=${2}
+
+    local new ip
+    
+    echo-command-form "dns"
+    if test "${ver}" == "new" ; then
+	echo-mark-new
+    else
+	echo-mark-cur
+    fi
+
+    if test -z "${dnss}" ; then
+	echo-value-null
+    else
+	local ip i=0
+	for ip in ${dnss}
+	do
+	    test ${i} -eq 0 || echo-blank-command
+	    echo-value "${ip}"
+	    ((i++))
+	done
+    fi
+}
+
+show-dnss()
+{
+    echo-begin-show
+    show-dnss1 'cur' "${CURRENT_NAME_SERVER_LIST}"
+    test "${CURRENT_NAME_SERVER_LIST}" == "${NAME_SERVER_LIST}" || show-dnss1 'new' "${NAME_SERVER_LIST}"
+    echo-end-show
+}
+
+run()
+{
+    if test -z "${ARGS[1]}" ; then show-dnss ; return 0 ; fi
+    local act=${ARGS[1]}
+
+    local ip
+
+    case ${act} in
+	raz)
+	    export NAME_SERVER_LIST=""
+	    ;;
+	add|del)
+	    test -n "${ARGS[2]}" || return 1
+	    
+	    if test ${ARGS[2]} == localhost ; then
+		ip="127.0.0.1"
+	    else
+		ip=${ARGS[2]}
+		check-ip ${ip} || return 12
+	    fi
+
+	    contextual-command-is-allowed || check-local-ip ${ip} || return 38
+
+	    if test ${act} == add ; then
+		check-dns-nb || return 90
+		export NAME_SERVER_LIST=$(remove "${NAME_SERVER_LIST}" ${ip})
+		if test -z "${NAME_SERVER_LIST}" ; then
+		    NAME_SERVER_LIST=${ip}
+		else
+		    NAME_SERVER_LIST="${NAME_SERVER_LIST} ${ip}"
+		fi
+	    else
+		export NAME_SERVER_LIST=$(remove "${NAME_SERVER_LIST}" ${ip})
+	    fi
+	    ;;
+	resolve)
+	    if test -z "${ARGS[2]}" ; then
+		echo-begin-show
+		echo-command-form "dns resolve"
+		if test -f ${TMP_DIR}/${NAME_2RESOLVE} ; then
+		    echo-value "on"
+		else
+		    echo-value "off"
+		fi
+		echo-end-show
+		return 0
+	    fi
+
+	    user-has-admin-rights || return 31
+
+	    case "${ARGS[2]}" in
+		on)
+		    touch ${TMP_DIR}/${NAME_2RESOLVE}
+		    NEWENV=1
+		    ;;
+		off)
+		    rm -f ${TMP_DIR}/${NAME_2RESOLVE}
+		    NEWENV=1
+		    ;;
+		*)
+		    return 1
+		    ;;
+	    esac
+	    ;;
+	*)
+	    return 1
+	    ;;
+    esac
+
+    SAVENV=1
+}
+
+main "${@}"

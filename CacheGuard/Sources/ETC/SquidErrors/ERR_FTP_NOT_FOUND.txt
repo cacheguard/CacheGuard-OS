@@ -1,0 +1,3 @@
+FTP path prblem
+Your Web Gateway sent the FTP command <code><strong>%f</strong></code> and then received the reply <code><strong>%F</strong></code>.
+This might be caused by an FTP URL with an absolute path (which does not comply with RFC 1738) - If this is the cause, then the file can be found at <a href="%B">%B</a>

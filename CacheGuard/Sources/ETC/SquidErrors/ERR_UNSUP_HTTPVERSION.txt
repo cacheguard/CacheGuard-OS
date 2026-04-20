@@ -1,0 +1,2 @@
+Unsupported HTTP version
+This Web Gateway does not accept the HTTP version you are attempting to use

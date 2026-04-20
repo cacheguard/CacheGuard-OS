@@ -1,0 +1,80 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       Commands
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+check-all-but-apply-lock1()
+{
+    local i=2
+
+    # Order is Important
+
+    test ! -f ${ADMIN_LOCK_DIR}/apl_apply_cancel || return ${i}
+    ((i++))
+    test ! -f ${ADMIN_LOCK_DIR}/apl_reboot || return ${i}
+    ((i++))
+    test ! -f ${ADMIN_LOCK_DIR}/apl_halt || return ${i}
+    ((i++))
+    test ! -f ${ADMIN_LOCK_DIR}/apl_rollback || return ${i}
+    ((i++))
+    test ! -f ${ADMIN_LOCK_DIR}/apl_configure || return ${i}
+    ((i++))
+    test ! -f ${ADMIN_LOCK_DIR}/apl_cache_clear || return ${i}
+    ((i++))
+    test ! -f ${ADMIN_LOCK_DIR}/apl_av_create || return ${i}
+    ((i++))
+    test ! -f ${ADMIN_LOCK_DIR}/apl_av_update || return ${i}
+    ((i++))
+    test ! -f ${ADMIN_LOCK_DIR}/apl_verify_usage || return ${i}
+    ((i++))
+    test ! -f ${ADMIN_LOCK_DIR}/apl_backup || return ${i}
+    ((i++))
+    test ! -f ${ADMIN_LOCK_DIR}/apl_logrotate || return ${i}
+    ((i++))
+    test ! -f ${ADMIN_LOCK_DIR}/apl_urllist_update || return ${i}
+    ((i++))
+    test ! -f ${ADMIN_LOCK_DIR}/apl_ha || return ${i}
+    ((i++))
+
+    return 0
+}
+
+check-lock1()
+{
+    test ! -f ${ADMIN_LOCK_DIR}/apl_apply || return 1
+    check-all-but-apply-lock1 || return ${?}
+    return 0
+}
+
+check-lock()
+{
+    check-lock1
+    export ERROR_NB=${?}
+    return ${ERROR_NB}
+}
+
+check-all-but-apply-lock()
+{
+    check-all-but-apply-lock1
+    export ERROR_NB=${?}
+    return ${ERROR_NB}
+}

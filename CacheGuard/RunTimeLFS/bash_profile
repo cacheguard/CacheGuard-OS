@@ -1,0 +1,9 @@
+#!/bin/bash
+
+search()
+{
+    test -n "${1}" || return 1
+    find . -type f -exec grep --files-with-matches "${1}" {} \;
+}
+
+export PATH=/usr/local/sbin:/usr/sbin:/sbin:/usr/local/bin:/usr/bin:/bin

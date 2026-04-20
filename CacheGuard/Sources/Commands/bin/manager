@@ -1,0 +1,1731 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       Commands
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+source functions
+
+manager-ssh-show()
+{
+    local file=${ADMIN_DIR}/.ssh/id_rsa.pub
+
+    test -f ${file} || return 104
+
+    echo
+    cat ${file} 2> /dev/null
+    echo
+}
+
+manager-ssh-fp-show()
+{
+    test -f ${SSH_MANAGER_RSA_FP_FILE} || return 104
+
+    local rsa_fp=$(cat ${SSH_MANAGER_RSA_FP_FILE})
+
+    echo-begin-show
+    echo-command-form "SHA256 (RSA)"
+    echo-value ${rsa_fp/*:}
+    echo-end-show
+}
+
+manager-ssh-load-save()
+{
+    local key_type=${1}
+    local op=${2}
+    local proto=${3}
+    local ip=${4}
+    local fn=${5}
+
+    check-manager-ssh-key-type ${key_type} || return 210
+    check-file-io ${op} || return 211
+
+    test -n "${proto}" || return 1
+    test -n "${ip}" || return 1
+    test -n "${fn}" || return 1
+
+    check-file-protocol ${proto} || return 63
+    check-ip-name ${ip} || return 113
+    check-filename ${fn} || return 19
+    check-file-ip ${ip} || return 27
+
+    case ${op} in
+	load)
+	    test ${key_type} != private || umask 0077
+	    local tmp_file=${TMP_DIR}/${LOADED}.manager.${SSH_KEY}.${key_type}
+
+	    load-files ${proto} ${ip} "${fn} ${tmp_file}" "" ascii
+	    local ret=${?}
+
+	    if test ${ret} -eq 0 ; then
+
+		ssh-keygen -l -f ${tmp_file} > /dev/null 2>&1
+		if test ${?} -ne 0 ; then
+		    rm -f ${tmp_file}
+		    return 225
+		fi
+
+		local active_key_file
+
+		case ${key_type} in
+		    private)
+			active_key_file=${ADMIN_DIR}/.ssh/id_rsa
+			;;
+		    public)
+			active_key_file=${ADMIN_DIR}/.ssh/id_rsa.pub
+			;;
+		    *)
+			return 255
+			;;
+		esac
+
+		if test -f ${active_key_file} ; then
+		    diff --brief ${tmp_file} ${active_key_file} > /dev/null 2>&1
+		    if test ${?} -eq 0 ; then
+			rm -f ${tmp_file}
+		    else
+			rm -f ${TMP_DIR}/${SSH_MANAGER_ARM_NEW}
+		    fi
+		    NEWENV=1
+		fi
+	    else
+		rm -f ${tmp_file}
+		update-modification-state
+		return ${ret}
+	    fi
+	    ;;
+        save)
+	    local file
+
+	    case ${key_type} in
+		private)
+		    file=${ADMIN_DIR}/.ssh/id_rsa
+		    ;;
+		public)
+		    file=${ADMIN_DIR}/.ssh/id_rsa.pub
+		    ;;
+		*)
+		    return 255
+		    ;;
+	    esac
+	    save-files ${proto} ${ip} "${file} ${fn}" "" ascii
+	    ;;
+	*)
+	    return 255
+	    ;;
+    esac
+}
+
+manager-ssh()
+{
+    local key=${1}
+
+    if test -z "${key}" ; then
+	manager-ssh-show
+	return 0
+    fi
+
+    case ${key} in
+	show)
+	    manager-ssh-show
+	    ;;
+	fingerprint)
+	    manager-ssh-fp-show
+	    ;;
+	generate)
+	    user-has-admin-rights || return 31
+	    touch ${TMP_DIR}/${SSH_MANAGER_ARM_NEW}
+	    rm -f ${TMP_DIR}/${LOADED}.manager.${SSH_KEY}.*
+	    NEWENV=1
+	    ;;
+	public|private)
+	    user-has-admin-rights || return 31
+	    manager-ssh-load-save "${@}"
+	    ;;
+	*)
+	    return 1
+	    ;;
+    esac
+}
+
+manager-sync-role-show()
+{
+    echo-command-form "manager sync role"
+    echo-mark-cur
+    echo-value "${CURRENT_MANAGER_SYNC_ROLE}"
+
+    test ${MANAGER_SYNC_ROLE} != ${CURRENT_MANAGER_SYNC_ROLE} || return 0
+
+    echo-command-form "manager sync role"
+    echo-mark-new
+    echo-value "${MANAGER_SYNC_ROLE}"
+}
+
+manager-sync-peer-show()
+{
+    echo-command-form "manager sync peer"
+    echo-mark-cur
+    echo-value "${CURRENT_MANAGER_SYNC_PEER_IP} ..."
+
+    test ${MANAGER_SYNC_PEER_IP} != ${CURRENT_MANAGER_SYNC_PEER_IP} || return 0
+
+    echo-command-form "manager sync peer"
+    echo-mark-new
+    echo-value "${MANAGER_SYNC_PEER_IP} ..."
+}
+
+manager-sync-show()
+{
+    echo-begin-show
+    manager-sync-role-show
+    manager-sync-peer-show
+    echo-end-show
+}
+
+manager-sync()
+{
+    local key=${1}
+
+    if test -z "${key}" ; then
+	manager-sync-show
+	return 0
+    fi
+
+    case ${key} in
+	role)
+	    local role=${2}
+	    if test -z "${role}" ; then
+		echo-begin-show
+		manager-sync-role-show
+		echo-end-show
+		return 0
+	    fi
+
+	    case ${role} in
+		alone|master|slave)
+		    MANAGER_SYNC_ROLE=${role}
+		    SAVENV=1
+		    ;;
+		*)
+		    return 246
+		    ;;
+	    esac
+	    ;;
+	peer)
+	    local peer_ip=${2}
+	    if test -z "${peer_ip}" ; then
+		echo-begin-show
+		manager-sync-peer-show
+		echo-end-show
+		return 0
+	    fi
+
+	    check-ip ${peer_ip} || return 12
+
+	    local ssh_key=${ARGS[3]}
+	    local ssh_key_id=$(get-manager-key-id peer)
+
+	    if test -n "${ssh_key}" ; then
+		echo ${ssh_key} > ${TMP_DIR}/work.${LOADED}.${SSH_KEY}.${ssh_key_id}
+		load-ssh-public-key-commit ${TMP_DIR}/work.${LOADED}.${SSH_KEY}.${ssh_key_id}
+	    else
+		rm -f ${TMP_DIR}/${LOADED}.${SSH_KEY}.${ssh_key_id}
+	    fi
+
+	    MANAGER_SYNC_PEER_IP=${peer_ip}
+	    SAVENV=1
+	    ;;
+	report)
+	    if test ${CURRENT_MANAGER_SYNC_ROLE} == master ; then
+
+		echo-begin-show
+
+		local seconds date status
+
+		local update_files=$(ls -1 ${MANAGER_SYNC_FILE}.* 2> /dev/null)
+
+		if test -z "${update_files}" ; then
+		    seconds=$(date +"%s" 2> /dev/null)
+		    date=$(get-date-from-epoch-seconds ${seconds})
+		    status="[OK]"
+		    
+		    display-log-line 0 ${date} No data to Synchronise with the Peer manager${status}
+		else
+		    local update_file
+		    local base name title code
+
+		    for update_file in ${update_files}
+		    do
+			base=$(file-basename ${update_file})
+			name=${base#*\.}
+
+			title=$(get-manager-sync-title ${name})
+			test -n "${name}" || continue
+
+			read code seconds < ${update_file}
+			if test ${code} -eq 0 ; then
+			    status="[OK]"
+			else
+			    status=" (${code}) [KO]"
+			fi
+			date=$(get-date-from-epoch-seconds ${seconds})
+			display-log-line 0 ${date} Synchronising ${title}${status}
+		    done
+		fi
+
+		echo-end-show
+	    fi
+	    ;;
+	*)
+	    return 1
+	    ;;
+    esac
+}
+
+show-templates()
+{
+    local dir=$(get-manager-context-rdir template)
+    local contexts
+
+    contexts=$(ls -1 ${dir} 2> /dev/null)
+
+    echo-begin-show
+
+    echo-command-form "manager template"
+    echo-mark-cur
+
+    if test -z "${contexts}" ; then
+	echo-value-null
+    else
+	local context i=0
+	for context in ${contexts}
+	do
+	    context=$(file-basename ${context})
+	    test ${i} -eq 0 || echo-blank-command
+	    echo-value ${context}
+	    ((i++))
+	done
+    fi
+
+    echo-end-show
+}
+
+show-gateways()
+{
+    echo-begin-show
+
+    echo-command-form "manager gateway"
+    echo-mark-cur
+
+    if test ! -s ${MANAGER_GATEWAY_INDEX} ; then
+	echo-value-null
+    else
+	local uuid domain id ip i=0
+	local col=$[${PRINT_COL} - 12]
+
+	while read uuid domain id ip
+	do
+	    test ${i} -eq 0 || echo-blank-command
+	    echo-value "${domain} ${id} ${ip}"
+	    ((i++))
+	done < ${MANAGER_GATEWAY_INDEX}
+    fi
+
+    echo-end-show
+}
+
+create-manager-context()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    local context=${1}
+    local id=${2}
+    local source_context=${3}
+    local source_id=${4}
+
+    local template_dir=$(get-manager-context-rdir ${context})
+    test ! -d ${template_dir}/${id} || return 0
+
+    if test -z "${source_id}" ; then
+
+	mkdir -p ${template_dir}/${id}/${SSL_CA_RDIR}
+	mkdir -p ${template_dir}/${id}/${SSL_LOCAL_CA_RDIR}
+	mkdir -p ${template_dir}/${id}/${SSL_SERVER_RDIR}
+	mkdir -p ${template_dir}/${id}/${SSL_CLIENT_RDIR}
+	mkdir -p ${template_dir}/${id}/${SSL_CTL_RDIR}
+	mkdir -p ${template_dir}/${id}/${SSL_SNMP_RDIR}
+
+	mkdir -p ${template_dir}/${id}/${URLLIST_RDIR}
+	mkdir -p ${template_dir}/${id}/${WAF_RDIR}
+	mkdir -p ${template_dir}/${id}/${VPN_IPSEC_RDIR}
+	mkdir -p ${template_dir}/${id}/${SSH_PUBLIC_KEY_RDIR}
+
+	cp --no-preserve=mode -f ${USERENV_FILE_FACTORY/.manager/.gateway} ${template_dir}/${id}/${ENV_NAME}
+	cp --no-preserve=mode -f ${USERENV_FILE_FACTORY/.manager/.gateway} ${template_dir}/${id}/${ENV_CANCEL_NAME}
+	cp --no-preserve=mode -f ${USERENV_FILE_FACTORY_CURRENT/.manager/.gateway} ${template_dir}/${id}/${ENV_CURRENT_NAME}
+
+	cp --no-preserve=mode -f ${CONFIGURATION_DB_FILE_FACTORY/.manager/.gateway} ${template_dir}/${id}/${CONFIGURATION_DB_NAME}
+	cp --no-preserve=mode -f ${CONFIGURATION_DB_FILE_FACTORY_CURRENT/.manager/.gateway} ${template_dir}/${id}/${CONFIGURATION_CURRENT_DB_NAME}
+
+	local secret=$(random-psk)
+	secret=$(encrypt-password "clear:${secret}" "${IPSEC_PASSWD}")
+	echo "${secret}" > ${template_dir}/${id}/${VPN_IPSEC_RDIR}/${IPSEC_AUTHENTICATE_PSK_FILENAME}
+	cp -f ${template_dir}/${id}/${VPN_IPSEC_RDIR}/${IPSEC_AUTHENTICATE_PSK_FILENAME} ${template_dir}/${id}/${VPN_IPSEC_RDIR}/${IPSEC_AUTHENTICATE_PSK_FILENAME}.current
+    else
+	test -n "${source_id}" || return 255
+	local source_dir=$(get-manager-context-rdir ${source_context})
+	test -d ${source_dir}/${source_id} || return 255
+	cp -rf ${source_dir}/${source_id} ${template_dir}/${id} || return 104
+
+	if test ${source_context} == gateway ; then
+
+	    local ssl_client_dir_name=$(file-basename ${SSL_CLIENT_RDIR})
+	    local tmp_index_file=${ADMIN_TMP_DIR}.openssl.index.${$}
+
+	    local state expiration serial unknown fdn
+	    local revoke ssl_dir_name
+
+	    rm -rf ${template_dir}/${id}/hard || return 104
+	    rm -rf ${template_dir}/${id}/${SSL_CLIENT_RDIR}/* || return 104
+
+	    while read state expiration serial unknown fdn
+	    do
+		if test ${state} == R ; then
+		    revoke=${serial}
+		    serial=${unknown}
+		    fdn=${fdn#unknown*\/}
+		    fdn=/${fdn}
+		fi
+
+		ssl_dir_name=$(readlink ${template_dir}/${id}/${SSL_CTL_RDIR}/${serial}.pem 2> /dev/null)
+		ssl_dir_name=${ssl_dir_name/\.\.\/}
+		ssl_dir_name=${ssl_dir_name/\/*}
+
+		if test ${ssl_dir_name} == ${ssl_client_dir_name} ; then
+		    rm -f ${template_dir}/${id}/${SSL_CTL_RDIR}/${serial}.pem
+		else
+		    if test ${state} == R ; then
+			echo -e "${state}\t${expiration}\t${revoke}\t${serial}\t${unknown}\t${fdn}"
+		    else
+			echo -e "${state}\t${expiration}\t\t${serial}\t${unknown}\t${fdn}"
+		    fi
+		fi
+	    done < ${template_dir}/${id}/${SSL_CTL_RDIR}/index.txt > ${tmp_index_file}
+
+	    cp -a ${tmp_index_file} ${template_dir}/${id}/${SSL_CTL_RDIR}/index.txt
+	    cp -a ${tmp_index_file} ${template_dir}/${id}/${SSL_CTL_RDIR}/index.txt.old
+	    rm -f ${tmp_index_file}
+	fi
+    fi
+
+    local tmp_base_dir=$(get-manager-context-tmp-dir ${context})
+    mkdir -p ${tmp_base_dir}/${id}
+
+    mkdir -p ${template_dir}/${id}/var/log
+}
+
+delete-manager-context()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    local context=${1}
+    local id=${2}
+    local force=${3}
+
+    test "${force}" == 'force' || request-confirmation
+
+    local dir=$(get-manager-context-rdir ${context})
+    local tmp_dir=$(get-manager-context-tmp-dir ${context})
+
+    rm -rf ${dir}/${id}
+    rm -rf ${tmp_dir}/${id}
+
+    test ${context} == gateway || return 0
+
+    rm -f ${URLLIST_VAR_DIR}/${id}.${MPUSHED_STATUS}
+    rm -f ${AV_VAR_DIR}/${id}.${MPUSHED_STATUS}
+}
+
+manager-template-report()
+{
+    test -n "${1}" || return 1
+    local report=${1}
+
+    case ${report} in
+	'exec')
+	    display-manager-exec-report template
+	    ;;
+	*)
+	    return 1
+	    ;;
+    esac
+}
+
+manager-template()
+{
+    local op=${1}
+
+    if test -z "${op}" ; then
+	show-templates
+	return 0
+    fi
+
+    if test ${op} == 'report' ; then
+	test -n "${2}" || return 1
+	manager-template-report ${2}
+	return ${?}
+    fi
+
+    if test ${op} == 'raz' ; then
+	user-has-admin-rights || return 31
+	is-usage-allowed || return 155
+	test ${CURRENT_MANAGER_SYNC_ROLE} != slave || return 247
+	test "${2}" == 'force' || request-confirmation
+	raz-manager-context template
+	return 0
+    fi
+
+    local id source_context source_id
+
+    case ${op} in
+	add|del)
+	    id=${2}
+	    source_context=${3}
+	    source_id=${4}
+	    ;;
+	begin)
+	    test -n "${2}" || return 1
+	    local sub_op=${2}
+	    case ${sub_op} in
+		conf)
+		    test ${CURRENT_MANAGER_SYNC_ROLE} != slave || return 247
+		    test -n "${3}" || return 1
+		    id=${3}
+		    manager-context-exist template ${id} || return 218
+		    ;;
+		'exec')
+		    id=${3}
+		    if test -n "${id}" ; then
+			manager-context-exist template ${id} || return 218
+		    else
+			local dir=$(get-manager-context-rdir template)
+			local templates=$(ls -1 ${dir} 2> /dev/null)
+			test -n "${templates}" || return 219
+		    fi
+
+		    ;;
+		*)
+		    return 1
+		    ;;
+	    esac
+	    ;;
+	*)
+	    return 1
+	    ;;
+    esac
+
+    if test -n "${id}" ; then
+	check-id-length ${id} || return 127
+	check-id ${id} || return 35
+
+	if test ${op} == add ; then
+	    if test -n "${source_context}" ; then
+		case ${source_context} in
+		    template|gateway)
+		        ;;
+		    *)
+			return 1
+			;;
+		esac
+		test -n "${source_id}" || return 1
+		manager-context-exist ${source_context} ${source_id} || return 218
+	    fi
+	fi
+    fi
+
+    user-has-admin-rights || return 31
+
+    case ${op} in
+	add)
+	    is-usage-allowed || return 155
+	    test ${CURRENT_MANAGER_SYNC_ROLE} != slave || return 247
+	    local len=$(get-template-numbers)
+	    test ${len} -lt ${MANAGER_TEMPLATE_NB} || return 90
+	    create-manager-context template ${id} ${source_context} ${source_id}
+	    ;;
+	del)
+	    is-usage-allowed || return 155
+	    manager-context-exist template ${id} || return 218
+	    ! manager-context-is-edited template ${id} || return 238
+	    test ${CURRENT_MANAGER_SYNC_ROLE} != slave || return 247
+	    delete-manager-context template ${id} ${3}
+	    ;;
+	begin)
+	    case ${sub_op} in
+		conf)
+		    test ${CURRENT_MANAGER_SYNC_ROLE} != slave || return 247
+		    cli-enter-manager-conf-context template ${id}
+		    ;;
+		'exec')
+		    is-usage-allowed || return 155
+		    test ${CURRENT_MANAGER_SYNC_ROLE} != slave || return 247
+		    enter-manager-exec-context template ${id}
+		    ;;
+		*)
+		    return 255
+		    ;;
+	    esac
+	    ;;
+	*)
+	    return 1
+	    ;;
+    esac
+}
+
+get-gateway-reference()
+{
+    test -n "${1}" || return 1
+    local ip=${1}
+
+    local reference
+    local ret
+
+    reference=$(run-command-on-gateway ${ip} "system internal reference" noinput 2> /dev/null)
+    ret=${?}
+    
+    echo ${reference}
+    return ${ret}
+}
+
+get-gateway-ip()
+{
+    test -n "${1}" || return 1
+    local in_id=${1}
+
+    test -s ${MANAGER_GATEWAY_INDEX} || return 11
+
+    local uuid domain id ip
+    while read uuid domain id ip
+    do
+	if test ${id} == ${in_id} ; then
+	    echo ${ip}
+	    return 0
+	fi
+    done < ${MANAGER_GATEWAY_INDEX}
+
+    return 13
+}
+
+get-gateway-domain()
+{
+    test -n "${1}" || return 1
+    local in_id=${1}
+
+    test -s ${MANAGER_GATEWAY_INDEX} || return 11
+
+    local uuid domain id ip
+    while read uuid domain id ip
+    do
+	test -n "${ip}" || continue
+
+	if test ${id} == ${in_id} ; then
+	    echo ${domain}
+	    return 0
+	fi
+    done < ${MANAGER_GATEWAY_INDEX}
+
+    return 13
+}
+
+get-gateway-id()
+{
+    test -n "${1}" || return 1
+    local in_ip=${1}
+
+    test -s ${MANAGER_GATEWAY_INDEX} || return 11
+
+    local uuid domain id ip
+    while read uuid domain id ip
+    do
+	test -n "${ip}" || continue
+
+	if test ${ip} == ${in_ip} ; then
+	    echo ${id}
+	    return 0
+	fi
+    done < ${MANAGER_GATEWAY_INDEX}
+
+    return 13
+}
+
+get-gateway-enrol-state()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    local in_uuid=${1}
+    local in_id=${2}
+
+    test -s ${MANAGER_GATEWAY_INDEX} || return 0
+       
+    local uuid domain id ip
+    while read uuid domain id ip
+    do
+	if test ${id} == ${in_id} ; then
+	    if test ${uuid} == ${in_uuid} ; then
+		return 0
+	    else
+		return 11
+	    fi
+	fi
+    done < ${MANAGER_GATEWAY_INDEX}
+
+    return 0
+}
+
+get-gateway-os-version()
+{
+    test -n "${1}" || return 1
+    local id=${1}
+
+    local dir=$(get-manager-context-rdir gateway)
+    local hard_dir=${dir}/${id}/${HARD_DIR_NAME}
+
+    local os_version=$(cat ${hard_dir}/os-version 2> /dev/null)
+    test -n "${os_version}" || os_version='0.0.0'
+
+    echo ${os_version}
+}
+
+check-remote-gateway-os-version()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    local id=${1}
+    local ip=${2}
+
+    local tmp_remote_os_file=${ADMIN_TMP_DIR}/${id}.os-version.${$}
+
+    scp -4BCpqO ${ip}:${HARD_DIR}/os-version ${tmp_remote_os_file} > /dev/null 2>&1
+    ret=${?}
+
+    if test ${ret} -ne 0 ; then
+	rm -f ${tmp_remote_os_file}
+	return 215
+    fi
+
+    local manager_os_version=$(get-os-cur-version)
+    local gateway_os_version=$(cat ${tmp_remote_os_file} 2> /dev/null)
+    rm -f ${tmp_remote_os_file}
+
+    test "${gateway_os_version}" == "${manager_os_version}" || return 228
+}
+
+manager-gateway-hard-pull()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    local id=${1}
+    local ip=${2}
+
+    local tmp_dir=${ADMIN_TMP_DIR}/${HARD_DIR_NAME}.${id}.${$} ret
+
+    scp -4BCpqOr ${ip}:${HARD_DIR} ${tmp_dir} > /dev/null 2>&1
+    ret=${?}
+
+    if test ${ret} -ne 0 ; then
+	rm -rf ${tmp_dir}
+	return 215
+    fi
+
+    local dir=$(get-manager-context-rdir gateway)
+    local appliance_dir=${dir}/${id}/${HARD_DIR_NAME}
+
+    rm -rf ${appliance_dir}
+    mkdir -p ${appliance_dir}
+
+    cp -f ${tmp_dir}/* ${appliance_dir}
+    rm -rf ${tmp_dir}
+}
+
+manager-gateway-conf-purge()
+{
+    test -n "${1}" || return 1
+    local id=${1}
+
+    local dir=$(get-manager-context-rdir gateway)
+    local tmp_dir=$(get-manager-context-tmp-dir gateway)
+
+    local env_dir=${dir}/${id}
+    
+    test -d ${env_dir} || return 11
+
+    rm -f ${env_dir}/${ENV_NAME}
+    rm -f ${env_dir}/${ENV_CURRENT_NAME}
+
+    rm -rf ${env_dir}/${SSL_RDIR}
+    rm -rf ${env_dir}/${URLLIST_RDIR}
+    rm -rf ${env_dir}/${WAF_RDIR}
+    rm -rf ${env_dir}/${VPN_IPSEC_RDIR}
+    rm -f ${env_dir}/${SSH_PUBLIC_KEY_RDIR}/*
+
+    rm -f ${tmp_dir}/${id}/*
+}
+
+manager-gateway-integrate-conf()
+{
+    test -n "${1}" || return 1
+    local id=${1}
+
+    local dir=$(get-manager-context-rdir gateway)
+    local env_dir=${dir}/${id}
+    
+    test -d ${env_dir} || return 11
+
+    cp -f ${env_dir}/${VPN_IPSEC_RDIR}/${IPSEC_AUTHENTICATE_PSK_FILENAME}.current ${env_dir}/${VPN_IPSEC_RDIR}/${IPSEC_AUTHENTICATE_PSK_FILENAME} &&
+	generate-env-file-from-current ${env_dir}/${ENV_CURRENT_NAME} > ${env_dir}/${ENV_NAME} &&
+	cp -f ${env_dir}/${ENV_NAME} ${env_dir}/${ENV_CANCEL_NAME} || return 11
+
+    init-env gateway ${id} || return 13
+
+    local files=$(ls -1 ${SSL_SERVER_DIR}/*.cnf 2> /dev/null) file
+    local tmp_file=${ADMIN_TMP_DIR}/ssl.cnf.${$}
+    local tls_id ret=0
+
+    for file in ${files}
+    do
+	tls_id=$(file-basename ${file} .cnf)
+	echo "SSLDIR = ${SSL_DIR}" > ${tmp_file}  &&
+	    tail --lines=+2 ${file} >> ${tmp_file} &&
+	    cp -f ${tmp_file} ${SSL_SERVER_DIR}/${tls_id}.cnf || ((ret++))
+    done
+
+    files=$(ls -1d ${SSL_CLIENT_DIR}/*.cur 2> /dev/null)
+    for file in ${files}
+    do
+	tls_id=$(file-basename ${file} .cur)
+	echo "SSLDIR = ${SSL_DIR}" > ${tmp_file} &&
+	    tail --lines=+2 ${file}/${tls_id}.cnf >> ${tmp_file} &&
+	    cp -f ${tmp_file} ${SSL_CLIENT_DIR}/${tls_id}.cur/${tls_id}.cnf || ((ret++))
+    done
+
+    rm -f ${tmp_file}
+    update-modification-state
+
+    return ${ret}
+}
+
+manager-gateway-conf-pull()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    local id=${1}
+    local ip=${2}
+
+    local tmp_dir=${ADMIN_TMP_DIR}/env.${id}.${$}
+    local ret
+
+    local-log ${MANAGER_PULL_OPERATION_LOG}.${id} "Checking '${id}' OS version compatibility"
+    check-remote-gateway-os-version ${id} ${ip}
+    ret=${?}
+    local-log-result ${MANAGER_PULL_OPERATION_LOG}.${id} ${ret}
+    test ${ret} -eq 0 || return ${ret}
+
+    local-log ${MANAGER_PULL_OPERATION_LOG}.${id} "Refreshing '${id}' hardware configuration"
+    manager-gateway-hard-pull ${id} ${ip}
+    ret=${?}
+    if test ${ret} -eq 0 ; then
+	local-log-result ${MANAGER_PULL_OPERATION_LOG}.${id} 0
+    else
+	local-log-result ${MANAGER_PULL_OPERATION_LOG}.${id} ${ret}
+	return ${ret}
+    fi
+
+    local-log ${MANAGER_PULL_OPERATION_LOG}.${id} "Downloading '${id}' configuration (1/2)"
+    scp -4BCpqOr ${ip}:${ENV_RDIR} ${tmp_dir} > /dev/null 2>&1
+    ret=${?}
+    if test ${ret} -eq 0 ; then
+	local-log-result ${MANAGER_PULL_OPERATION_LOG}.${id} 0
+    else
+	local-log-result ${MANAGER_PULL_OPERATION_LOG}.${id} 215
+	rm -rf ${tmp_dir}
+	return 215
+    fi
+
+    local-log ${MANAGER_PULL_OPERATION_LOG}.${id} "Downloading '${id}' configuration (2/2)"
+    mkdir -p ${tmp_dir}/${SSH_PUBLIC_KEY_RDIR} &&
+	scp -4BCpqOr ${ip}:${SSH_PUBLIC_KEY_RDIR} ${tmp_dir}/.ssh > /dev/null 2>&1
+    ret=${?}
+    if test ${ret} -eq 0 ; then
+	local-log-result ${MANAGER_PULL_OPERATION_LOG}.${id} 0
+    else
+	local-log-result ${MANAGER_PULL_OPERATION_LOG}.${id} 215
+	rm -rf ${tmp_dir}
+	return 215
+    fi
+
+    local-log ${MANAGER_PULL_OPERATION_LOG}.${id} "Purging '${id}' local configuration"
+    manager-gateway-conf-purge ${id}
+    if test ${?} -eq 0 ; then
+	local-log-result ${MANAGER_PULL_OPERATION_LOG}.${id} 0
+    else
+	local-log-result ${MANAGER_PULL_OPERATION_LOG}.${id} 104
+	rm -rf ${tmp_dir}
+	return 104
+    fi
+
+    local dir=$(get-manager-context-rdir gateway)
+    local env_dir=${dir}/${id}
+
+    local-log ${MANAGER_PULL_OPERATION_LOG}.${id} "Committing '${id}' configuration (1/2)"
+    cp -a ${tmp_dir}/* ${env_dir} &&
+	cp -a ${tmp_dir}/${SSH_PUBLIC_KEY_RDIR} ${env_dir}/.ssh
+    if test ${?} -eq 0 ; then
+	local-log-result ${MANAGER_PULL_OPERATION_LOG}.${id} 0
+    else
+	local-log-result ${MANAGER_PULL_OPERATION_LOG}.${id} 104
+	rm -rf ${tmp_dir}
+	return 104
+    fi
+
+    local-log ${MANAGER_PULL_OPERATION_LOG}.${id} "Committing '${id}' configuration (2/2)"
+    manager-gateway-integrate-conf ${id}
+    ret=${?}
+
+    if test ${ret} -eq 0 ; then
+	local-log-result ${MANAGER_PULL_OPERATION_LOG}.${id} 0
+    else
+	local-log-result ${MANAGER_PULL_OPERATION_LOG}.${id} 104
+	ret=104
+    fi
+
+    rm -rf ${tmp_dir}
+
+    return ${ret}
+}
+
+gateway-conf-allow-manager-ip()
+{
+    local access=$(get-variable-value-from-file ${USERENV_FILE} ACCESS_MANAGER_LIST)
+
+    local role
+    local ssh_key_id ssh_key_file
+    local elt range i=0
+
+    for elt in ${access}
+    do
+	range=$[${i} % 3]
+	case ${range} in
+	    0)
+		role=${elt}
+		;;
+	    1)
+		;;
+	    2)
+		ssh_key_id=$(get-manager-key-id ${role})
+		ssh_key_file=${SSH_PUBLIC_KEY_DIR}/${ssh_key_id}
+		if test -f ${ssh_key_file} -a -f ${ADMIN_DIR}/.ssh/id_rsa.pub ; then
+		    diff --brief ${ssh_key_file} ${ADMIN_DIR}/.ssh/id_rsa.pub > /dev/null 2>&1
+		    test ${?} -ne 0 || return 0
+		fi
+		;;
+	    *)
+		return 255
+		;;
+	esac
+	((i++))
+    done
+
+    return 11
+}
+
+manager-gateway-conf-push()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    local id=${1}
+    local ip=${2}
+
+    local elt range i=0
+    local files file base
+    local stars code_type code rest
+    local message ret
+    
+    local pushed_dir=${ADMIN_TMP_DIR}/${MANAGER_PUSHED}.${id}.conf.${$}
+    rm -rf ${pushed_dir}
+
+    local-log ${MANAGER_PUSH_OPERATION_LOG}.${id} "Checking '${id}' OS version compatibility"
+    check-remote-gateway-os-version ${id} ${ip}
+    ret=${?}
+    local-log-result ${MANAGER_PUSH_OPERATION_LOG}.${id} ${ret}
+    test ${ret} -eq 0 || return ${ret}
+
+    local-log ${MANAGER_PUSH_OPERATION_LOG}.${id} "Loading '${id}' configuration"
+    init-env gateway ${id}
+    ret=${?}
+    if test ${ret} -eq 0 ; then
+	local-log-result ${MANAGER_PUSH_OPERATION_LOG}.${id} 0
+    else
+	local-log-result ${MANAGER_PUSH_OPERATION_LOG}.${id} ${ret}
+	return ${ret}
+    fi
+
+    local-log ${MANAGER_PUSH_OPERATION_LOG}.${id} "Checking '${id}' configuration validity"
+
+    if ! gateway-conf-allow-manager-ip ; then
+	local-log-result ${MANAGER_PUSH_OPERATION_LOG}.${id} 242
+	return 236
+    fi
+
+    if static-conf-modified ; then
+	local-log-result ${MANAGER_PUSH_OPERATION_LOG}.${id} 236
+	return 236
+    else
+	local-log-result ${MANAGER_PUSH_OPERATION_LOG}.${id} 0
+    fi
+
+    local-log ${MANAGER_PUSH_OPERATION_LOG}.${id} "Cancelling new configuration on remote '${id}'"
+    run-command-on-gateway ${ip} "cancel" noinput > /dev/null 2> ${MANAGER_PUSH_OPERATION_LOG}.cancel.${id}.${$}
+    read stars code_type code rest < ${MANAGER_PUSH_OPERATION_LOG}.cancel.${id}.${$}
+    rm -f ${MANAGER_PUSH_OPERATION_LOG}.cancel.${id}.${$}
+
+    if test -z "${code}" ; then
+	local-log-result ${MANAGER_PUSH_OPERATION_LOG}.${id} 0
+    else
+	check-digit ${code} || code=255
+	message=$(get-run-command-on-gateway-message ${code_type} ${code})
+	local-log-result ${MANAGER_PUSH_OPERATION_LOG}.${id} ${code}
+
+	if test -n "${message}" ; then
+	    local-log ${MANAGER_PUSH_OPERATION_LOG}.${id} "${message}"
+	    local-log-result ${MANAGER_PUSH_OPERATION_LOG}.${id}
+	fi
+	return ${code}
+    fi
+
+    local-log ${MANAGER_PUSH_OPERATION_LOG}.${id} "Exporting the configuration for '${id}'"
+    ret=0
+
+    mkdir -p ${pushed_dir}${ADMIN_DIR}/${ENV_RDIR} || ((ret++))
+    mkdir -p ${pushed_dir}${ADMIN_DIR}/${ENV_RDIR}/${URLLIST_RDIR} || ((ret++))
+    mkdir -p ${pushed_dir}${ADMIN_DIR}/${ENV_RDIR}/${VPN_IPSEC_RDIR} || ((ret++))
+    mkdir -p ${pushed_dir}${ADMIN_TMP_DIR} || ((ret++))
+
+    cp -af ${USERENV_FILE} ${pushed_dir}${ADMIN_DIR}/${ENV_RDIR}/${ENV_NAME} || ((ret++))
+    cp -af ${CONFIGURATION_DB_FILE} ${pushed_dir}${ADMIN_DIR}/${ENV_RDIR}/${CONFIGURATION_DB_NAME} || ((ret++))
+    cp -af ${VPN_IPSEC_DIR}/${IPSEC_AUTHENTICATE_PSK_FILENAME} ${pushed_dir}${ADMIN_DIR}/${ENV_RDIR}/${VPN_IPSEC_RDIR}/${IPSEC_AUTHENTICATE_PSK_FILENAME} || ((ret++))
+
+    test ! -f ${VPN_IPSEC_DIR}/whitelist || cp -af ${VPN_IPSEC_DIR}/whitelist ${pushed_dir}${ADMIN_DIR}/${ENV_RDIR}/${VPN_IPSEC_RDIR}/whitelist || ((ret++))
+
+    files=$(ls -1 ${SSL_CA_DIR}/${SYSTEM_CA}.{key,certificate} 2> /dev/null)
+    for file in ${files}
+    do
+	base=$(file-basename ${file})
+	cp -af ${file} ${pushed_dir}${ADMIN_TMP_DIR}/work.${LOADED}.${base} || ((ret++))
+    done
+
+    files=$(ls -1 ${SSL_LOCAL_CA_DIR}/*.certificate 2> /dev/null)
+    for file in ${files}
+    do
+	base=$(file-basename ${file} .certificate)
+	test ${base} != system || continue
+	cp -af ${file} ${pushed_dir}${ADMIN_TMP_DIR}/work.${LOADED}.${THIRD_CA}.${base} || ((ret++))
+    done
+
+    files=$(ls -1 ${SSL_SERVER_DIR}/*.certificate 2> /dev/null)
+    for file in ${files}
+    do
+	base=$(file-basename ${file} .certificate)
+	if test -f ${SSL_SERVER_DIR}/${base}.key ; then
+	    cp -af ${SSL_SERVER_DIR}/${base}.key ${pushed_dir}${ADMIN_TMP_DIR}/work.${LOADED}.${TLS_SERVER}.key.${base} || ((ret++))
+	    cp -af ${SSL_SERVER_DIR}/${base}.certificate ${pushed_dir}${ADMIN_TMP_DIR}/work.${LOADED}.${TLS_SERVER}.certificate.${base} || ((ret++))
+
+	    if test -f ${SSL_SERVER_DIR}/${base}.revoked ; then
+		cp -f ${SSL_SERVER_DIR}/${base}.revoked ${pushed_dir}${ADMIN_TMP_DIR}/work.${TLS_SERVER}.${base}.2rev || ((ret++))
+	    fi
+	else
+	    test ! -f ${SSL_SERVER_DIR}/${base}.csr || cp -a ${SSL_SERVER_DIR}/${base}.csr ${pushed_dir}${ADMIN_TMP_DIR}/work.${LOADED}.${TLS_SERVER}.csr.${base} || ((ret++))
+	fi
+    done
+
+    files=$(ls -1d ${SSL_CLIENT_DIR}/*.cur 2> /dev/null)
+    for file in ${files}
+    do
+	base=$(file-basename ${file} .cur)
+	test -f ${SSL_CLIENT_DIR}/${base}.cur/${base}.certificate || continue
+	cp -af ${SSL_CLIENT_DIR}/${base}.cur/${base}.certificate ${pushed_dir}${ADMIN_TMP_DIR}/work.${LOADED}.${TLS_CLIENT}.certificate.${base} || ((ret++))
+
+	if test -f ${SSL_CLIENT_DIR}/${base}.revoked ; then
+	    cp -f ${SSL_CLIENT_DIR}/${base}.revoked ${pushed_dir}${ADMIN_TMP_DIR}/work.${TLS_CLIENT}.${base}.2rev || ((ret++))
+	fi
+    done
+
+    if test -f ${SSL_SNMP_DIR}/${SNMP_SSL}.crt ; then
+	cp -af ${SSL_SNMP_DIR}/${SNMP_SSL}.crt ${pushed_dir}${ADMIN_TMP_DIR}/work.${LOADED}.${SNMP_SSL}.certificate || ((ret++))
+    fi
+
+    if test -f ${AV_VAR_DIR}/${AV_WHITELIST_SIG} ; then
+	cp -af ${AV_VAR_DIR}/${AV_WHITELIST_SIG} ${pushed_dir}${ADMIN_TMP_DIR}/work.${LOADED}.${AV_WHITELIST_SIG} || ((ret++))
+    else
+	local touch_file=${ADMIN_TMP_DIR}/${AV_WHITELIST_SIG}.2del.${id}.${$} ; touch ${touch_file}
+	cp -af ${touch_file} ${pushed_dir}${ADMIN_TMP_DIR}/${AV_WHITELIST_SIG}.2del || ((ret++))
+	rm -f ${touch_file}
+	NEWENV=1
+	test ${ret} -eq 0 || return 215
+    fi
+
+    files=$(ls -1 ${SSH_PUBLIC_KEY_DIR}/* 2> /dev/null)
+    for file in ${files}
+    do
+	base=$(file-basename ${file})
+	cp -a ${file} ${pushed_dir}${ADMIN_TMP_DIR}/work.${LOADED}.${SSH_KEY}.${base} || ((ret++))
+    done
+
+    files=$(ls -1 ${URLLIST_VAR_DIR}/*.gz 2> /dev/null)
+    for file in ${files}
+    do
+	base=$(file-basename ${file})
+	cp -af ${file} ${pushed_dir}${ADMIN_TMP_DIR}/${base} || ((ret++))
+	test ! -f ${file}.${SIGNATURE} || cp -af ${file}.${SIGNATURE} ${pushed_dir}${ADMIN_TMP_DIR}/${base}.${SIGNATURE} || ((ret++))
+    done
+
+    local del_file=${ADMIN_TMP_DIR}/${WAF_RWEB_CUSTOM}.${id}.${$}
+    touch ${del_file}
+    for elt in ${RWEB_SITE_LIST}
+    do
+	range=$[${i} % 5]
+	case ${range} in
+	    0)
+		base=${elt}
+		;;
+	    1|2|3)
+		;;
+	    4)
+		file=${WAF_DIR}/${base}.rules
+
+		if test -f  ${file} ; then
+		    cp -af ${file} ${pushed_dir}${ADMIN_TMP_DIR}/work.${LOADED}.${WAF_RWEB_CUSTOM}.${base} || ((ret++))
+		else
+		    cp -a ${del_file} ${pushed_dir}${ADMIN_TMP_DIR}/2del.${WAF_RWEB_CUSTOM}.${base} || ((ret++))
+		fi
+		;;
+	    *)
+		return 1
+		;;
+	esac
+	((i++))
+    done
+    rm -f ${del_file}
+
+    local off_file=${ADMIN_TMP_DIR}/${URLLIST_AUTO}.${id}.${$}
+    echo off > ${off_file}
+    for name in ${URLLIST_LIST}
+    do
+	file=${URLLIST_DIR}/${name}.${URLLIST_AUTO}
+	if test -f ${file}.current ; then
+	    cp -af ${file}.current ${pushed_dir}${ADMIN_DIR}/${ENV_RDIR}/${URLLIST_RDIR}/work.${name}.${URLLIST_AUTO} || ((ret++))
+	else
+	    cp -af ${off_file} ${pushed_dir}${ADMIN_DIR}/${ENV_RDIR}/${URLLIST_RDIR}/work.${name}.${URLLIST_AUTO} || ((ret++))
+	fi
+    done
+    rm -f ${off_file}
+
+    if test ${ret} -eq 0 ; then
+	local-log-result ${MANAGER_PUSH_OPERATION_LOG}.${id} 0
+    else
+	local-log-result ${MANAGER_PUSH_OPERATION_LOG}.${id}
+    fi
+
+    cd ${pushed_dir}
+    local-log ${MANAGER_PUSH_OPERATION_LOG}.${id} "Uploading the configuration to '${id}'"
+    scp -4BCpqOr * ${ip}:/ > /dev/null 2>&1
+    ret=${?}
+    cd ..
+
+    rm -rf ${pushed_dir}
+
+    if test ${ret} -eq 0 ; then
+	local-log-result ${MANAGER_PUSH_OPERATION_LOG}.${id} 0
+    else
+	local-log-result ${MANAGER_PUSH_OPERATION_LOG}.${id} 104
+	return 104
+    fi
+
+    local-log ${MANAGER_PUSH_OPERATION_LOG}.${id} "Applying '${id}' pushed configuration"
+
+    run-command-on-gateway ${ip} "system internal integrateconf&&apply force" noinput > /dev/null 2> ${MANAGER_PUSH_OPERATION_LOG}.${id}.apply.${$}
+    read stars code_type code rest < ${MANAGER_PUSH_OPERATION_LOG}.${id}.apply.${$}
+    rm -f ${MANAGER_PUSH_OPERATION_LOG}.${id}.apply.${$}
+
+    if test -z "${code}" ; then
+	local-log-result ${MANAGER_PUSH_OPERATION_LOG}.${id} 0
+    else
+	check-digit ${code} || code=255
+	message=$(get-run-command-on-gateway-message ${code_type} ${code})
+	local-log-result ${MANAGER_PUSH_OPERATION_LOG}.${id} ${code}
+
+	if test -n "${message}" ; then
+	    local-log ${MANAGER_PUSH_OPERATION_LOG}.${id} "${message}"
+	    local-log-result ${MANAGER_PUSH_OPERATION_LOG}.${id}
+	fi
+	return ${code}
+    fi
+
+    return 0
+}
+
+gateway-index-update()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    test -n "${3}" || return 3
+    test -n "${4}" || return 4
+    local in_uuid=${1}
+    local in_domain=${2}
+    local in_id=${3}
+    local in_ip=${4}
+
+    test ! -f ${MANAGER_GATEWAY_INDEX}.save || mv -f ${MANAGER_GATEWAY_INDEX}.save ${MANAGER_GATEWAY_INDEX}
+
+    if test ! -s ${MANAGER_GATEWAY_INDEX} ; then
+	echo ${in_uuid} ${in_domain} ${in_id} ${in_ip} > ${MANAGER_GATEWAY_INDEX}
+	return 0
+    fi
+
+    local uuid domain d ip
+    local tmp_index=${ADMIN_TMP_DIR}/gateway-index.${in_id}.${$}
+    local found
+
+    while read uuid domain id ip
+    do
+	test -n "${ip}" || continue
+
+	if test ${id} == ${in_id} -a ${uuid} == ${in_uuid} ; then
+	    echo ${uuid} ${domain} ${id} ${in_ip}
+	    found='yes'
+	else
+	    echo ${uuid} ${domain} ${id} ${ip}
+	fi
+    done < ${MANAGER_GATEWAY_INDEX} > ${tmp_index}
+
+    test -n "${found}" || echo ${in_uuid} ${in_domain} ${in_id} ${in_ip} >> ${tmp_index}
+
+    sort --key=2 ${tmp_index} > ${tmp_index}.sorted &&
+	mv -f ${tmp_index}.sorted ${tmp_index} || return 11
+
+    mv -f ${MANAGER_GATEWAY_INDEX} ${MANAGER_GATEWAY_INDEX}.save &&
+	cp -f ${tmp_index} ${MANAGER_GATEWAY_INDEX} &&
+	rm -f ${MANAGER_GATEWAY_INDEX}.save ${tmp_index} || return 13
+}
+
+gateway-index-del()
+{
+    test -n "${1}" || return 1
+    local in_id=${1}
+
+    test ! -f ${MANAGER_GATEWAY_INDEX}.save || mv -f ${MANAGER_GATEWAY_INDEX}.save ${MANAGER_GATEWAY_INDEX}
+	
+    test -s ${MANAGER_GATEWAY_INDEX} || return 0
+
+    local uuid domain id ip
+    local tmp_index=${ADMIN_TMP_DIR}/gateway-index.${in_id}.${$}
+
+    while read uuid domain id ip
+    do
+	test -n "${ip}" || continue
+	test ${id} != ${in_id} || continue
+
+	echo ${uuid} ${domain} ${id} ${ip}
+    done < ${MANAGER_GATEWAY_INDEX} > ${tmp_index}
+
+    mv -f ${MANAGER_GATEWAY_INDEX} ${MANAGER_GATEWAY_INDEX}.save &&
+	cp -f ${tmp_index} ${MANAGER_GATEWAY_INDEX} &&
+	rm -f ${MANAGER_GATEWAY_INDEX}.save ${tmp_index}
+
+    rm -f /var/${URLLIST_RDIR}/${in_id}.${MPUSHED}
+}
+
+manager-gateway-push-report()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    test -n "${3}" || return 3
+    test -n "${4}" || return 4
+    local id=${1}
+    local ip=${2}
+    local code=${3}
+    local message=${4}
+
+    manager-report ${MANAGER_PUSH_OPERATION_LOG} ${id} ${ip} ${code} "${message}"
+}
+
+manager-gateway-pull-report()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    test -n "${3}" || return 3
+    test -n "${4}" || return 4
+    local id=${1}
+    local ip=${2}
+    local code=${3}
+    local message=${4}
+
+    manager-report ${MANAGER_PULL_OPERATION_LOG} ${id} ${ip} ${code} "${message}"
+}
+
+display-manager-gateway-report()
+{
+    test -n "${1}" || return 1
+    local report=${1}
+
+    case ${report} in
+	'exec')
+	    local sub_report=${2}
+	    test -n "${sub_report}" || return 1
+
+	    case ${sub_report} in
+		local|remote)
+		    display-manager-exec-report gateway ${sub_report}
+		    ;;
+		*)
+		    return 1
+		    ;;
+	    esac
+	    ;;
+	pull)
+	    display-manager-gateway-pull-report
+	    ;;
+	push)
+	    display-manager-gateway-push-report
+	    ;;
+	*)
+	    return 1
+	    ;;
+    esac
+}
+
+get-gateways-in-domain()
+{
+    test -n "${1}" || return 1
+    local in_domain=${1}
+
+    test -s ${MANAGER_GATEWAY_INDEX} || return 11
+
+    local uuid domain id ip
+    local ids
+
+    while read uuid domain id ip
+    do
+	test -n "${ip}" || continue
+
+	test ${domain} != ${in_domain} || ids="${ids} ${id}"
+
+    done < ${MANAGER_GATEWAY_INDEX}
+
+    echo ${ids:1}
+}
+
+get-manager-used-capacity()
+{
+    if test ! -s ${MANAGER_GATEWAY_INDEX} ; then
+	echo "0 0"
+	return 0
+    fi
+
+    local uuid domain id ip
+    local total_users_nb=0 total_rweb_nb=0
+    local users_nb rweb_nb model_file
+    local base_dir=$(get-manager-context-rdir gateway)
+
+    while read uuid domain id ip
+    do
+	test -n "${ip}" || continue
+	model_file=${base_dir}/${id}/${HARD_DIR_NAME}/model.conf
+	test -f ${model_file} || continue
+
+	users_nb=$(get-variable-value-from-file ${model_file} USERS_NB)
+	rweb_nb=$(get-variable-value-from-file ${model_file} RWEB_NB)
+
+	test -n "${users_nb}" -a -n "${rweb_nb}" || continue
+
+	((total_users_nb += users_nb))
+	((total_rweb_nb += rweb_nb))
+
+	done < ${MANAGER_GATEWAY_INDEX}
+
+    echo "${total_users_nb} ${total_rweb_nb}"
+}
+
+manager-gateway()
+{
+    local op=${1}
+
+    if test -z "${op}" ; then
+	show-gateways
+	return 0
+    fi
+
+    if test ${op} == 'report' ; then
+	shift
+	display-manager-gateway-report ${1} ${2}
+	return ${?}
+    fi
+
+    if test ${op} == 'raz' ; then
+	user-has-admin-rights || return 31
+	is-usage-allowed || return 155
+	test ${CURRENT_MANAGER_SYNC_ROLE} != slave || return 247
+	test "${2}" == 'force' || request-confirmation
+	raz-manager-context gateway
+	rm -f ${MANAGER_GATEWAY_INDEX}
+	return 0
+    fi
+
+    local in_domain in_id
+
+    case ${op} in
+	add)
+	    test -n "${2}" || return 1
+	    test -n "${3}" || return 1
+	    in_domain=${2}
+	    in_id=${3}
+	    ;;
+	del)
+	    test -n "${2}" || return 1
+	    in_id=${2}
+	    ;;
+
+	pull|push)
+	    local in_uuid domain in_ip
+	    in_domain=${2}
+	    in_id=${3}
+	    ;;
+	begin)
+	    test -n "${2}" || return 1
+	    op=${2}
+	    case ${op} in
+		conf)
+		    test -n "${3}" || return 1
+		    in_id=${3}
+		    ;;
+		'exec')
+		    test -n "${3}" || return 1
+		    local place=${3}
+		    case ${place} in
+			remote|local)
+			    ;;
+			*)
+			    return 1
+			    ;;
+		    esac
+		    in_domain=${4}
+		    in_id=${5}
+		    ;;
+		*)
+		    return 1
+		    ;;
+	    esac
+	    ;;
+	*)
+	    return 1
+	    ;;
+    esac
+
+    if test -n "${in_id}" ; then
+	check-id-length ${in_id} || return 127
+	check-id ${in_id} || return 35
+    fi
+
+    if test -n "${in_domain}" ; then
+	check-id-length ${in_domain} || return 127
+	check-id ${in_domain} || return 35
+    fi
+
+    case ${op} in
+	pull|push|'exec')
+
+    	    if test -n "${in_id}" ; then
+		domain=$(get-gateway-domain ${in_id})
+		if test ${?} -ne 0 ; then
+		    error 218
+		else
+		    test "${domain}" == "${in_domain}" || warning 5
+		fi
+	    else
+		local ips ids n i=0
+		declare -a ips ids
+
+		while read in_uuid domain in_id in_ip
+		do
+		    test -n "${in_ip}" || continue
+
+		    if test -z "${in_domain}" -o ${domain} == "${in_domain}" ; then
+			ids[${i}]=${in_id}
+			ips[${i}]=${in_ip}
+			((i++))
+		    fi
+		done < ${MANAGER_GATEWAY_INDEX}
+		n=${i}
+
+		test ${n} -gt 0 || return 219
+	    fi
+	    ;;
+	*)
+	    ;;
+    esac
+
+    user-has-admin-rights || return 31
+
+    case ${op} in
+	add)
+	    is-usage-allowed || return 155
+	    test ${CURRENT_MANAGER_SYNC_ROLE} != slave || return 247
+	    local in_ip=${4}
+	    check-ip ${in_ip} || return 12
+
+	    local reference
+
+	    reference=$(get-gateway-reference ${in_ip})
+	    test ${?} -eq 0 || return 215
+
+	    check-reference "${reference}" || return 229
+	    local remote_passwd=${reference/:*}
+	    local local_passwd=$(cat ${PRIVATE_DIR}/.${APPLIANCE_PASSWD} 2> /dev/null)
+	    test "${remote_passwd}" == "${local_passwd}" || return 229
+
+	    local passport=${reference/,*}
+	    local role=${passport#*:} ; role=${role/:*}
+	    test "${role}" == 'gateway' || return 230
+
+	    local capacity=${reference/*,}
+	    local users_nb=${capacity/:*}
+	    local rweb_nb=${capacity/*:}
+
+	    local total_capacity=$(get-manager-used-capacity)
+	    local total_users_nb=${total_capacity/ *}
+	    local total_rweb_nb=${total_capacity/* }
+
+	    ((total_users_nb += users_nb))
+	    test ${total_users_nb} -le ${MANAGER_TOTAL_USERS_NB} || return 240
+
+	    ((total_rweb_nb += rweb_nb))
+	    test ${total_rweb_nb} -le ${MANAGER_TOTAL_RWEB_NB} || return 241
+
+
+	    local in_uuid=${passport/*:}
+
+	    get-gateway-enrol-state ${in_uuid} ${in_id} || return 216
+
+	    local id=$(get-gateway-id ${in_ip})
+	    test -z "${id}" || test ${id} == ${in_id} || return 235
+
+	    check-remote-gateway-os-version ${in_id} ${in_ip} || return ${?}
+	    gateway-index-update ${in_uuid} ${in_domain} ${in_id} ${in_ip} || return 104
+	    create-manager-context gateway ${in_id}
+	    manager-gateway-hard-pull ${in_id} ${in_ip} || return ${?}
+	    ;;
+
+	del)
+	    is-usage-allowed || return 155
+	    manager-context-exist gateway ${in_id} || return 218
+	    ! manager-context-is-edited gateway ${in_id} || return 238
+	    test ${CURRENT_MANAGER_SYNC_ROLE} != slave || return 247
+	    delete-manager-context gateway ${in_id} ${3}
+	    gateway-index-del ${in_id}
+	    ;;
+
+	conf)
+	    manager-context-exist gateway ${in_id} || return 218
+	    test ${CURRENT_MANAGER_SYNC_ROLE} != slave || return 247
+	    cli-enter-manager-conf-context gateway ${in_id}
+	    ;;
+
+	pull)
+	    is-usage-allowed || return 155
+	    test ${CURRENT_MANAGER_SYNC_ROLE} != slave || return 247
+	    reset-manager-gateway-pull-report
+
+	    local message
+
+	    if test -n "${in_id}" ; then
+		message="Pulling from '${in_id}' (1/1) - Begin"
+		manager-context-exist gateway ${in_id}
+
+		if test ${?} -ne 0 ; then
+		    manager-gateway-pull-report ${in_id} - 218 "${message}"
+		    return 218
+		else
+		    in_ip=$(get-gateway-ip ${in_id})
+		    if test -z "${in_ip}" ; then
+			manager-gateway-pull-report ${in_id} - 218 "${message}"
+			return 218
+		    fi
+		fi
+		manager-gateway-pull-report ${in_id} ${in_ip} 0 "${message}"
+		manager-gateway-conf-pull ${in_id} ${in_ip} &
+	    else
+		message="Pulling from"
+
+		for ((i=0 ; i<n ; i++))
+		do
+		    in_id=${ids[${i}]}
+		    in_ip=${ips[${i}]}
+
+		    manager-context-exist gateway ${in_id} ${in_ip}
+
+		    if test ${?} -ne 0 ; then
+			manager-gateway-pull-report ${in_id} ${in_ip} 218 "${message} '${in_id}' ($[${i} + 1]/${n}) - Begin"
+		    else
+			manager-gateway-pull-report ${in_id} ${in_ip} 0 "${message} '${in_id}' ($[${i} + 1]/${n}) - Begin"
+		    fi
+		    manager-gateway-conf-pull ${in_id} ${in_ip} &
+		done
+	    fi
+	    ;;
+
+	push)
+	    is-usage-allowed || return 155
+	    test ${CURRENT_MANAGER_SYNC_ROLE} != slave || return 247
+	    local manager_ip=${IP_INTERNAL_IP}
+
+	    reset-manager-gateway-push-report
+
+	    local message
+
+	    if test -n "${in_id}" ; then
+
+		message="Pushing to '${in_id}' (1/1) - Begin"
+		manager-context-exist gateway ${in_id}
+
+		if test ${?} -ne 0 ; then
+		    manager-gateway-push-report ${in_id} - 218 "${message}"
+		    return 218
+		else
+		    in_ip=$(get-gateway-ip ${in_id})
+		    if test -z "${in_ip}" ; then
+			manager-gateway-push-report ${in_id} - 218 "${message}"
+			return 218
+		    fi
+		fi
+		manager-gateway-push-report ${in_id} ${in_ip} 0 "${message}"
+		manager-gateway-conf-push ${in_id} ${in_ip} &
+	    else
+		message="Pushing to"
+
+		for ((i=0 ; i<n ; i++))
+		do
+		    in_id=${ids[${i}]}
+		    in_ip=${ips[${i}]}
+
+		    manager-context-exist gateway ${in_id}
+
+		    if test ${?} -ne 0 ; then
+			manager-gateway-push-report ${in_id} ${in_ip} 218 "${message} '${in_id}' ($[${i} + 1]/${n}) - Begin"
+		    else
+			manager-gateway-push-report ${in_id} ${in_ip} 0 "${message} '${in_id}' ($[${i} + 1]/${n}) - Begin"
+		    fi
+		    manager-gateway-conf-push ${in_id} ${in_ip} &
+		done
+	    fi
+	    ;;
+
+	'exec')
+	    is-usage-allowed || return 155
+	    local in_ip
+
+	    if test -n "${in_id}" ; then
+		in_ip=$(get-gateway-ip ${in_id})
+		test -n "${in_ip}" || return 218
+	    elif test -n "${in_domain}" ; then
+		local ids=$(get-gateways-in-domain ${in_domain})
+		test -n "${ids}" || return 219
+	    fi
+
+	    test ${place} != local || test ${CURRENT_MANAGER_SYNC_ROLE} != slave || return 247
+
+	    enter-manager-exec-context gateway ${place} ${in_domain} ${in_id} ${in_ip}
+	    ;;
+	*)
+	    return 255
+	    ;;
+    esac
+}
+
+manager-unlock()
+{
+    trap "" EXIT INT QUIT TERM
+
+    rm -f /var/lock/manager.${USER}
+}
+
+manager-lock()
+{
+    touch /var/lock/manager.${USER}
+}
+
+is-manager-locked()
+{
+    test -f /var/lock/manager.${USER}
+}
+
+trap "manager-unlock" EXIT INT QUIT TERM
+
+run()
+{
+    ! contextual-command-is-allowed || return 206
+
+    local key=${ARGS[1]}
+    shift-args
+
+    user-has-admin-rights || cd ${ADMIN_DIR}
+
+    case "${key}" in
+	ssh)
+	    manager-ssh ${ALLARGS}
+	    ;;
+	template|gateway)
+
+	    local ret
+
+	    case "${key}" in
+		template)
+		    manager-template ${ALLARGS}
+		    ;;
+		gateway)
+		    manager-gateway ${ALLARGS}
+		    ;;
+		*)
+		    return 255
+		    ;;
+	    esac
+	    ;;
+	sync)
+	    manager-sync ${ALLARGS}
+	    ;;
+	*)
+	    return 1
+	    ;;
+    esac
+}
+
+! is-manager-locked || error 205
+manager-lock
+main "${@}"
+manager-unlock

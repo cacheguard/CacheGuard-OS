@@ -1,0 +1,389 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       Scripts
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+CACHEGUARD_DIR=/etc/sysconfig/cacheguard
+source ${CACHEGUARD_DIR}/constant
+source ${APPLIANCE_DIR}/etc/role
+source ${LOCAL_DIR}/lib/apl_common
+source ${ABASE_DIR}/${ENV_RDIR}/${ENV_CURRENT_NAME}
+
+set-environment()
+{
+    if test -n "${1}" ; then
+	CALLER_PID=${1}
+    else
+	CALLER_PID=${$}
+    fi
+
+    TMP_IPSEC_STATUS=/tmp/ipsec.status.${$}
+    TMP_IPSEC_REPORT=/tmp/ipsec.report.${$}
+    trap "clean-exit 1" INT QUIT TERM
+    touch ${RUN_DIR}/${WAITING_PROCESS}.${CALLER_PID}    
+}
+
+clean-environment()
+{
+    rm -f ${RUN_DIR}/${WAITING_PROCESS}.${CALLER_PID}
+    rm -f ${TMP_IPSEC_STATUS} ${TMP_IPSEC_REPORT}
+}
+
+clean-exit()
+{
+    trap "" INT QUIT TERM
+
+    local code=${1}
+    clean-environment
+    exit ${code}
+}
+
+vpnipsec-site-report()
+{
+    local connection_file connection_files
+    local keyword equal value
+    local remote_address remote_id=nil
+    local connection status duration
+    local col1 col2 rest
+    local site_found
+
+    connection_files=$(ls -1 ${CONF_DIR}/${IPSEC_CONNECTION_DIR_NAME}/site-*.conf 2> /dev/null)
+    test -n "${connection_files}" || return 0
+
+    for connection_file in ${connection_files}
+    do
+	while read keyword equal value
+	do
+	    test -n "${keyword}" || continue
+
+	    case ${keyword} in
+		conn)
+		    connection=${equal}
+		    connections="${connections} ${connection}"
+		    unset connection
+		    continue
+		    ;;
+		*)
+		    continue
+		    ;;
+	    esac
+	done < ${connection_file}
+    done
+    connections="${connections:1}"
+
+    for connection in ${connections}
+    do
+	unset site_found
+
+	ipsec status ${connection} > ${TMP_IPSEC_STATUS} 2> /dev/null
+
+	case ${?} in
+	    0|3)
+	        ;;
+	    *)
+		echo ${connection} 'KO' ${remote_address} ${remote_id} >> ${TMP_IPSEC_REPORT}
+		continue
+		;;
+	esac
+
+	while read col1 col2 rest
+	do
+	    test -n "${col1}" || continue
+	    [[ "${col1}" =~ ^site-[a-zA-Z][a-zA-Z0-9_\-]*\[[0-9]+\]:$ ]] || continue
+
+	    site_found='yes'
+	    test -n "${col2}" || continue
+	    status=${col2}
+
+	    case ${status} in
+		'ESTABLISHED')
+		    status='ESTABLISHED'
+		    ;;
+		'CONNECTING,')
+		    status='CONNECTING'
+		    ;;
+		*)
+		    continue
+		    ;;
+	    esac
+
+	    if test ${status} == 'ESTABLISHED' ; then
+		duration="${rest/,*}"
+		duration=${duration/ ago}
+		remote="${rest/*...}"
+		remote_address=${remote/\[*}
+	    else
+		remote_address=nil
+		unset duration
+	    fi
+
+	    echo ${connection} ${status} ${remote_address} ${remote_id} ${duration}
+	    break
+	done < ${TMP_IPSEC_STATUS} >> ${TMP_IPSEC_REPORT}
+
+	test -n "${site_found}" -a -s ${TMP_IPSEC_REPORT} || echo ${connection} 'KO' nil ${remote_id} >> ${TMP_IPSEC_REPORT}
+    done
+}
+
+get-eap-id()
+{
+    test -n "${1}" || return 1
+    local in_public_ip=${1}
+
+    local tmp_sas_list=/tmp/swanctl.list-sas.${$}
+    local remote public_ip at server_info eap eap_id private_ip
+    local len
+    
+    swanctl --list-sas > ${tmp_sas_list}
+
+    while read remote public_ip at server_info eap eap_id private_ip
+    do
+	test -n "${private_ip}" || continue
+	test ${remote} == remote || continue
+	test ${public_ip} != "'${in_public_ip}'" || break
+    done < ${tmp_sas_list}
+
+    rm -f ${tmp_sas_list}
+
+    len=${#eap_id}
+    ((len--))
+    ((len--))
+    echo ${eap_id:1:${len}}
+}
+
+get-formatted-duration()
+{
+    test -n "${1}" || return 1
+    local seconds=${1}
+
+    local seconds_txt
+    local minutes minutes_txt
+    local hours hours_txt
+    local days days_txt
+    local duration s
+
+    ((days = seconds / 86400))
+
+    if test ${days} -eq 0 ; then
+        ((hours = seconds / 3600))
+        if test ${hours} -eq 0 ; then
+            ((minutes = seconds / 60))
+            if test ${minutes} -eq 0 ; then
+                test ${seconds} -le 1 || s=s
+                seconds_txt="${seconds} second${s}"
+            else
+                test ${minutes} -le 1 || s=s
+                minutes_txt="${minutes} minute${s}"
+            fi
+        else
+            test ${hours} -le 1 || s=s
+            hours_txt="${hours} hour${s}"
+        fi
+    else
+        test ${days} -le 1 || s=s
+        days_txt="${days} day${s}"
+    fi
+
+    duration=${days_txt}${hours_txt}${minutes_txt}${seconds_txt}
+
+    echo ${duration}
+}
+
+vpnipsec-access-update-db()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    test -n "${3}" || return 3
+    local id=${1}
+    local ip=${2}
+    local date=${3}
+
+    test -f ${RUN_DIR}/${VPN_IPSEC_ACCESS_DB_FILE} || return 11
+
+    sqlite3 ${RUN_DIR}/${VPN_IPSEC_ACCESS_DB_FILE} << EOFSQL 2> /dev/null
+INSERT OR REPLACE INTO access (id, ip, alive_date) VALUES( '${id}', '${ip}', ${date} );
+EOFSQL
+}
+
+vpnipsec-access-report-noeap()
+{
+    test -n "${1}" || return 1
+    local connection=${1}
+
+    ipsec status ${connection} > ${TMP_IPSEC_STATUS} 2> /dev/null
+    test ${?} -eq 0 || return 0
+
+    local col1 col2 col3 rest
+    local vip status remote_ip remote_id duration
+    local len remote managed
+
+    local date=$(date +"%s" 2> /dev/null)
+
+    while read col1 col2 col3 rest
+    do
+	test -n "${col1}" || continue
+	test -n "${col2}" || continue
+	test -n "${col3}" || continue
+	test -n "${rest}" || continue
+
+	if [[ "${col1}" =~ ^${connection}\[[0-9]+\]:$ ]] ; then
+
+	    unset managed
+	    status=${col2}
+
+	    case ${status} in
+		'ESTABLISHED')
+		    status='ESTABLISHED'
+		    duration="${col3} ${rest/,*}"
+		    duration=${duration/ ago}
+		    ;;
+		'CONNECTING,')
+		    status='CONNECTING'
+		    unset duration
+		    ;;
+		*)
+		    continue
+		    ;;
+	    esac
+	    remote="${rest/*...}"
+	    remote_ip=${remote/\[*}
+	    remote_id=${remote/*\[}
+            remote_id=${remote_id/*=}
+	    len=${#remote_id} ; ((len--))
+	    remote_id=${remote_id:0:${len}}
+
+	elif [[ "${col1}" =~ ^${connection}\{[0-9]+\}:$ ]] ; then
+	    if test -z "${managed}" -a ${col2} != 'INSTALLED,' ; then
+		rest="${col3} ${rest}"
+		vip=${rest/*=== }
+
+		if test "${vip}" != "${rest}" ; then
+		    vip=${vip/\/*}
+		    echo ${vip} ${status} ${remote_ip} ${remote_id} ${duration}
+		    managed='yes'
+		    vpnipsec-access-update-db ${remote_id} ${remote_ip} ${date}
+		fi
+	    fi
+	fi
+    done < ${TMP_IPSEC_STATUS} > ${TMP_IPSEC_REPORT}
+}
+
+vpnipsec-access-report-eap()
+{
+    test -n "${1}" || return 1
+    local connection=${1}
+
+    swanctl --list-sas > ${TMP_IPSEC_STATUS} 2> /dev/null
+    test ${?} -eq 0 || return 0
+
+    local col1 col2 col3 col4 col5 col6 col7
+    local vip status remote_ip remote_id duration
+    local len status='ESTABLISHED'
+
+    local date=$(date +"%s" 2> /dev/null)
+
+    while read col1 col2 col3 col4 col5 col6 col7
+    do
+	test -n "${col5}" || continue
+
+	case ${col1} in
+	    remote)
+		remote_id=${col2}
+		case ${col5} in
+		    EAP:)
+			remote_ip=${col4}
+			remote_id=${col6}
+			vip=${col7}
+			;;
+		    *)
+			remote_id=${col2}
+			remote_ip=${col4}
+			vip=${col5}
+			;;
+		esac
+
+		len=${#vip}
+		((len--))
+		((len--))
+		vip=${vip:1:${len}}
+
+		remote_ip=${remote_ip/\[*}
+
+		len=${#remote_id}
+		((len--))
+		((len--))
+		remote_id=${remote_id:1:${len}}
+		;;
+
+	    established)
+		duration=${col2}
+		len=${#duration}
+		((len--))
+		duration=${duration:0:${len}}
+		duration=$(get-formatted-duration ${duration})
+
+		echo ${vip} ${status} ${remote_ip} ${remote_id} ${duration}
+		vpnipsec-access-update-db ${remote_id} ${remote_ip} ${date}
+		;;
+	    *)
+		;;
+	esac
+    done < ${TMP_IPSEC_STATUS} > ${TMP_IPSEC_REPORT}
+}
+
+vpnipsec-access-report()
+{
+    local connection='access'
+
+    case ${CURRENT_VPN_IPSEC_ACCESS_AUTHENTICATE} in
+	eaptls)
+	    vpnipsec-access-report-eap ${connection} "${@}"
+	    ;;
+	*)
+	    vpnipsec-access-report-noeap ${connection} "${@}"
+	    ;;
+    esac
+}
+
+main()
+{
+    rm -f ${TMP_IPSEC_REPORT}
+
+    if test ${CURRENT_VPN_IPSEC_MODE} == True ; then
+	if test "${CURRENT_VPN_IPSEC_ACCESS/ *}" == 'off' ; then
+	    vpnipsec-site-report "${@}"
+	else
+	    vpnipsec-access-report "${@}"
+	fi
+    fi
+
+    test -f ${TMP_IPSEC_REPORT} || echo -n > ${TMP_IPSEC_REPORT}
+    mv -f ${TMP_IPSEC_REPORT} ${RUN_DIR}/${VPN_IPSEC_STATUS_FILENAME}
+
+    clean-exit ${?}
+}
+
+# Main()
+
+set-environment "${@}"
+main "${@}"
+clean-environment "${@}"

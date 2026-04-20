@@ -1,0 +1,1665 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       Commands
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+source functions
+
+exit-cb()
+{
+    stty echo
+    exit 0
+}
+
+check-snmp-version()
+{
+    test -n "${1}" || return 1
+
+    case "${1}" in
+	v1|v2c|v3)
+	    return 0
+	    ;;
+	*)
+	    return 1
+	    ;;
+    esac
+}
+
+check-snmp-user-name()
+{
+    test ${#1} -le ${MAX_LEN} || return 1
+    check-allowed-argument-no-space "${1}"
+}
+
+check-trap-password()
+{
+    test -n "${1}" || return 0
+    test ${#1} -le ${MAX_LEN} || return 1
+    check-allowed-argument-no-space "${1}"
+}
+
+show-admin-snmp()
+{
+    echo-command-form "admin snmp"
+    local val=$(external-form ${CURRENT_ADMIN_SNMP})
+    echo-mark-cur
+    echo-value "${val}"
+
+    if test "${CURRENT_ADMIN_SNMP}" != "${ADMIN_SNMP}" ; then
+	echo-command-form "admin snmp"
+	echo-mark-new
+	val=$(external-form ${ADMIN_SNMP})
+	echo-value "${val}"
+    fi
+}
+
+show-admin-ssh()
+{
+    echo-command-form "admin ssh"
+    local val=$(external-form ${CURRENT_ADMIN_SSH})
+    echo-mark-cur
+    echo-value "${val}"
+
+    if test "${CURRENT_ADMIN_SSH}" != "${ADMIN_SSH}" ; then
+	echo-command-form "admin ssh"
+	echo-mark-new
+	val=$(external-form ${ADMIN_SSH})
+	echo-value "${val}"
+    fi
+}
+
+show-admin-wadmin()
+{
+    echo-command-form "admin wadmin"
+    local val=$(external-form ${CURRENT_ADMIN_WADMIN})
+    echo-mark-cur
+    echo-value "${val}"
+
+    if test "${CURRENT_ADMIN_WADMIN}" != "${ADMIN_WADMIN}" ; then
+	echo-command-form "admin wadmin"
+	echo-mark-new
+	val=$(external-form ${ADMIN_WADMIN})
+	echo-value "${val}"
+    fi
+}
+
+show-admin-2fa()
+{
+    local cur_2fa=$(get-admin-2fa ${USER} cur)
+    local new_2fa=$(get-admin-2fa ${USER} new)
+
+    echo-command-form "admin 2fa"
+    local val=$(external-form ${cur_2fa})
+    echo-mark-cur
+    echo-value "${val}"
+
+    if test ${cur_2fa} != ${new_2fa} ; then
+	echo-command-form "admin 2fa"
+	echo-mark-new
+	val=$(external-form ${new_2fa})
+	echo-value "${val}"
+    fi
+}
+
+show-admin-waudit()
+{
+    echo-command-form "admin waudit"
+    local val=$(external-form ${CURRENT_ADMIN_WAUDIT})
+    echo-mark-cur
+    echo-value "${val}"
+
+    if test "${CURRENT_ADMIN_WAUDIT}" != "${ADMIN_WAUDIT}" ; then
+	echo-command-form "admin waudit"
+	echo-mark-new
+	val=$(external-form ${ADMIN_WAUDIT})
+	echo-value "${val}"
+    fi
+}
+
+show-snmp-engine-id()
+{
+    echo-command-form "admin snmp engine"
+    local engine_file=/var/run/${SNMP_ENGINE_ID}
+    echo-mark-cur
+    if test -s ${engine_file} ; then
+	local value=$(cat ${engine_file})
+	echo-value "Hex: ${value// /}"
+    else
+	echo-value "<not running>"
+    fi
+}
+
+show-snmp-community()
+{
+    echo-command-form "admin snmp community"
+    echo-mark-cur
+    echo-value "..."
+
+    if test "${CURRENT_SNMP_COMMUNITY}" != "${SNMP_COMMUNITY}" ; then
+	echo-command-form "admin snmp community"
+	echo-mark-new
+	echo-value "..."
+    fi
+}
+
+show-snmp-privacy()
+{
+    echo-command-form "admin snmp privacy"
+    echo-mark-cur
+    echo-value "..."
+
+    if test "${CURRENT_SNMP_PRIVACY}" != "${SNMP_PRIVACY}" ; then
+	echo-command-form "admin snmp privacy"
+	echo-mark-new
+	echo-value "..."
+    fi
+}
+
+show-snmp-user()
+{
+    echo-command-form "admin snmp user"
+    echo-mark-cur
+    echo-value "${CURRENT_SNMP_USER}"
+    if test "${CURRENT_SNMP_USER}" != "${SNMP_USER}" ; then
+	echo-command-form "admin snmp user"
+	echo-mark-new
+	echo-value "${SNMP_USER}"
+    fi
+}
+
+show-snmp-tls()
+{
+    echo-command-form "admin snmp tls"
+    local val=$(external-form ${CURRENT_SNMP_TLS})
+    echo-mark-cur
+    echo-value "${val}"
+
+    if test "${CURRENT_SNMP_TLS}" != "${SNMP_TLS}" ; then
+	echo-command-form "admin snmp tls"
+	echo-mark-new
+	val=$(external-form ${SNMP_TLS})
+	echo-value "${val}"
+    fi
+}
+
+show-snmp-udp()
+{
+    echo-command-form "admin snmp udp"
+    local val=$(external-form ${CURRENT_SNMP_UDP})
+    echo-mark-cur
+    echo-value "${val}"
+
+    if test "${CURRENT_SNMP_UDP}" != "${SNMP_UDP}" ; then
+	echo-command-form "admin snmp udp"
+	echo-mark-new
+	val=$(external-form ${SNMP_UDP})
+	echo-value "${val}"
+    fi
+}
+
+show-snmp-tcp()
+{
+    echo-command-form "admin snmp tcp"
+    local val=$(external-form ${CURRENT_SNMP_TCP})
+    echo-mark-cur
+    echo-value "${val}"
+
+    if test "${CURRENT_SNMP_TCP}" != "${SNMP_TCP}" ; then
+	echo-command-form "admin snmp tcp"
+	echo-mark-new
+	val=$(external-form ${SNMP_TCP})
+	echo-value "${val}"
+    fi
+}
+
+show-snmp()
+{
+    echo-begin-show
+    case ${1} in
+	mode)
+	    show-admin-snmp
+	    ;;
+	engine)
+	    show-snmp-engine-id
+	    ;;
+	user)
+	    show-snmp-user
+	    ;;
+	community)
+	    show-snmp-community
+	    ;;
+	privacy)
+	    show-snmp-privacy
+	    ;;
+	'trap')
+	    show-snmp-trap
+	    ;;
+	tls)
+	    show-snmp-tls
+	    ;;
+	udp)
+	    show-snmp-udp
+	    ;;
+	tcp)
+	    show-snmp-tcp
+	    ;;
+	"")
+	    show-admin-snmp
+	    show-snmp-engine-id
+	    show-snmp-user
+	    show-snmp-community
+	    show-snmp-privacy
+	    show-snmp-trap
+	    show-snmp-tls
+	    show-snmp-udp
+	    show-snmp-tcp
+	    ;;  
+	*)
+	    error 255
+	    ;;
+    esac
+    echo-end-show
+}
+
+show-admin()
+{
+    echo-begin-show
+
+    case "${1}" in
+	ssh)
+	    show-admin-ssh
+	    ;;
+	wadmin)
+	    show-admin-wadmin
+	    ;;
+	snmp)
+	    show-snmp
+	    ;;
+	waudit)
+	    ! contextual-command-is-allowed || show-admin-waudit
+	    ;;
+	2fa)
+	    show-admin-2fa
+	    ;;
+	'')
+	    show-admin-ssh
+	    show-admin-wadmin
+	    show-admin-snmp
+
+	    ! contextual-command-is-allowed || show-admin-waudit
+	    ! is-in-top-level-context || show-admin-2fa
+	    ;;
+	*)
+	    return 255
+	    ;;
+    esac
+
+    echo-end-show
+}
+
+show-admin-topology-internal()
+{
+    echo-command-form "admin topology internal"
+    local val=$(external-form ${CURRENT_ADMIN_INTERNAL})
+    echo-mark-cur
+    echo-value "${val}" 32
+
+    if test "${CURRENT_ADMIN_INTERNAL}" != "${ADMIN_INTERNAL}" ; then
+	echo-command-form "admin topology internal"
+	echo-mark-new
+	val=$(external-form ${ADMIN_INTERNAL})
+	echo-value "${val}" 32
+    fi
+}
+
+show-admin-topology-external()
+{
+    echo-command-form "admin topology external"
+    local val=$(external-form ${CURRENT_ADMIN_EXTERNAL})
+    echo-mark-cur
+    echo-value "${val}" 32
+
+    if test "${CURRENT_ADMIN_EXTERNAL}" != "${ADMIN_EXTERNAL}" ; then
+	echo-command-form "admin topology external"
+	echo-mark-new
+	val=$(external-form ${ADMIN_EXTERNAL})
+	echo-value "${val}" 32
+    fi
+}
+
+show-admin-topology-auxiliary()
+{
+    echo-command-form "admin topology auxiliary"
+    local val=$(external-form ${CURRENT_ADMIN_AUXILIARY})
+    echo-mark-cur
+    echo-value "${val}" 32
+
+    if test "${CURRENT_ADMIN_AUXILIARY}" != "${ADMIN_AUXILIARY}" ; then
+	echo-command-form "admin topology auxiliary"
+	echo-mark-new
+	val=$(external-form ${ADMIN_AUXILIARY})
+	echo-value "${val}" 32
+    fi
+}
+
+show-admin-topology-vpnipsec()
+{
+    echo-command-form "admin topology vpnipsec"
+    local val=$(external-form ${CURRENT_ADMIN_VPN_IPSEC})
+    echo-mark-cur
+    echo-value "${val}" 32
+
+    if test "${CURRENT_ADMIN_VPN_IPSEC}" != "${ADMIN_VPN_IPSEC}" ; then
+	echo-command-form "admin topology vpnipsec"
+	echo-mark-new
+	val=$(external-form ${ADMIN_VPN_IPSEC})
+	echo-value "${val}" 32
+    fi
+}
+
+show-admin-topology()
+{
+    echo-begin-show
+    case "${1}" in
+	internal)
+	    show-admin-topology-internal
+	    ;;
+	external)
+	    show-admin-topology-external
+	    ;;
+	auxiliary)
+	    show-admin-topology-auxiliary
+	    ;;
+	vpnipsec)
+	    show-admin-topology-vpnipsec
+	    ;;
+	"")
+	    show-admin-topology-internal
+	    show-admin-topology-external
+	    show-admin-topology-auxiliary
+	    show-admin-topology-vpnipsec
+	    ;;
+	*)
+	    error 255
+	    ;;
+    esac
+    echo-end-show
+}
+
+show-ssh-key1()
+{
+    local list=${2}
+
+    echo-command-form "admin ssh key"
+    if test "${1}" == "new" ; then
+	echo-mark-new
+    else
+	echo-mark-cur
+    fi
+
+    if test -z "${list}" ; then
+	echo-value-null
+    else
+	local key_id key_file key key_state begin begin_len=15
+
+	for key_id in ${list}
+	do
+	    if test -f ${TMP_DIR}/${LOADED}.${SSH_KEY}.${key_id} ; then
+		key_file=${TMP_DIR}/${LOADED}.${SSH_KEY}.${key_id}
+		key_state='[loaded]'
+	    elif
+		test -f ${SSH_PUBLIC_KEY_DIR}/${key_id} ; then
+		key_file=${SSH_PUBLIC_KEY_DIR}/${key_id}
+		key_state='[active]'
+	    else
+		key_state='[empty ]'
+		unset key_file
+	    fi
+	    
+	    if test -n "${key_file}" ; then
+		key=$(cat ${key_file} 2> /dev/null)
+		begin=${key:0:${begin_len}}
+		echo-value "${key_state} ${key_id}: ${begin}..."
+	    else
+		echo-value "${key_state} ${key_id}:"
+	    fi
+	done
+    fi
+}
+
+show-ssh-key()
+{
+    echo-begin-show
+    show-ssh-key1 'current' "${CURRENT_SSH_KEY_LIST}"
+    test "${CURRENT_SSH_KEY_LIST}" == "${SSH_KEY_LIST}" || show-ssh-key1 'new' "${SSH_KEY_LIST}"
+    echo-end-show
+}
+
+admin-ssh-key-show()
+{
+    test -n "${1}" || return 1
+    local key_id=${1}
+
+    local file
+
+    if test -f ${TMP_DIR}/${LOADED}.${SSH_KEY}.${key_id} ; then
+	file=${TMP_DIR}/${LOADED}.${SSH_KEY}.${key_id}
+    elif test -f ${SSH_PUBLIC_KEY_DIR}/${key_id} ; then
+	file=${SSH_PUBLIC_KEY_DIR}/${key_id}
+    else
+	return 0
+    fi
+
+    echo-begin-show
+    cat ${file} 2> /dev/null
+    echo-end-show
+}
+
+manage-ssh-key()
+{
+    local op=${1}
+
+    if test -z "${op}" ; then
+	show-ssh-key
+	return 0
+    fi
+    
+    case ${op} in
+	raz)
+	    user-has-admin-rights || return 31
+	    export SSH_KEY_LIST=''
+	    rm -f ${TMP_DIR}/${LOADED}.${SSH_KEY}.*
+	    SAVENV=1
+	    ;;
+
+	add|del|load|show)
+	    local key_id=${2}
+	    test -n "${key_id}" || return 1
+
+	    check-id-length "${key_id}" || return 127
+	    check-id ${key_id} || return 35
+
+	    if test ${op} == add ; then
+		test ${key_id} != ${MASTER_MANAGER_NAME} || return 32
+		test ${key_id} != ${BACKUP_MANAGER_NAME} || return 32
+		test ${key_id} != ${PEER_MANAGER_NAME} || return 32
+		local len=$(length-list "${SSH_KEY_LIST}")
+		test ${len} -lt ${MAX_SSH_KEY_NB} || return 90
+		export SSH_KEY_LIST=$(insert-record-in-slist 1 1 "${key_id}" "${SSH_KEY_LIST}")
+		SAVENV=1
+		return 0
+	    fi
+
+	    if test ${op} == del ; then
+		user-has-admin-rights || return 31
+		export SSH_KEY_LIST=$(remove "${SSH_KEY_LIST}" ${key_id})
+		rm -f ${TMP_DIR}/${LOADED}.${SSH_KEY}.${key_id}
+		SAVENV=1
+		return 0
+	    fi
+
+	    member "${SSH_KEY_LIST} ${BACKUP_MANAGER_NAME} ${MASTER_MANAGER_NAME} ${PEER_MANAGER_NAME}" ${key_id} || return 30
+
+	    if test ${op} == show ; then
+		admin-ssh-key-show ${key_id}
+		return 0
+	    fi
+
+	    test ${op} == load || return 255
+
+	    local protocol=${3}
+	    local ip=${4}
+	    local fn=${5}
+
+	    test -n "${protocol}" || return 1
+	    test -n "${ip}" || return 1
+	    test -n "${fn}" || return 1
+
+	    check-file-protocol ${protocol} || return 63
+	    check-ip-name ${ip} || return 113
+	    check-file-ip ${ip} || return 27
+	    check-filename ${fn} || return 19
+	    user-has-admin-rights || return 31
+
+	    local tmp_file=${TMP_DIR}/work.${LOADED}.${SSH_KEY}.${key_id}
+
+	    load-files ${protocol} ${ip} "${fn} ${tmp_file}" "" ascii
+	    local ret=${?}
+
+	    if test ${ret} -eq 0 ; then
+		ssh-keygen -l -f ${tmp_file} > /dev/null 2>&1
+		if test ${?} -ne 0 ; then
+		    rm -f ${tmp_file}
+		    return 225
+		fi
+		load-ssh-public-key-commit ${tmp_file}
+	    else
+		rm -f ${tmp_file}
+		return ${ret}
+	    fi
+	    ;;
+	*)
+	    return 1
+	    ;;
+    esac
+}
+
+show-ssh-password()
+{
+    echo-begin-show
+
+    echo-command-form "admin ssh password"
+    local val=$(external-form ${CURRENT_ADMIN_SSH_PASSWORD})
+    echo-mark-cur
+    echo-value "${val}"
+
+    if test "${CURRENT_ADMIN_SSH_PASSWORD}" != "${ADMIN_SSH_PASSWORD}" ; then
+	echo-command-form "admin ssh password"
+	echo-mark-new
+	val=$(external-form ${ADMIN_SSH_PASSWORD})
+	echo-value "${val}"
+    fi
+
+    echo-end-show
+}
+
+manage-ssh-password()
+{
+    local val=${1}
+
+    if test -z "${val}" ; then
+	show-ssh-password
+	return 0
+    fi
+
+    check-boolean ${val} || return 18
+    local bool=$(internal-form ${val})
+
+    ADMIN_SSH_PASSWORD="${bool}"
+    SAVENV=1
+}
+
+show-snmp-trap1()
+{
+    local traps=${2}
+
+    echo-command-form "admin snmp trap"
+    if test "${1}" == "new" ; then
+	echo-mark-new
+    else
+	echo-mark-cur
+    fi
+
+    if test -z "${traps}" ; then
+	echo-value-null
+	return 0
+    fi
+
+    local i=0 n=0 elt range
+    local version server port user auth enc
+
+    for elt in ${traps}
+    do
+	range=$[${i} % 8]
+	case ${range} in
+	    0)
+		version=${elt}
+		;;
+	    1)
+		server=${elt}
+		;;
+	    2)
+		port=${elt}
+		;;
+	    3)
+		user=${elt}
+		;;
+	    4)
+		auth=${elt}
+		;;
+	    5)
+		enc=${elt}
+		;;
+	    6)
+		;;
+	    7)
+		test ${n} -eq 0 || echo-blank-command
+		case ${version} in
+		    v1|v2c)
+			echo-value "${version} ${server} ${port} ..."
+			;;
+		    v3)
+			echo-value "${version} ${server} ${port} ${user} ${auth} ${enc} ..."
+			;;
+		    *)
+			return 255
+			;;
+		esac
+		((n++))
+		;;
+	    *)
+		return 1
+		;;
+	esac
+	((i++))
+    done
+}
+
+show-snmp-trap()
+{
+    show-snmp-trap1 'current' "${CURRENT_SNMP_TRAP_SERVER_LIST}"
+
+    test "${CURRENT_SNMP_TRAP_SERVER_LIST}" == "${SNMP_TRAP_SERVER_LIST}" || \
+	show-snmp-trap1 'new' "${SNMP_TRAP_SERVER_LIST}"
+}
+
+snmp-trap-del()
+{
+    SNMP_TRAP_SERVER_LIST=$(remove-record-from-list 8 4 "${1}" "${SNMP_TRAP_SERVER_LIST}")
+}
+
+snmp-trap-add()
+{
+    export SNMP_TRAP_SERVER_LIST=$(insert-record-in-slist 8 4 "${1}" "${SNMP_TRAP_SERVER_LIST}")
+}
+
+check-enc()
+{
+    test -n "${1}" || return 1
+    local enc=${1}
+
+    case ${enc} in
+	des|aes)
+	    return 0
+	    ;;
+	*)
+	    return 1
+	    ;;
+    esac
+}
+
+manage-snmp-trap()
+{
+    local action=${1}
+
+    if test -z "${action}" ; then
+	show-snmp-trap
+	return 0
+    fi
+
+    local version server port user hash_function enc_algorithm password privacy
+    case "${action}" in
+	add|add:encrypted|del)
+	    if test "${action}" != "del" ; then
+		local len=$(record8-length-list "${SNMP_TRAP_SERVER_LIST}")
+		test ${len} -lt ${MAX_SNMP_TRAP_NB} || return 90
+	    fi
+
+	    test -n "${2}" || return 1
+	    test -n "${3}" || return 1
+	    version=${2}
+	    server=${3}
+	    local port=${4}
+	    test -n "${port}" || port=162
+
+	    check-snmp-version ${version} || return 116
+	    check-ip-name ${server} || return 113
+	    port=$(remove-leading-zeros ${port})
+	    check-service-port-nb ${port} || return 61
+
+	    case ${version} in
+		v3)
+		    user=${5}
+		    hash_function=${6}
+		    enc_algorithm=${7}
+		    check-snmp-user-name "${user}" || return 117
+		    password=${8}
+		    privacy=${9}
+		    ;;
+		*)
+		    password=${5}
+                    user='none'
+		    privacy='none'
+                    hash_function='none'
+                    enc_algorithm='none'
+		    ;;
+	    esac
+
+	    case ${action} in
+		add)
+		    if test "${version}" == v3 ; then
+			check-integrity-algorithm ${hash_function} || return 197
+			check-enc ${enc_algorithm} || return 125
+		    fi
+
+		    if test -z "${password}" ; then
+
+			test ${TERM} != ${WADMIN_TERM} || return 34
+			test "${__BATCH_MODE}" != yes || error 111
+			test -z "${TRANSACTION}" || return 106
+
+			case ${version} in
+			    v3)
+				echo -n "Please type the authentication password: "
+				;;
+			    *)
+				echo -n "Please type the community string: "
+				;;
+			esac
+			stty -echo
+			read password
+			stty echo
+			echo
+		    fi
+		    check-trap-password "${password}" || return 22
+
+		    if test ${version} == v3 ; then
+			if test -n "${password}" ; then
+			    check-snmp-password-length "${password}" || return 34
+
+			    if test -z "${privacy}" ; then
+
+				test ${TERM} != ${WADMIN_TERM} || return 34
+				test "${__BATCH_MODE}" != yes || error 111
+				test -z "${TRANSACTION}" || return 106
+
+				echo -n "Please type the encryption password: "
+				stty -echo
+				read privacy
+				stty echo
+				echo
+			    fi
+
+			    if test -n "${privacy}" ; then
+				check-snmp-password-length "${privacy}" || return 34
+				check-trap-password "${privacy}" || return 22
+			    fi
+			fi
+		    fi
+		    snmp-trap-add "${version} ${server} ${port} ${user} ${hash_function} ${enc_algorithm} ${password} ${privacy}"
+		    ;;
+		add:encrypted)
+		    test -n "${password}" || return 0
+		    test -n "${privacy}" || return 0
+
+		    password=$(decrypt-password "encrypted:${password}" "${SNMP_PASSWD}")
+		    check-trap-password "${password}" || return 22
+
+		    if test ${version} == v3 ; then
+			check-snmp-password-length "${password}" || return 34
+			privacy=$(decrypt-password "encrypted:${privacy}" "${SNMP_PASSWD}")
+			check-snmp-password-length "${privacy}" || return 34
+			check-trap-password "${privacy}" || return 22
+		    fi
+		    snmp-trap-add "${version} ${server} ${port} ${user} ${hash_function} ${enc_algorithm} ${password} ${privacy}"
+		    ;;
+		del)
+		    snmp-trap-del "${version} ${server} ${port} ${user}"
+		    ;;
+		*)
+		    error 255
+		    ;;
+	    esac
+	    SAVENV=1
+	    ;;
+	raz)
+	    export SNMP_TRAP_SERVER_LIST=''
+	    SAVENV=1
+	    ;;
+	'test')
+	    if test "${CURRENT_ADMIN_SNMP}" == True ; then
+		if test -n "${CURRENT_SNMP_TRAP_SERVER_LIST}" ; then
+		    check-lock || return 123
+		    supervisor-action "snmp-trap-test"
+		    test ${?} -eq 0 || return 104
+		    return 0
+		else
+		    test -z "${SNMP_TRAP_SERVER_LIST}" || return 134
+		    return 133
+		fi
+	    else
+		test "${ADMIN_SNMP}" == False || return 134
+		return 132
+	    fi
+	    ;;
+	*)
+	    return 1
+	    ;;
+    esac
+}
+
+validate-load-admin-snmp-certificate()
+{
+    rm -f ${ADMIN_TMP_DIR}/${SNMP_SSL}.openssl.${$}
+    validate-load-admin-snmp-certificate-commit
+}
+
+cancel-load-admin-snmp-certificate()
+{
+    rm -f ${ADMIN_TMP_DIR}/${SNMP_SSL}.openssl.${$}
+    rm -f work.${TMP_DIR}/${LOADED}.${SNMP_SSL}.certificate
+}
+
+load-admin-snmp-certificate()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    test -n "${3}" || return 3
+    local protocol=${1}
+    local ip=${2}
+    local fn=${3}
+
+    local tmp_file=${TMP_DIR}/work.${LOADED}.${SNMP_SSL}.certificate
+
+    load-files ${protocol} ${ip} "${fn} ${tmp_file}" "" ascii
+    local ret=${?}
+
+    if test ${ret} -eq 0 ; then
+	
+	test -f ${tmp_file} || return 104
+
+	if ! check-ascii-file ${tmp_file} ; then
+	    cancel-load-admin-snmp-certificate
+	    return 220
+	fi
+
+	openssl verify -CAfile ${SSL_VAR_DIR}/ca-bundle.crt -CApath ${SSL_LOCAL_CA_DIR} -purpose sslclient ${tmp_file} > ${ADMIN_TMP_DIR}/${SNMP_SSL}.openssl.${$} 2>&1
+
+	if test ${?} -ne 0 ; then
+
+	    grep --quiet 'error 26 at' ${ADMIN_TMP_DIR}/${SNMP_SSL}.openssl.${$} > /dev/null 2>&1
+	    if test ${?} -eq 0 ; then
+		cancel-load-admin-snmp-certificate
+		return 222
+	    fi
+
+	    grep --quiet 'error 18 at' ${ADMIN_TMP_DIR}/${SNMP_SSL}.openssl.${$} > /dev/null 2>&1
+	    if test ${?} -eq 0 ; then
+		validate-load-admin-snmp-certificate
+		return 0
+	    fi
+
+	    grep --quiet 'error 20 at' ${ADMIN_TMP_DIR}/${SNMP_SSL}.openssl.${$} > /dev/null 2>&1
+	    if test ${?} -eq 0 ; then
+		validate-load-admin-snmp-certificate
+		return 0
+	    fi
+
+	    cancel-load-admin-snmp-certificate
+	    return 222
+	else
+	    validate-load-admin-snmp-certificate
+	fi
+    else
+	cancel-load-admin-snmp-certificate
+	return ${ret}
+    fi
+}
+
+manage-snmp-certificate()
+{
+    local operation=${1}
+
+    local certificate_file
+
+    if test -z "${operation}" ; then
+	if test -f ${TMP_DIR}/${LOADED}.${SNMP_SSL}.certificate ; then
+	    certificate_file=${TMP_DIR}/${LOADED}.${SNMP_SSL}.certificate
+	elif test -f ${SSL_SNMP_DIR}/${SNMP_SSL}.crt ; then
+	    certificate_file=${SSL_SNMP_DIR}/${SNMP_SSL}.crt
+	else
+	    return 74
+	fi
+
+	echo
+	openssl x509 -in ${certificate_file} -text 2> /dev/null
+	echo
+
+	return 0
+    fi
+
+    case ${operation} in
+	raz)
+	    rm -f ${TMP_DIR}/${LOADED}.${SNMP_SSL}.certificate
+	    if test -f ${SSL_SNMP_DIR}/${SNMP_SSL}.crt ; then
+		SNMP_CLIENT_CERTIFICATE=False
+		SAVENV=1
+	    fi
+	    ;;
+	load)
+	    local protocol=${2}
+	    local ip=${3}
+	    local file_name=${4}
+
+	    test -n "${protocol}" || return 1
+	    test -n "${ip}" || return 1
+	    test -n "${file_name}" || return 1
+
+	    check-file-protocol ${protocol} || return 63
+	    check-ip-name ${ip} || return 113
+	    check-file-ip ${ip} || return 27
+	    check-filename ${file_name} || return 19
+	
+	    load-admin-snmp-certificate ${protocol} ${ip} ${file_name}
+	    ;;
+	*)
+	    return 1
+	    ;;
+    esac
+}
+
+manage-snmp-secret()
+{
+    local mod=${1}
+    local val=${2}
+
+    if test -z "${val}" ; then
+	case ${mod} in
+	    community:show)
+		show-snmp community
+		;;
+	    community)
+		test ${TERM} != ${WADMIN_TERM} || return 0
+		test "${__BATCH_MODE}" != yes || error 111
+		test -z "${TRANSACTION}" || return 106
+
+		echo -n "Please type the password: "
+		stty -echo
+		read val
+		stty echo
+		echo
+		check-snmp-password-length "${val}" || return 34
+		check-snmp-password "${val}" || return 22
+		export SNMP_COMMUNITY="${val}"
+		SAVENV=1
+		;;
+	    privacy:show)
+		show-snmp privacy
+		;;
+	    privacy)
+		test ${TERM} != ${WADMIN_TERM} || return 0
+		test "${__BATCH_MODE}" != yes || error 111
+		test -z "${TRANSACTION}" || return 106
+
+		echo -n "Please type the privacy passphrase: "
+		stty -echo
+		read val
+		stty echo
+		echo
+		check-snmp-password-length "${val}" || return 34
+		check-snmp-password "${val}" || return 22
+		export SNMP_PRIVACY="${val}"
+		SAVENV=1
+		;;
+	    community:encrypted|privacy:encrypted)
+		;;
+	    *)
+		return 255
+		;;
+	esac
+
+	return 0
+    fi
+
+    local secret
+
+    case "${mod}" in
+	community)
+	    check-snmp-password-length "${val}" || return 34
+	    check-snmp-password "${val}" || return 22
+	    export SNMP_COMMUNITY="${val}"
+	    SAVENV=1
+	    ;;
+	community:encrypted)
+	    test -n "${val}" || return 1
+	    secret=$(decrypt-password "encrypted:${val}" "${SNMP_PASSWD}")
+	    export SNMP_COMMUNITY="${secret}"
+	    SAVENV=1
+	    ;;
+	privacy)
+	    check-snmp-password-length "${val}" || return 34
+	    check-snmp-password "${val}" || return 22
+	    export SNMP_PRIVACY="${val}"
+	    SAVENV=1
+	    ;;
+	privacy:encrypted)
+	    test -n "${val}" || return 1
+	    secret=$(decrypt-password "encrypted:${val}" "${SNMP_PASSWD}")
+	    export SNMP_PRIVACY="${secret}"
+	    SAVENV=1
+	    ;;
+	*)
+	    return 255
+	    ;;
+    esac
+}
+
+manage-snmp()
+{
+    local mod=${1}
+    local val=${2}
+
+    if test -z "${val}" ; then
+	case ${mod} in
+	    mode)
+		show-snmp mode
+		return 0
+		;;
+	    engine)
+		show-snmp engine
+		return 0
+		;;
+	    user)
+		show-snmp user
+		return 0
+		;;
+	    'trap')
+		show-snmp trap
+		return 0
+		;;
+	    tls)
+		show-snmp tls
+		return 0
+		;;
+	    udp)
+		show-snmp udp
+		return 0
+		;;
+	    tcp)
+		show-snmp tcp
+		return 0
+		;;
+	    *)
+		return 1
+		;;
+	esac
+    fi
+
+    case "${mod}" in
+	user)
+	    check-id ${val} || return 35
+	    export SNMP_USER=${val}
+	    SAVENV=1
+	    ;;
+	tls|udp|tcp|mode)
+	    check-boolean ${val} || return 18
+	    local bool=$(internal-form ${val})
+	    case "${mod}" in
+		tls)
+		    export SNMP_TLS="${bool}"
+		    ;;
+		udp)
+		    export SNMP_UDP="${bool}"
+		    ;;
+		tcp)
+		    export SNMP_TCP="${bool}"
+		    ;;
+		mode)
+		    export ADMIN_SNMP="${bool}"
+		    ;;
+		*)
+		    return 1
+		    ;;
+	    esac
+	    SAVENV=1
+	    ;;
+	*)
+	    return 1
+	    ;;
+    esac
+}
+
+manage-topology()
+{
+    local interface=${1}
+    local val=${2}
+
+    if test -z "${interface}" ; then
+	show-admin-topology
+	return 0
+    fi
+
+    check-interface ${interface} || return 43
+
+    if test -z "${val}" ; then
+	show-admin-topology ${interface}
+	return 0
+    fi
+
+    contextual-command-is-allowed || check-manager-interface ${interface} || return 209
+
+    check-boolean ${val} || return 18
+    local bool=$(internal-form ${val})
+
+    case ${interface} in
+	internal)
+	    export ADMIN_INTERNAL="${bool}"
+	    ;;
+	external)
+	    export ADMIN_EXTERNAL="${bool}"
+	    ;;
+	auxiliary)
+	    export ADMIN_AUXILIARY="${bool}"
+	    ;;
+	vpnipsec)
+	    export ADMIN_VPN_IPSEC="${bool}"
+	    ;;
+	*)
+	    error 255
+	    ;;
+    esac
+
+    SAVENV=1
+}
+
+initialise-2fa()
+{
+    test -n "${1}" || return 1
+    local bool=${1}
+    local ecode_nb=${2}
+    test -n "${ecode_nb}" || ecode_nb=8
+
+    if test ! -f ${_TWO_FACTOR_GOOGLE_AUTHENTICATOR} ; then
+	google-authenticator --force --no-confirm --qr-mode=NONE \
+  		       	     --time-based --disallow-reuse --window-size=${TWO_FACTOR_AUTHENTICATION_WINDOW_SIZE} \
+		       	     --step-size=${TWO_FACTOR_AUTHENTICATION_STEP_SIZE} --rate-limit=3 --rate-time=30 \
+			     --secret=${_TWO_FACTOR_GOOGLE_AUTHENTICATOR} \
+			     --emergency-codes=${ecode_nb} > /dev/null 2>&1
+
+	if test ${?} -ne 0 ; then
+	    rm -f ${_TWO_FACTOR_GOOGLE_AUTHENTICATOR}
+	    INDIRECT_ERROR_CODE=524
+	    return 254
+	fi
+
+	if test ! -f ${_TWO_FACTOR_GOOGLE_AUTHENTICATOR} ; then
+	    INDIRECT_ERROR_CODE=524
+	    return 254
+	fi
+    fi
+
+    local secrets=$(get-2fa-secrets ${_TWO_FACTOR_GOOGLE_AUTHENTICATOR})
+    local secret=${secrets/ *}
+    local ecodes=${secrets#* }
+
+    if test "${TERM}" != "${WADMIN_TERM}" -a ${bool} == True ; then
+	echo
+	echo -e "Your 2FA secret key: ${secret}\n"
+
+	if test ${USER} == ${ADMIN_NAME} ; then
+	    echo -ne "You can get its associated QR code in the Web GUI at the: '[GENERAL] > [Administration Settings] > [Administration Services]' location. It is important to note that you should scan this QR code with your Authenticator App before the 2FA activation (by using the 'apply' command). "
+	else
+	    echo -ne "You can get its associated QR code by login via the Web GUI. It is important to note that you should scan this QR code with your Authenticator App before you confirm its scanning. "
+	fi
+
+	echo -e "Otherwise you would not be able to login!\n"
+
+	echo -e "Your emergency codes: ${ecodes}. It is important that you save these codes in a safe place.\n"
+    fi
+}
+
+manage-admin-srv()
+{
+    test -n "${1}" || return 1
+    local srv=${1}
+    local val=${2}
+
+    if test -z "${val}" ; then
+	case ${srv} in
+	    waudit)
+		contextual-command-is-allowed || return 207
+		show-admin ${srv}
+		return 0
+		;;
+	    2fa)
+		is-in-top-level-context || return 231
+		show-admin ${srv}
+		return 0
+		;;
+	    *)
+		show-admin ${srv}
+		return 0
+	esac
+    fi
+
+    check-boolean ${val} || return 18
+    local bool=$(internal-form ${val})
+
+    case ${srv} in
+	snmp)
+	    export ADMIN_SNMP="${bool}"
+	    ;;
+	ssh)
+	    export ADMIN_SSH="${bool}"
+	    ;;
+	wadmin)
+	    export ADMIN_WADMIN="${bool}"
+	    ;;
+	2fa)
+	    is-in-top-level-context || return 231
+
+	    local new_2fa=$(get-admin-2fa ${USER} new)
+	    local cur_2fa=$(get-admin-2fa ${USER} cur)
+
+	    if test ${cur_2fa} == False ; then
+		if test ${bool} == False ; then
+		    reset-admin-2fa ${USER}
+		    rm -f ${_TWO_FACTOR_GOOGLE_AUTHENTICATOR}
+		else
+		    if test ${bool} != ${new_2fa} ; then
+			initialise-2fa ${bool} || return ${?}
+			set-admin-2fa ${USER} new ${bool} || return 104
+		    fi
+		fi
+	    else
+		set-admin-2fa ${USER} new ${bool} || return 104
+	    fi
+	    ;;
+	waudit)
+	    contextual-command-is-allowed || return 207
+	    export ADMIN_WAUDIT="${bool}"
+	    ;;
+	*)
+	    error 255
+	    ;;
+    esac
+
+    SAVENV=1
+}
+
+show-admin-tls()
+{
+    echo-begin-show
+    echo-command-form "admin tls"
+    echo-mark-cur
+    echo-value "${CURRENT_ADMIN_TLS}"
+    if test "${CURRENT_ADMIN_TLS}" != "${ADMIN_TLS}" ; then
+	echo-command-form "admin tls"
+	echo-mark-new
+	echo-value "${ADMIN_TLS}"
+    fi
+    echo-end-show
+}
+
+manage-admin-tls()
+{
+    local tls=${1}
+
+    if test -z "${tls}" ; then
+	show-admin-tls
+	return 0
+    fi
+
+    local level=$(tls-get-ca-chain-level "${tls}")
+    test ${level} -le 2 || return 28
+
+    local id
+
+    for id in ${tls//:/ }
+    do
+	check-tls-id ${id} || return 213
+    done
+
+    export ADMIN_TLS=${tls}
+    SAVENV=1
+}
+
+valid-user()
+{
+    test -n "${1}" || return 1
+    local user=${1}
+
+    case ${user} in
+	${SUPERADMIN_NAME}|${ADMIN_NAME}|${WADMIN_NAME}|${MANAGER_NAME}|root|bin|nobody|daemon|sshd|ntp|named|cache|filter|proxy|snmp|av)
+	    return 1
+	    ;;
+	*)
+	    return 0
+	    ;;
+    esac
+}
+
+print-users-list()
+{
+    test -n "${1}" || return 1
+    local list=${1}
+
+    local user i=0
+    for user in ${list}
+    do
+	test ${i} -eq 0 || echo-blank-command
+	echo-value "${user}"
+	((i++))
+    done
+}
+
+show-user()
+{
+    echo-begin-show
+    echo-command-form "admin user"
+    echo-mark-cur
+    if test -z "${CURRENT_ADMIN_USER_LIST}" ; then
+	echo-value-null
+    else
+	print-users-list "${CURRENT_ADMIN_USER_LIST}"
+    fi
+
+    if test "${CURRENT_ADMIN_USER_LIST}" != "${ADMIN_USER_LIST}" ; then
+	echo-command-form "admin user"
+	echo-mark-new
+	if test -z "${ADMIN_USER_LIST}" ; then
+	    echo-value-null
+	else
+	    print-users-list "${ADMIN_USER_LIST}"
+	fi
+    fi
+    echo-end-show
+}
+
+manage-user()
+{
+    if test -z "${1}" ; then show-user ; return 0 ; fi
+    user-has-admin-rights || return 31
+
+    local act=${1}
+    check-action ${act} || return 122
+
+    case ${act} in
+	add)
+	    users_nb=$(length-list "${ADMIN_USER_LIST}")
+	    test ${users_nb} -lt ${MAX_ADMINISTRATORS_NB} || return 90
+
+	    local user=${2}
+	    test -n "${user}" || return 1
+	    check-id ${user} || return 35
+	    valid-user ${user} || return 32
+
+	    ADMIN_USER_LIST=$(insert-record-in-slist 1 1 "${user}" "${ADMIN_USER_LIST}")		
+
+	    if ! member "${CURRENT_ADMIN_USER_LIST}" ${user} ; then
+
+		local password=${3}
+
+		if test -z "${password}" ; then
+
+		    test ${TERM} != ${WADMIN_TERM} || return 86
+		    test "${__BATCH_MODE}" != yes || error 111
+		    test -z "${TRANSACTION}" || return 106
+
+		    if test -n "${TRANSACTION}" ; then
+			local year=$(date +"%Y" 2> /dev/null)
+			password="${user}@appliance-${year}"
+		    else
+			echo -n "Please enter the ${user}'s password: "
+			stty -echo
+			read password
+			stty echo
+			echo
+		    fi
+		fi
+
+		check-password "${password}" || return 86
+		echo ${password} > ${TMP_DIR}/${ADMIN_USER_PASSWD}.${user}
+		NEWENV=1
+	    fi
+	    ;;
+	del)
+	    local user=${2}
+	    check-id ${user} || return 35
+	    export ADMIN_USER_LIST
+
+	    ADMIN_USER_LIST=$(remove "${ADMIN_USER_LIST}" "${user}")
+
+	    if test ${?} -ne 0 ; then
+		INDIRECT_ERROR_CODE=527
+		return 254
+	    fi
+	    rm -f ${TMP_DIR}/${ADMIN_USER_PASSWD}.${user}
+
+	    NEWENV=1
+	    ;;
+	raz)
+	    export ADMIN_USER_LIST=''
+	    rm -f ${TMP_DIR}/${ADMIN_USER_PASSWD}.*
+	    NEWENV=1
+	    ;;
+	*)
+	    error 255
+	    ;;
+    esac
+    
+    SAVENV=1
+}
+
+show-ssh-fp()
+{
+    echo-begin-show
+
+    echo-command-form "SHA256 (RSA)"
+
+    if cli-is-in-template-context ; then
+	echo-value-null
+    else
+	if test -f ${HARD_DIR}/${SSH_HOST_RSA_FP} ; then
+	    local rsa_fp=$(cat ${HARD_DIR}/${SSH_HOST_RSA_FP})
+	    echo-value ${rsa_fp/*:}
+	else
+	    echo-value-null
+	fi
+    fi
+
+    echo-end-show
+}
+
+run()
+{
+    if test -z "${ARGS[1]}" ; then show-admin ; return 0 ; fi
+
+    local key=${ARGS[1]}
+
+    shift-args
+
+    trap exit-cb INT QUIT TERM
+
+    if test ${USER} == ${ADMIN_NAME} ; then
+	_TWO_FACTOR_GOOGLE_AUTHENTICATOR=/${TWO_FACTOR_GOOGLE_AUTHENTICATOR}
+    else
+	_TWO_FACTOR_GOOGLE_AUTHENTICATOR=${TWO_FACTOR_GOOGLE_AUTHENTICATOR}
+    fi
+
+    case ${key} in
+	internal)
+	    local op=${ARGS[1]}
+
+	    case ${op} in
+		2fa-is-enabled)
+		    is-admin-2fa-enabled && echo 'yes' || echo 'no'
+		    return 0
+		    ;;
+		2fa-is-initialised)
+		    is-admin-2fa-is-running ${USER} && echo 'yes' || echo 'no'
+		    return 0
+		    ;;
+		2fa-initialise)
+		    test ${USER} != ${ADMIN_NAME} || return 0
+		    is-admin-2fa-enabled || return 0
+		    test "${TERM}" == "${WADMIN_TERM}" || \
+			echo -e "\nThe 2FA mode is activated on this system and you are invited to initialise the 2FA associated to your administrator account."
+		    initialise-2fa True 4
+		    local ret=${?}
+		    test ${ret} -eq 0 || return ${ret}
+
+		    local response
+
+		    if test "${TERM}" != "${WADMIN_TERM}" ; then
+			echo -n "Do you confirm that you have entered your secret key in your Authenticator App or have scanned its associated QR code? [Y|N] [N]? "
+			read response
+			echo
+		    else
+			response=${ARGS[2]}
+		    fi
+
+		    if test "${response:0:1}" == "Y" -o "${response:0:1}" == "y" ; then
+			supervisor-action "2fa-copy-conf"
+			set-admin-2fa ${USER} cur True || return 104
+			info 7
+		    fi
+
+		    return 0
+		    ;;
+		2fa-get-secrets|2fa-consume-ecode|2fa-get-disallow-reused)
+		    if test "${TERM}" != ${WADMIN_TERM} ; then
+			INDIRECT_ERROR_CODE=526
+			return 254
+		    fi
+
+		    case ${op} in
+			2fa-get-secrets)
+			    local secrets=$(get-2fa-secrets ${_TWO_FACTOR_GOOGLE_AUTHENTICATOR})
+			    echo ${secrets}
+			    ;;
+			2fa-get-disallow-reused)
+			    local dates=$(get-2fa-disallow-reuse ${_TWO_FACTOR_GOOGLE_AUTHENTICATOR})
+			    echo ${dates}			    
+			    ;;
+			2fa-consume-ecode)
+			    local ecode=${ARGS[2]}
+			    sed -i -e "/^${ecode}$/d" ${_TWO_FACTOR_GOOGLE_AUTHENTICATOR} > /dev/null 2>&1
+			    test ${USER} == ${ADMIN_NAME} || supervisor-action "2fa-copy-conf"
+			    ;;
+			*)
+			    return 254
+			    ;;
+		    esac
+		    ;;
+		2fa-revert-copy-conf)
+		    test ${USER} != ${ADMIN_NAME} || return 0
+		    test "${TERM}" != "${WADMIN_TERM}" || return 0
+		    supervisor-action "2fa-revert-copy-conf"
+		    ;;
+		2fa-update-timestamp)
+		    local status=${ARGS[2]}
+		    test -n "${status}" || return 0
+
+		    if test ${USER} == ${ADMIN_NAME} ; then
+			update-2fa-timestamp ${USER} ${status}
+		    else
+			supervisor-push-args ${status}
+			supervisor-action "2fa-update-timestamp"
+		    fi
+		    ;;
+		*)
+		    return 0
+		    ;;
+	    esac
+	    ;;
+	user)
+	    manage-user ${ALLARGS}
+	    ;;
+	snmp)
+	    case ${ARGS[1]} in
+		'')
+		    show-admin snmp
+		    ;;
+		on|off)
+		    manage-admin-srv ${key} ${ALLARGS}
+		    ;;
+		community|community:show|community:encrypted|privacy|privacy:show|privacy:encrypted)
+		    manage-snmp-secret ${ARGS[1]} "${ARGS[2]}"
+		    ;;
+		'trap')
+		    shift-args
+		    manage-snmp-trap ${ALLARGS}
+		    ;;
+		certificate)
+		    shift-args
+		    manage-snmp-certificate ${ALLARGS}
+		    ;;
+		*)
+		    manage-snmp ${ARGS[1]} "${ARGS[2]}"
+		    ;;
+	    esac
+	    ;;
+	ssh)
+	    case ${ARGS[1]} in
+		key)
+		    shift-args
+		    manage-ssh-key ${ALLARGS}
+		    ;;
+		fingerprint)
+		    show-ssh-fp
+		    ;;
+		generate)
+		    if test -z "${ARGS[2]}" ; then
+			echo-begin-show
+			echo-command-form "admin ssh generate"
+			if test -f  ${TMP_DIR}/${SSH_HOST_ARM_NEW} ; then
+			    echo-value "on"
+			else
+			    echo-value "off"
+			fi
+			echo-end-show
+			return 0
+		    fi
+
+		    user-has-admin-rights || return 31
+
+		    case "${ARGS[2]}" in
+			on)
+			    touch ${TMP_DIR}/${SSH_HOST_ARM_NEW}
+			    NEWENV=1
+			    ;;
+			off)
+			    rm -f ${TMP_DIR}/${SSH_HOST_ARM_NEW}
+			    NEWENV=1
+			    ;;
+			*)
+			    return 1
+			    ;;
+		    esac
+		    ;;
+		password)
+		    shift-args
+		    manage-ssh-password ${ALLARGS}
+		    ;;
+		*)
+		    manage-admin-srv ${key} ${ALLARGS}
+		    ;;
+	    esac
+	    ;;
+	wadmin|waudit|2fa)
+	    manage-admin-srv ${key} ${ALLARGS}
+	    ;;
+	topology)
+	    contextual-command-is-allowed || return 207
+	    manage-topology ${ALLARGS}
+	    ;;
+	tls)
+	    manage-admin-tls "${ARGS[1]}"
+	    ;;
+	*)
+	    return 1
+	    ;;
+    esac
+}
+
+main "${@}"

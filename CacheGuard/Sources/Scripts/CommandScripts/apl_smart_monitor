@@ -1,0 +1,93 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       Scripts
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+CACHEGUARD_DIR=/etc/sysconfig/cacheguard
+source ${CACHEGUARD_DIR}/constant
+source ${APPLIANCE_DIR}/etc/role
+source ${ABASE_DIR}/${ENV_RDIR}/${ENV_CURRENT_NAME}
+
+send-smart-snmp-trap()
+{
+    test -n "${SMARTD_DEVICE}" || return 1
+    test -n "${SMARTD_FAILTYPE}" || return 2
+
+    local event=${SMARTD_FAILTYPE}
+    local device=${SMARTD_DEVICE}
+
+    local event_description
+
+    case ${event} in
+	EmailTest)
+	    event_description="This is test event."
+	    ;;
+        Health)
+	    event_description="The SMART health status indicates imminent failure."
+	    ;;
+        Usage)
+	    event_description="A usage Attribute has failed."
+	    ;;
+        SelfTest)
+	    event_description="The number of self-test failures has increased."
+	    ;;
+        ErrorCount)
+	    event_description="The number of errors in the ATA error log has increased."
+	    ;;
+        CurrentPendingSector)
+	    event_description="One of more disk sectors could not be read and are marked to be reallocated (replaced with spare sectors)."
+	    ;;
+        OfflineUncorrectableSector)
+	    event_description="During off-line testing, or self-test-ing one or more disk sectors could not be read."
+	    ;;
+        Temperature)
+	    event_description="Temperature reached critical limit."
+	    ;;
+        FailedHealthCheck)
+	    event_description="The SMART health status command failed."
+	    ;;
+        FailedReadSmartData)
+	    event_description="The command to read SMART Attribute data failed."
+	    ;;
+        FailedReadSmartErrorLog)
+	    event_description="The command to read the SMART error log failed."
+	    ;;
+        FailedReadSmartSelfTestLog)
+	    event_description="The command to read the SMART self-test log failed."
+	    ;;
+        FailedOpenDevice)
+	    event_description="The open() command to the device failed."
+	    ;;
+	*)
+	    event_description="Unkonw event (Info)."
+	    ;;
+    esac
+    
+    logger -p daemon.alert -t apl_smart_monitor -- "${event} event on ${device}: ${description}"
+    ${LOCAL_DIR}/bin/apl_rlogger "${event} event on ${device}: ${description}"
+    test "${CURRENT_ADMIN_SNMP}" == True || return 0
+    ${LOCAL_DIR}/bin/apl_snmp_trap 12 "${event}" "${device}" "${event_description}" > /dev/null 2>&1
+}
+
+# Main()
+
+send-smart-snmp-trap

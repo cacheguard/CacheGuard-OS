@@ -1,0 +1,43 @@
+Manage the VRRP configuration in HA mode
+.SH SYNOPSIS
+
+[1] \fBvrrp\fR [(\fBinternal\fR | \fBexternal\fR | \fBauxiliary\fR | \fBweb\fR | \fBrweb\fR | \fBantivirus\fR) [\fBadd\fR \fI<vrrp-ip>\fR (\fBmaster\fR | \fBbackup\fR) [\fI<priority>\fR [\fI<vrrp-id>\fR]]]]
+
+[2] \fBvrrp\fR [(\fBinternal\fR | \fBexternal\fR | \fBauxiliary\fR | \fBweb\fR | \fBrweb\fR | \fBantivirus\fR) [\fBdel\fR \fI<vrrp-ip>\fR]]
+
+[3] \fBvrrp\fR [(\fBinternal\fR | \fBexternal\fR | \fBauxiliary\fR | \fBweb\fR | \fBrweb\fR | \fBantivirus\fR) [\fBraz\fR]]
+
+.SH DESCRIPTION
+This command allows you to set the VRRP (Virtual Redundancy Router Protocol) IP configuration when using the HA (High Availability) mode (see the \fBmode\fR command to activate the HA mode). One or more VRRP IP addresses can be associated to each logical network interface (\fBexternal\fR, the \fBinternal\fR and the \fBauxiliary\fR). VRRP IPs can be also associated to the \fBweb\fR, \fBrweb\fR and \fBantivirus\fR 802.1q pseudo network interfaces when using the 802.1q VLAN mode (see the \fBmode\fR command to activate the VLAN mode).
+
+The appliance implements the VRRP v2 to assure a High level of Availability. When using VRRP, two (or more) appliance utilise the same virtual IP (VRRP IP) address while each appliance has its own real IP address. Virtual IP addresses are then used by clients accessing the virtual appliance (made by two or more real appliances). For each VRRP IP address, one appliance is configured as the master and other appliances act as backups. In case of the failure of the master appliance, a backup appliance is then elected as the new master.
+
+A classical configuration uses two appliances with two VRRP IP address configured on both. The first VRRP IP address is configured as master on the first appliance while this VRRP IP address is configured as a backup VRRP IP address on the second appliance. The second VRRP IP address is then a backup address on the first appliance and master on the second appliance. In such a configuration, users, backend web servers and any other equipments connected to the appliance should use VRRP IP addresses configured on appliances.
+
+To use both appliances equally, different methods are available. One method consists of using a round robin DNS (appliances are addressed by using a unique name configured on a local DNS and this name is associated to both VRRP IP addresses). Another method uses WPAD (Web Proxy Auto Discovery) script, which automatically configures settings for clients (this script should share the load between both appliances). Finally, a Switch L4 can be used to load balance the traffic on both appliances.
+
+The first [1] usage form allows you to associate a VRRP IP to a logical network interface. To define a VRRP IP address for a network interface, give the network interface name followed by the keyword \fBadd\fR , the VRRP IP address and its initial state (\fBmaster\fR or \fBbackup\fR). Note that the same VRRP IP address must be defined on all real appliances creating the virtual appliance but only one appliance must declare that VRRP IP address as master.
+
+The optional \fI<priority>\fR argument is a numeric value between 0 and 255 specifying the priority during the master election phase. The appliance with the highest priority value is then elected as the Master. By default, the priority is set to 110 for a master VRRP IP and to 100 for a backup VRRP IP. Take care to define different priorities for the same VRRP IP on each appliance. 
+
+The priority value is also used to bind together all logical network interfaces (\fBinternal\fR, \fBexternal\fR, \fBauxiliary\fR, \fBweb\fR, \fBrweb\fR or \fBantivirus\fR) so in case of a failure on one of them all associated VRRPs having the same priority will move together. This avoid to have inconsistencies situations where an appliance is active for one configured VRRP IP and passive for others.
+
+A VRRP identifier could be specified as the last argument. When more than one virtual network equipment share the same LAN, the \fI<vrrp-id>\fR allows you to specify to which virtual equipment belongs a real network equipment. The \fI<vrrp-id>\fR must be a numeric value between 0  and 255. If no \fI<vrrp-id>\fR is given, the last byte of the VRRP IP address is used as the \fI<vrrp-id>\fR.
+
+Usage forms two [2] and three [3] allow you delete a VRRP IP or erase the list of all VRRP IPs associated to a logical network interface.
+
+.SH SHARED VLAN-ID RULES
+
+In case where a pseudo network interface shares the same \fI<vlan-id>\fR of another pseudo network interface and no VRRP IP address is specified for it, the following rules are applied:
+
+  \(bu The pseudo network interface takes the VRRP IP addresses specified for the other pseudo network interfaces having the same \fI<vlan-id>\fR.
+
+  \(bu If more than one pseudo network interface share the same \fI<vlan-id>\fR, the pseudo network interface takes the VRRP IP addresses of the preferred pseudo network interface. Preferences are in the following order: \fBweb\fR, \fBrweb\fR and \fBantivirus\fR.
+
+.SH SEE ALSO
+.B apply
+(1)
+.B mode
+(1)
+.B vlan
+(1)

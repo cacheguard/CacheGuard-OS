@@ -1,0 +1,1317 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       Commands
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+source functions
+
+check-gress()
+{
+    test -n "${1}" || return 1
+
+    case "${1}" in
+	ingress|egress)
+	    return 0
+	    ;;
+	*)
+	    return 1
+	    ;;
+    esac
+}
+
+check-qos-protocol()
+{
+    test -n "${1}" || return 1
+
+    case "${1}" in
+	any)
+	    return 0
+	    ;;
+	udp|tcp)
+	    return 0
+	    ;;
+	*)
+	    return 1
+	    ;;
+    esac
+}
+
+check-qos-port()
+{
+    test -n "${1}" || return 1
+    local port=${1}
+
+    test ${port} != any || return 0
+    check-port-nb ${port} || return 1
+}
+
+check-dscp()
+{
+    test -n "${1}" || return 1
+    local dscp=${1}
+
+    check-digit ${dscp} || return 11
+    test ${dscp} -ge 0 -a ${dscp} -le 63 || return 13
+}
+
+check-bandwidth()
+{
+    test -n "${1}" || return 1
+    
+    local len=$(expr length "${1}" 2> /dev/null)
+    local match_len=$(expr match "${1}" "[0-9]*" 2> /dev/null)
+    test ${len} -eq ${match_len} || return 1
+    test ${1} -ge 1 || return 1
+    return 0
+}
+
+check-qos-shape-type()
+{
+    test -n "${1}" || return 1
+    local at=${1}
+
+    case ${at} in
+	file|peer|web|tweb|rweb|antivirus|vpnipsec|default|router)
+	    return 0
+	    ;;
+	*)
+	    return 1
+	    ;;
+    esac
+}
+
+check-qos-flow-type()
+{
+    test -n "${1}" || return 1
+    local at=${1}
+
+    case ${at} in
+	all|admin|etc|gateway)
+	    return 0
+	    ;;
+	*)
+	    check-qos-shape-type ${at}
+	    ;;
+    esac
+}
+
+get-qos()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 1
+
+    local list=${1}
+    local in_at=${2}
+
+    local elt i=0 range
+    local at qos
+    for elt in ${list}
+    do
+	range=$[${i} % 2]
+	case ${range} in
+	    0)
+		at=${elt}
+		;;
+	    1)
+		qos=${elt}
+		if test "${at}" == "${in_at}" ; then
+		    show-qos-value ${qos}
+		    return 0
+		fi
+		;;
+	    *)
+		return 1
+		;;
+	esac
+	((i++))
+    done
+    return 1
+}
+
+show-qos-value()
+{
+    test -n "${1}" || return 1
+    local qos=${1}
+
+    local len=${#qos} ; ((len--))
+    if test ${qos:${len}} == '%' ; then
+	echo "${qos}"
+    else
+	echo "${qos} kbps"
+    fi
+}
+
+show-qos-bw-internal-ingress()
+{
+    echo-command-form "qos bandwidth"
+    echo-mark-cur
+    echo-value "internal ingress ${CURRENT_QOS_BW_INTERNAL_INGRESS} kbps"
+    if test "${CURRENT_QOS_BW_INTERNAL_INGRESS}" != "${QOS_BW_INTERNAL_INGRESS}" ; then
+	echo-command-form "qos bandwidth"
+	echo-mark-new
+	echo-value "internal ingress ${QOS_BW_INTERNAL_INGRESS} kbps"
+    fi
+}
+
+show-qos-bw-internal-egress()
+{
+    echo-command-form "qos bandwidth"
+    echo-mark-cur
+    echo-value "internal egress ${CURRENT_QOS_BW_INTERNAL_EGRESS} kbps"
+    if test "${CURRENT_QOS_BW_INTERNAL_EGRESS}" != "${QOS_BW_INTERNAL_EGRESS}" ; then
+	echo-command-form "qos bandwidth"
+	echo-mark-new
+	echo-value "internal egress ${QOS_BW_INTERNAL_EGRESS} kbps"
+    fi
+}
+
+show-qos-bw-external-ingress()
+{
+    echo-command-form "qos bandwidth"
+    echo-mark-cur
+    echo-value "external ingress ${CURRENT_QOS_BW_EXTERNAL_INGRESS} kbps"
+    if test "${CURRENT_QOS_BW_EXTERNAL_INGRESS}" != "${QOS_BW_EXTERNAL_INGRESS}" ; then
+	echo-command-form "qos bandwidth"
+	echo-mark-new
+	echo-value "external ingress ${QOS_BW_EXTERNAL_INGRESS} kbps"
+    fi
+}
+
+show-qos-bw-external-egress()
+{
+    echo-command-form "qos bandwidth"
+    echo-mark-cur
+    echo-value "external egress ${CURRENT_QOS_BW_EXTERNAL_EGRESS} kbps"
+    if test "${CURRENT_QOS_BW_EXTERNAL_EGRESS}" != "${QOS_BW_EXTERNAL_EGRESS}" ; then
+	echo-command-form "qos bandwidth"
+	echo-mark-new
+	echo-value "external egress ${QOS_BW_EXTERNAL_EGRESS} kbps"
+    fi
+}
+
+show-qos-bw-auxiliary-ingress()
+{
+    echo-command-form "qos bandwidth"
+    echo-mark-cur
+    echo-value "auxiliary ingress ${CURRENT_QOS_BW_AUXILIARY_INGRESS} kbps"
+    if test "${CURRENT_QOS_BW_AUXILIARY_INGRESS}" != "${QOS_BW_AUXILIARY_INGRESS}" ; then
+	echo-command-form "qos bandwidth"
+	echo-mark-new
+	echo-value "auxiliary ingress ${QOS_BW_AUXILIARY_INGRESS} kbps"
+    fi
+}
+
+show-qos-bw-auxiliary-egress()
+{
+    echo-command-form "qos bandwidth"
+    echo-mark-cur
+    echo-value "auxiliary egress ${CURRENT_QOS_BW_AUXILIARY_EGRESS} kbps"
+    if test "${CURRENT_QOS_BW_AUXILIARY_EGRESS}" != "${QOS_BW_AUXILIARY_EGRESS}" ; then
+	echo-command-form "qos bandwidth"
+	echo-mark-new
+	echo-value "auxiliary egress ${QOS_BW_AUXILIARY_EGRESS} kbps"
+    fi
+}
+
+show-qos-bw() {
+
+    local dev=${1}
+    local gress=${2}
+
+    echo-begin-show
+    case "${dev}" in
+	internal|external|auxiliary)
+	    case "${gress}" in
+		ingress|egress)
+		    show-qos-bw-${dev}-${gress}
+		    ;;
+		"")
+		    show-qos-bw-${dev}-ingress
+		    show-qos-bw-${dev}-egress
+		    ;;
+		*)
+		    return 255
+		    ;;
+	    esac
+	    ;;
+	"")
+	    show-qos-bw-internal-ingress
+	    show-qos-bw-internal-egress
+	    show-qos-bw-external-ingress
+	    show-qos-bw-external-egress
+	    show-qos-bw-auxiliary-ingress
+	    show-qos-bw-auxiliary-egress
+	    ;;
+	*)
+	    return 255
+	    ;;
+    esac
+    echo-end-show
+}
+
+show-qos-shape2()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    test -n "${3}" || return 3
+    test -n "${4}" || return 4
+    local dev=${1}
+    local gress=${2}
+    local list=${3}
+    local in_flow=${4}
+
+    local new_list=$(eval echo \$${list})
+    local current_list=$(eval echo \$CURRENT_${list})
+
+    local i=0 elt range
+    local flow cur_qos new_qos
+
+    for elt in ${current_list}
+    do
+	range=$[${i} % 2]
+	case ${range} in
+	    0)
+		flow=${elt}
+		;;
+	    1)
+		cur_qos=${elt}
+		if test "${flow}" == "${in_flow}" ; then
+		    echo-command-form "qos shape ${in_flow}"
+		    echo-mark-cur
+		    echo-value "${dev} ${gress} $(show-qos-value ${cur_qos})"
+		    break
+		fi
+		;;
+	    *)
+		return 255
+		;;
+	esac
+	((i++))
+    done
+    
+    i=0
+    for elt in ${new_list}
+    do
+	range=$[${i} % 2]
+	case ${range} in
+	    0)
+		flow=${elt}
+		;;
+	    1)
+		new_qos=${elt}
+		if test "${flow}" == "${in_flow}" -a "${new_qos}" != "${cur_qos}" ; then
+		    echo-command-form "qos shape ${in_flow}"
+		    echo-mark-new
+		    echo-value "${dev} ${gress} $(show-qos-value ${new_qos})"
+		    return 0
+		fi
+		;;
+	    *)
+		return 255
+		;;
+	esac
+	((i++))
+    done
+}
+
+show-qos-shape1()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    test -n "${3}" || return 3
+    local dev=${1}
+    local gress=${2}
+    local flow=${3}
+
+    local list
+
+    case ${dev} in
+	internal)
+	    case ${gress} in
+		ingress)
+		    list=QOS_SHAPE_INTERNAL_INGRESS_LIST
+		    ;;
+		egress)
+		    list=QOS_SHAPE_INTERNAL_EGRESS_LIST
+		    ;;
+		*)
+		    return 11
+		    ;;
+	    esac
+	    ;;
+	external)
+	    case ${gress} in
+		ingress)
+		    list=QOS_SHAPE_EXTERNAL_INGRESS_LIST
+		    ;;
+		egress)
+		    list=QOS_SHAPE_EXTERNAL_EGRESS_LIST
+		    ;;
+		*)
+		    return 13
+		    ;;
+	    esac
+	    ;;
+	auxiliary)
+	    case ${gress} in
+		ingress)
+		    list=QOS_SHAPE_AUXILIARY_INGRESS_LIST
+		    ;;
+		egress)
+		    list=QOS_SHAPE_AUXILIARY_EGRESS_LIST
+		    ;;
+		*)
+		    return 15
+		    ;;
+	    esac
+	    ;;
+	*)
+	    return 15
+	    ;;
+    esac
+	
+    show-qos-shape2 ${dev} ${gress} ${list} ${flow}
+}
+
+show-qos-shape-flow()
+{
+    test -n "${1}" || return 1
+    local flow=${1}
+    local dev=${2}
+    local gress=${3}
+
+    case "${dev}" in
+	internal|external|auxiliary)
+	    case "${gress}" in
+		ingress|egress)
+		    show-qos-shape1 ${dev} ${gress} ${flow}
+		    ;;
+		"")
+		    show-qos-shape1 ${dev} ingress ${flow}
+		    show-qos-shape1 ${dev} egress ${flow}
+		    ;;
+		*)
+		    return 11
+		    ;;
+	    esac
+	    ;;
+	"")
+	    for dev in internal external auxiliary
+	    do
+		show-qos-shape1 ${dev} ingress ${flow}
+		show-qos-shape1 ${dev} egress ${flow}
+	    done
+	    ;;
+	*)
+	    return 13
+    esac
+}
+
+show-qos-shape-tweb()
+{
+    local dev=${1}
+    local gress=${2}
+
+    local flow=tweb
+
+    case "${dev}" in
+	internal|auxiliary)
+	    case "${gress}" in
+		ingress|egress)
+		    show-qos-shape1 ${dev} ${gress} ${flow}
+		    ;;
+		"")
+		    show-qos-shape1 ${dev} ingress ${flow}
+		    show-qos-shape1 ${dev} egress ${flow}
+		    ;;
+		*)
+		    return 21
+		    ;;
+	    esac
+	    ;;
+	"")
+	    for dev in internal auxiliary
+	    do
+		for gress in ingress egress
+		do
+		    show-qos-shape1 ${dev} ${gress} ${flow}
+		done
+	    done
+	    ;;
+	*)
+	    return 23
+	    ;;
+    esac
+}
+
+show-qos-shape-rweb()
+{
+    local dev=${1}
+    local gress=${2}
+
+    local flow=rweb
+
+    case "${dev}" in
+	internal|external)
+	    case "${gress}" in
+		ingress|egress)
+		    show-qos-shape1 ${dev} ${gress} ${flow}
+		    ;;
+		"")
+		    show-qos-shape1 ${dev} ingress ${flow}
+		    show-qos-shape1 ${dev} egress ${flow}
+		    ;;
+		*)
+		    return 31
+		    ;;
+	    esac
+	    ;;
+	"")
+	    for dev in internal external
+	    do
+		for gress in ingress egress
+		do
+		    show-qos-shape1 ${dev} ${gress} ${flow}
+		done
+	    done
+	    ;;
+	*)
+	    return 33
+	    ;;
+    esac
+}
+
+show-qos-shape-peer()
+{
+    local dev=${1}
+    local gress=${2}
+
+    local flow=peer
+
+    case "${dev}" in
+	internal)
+	    case "${gress}" in
+		ingress|egress)
+		    show-qos-shape1 ${dev} ${gress} ${flow}
+		    ;;
+		"")
+		    show-qos-shape1 ${dev} ingress ${flow}
+		    show-qos-shape1 ${dev} egress ${flow}
+		    ;;
+		*)
+		    return 41
+		    ;;
+	    esac
+	    ;;
+	"")
+	    show-qos-shape1 internal ingress ${flow}
+	    show-qos-shape1 internal egress ${flow}
+	    ;;
+	*)
+	    return 43
+    esac
+}
+
+show-qos-shape-router1()
+{
+    test -n "${1}" || return 1
+    local mode=${1}
+    local rules=${2}
+
+    echo-command-form "qos shape router"
+    if test "${mode}" == "new" ; then
+	echo-mark-new
+    else
+	echo-mark-cur
+    fi
+
+    if test -z "${rules}" ; then
+	echo-value-null
+	return 0
+    fi
+    
+    local i=0 n=0 elt range
+    local id dev protocol src_ip src_port dst_ip dst_port ingress_qos egress_qos dscp
+    local rule
+
+    for elt in ${rules}
+    do
+	range=$[${i} % 10]
+	case ${range} in
+	    0)
+		id=${elt}
+		;;
+	    1)
+		dev=${elt}
+		;;
+	    2)
+		protocol=${elt}
+		;;
+	    3)
+		src_ip=${elt}
+		;;
+	    4)
+		src_port=${elt}
+		;;
+	    5)
+		ingress_qos=${elt}
+		;;
+	    6)
+		dst_ip=${elt}
+		;;
+	    7)
+		dst_port=${elt}
+		;;
+	    8)
+		egress_qos=${elt}
+		;;
+	    9)
+		dscp=${elt}
+		if test ${dscp} == nil ; then
+		    unset dscp
+		else
+		    dscp=" ${dscp}"
+		fi
+
+		rule="${id} ${dev} ${protocol} ${src_ip} ${src_port} ${ingress_qos} ${dst_ip} ${dst_port} ${egress_qos}${dscp}"
+		test ${n} -eq 0 || echo-blank-command
+		echo-value "${rule}"
+		((n++))
+		;;
+	    *)
+		return 255
+		;;
+	esac
+	((i++))
+    done
+}
+
+show-qos-shape-router()
+{
+    show-qos-shape-router1 cur "${CURRENT_QOS_SHAPE_ROUTER_LIST}"
+    test "${CURRENT_QOS_SHAPE_ROUTER_LIST}" == "${QOS_SHAPE_ROUTER_LIST}" || \
+	show-qos-shape-router1 new "${QOS_SHAPE_ROUTER_LIST}"
+}
+
+show-qos-shape()
+{
+    local flow=${1}
+    local dev=${2}
+    local gress=${3}
+
+    echo-begin-show
+
+    case "${flow}" in
+	web)
+	    show-qos-shape-flow web ${dev} ${gress}
+	    ;;
+	tweb)
+	    show-qos-shape-tweb ${dev} ${gress}
+	    ;;
+	rweb)
+	    show-qos-shape-rweb ${dev} ${gress}
+	    ;;
+	antivirus)
+	    show-qos-shape-flow antivirus ${dev} ${gress}
+	    ;;
+	file)
+	    show-qos-shape-flow file ${dev} ${gress}
+	    ;;
+	peer)
+	    show-qos-shape-peer ${dev} ${gress}
+	    ;;
+	vpnipsec)
+	    show-qos-shape-flow vpnipsec ${dev} ${gress}
+	    ;;
+	default)
+	    show-qos-shape-flow default ${dev} ${gress}
+	    ;;
+	router)
+	    show-qos-shape-router
+	    ;;
+	"")
+	    show-qos-shape-flow web
+	    show-qos-shape-tweb
+	    show-qos-shape-rweb
+	    show-qos-shape-flow antivirus
+	    show-qos-shape-flow file
+	    show-qos-shape-peer
+	    show-qos-shape-flow vpnipsec
+	    show-qos-shape-flow default
+            show-qos-shape-router
+	    ;;
+	*)
+	    return 101
+	    ;;
+    esac
+    echo-end-show
+}
+
+set-qos-shape()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    test -n "${3}" || return 3
+    test -n "${4}" || return 4
+    local dev=${1}
+    local gress=${2}
+    local in_at=${3}
+    local in_qos=${4}
+
+    local list_name
+
+    case ${dev} in
+	internal)
+	    case ${gress} in
+		ingress)
+		    list_name=QOS_SHAPE_INTERNAL_INGRESS_LIST
+		    ;;
+		egress)
+		    list_name=QOS_SHAPE_INTERNAL_EGRESS_LIST
+		    ;;
+		*)
+		    return 11
+		    ;;
+	    esac
+	    ;;
+	external)
+	    case ${gress} in
+		ingress)
+		    list_name=QOS_SHAPE_EXTERNAL_INGRESS_LIST
+		    ;;
+		egress)
+		    list_name=QOS_SHAPE_EXTERNAL_EGRESS_LIST
+		    ;;
+		*)
+		    return 11
+		    ;;
+	    esac
+	    ;;
+	auxiliary)
+	    case ${gress} in
+		ingress)
+		    list_name=QOS_SHAPE_AUXILIARY_INGRESS_LIST
+		    ;;
+		egress)
+		    list_name=QOS_SHAPE_AUXILIARY_EGRESS_LIST
+		    ;;
+		*)
+		    return 11
+		    ;;
+	    esac
+	    ;;
+	*)
+	    return 13
+	    ;;
+    esac
+
+    local list=$(eval echo \$${list_name})
+
+    local i=0 out_list
+    local elt range
+    local at qos
+    
+    for elt in ${list}
+    do
+	range=$[${i} % 2]
+	case ${range} in
+	    0)
+		at=${elt}
+		;;
+	    1)
+		qos=${elt}
+		if test ${at} == ${in_at} ; then
+		    out_list="${out_list} ${in_at} ${in_qos}"
+		else
+		    out_list="${out_list} ${at} ${qos}"
+		fi
+		;;
+	    *)
+		return 1
+		;;
+	esac
+	((i++))
+    done
+    out_list=${out_list:1}
+    
+    export ${list_name}="${out_list}"
+}
+
+conf-bandwidth()
+{
+    local dev=${1}
+    local gs=${2}
+    local bw=${3}
+
+    if test -z "${dev}" ; then
+	show-qos-bw
+	return 0
+    fi
+
+    case ${dev} in
+	internal|external|auxiliary)
+	    if test -z "${gs}" ; then show-qos-bw ${dev} ; return 0 ; fi
+	    check-gress ${gs} || return 44
+	    if test -z "${bw}" ; then show-qos-bw ${dev} ${gs} ; return 0 ; fi
+	    check-bandwidth ${bw} || return 14
+
+	    case ${dev} in
+		internal)
+		    case ${gs} in
+			ingress)
+			    export QOS_BW_INTERNAL_INGRESS=${bw}
+			    ;;
+			egress)
+			    export QOS_BW_INTERNAL_EGRESS=${bw}
+			    ;;
+			*)
+			    return 255
+			    ;;
+		    esac
+		    ;;
+		external)
+		    case ${gs} in
+			ingress)
+			    export QOS_BW_EXTERNAL_INGRESS=${bw}
+			    ;;
+			egress)
+			    export QOS_BW_EXTERNAL_EGRESS=${bw}
+			    ;;
+			*)
+			    return 255
+			    ;;
+		    esac
+		    ;;
+		auxiliary)
+		    case ${gs} in
+			ingress)
+			    export QOS_BW_AUXILIARY_INGRESS=${bw}
+			    ;;
+			egress)
+			    export QOS_BW_AUXILIARY_EGRESS=${bw}
+			    ;;
+			*)
+			    return 255
+			    ;;
+		    esac
+		    ;;
+		*)
+		    return 255
+	    esac
+	    ;;
+	*)
+	    return 1
+	    ;;
+    esac
+    SAVENV=1
+}
+
+conf-shape-router()
+{
+    if test -z "${1}" ; then show-qos-shape router ; return 0 ; fi
+
+    local operation=${1}
+    local position_id position_nb position
+
+    case "${operation}" in
+	add|del|raz)
+	    ;;
+	*)
+	    if test "${operation:0:7}" == "insert:" ; then
+		position_id=${operation:7}
+		operation=insert
+		position=before
+	    elif test "${operation:0:4}" == "add:" ; then
+		position_id=${operation:4}
+		operation=insert
+		position=after
+	    elif test "${operation:0:5}" == "move:" ; then
+		if check-digit ${operation:5} ; then
+		    position_nb=${operation:5}
+		else
+		    position_id=${operation:6}
+		    case "${operation:5:1}" in
+			+)
+			    position=after
+			    ;;
+			-)
+			    position=before
+			    ;;
+			*)
+			    return 1
+			    ;;
+		    esac
+		fi
+		operation=move
+	    else
+		return 1
+	    fi
+	    check-id-length "${position_id}" || return 127
+	    test -n "${position_nb}" || check-id "${position_id}" || return 35
+	    ;;
+    esac
+    
+    case "${operation}" in
+	add|insert|move|del)
+	    test -n "${2}" || return 1
+	    local id=${2}
+	    check-id-length "${id}" || return 127
+	    check-id "${id}" || return 35
+
+	    case ${operation} in
+		move)
+		    export QOS_SHAPE_ROUTER_LIST
+		    if test -n "${position_nb}" ; then
+			QOS_SHAPE_ROUTER_LIST=$(move-record-at-position-in-list 10 1 "${id}" "${QOS_SHAPE_ROUTER_LIST}" ${position_nb})
+		    else
+			QOS_SHAPE_ROUTER_LIST=$(move-record-in-list 10 1 "${id}" "${QOS_SHAPE_ROUTER_LIST}" "${position_id}" ${position})
+		    fi
+		    test ${?} -eq 0 || return 152
+		    ;;
+
+		add|insert)
+		    local len=$(record10-length-list "${QOS_SHAPE_ROUTER_LIST}")
+		    test ${len} -lt ${MAX_QOS_SHAPE_ROUTER_RULES_NB} || return 90
+
+		    test -n "${3}" || return 1
+		    local dev=${3}
+		    test ${dev} != vpnipsec || return 43
+		    check-interface ${dev} || return 43
+		    
+		    test -n "${4}" || return 1
+		    local protocol=${4}
+		    check-qos-protocol ${protocol} || return 59
+
+		    test -n "${5}" || return 1
+		    local src_ip=${5}
+		    test ${src_ip} != 0.0.0.0/0 || src_ip=any
+		    check-rule-ip-address ${src_ip} || return ${?}
+
+		    test -n "${6}" || return 1
+		    local src_port=${6}
+		    check-qos-port ${src_port} || return 60
+
+		    test -n "${7}" || return 1
+		    local ingress_qos=${7}
+		    check-qos ${ingress_qos} || return 11
+
+		    test -n "${8}" || return 1
+		    local dst_ip=${8}
+		    test ${dst_ip} != 0.0.0.0/0 || dst_ip=any
+		    check-rule-ip-address ${dst_ip} || return ${?}
+
+		    test -n "${9}" || return 1
+		    local dst_port=${9}
+		    check-qos-port ${dst_port} || return 60
+
+		    test -n "${10}" || return 1
+		    local egress_qos=${10}
+		    check-qos ${egress_qos} || return 11
+
+		    if test -z "${11}"  ; then
+			local dscp=nil
+		    else
+			local dscp=${11}
+			check-dscp ${dscp} || return 121
+		    fi
+		    
+		    local rule="${dev} ${protocol} ${src_ip} ${src_port} ${ingress_qos} ${dst_ip} ${dst_port} ${egress_qos} ${dscp}"
+		    export QOS_SHAPE_ROUTER_LIST
+		    QOS_SHAPE_ROUTER_LIST=$(insert-record-in-list 10 1 "${id} ${rule}" "${QOS_SHAPE_ROUTER_LIST}" "${position_id}" ${position})
+		    test ${?} -eq 0 -o ${operation} != insert || return 152
+		    ;;
+		del)
+		    export QOS_SHAPE_ROUTER_LIST
+		    QOS_SHAPE_ROUTER_LIST=$(remove-record-from-list 10 1 ${id} "${QOS_SHAPE_ROUTER_LIST}")
+		    test ${?} -eq 0 || return 157
+		    ;;
+		*)
+		    return 255
+		    ;;
+	    esac
+	    ;;
+	raz)
+	    unset QOS_SHAPE_ROUTER_LIST
+	    ;;
+	*)
+	    return 255
+	    ;;
+    esac
+
+    SAVENV=1
+}
+
+conf-shape()
+{
+    if test -z "${1}" ; then show-qos-shape ; return 0 ; fi
+    local flow=${1}
+    check-qos-shape-type ${flow} || return 71
+
+    if test ${flow} == router ; then
+	shift
+	conf-shape-router "${@}"
+	return ${?}
+    fi
+
+    if test -z "${2}" ; then show-qos-shape ${flow} ; return 0 ; fi
+    local dev=${2}
+    test ${dev} != vpnipsec || return 43
+    check-interface ${dev} || return 43
+
+    case ${flow} in
+	file|default|web|antivirus)
+	    ;;
+	peer)
+	    test ${dev} == internal || return 85
+	    ;;
+	tweb)
+	    test ${dev} != external || return 85
+	    ;;
+	rweb)
+	    case ${dev} in
+		internal|external)
+		    ;;
+		*)
+		    return 85
+		    ;;
+	    esac
+	    ;;
+	vpnipsec)
+	    test ${dev} == external || return 85
+	    ;;
+
+	*)
+	    return 255
+	    ;;
+    esac
+
+    if test -z "${3}" ; then show-qos-shape ${flow} ${dev} ; return 0 ; fi
+    local gress=${3}
+    check-gress ${gress} || return 44
+    if test -z "${4}" ; then show-qos-shape ${flow} ${dev} ${gress} ; return 0 ; fi
+    local qos=${4}
+    check-qos ${qos} || return 11
+    set-qos-shape ${dev} ${gress} ${flow} ${qos}
+    SAVENV=1
+}
+
+show-qos-borrow-internal-ingress()
+{
+    echo-command-form "qos borrow"
+    local val=$(external-form ${CURRENT_QOS_BORROW_INTERNAL_INGRESS})
+    echo-mark-cur
+    echo-value "internal ingress ${val}"
+
+    if test "${CURRENT_QOS_BORROW_INTERNAL_INGRESS}" != "${QOS_BORROW_INTERNAL_INGRESS}" ; then
+	echo-command-form "qos borrow"
+	echo-mark-new
+	val=$(external-form ${QOS_BORROW_INTERNAL_INGRESS})
+	echo-value "internal ingress ${val}"
+    fi
+}
+
+show-qos-borrow-internal-egress()
+{
+    echo-command-form "qos borrow"
+    local val=$(external-form ${CURRENT_QOS_BORROW_INTERNAL_EGRESS})
+    echo-mark-cur
+    echo-value "internal egress ${val}"
+
+    if test "${CURRENT_QOS_BORROW_INTERNAL_EGRESS}" != "${QOS_BORROW_INTERNAL_EGRESS}" ; then
+	echo-command-form "qos borrow"
+	echo-mark-new
+	val=$(external-form ${QOS_BORROW_INTERNAL_EGRESS})
+	echo-value "internal egress ${val}"
+    fi
+}
+
+show-qos-borrow-external-ingress()
+{
+    echo-command-form "qos borrow"
+    local val=$(external-form ${CURRENT_QOS_BORROW_EXTERNAL_INGRESS})
+    echo-mark-cur
+    echo-value "external ingress ${val}"
+
+    if test "${CURRENT_QOS_BORROW_EXTERNAL_INGRESS}" != "${QOS_BORROW_EXTERNAL_INGRESS}" ; then
+	echo-command-form "qos borrow"
+	echo-mark-new
+	val=$(external-form ${QOS_BORROW_EXTERNAL_INGRESS})
+	echo-value "external ingress ${val}"
+    fi
+}
+
+show-qos-borrow-external-egress()
+{
+    echo-command-form "qos borrow"
+    local val=$(external-form ${CURRENT_QOS_BORROW_EXTERNAL_EGRESS})
+    echo-mark-cur
+    echo-value "external egress ${val}"
+
+    if test "${CURRENT_QOS_BORROW_EXTERNAL_EGRESS}" != "${QOS_BORROW_EXTERNAL_EGRESS}" ; then
+	echo-command-form "qos borrow"
+	echo-mark-new
+	val=$(external-form ${QOS_BORROW_EXTERNAL_EGRESS})
+	echo-value "external egress ${val}"
+    fi
+}
+
+show-qos-borrow-auxiliary-ingress()
+{
+    echo-command-form "qos borrow"
+    local val=$(external-form ${CURRENT_QOS_BORROW_AUXILIARY_INGRESS})
+    echo-mark-cur
+    echo-value "auxiliary ingress ${val}"
+
+    if test "${CURRENT_QOS_BORROW_AUXILIARY_INGRESS}" != "${QOS_BORROW_AUXILIARY_INGRESS}" ; then
+	echo-command-form "qos borrow"
+	echo-mark-new
+	val=$(external-form ${QOS_BORROW_AUXILIARY_INGRESS})
+	echo-value "auxiliary ingress ${val}"
+    fi
+}
+
+show-qos-borrow-auxiliary-egress()
+{
+    echo-command-form "qos borrow"
+    local val=$(external-form ${CURRENT_QOS_BORROW_AUXILIARY_EGRESS})
+    echo-mark-cur
+    echo-value "auxiliary egress ${val}"
+
+    if test "${CURRENT_QOS_BORROW_AUXILIARY_EGRESS}" != "${QOS_BORROW_AUXILIARY_EGRESS}" ; then
+	echo-command-form "qos borrow"
+	echo-mark-new
+	val=$(external-form ${QOS_BORROW_AUXILIARY_EGRESS})
+	echo-value "auxiliary egress ${val}"
+    fi
+}
+
+show-qos-borrow() {
+
+    local dev=${1}
+    local gress=${2}
+
+    echo-begin-show
+    case "${dev}" in
+	internal|external|auxiliary)
+	    case "${gress}" in
+		ingress|egress)
+		    show-qos-borrow-${dev}-${gress}
+		    ;;
+		"")
+		    show-qos-borrow-${dev}-ingress
+		    show-qos-borrow-${dev}-egress
+		    ;;
+		*)
+		    return 255
+		    ;;
+	    esac
+	    ;;
+	"")
+	    show-qos-borrow-internal-ingress
+	    show-qos-borrow-internal-egress
+	    show-qos-borrow-external-ingress
+	    show-qos-borrow-external-egress
+	    show-qos-borrow-auxiliary-ingress
+	    show-qos-borrow-auxiliary-egress
+	    ;;
+	*)
+	    return 255
+	    ;;
+    esac
+    echo-end-show
+}
+
+show-qos-report()
+{
+    local arg1=${1}
+    local arg2=${2}
+
+    local diff=0
+    local in_flow len
+
+    if test -n "${arg1}" ; then
+	if test ${arg1} == diff ; then
+	    diff=1
+	    test -z "${arg2}" || return 1
+	else
+	    in_flow=${arg1}
+	    check-qos-flow-type ${in_flow} || return 71
+	    if test -n "${arg2}" ; then
+		test ${arg2} == diff || return 1
+		diff=1
+	    fi
+	fi
+    fi
+
+    len=${#in_flow}
+    local qos_traffic_filename
+    local flow interface ibytes obytes
+    local ikbits okbits
+
+    if test ${diff} -eq 0 ; then
+	qos_traffic_filename=${QOS_TRAFFIC_FILENAME}
+    else
+	qos_traffic_filename=${QOS_DIFF_TRAFFIC_FILENAME}
+    fi
+
+    update-report qos-report 20 5000000 || return 104
+    test -f ${RUN_DIR}/${qos_traffic_filename} || return 104
+
+    test "${TERM}" != "${WADMIN_TERM}" || return 0
+
+    echo-begin-show
+
+    printf "%-36s%-12s%-17s%s\n" 'Traffic' 'Interface' 'Ingress (kbits)' 'Egress (kbits)'
+    printf "%-36s%-12s%-17s%s\n" '-----------------------------------' '---------' '---------------' '--------------'
+
+    while read flow interface ibytes obytes
+    do
+	((ikbits = ibytes * 8)) ; ((ikbits /= 1024)) ; test $((ikbits % 1024)) -lt 512 || ((ikbits++))
+	((okbits = obytes * 8)) ; ((okbits /= 1024)) ; test $((okbits % 1024)) -lt 512 || ((okbits++))
+
+	if test -z "${in_flow}" ; then
+	    printf "%-36s%-11s%16d%16d\n" ${flow} ${interface} ${ikbits} ${okbits}
+	else
+	    case ${in_flow} in
+		rweb)
+		    test ${flow:0:4} == rweb || continue
+		    ;;
+		all|antivirus|gateway|antivirus|etc|peer|tweb|admin|default|file|router|vpnipsec|web)
+		    test ${flow:0:${len}} == ${in_flow} || continue
+		    ;;
+		*)
+		    ;;
+	    esac
+	    printf "%-36s%-11s%16d%16d\n" ${flow} ${interface} ${ikbits} ${okbits}
+	fi
+    done < ${RUN_DIR}/${qos_traffic_filename}
+
+    echo-end-show
+}
+
+conf-borrow()
+{
+    local dev=${1}
+    local gress=${2}
+    local state=${3}
+
+    if test -z "${dev}" ; then
+	show-qos-borrow
+	return 0
+    fi
+
+    case ${dev} in
+	internal|external|auxiliary)
+	    if test -z "${gress}" ; then show-qos-borrow ${dev} ; return 0 ; fi
+	    check-gress ${gress} || return 44
+	    if test -z "${state}" ; then show-qos-borrow ${dev} ${gress} ; return 0 ; fi
+	    check-boolean ${state} || return 18
+	    local bool=$(internal-form ${state})
+
+	    case ${dev} in
+		internal)
+		    case ${gress} in
+			ingress)
+			    export QOS_BORROW_INTERNAL_INGRESS=${bool}
+			    ;;
+			egress)
+			    export QOS_BORROW_INTERNAL_EGRESS=${bool}
+			    ;;
+			*)
+			    return 255
+			    ;;
+		    esac
+		    ;;
+		external)
+		    case ${gress} in
+			ingress)
+			    export QOS_BORROW_EXTERNAL_INGRESS=${bool}
+			    ;;
+			egress)
+			    export QOS_BORROW_EXTERNAL_EGRESS=${bool}
+			    ;;
+			*)
+			    return 255
+			    ;;
+		    esac
+		    ;;
+		auxiliary)
+		    case ${gress} in
+			ingress)
+			    export QOS_BORROW_AUXILIARY_INGRESS=${bool}
+			    ;;
+			egress)
+			    export QOS_BORROW_AUXILIARY_EGRESS=${bool}
+			    ;;
+			*)
+			    return 255
+			    ;;
+		    esac
+		    ;;
+		*)
+		    return 255
+		    ;;
+	    esac
+	    SAVENV=1
+	    ;;
+	*)
+	    return 1
+	    ;;
+    esac
+}
+
+run()
+{
+    contextual-command-is-allowed || return 207
+
+    local key
+
+    if test -n "${ARGS[1]}" ; then
+	key=${ARGS[1]}
+	shift-args
+    fi
+
+    case "${key}" in
+	bandwidth)
+	    conf-bandwidth ${ALLARGS}
+	    ;;
+	shape)
+	    conf-shape ${ALLARGS}
+	    ;;
+	borrow)
+	    conf-borrow ${ALLARGS}
+	    ;;
+	report)
+	    show-qos-report ${ALLARGS}
+	    ;;
+	'')
+	    conf-bandwidth
+	    conf-shape
+	    conf-borrow
+	    ;;
+	*)
+	    return 1
+	    ;;
+    esac
+}    
+
+main "${@}"

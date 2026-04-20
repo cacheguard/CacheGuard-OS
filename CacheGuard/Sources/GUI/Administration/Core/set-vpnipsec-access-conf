@@ -1,0 +1,76 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       GUI
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+set-tls-server-manage()
+{
+    local client_tls_id protocol server target name
+    local system=${VALUES[0]}
+
+    local transaction=/tmp/${TRANSACTION_FILE}.wadmin.${REMOTE_USER}.${$}
+    rm -f ${transaction}
+
+    if test "${ATTRIBUTES[1]}" == tls ; then
+	client_tls_id=${VALUES[1]}
+	protocol=${VALUES[2]}
+	server=${VALUES[3]}
+	target=${VALUES[4]}
+	name=${VALUES[5]}
+    else
+	client_tls_id=any
+	protocol=${VALUES[1]}
+	server=${VALUES[2]}
+	target=${VALUES[3]}
+	name=${VALUES[4]}
+    fi
+
+    protocol=${protocol:1}
+
+    case ${protocol} in
+	ftp|sftp|tftp)
+	    if test -n "${target}" ; then
+		echo "vpnipsec access conf ${system} ${client_tls_id} save ${protocol} ${server} ${target}" > ${transaction}
+	    else
+		gen-gui-error 6
+	    fi
+	    ;;
+	smtp)
+	    
+	    if test -n "${target}" ; then
+		if test -n "${name}" ; then
+		    echo "vpnipsec access conf ${system} ${client_tls_id} email ${target} '${name}'" > ${transaction}
+		else
+		    echo "vpnipsec access conf ${system} ${client_tls_id} email ${target}" > ${transaction}
+		fi		    
+	    else
+		gen-gui-error 22
+	    fi
+	    ;;
+	*)
+	    ;;
+    esac
+
+    execute-transaction ${transaction}
+}
+
+set-tls-server-manage

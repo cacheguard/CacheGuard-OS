@@ -1,0 +1,29 @@
+Manage the transparent Web proxy
+.SH SYNOPSIS
+
+[1] \fBtransparent\fR [\fBraz\fR | (\fBadd\fR (\fBinternal\fR | \fBauxiliary\fR | \fBvpnipsec\fR) \fI<ip>\fR [\fI<network-mask>\fR [\fI<qos>\fR]]) | (\fBdel\fR (\fBinternal\fR | \fBauxiliary\fR | \fBvpnipsec\fR) \fI<ip>\fR \fI<network-mask>\fR)]
+
+.SH DESCRIPTION
+When the transparent mode is activated, the system transparently intercepts incoming Web traffic and manage it the same way as it has destined to the system's Web proxy (in \fBweb\fR mode). This command is used to limit the transparent mode to specified Web traffic only. If no transparent traffic is defined, the system acts as a transparent Web gateway (Web proxy) for all Web traffic incoming from the \fBinternal\fR (\fBweb\fR in \fBvlan\fR mode), \fBauxiliary\fR and \fBvpnipsec\fR interfaces. If at least one transparent Web traffic or one Web access network (see the command usage form \fBaccess web\fR) is defined, the system acts as a transparent Web gateway only for specified Web traffic. A transparent Web traffic is identified by two parameters: the network interface via which it enters into the system and and it's source IP address.
+
+Traffic bandwidths can also be customised for transparent networks by setting the optional \fI<qos>\fR parameter. The \fI<qos%>\fR value is a percentage of the ingress or egress bandwidth allocated to \fBtweb\fR (transparent Web) traffic and should be an integer between 1 and 100. Ingress and egress bandwidth values to which the percentage is applied are as follows:
+
+  \(bu For Web traffic exchanged via the via the native \fBinternal\fR network interface or the 802.1q pseudo network interface called \fBweb\fR (in \fBvlan\fR mode), the ingress and egress bandwidths to consider are defined with the command usage form \fBqos shape tweb internal\fR.
+
+  \(bu For Web traffic exchanged via the \fBauxiliary\fR network interface, the ingress and egress bandwidths to consider are defined with the command usage form \fBqos shape tweb auxiliary\fR.
+
+  \(bu For Web traffic exchanged via the \fBvpnipsec\fR virtual network interface, the ingress bandwidth to consider is defined with the command usage form \fBqos shape vpnipsec external ingress\fR. The egress bandwidth for Web traffic exchanged via the \fBvpnipsec\fR virtual network interface can't be customised.
+
+If no \fI<qos%>\fR is given, the value of 100% is used by default.
+
+.SH SEE ALSO
+.B access
+(1)
+.B apply
+(1)
+.B mode
+(1)
+.B qos
+(1)
+.B vlan
+(1)

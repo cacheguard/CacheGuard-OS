@@ -1,0 +1,2745 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       Configurator
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+set-qos-constant()
+{
+    export QOS_ADMIN_MARK=0x1
+    export QOS_ESP_MARK=0x2
+    export QOS_FILE_MARK=0x3
+
+    export QOS_HANDLE_ROOT=1
+    export QOS_PARENT_ADMIN=${QOS_HANDLE_ROOT}:1
+    export QOS_PARENT_GW=${QOS_HANDLE_ROOT}:2
+    export QOS_HANDLE_TOP_ADMIN=2
+    export QOS_HANDLE_TOP_GW=3
+    export QOS_CLASS_TOP_GW=${QOS_HANDLE_TOP_GW}:1
+
+    export QOS_HANDLE_DEFAULT=2
+    export QOS_HANDLE_IPSEC=3
+    export QOS_HANDLE_ETC=4
+    export QOS_HANDLE_RWEB_EXT=5
+    export QOS_HANDLE_RWEB_LOCAL=6
+    export QOS_HANDLE_RWEB_VPN_IPSEC=7
+    export QOS_HANDLE_PEER=8
+    export QOS_HANDLE_WEB_EXT=9
+    export QOS_HANDLE_WEB_LOCAL=10
+    export QOS_HANDLE_WEB_VPN_IPSEC=11
+    export QOS_HANDLE_TWEB=12
+    export QOS_HANDLE_TWEB_VPN_IPSEC=13
+    export QOS_HANDLE_AV=14
+    export QOS_HANDLE_AV_VPN_IPSEC=15
+    export QOS_HANDLE_FILE=16
+    export QOS_HANDLE_FILE_VPN_IPSEC=17
+    export QOS_HANDLE_DROP=18
+    export QOS_HANDLE_INIT=19
+
+    export QOS_CLASS_DEFAULT=${QOS_HANDLE_TOP_GW}:${QOS_HANDLE_DEFAULT}
+    export QOS_CLASS_IPSEC=${QOS_HANDLE_TOP_GW}:${QOS_HANDLE_IPSEC}
+    export QOS_CLASS_ETC=${QOS_HANDLE_TOP_GW}:${QOS_HANDLE_ETC}
+    export QOS_CLASS_FILE=${QOS_HANDLE_TOP_GW}:${QOS_HANDLE_FILE}
+    export QOS_CLASS_FILE_VPN_IPSEC=${QOS_HANDLE_TOP_GW}:${QOS_HANDLE_FILE_VPN_IPSEC}
+    export QOS_CLASS_RWEB_EXT=${QOS_HANDLE_TOP_GW}:${QOS_HANDLE_RWEB_EXT}
+    export QOS_CLASS_RWEB_LOCAL=${QOS_HANDLE_TOP_GW}:${QOS_HANDLE_RWEB_LOCAL}
+    export QOS_CLASS_RWEB_VPN_IPSEC=${QOS_HANDLE_TOP_GW}:${QOS_HANDLE_RWEB_VPN_IPSEC}
+    export QOS_CLASS_PEER=${QOS_HANDLE_TOP_GW}:${QOS_HANDLE_PEER}
+    export QOS_CLASS_WEB_EXT=${QOS_HANDLE_TOP_GW}:${QOS_HANDLE_WEB_EXT}
+    export QOS_CLASS_WEB_LOCAL=${QOS_HANDLE_TOP_GW}:${QOS_HANDLE_WEB_LOCAL}
+    export QOS_CLASS_WEB_VPN_IPSEC=${QOS_HANDLE_TOP_GW}:${QOS_HANDLE_WEB_VPN_IPSEC}
+    export QOS_CLASS_TWEB=${QOS_HANDLE_TOP_GW}:${QOS_HANDLE_TWEB}
+    export QOS_CLASS_TWEB_VPN_IPSEC=${QOS_HANDLE_TOP_GW}:${QOS_HANDLE_TWEB_VPN_IPSEC}
+    export QOS_CLASS_AV=${QOS_HANDLE_TOP_GW}:${QOS_HANDLE_AV}
+    export QOS_CLASS_AV_VPN_IPSEC=${QOS_HANDLE_TOP_GW}:${QOS_HANDLE_AV_VPN_IPSEC}
+    export QOS_CLASS_DROP=${QOS_HANDLE_TOP_GW}:${QOS_HANDLE_DROP}
+
+    export QOS_ARP_FILTER_PRIO=100
+    export QOS_ADMIN_FILTER_PRIO=102
+    export QOS_ADMIN_SNMP_TRAP_FILTER_PRIO=104
+    export QOS_ADMIN_SYSLOG_FILTER_PRIO=106
+    export QOS_ADMIN_SNMP_FILTER_PRIO=108
+    export QOS_NON_ADMIN_FILTER_PRIO=130
+    export QOS_IKE_FILTER_PRIO=150
+    export QOS_ESP_FILTER_PRIO=160
+    export QOS_GATEWAY_TWEB_FILTER_PRIO=200
+    export QOS_ROUTER_FILTER_PRIO=250
+    export QOS_GATEWAY_FILTER_PRIO=300
+    export QOS_ETC_FILTER_PRIO_ARP=401
+    export QOS_ETC_FILTER_PRIO_DHCP=403
+    export QOS_ETC_FILTER_PRIO_VRRP=405
+    export QOS_ETC_FILTER_PRIO_ICMP=407
+    export QOS_ETC_FILTER_PRIO_AUTH=409
+    export QOS_ETC_FILTER_PRIO_NTP=411
+    export QOS_ETC_FILTER_PRIO_OCSP=413
+    export QOS_ETC_FILTER_PRIO_EMAIL=415
+
+    export QOS_RWEB_FILTER_PRIO=500
+    export QOS_PEER_FILTER_PRIO=600
+    export QOS_TWEB_FILTER_PRIO=700
+    export QOS_WEB_FILTER_PRIO=800
+    export QOS_AV_FILTER_PRIO=850
+    export QOS_FILE_FILTER_PRIO=900
+    export QOS_DROP_FILTER_PRIO=1000
+
+    export QOS_QDISC_SFQ="sfq perturb 5 quantum 1514b"
+    export QOS_HTB_QUANTUM="quantum 1514"
+
+    export QOS_FILTER_SYN="match u8 0x02 0xff at 33"
+    export QOS_FILTER_NSYN="match u8 0x00 0x02 at 33"
+    export QOS_FILTER_ACK="match u8 0x10 0xff at 33"
+    export QOS_FILTER_NACK="match u8 0x00 0x10 at 33"
+
+    export QOS_FILTER_ALL="match u32 0 0"
+    export QOS_FILTER_ICMP="match ip protocol 1 0xff"
+    export QOS_FILTER_IGMP="match ip protocol 2 0xff"
+    export QOS_FILTER_TCP="match ip protocol 6 0xff"
+    export QOS_FILTER_UDP="match ip protocol 17 0xff"
+    export QOS_FILTER_ESP="match ip protocol 50 0xff"
+    export QOS_FILTER_AH="match ip protocol 51 0xff"
+
+    export QOS_FILTER_TOTAL_LEN_L64="match u16 0x0000 0xffc0 at 2"
+    export QOS_FILTER_PROXY="match u32 0xCD040000 0xFFFF0000 at 20"
+    export QOS_FILTER_MISS="match u32 0xCD040000 0xFFFFFFFF at 20"
+    export QOS_FILTER_HIT="match u32 0xCD04FFFF 0xFFFFFFFF at 20"
+
+    export QOS_SYN_PCT=20
+    export QOS_ACK_PCT=20
+}
+
+set-qos-parameters()
+{
+    set-qos-constant
+
+    local rate=50
+
+    if test-auth-state ; then
+	local users=$[${SIMULTANEOUS_USERS_NB} + ${SIMULTANEOUS_RUSERS_NB}]
+	rate=$[${rate} + ${users} * 5]
+    fi
+
+    local ceil=$[${rate} * 5]
+    export QOS_ETC_RATE="${rate}kbit ceil ${ceil}kbit"
+}
+
+commit-qos-index()
+{
+    test -f /tmp/${QOS_INDEX_FILENAME}.${$} || return 0
+    mv -f /tmp/${QOS_INDEX_FILENAME}.${$} ${RUN_DIR}/${QOS_INDEX_FILENAME}
+    rm -f ${RUN_DIR}/${QOS_DIFF_TRAFFIC_FILENAME} ${RUN_DIR}/${QOS_TRAFFIC_FILENAME}{,.old}
+}
+
+gen-qos-index()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    test -n "${3}" || return 3
+    test -n "${4}" || return 4
+    test -n "${5}" || return 5
+    test -n "${6}" || return 6
+    local flow=${1}
+    local qdisc=${2}
+    local interface=${3}
+    local idev=${4}
+    local odev=${5}
+    local handle=${6}
+
+    echo "${flow} ${qdisc} ${interface} ${idev} ${odev} ${handle}" >> /tmp/${QOS_INDEX_FILENAME}.${$}
+}
+
+get-qos-dev()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    local interface=${1}
+    local sense=${2}
+
+    case ${interface} in
+	internal)
+	    case ${sense} in
+		ingress)
+		    echo ${IF_QOS_INTERNAL_INGRESS}
+		    ;;
+		egress)
+		    echo ${IF_QOS_INTERNAL_EGRESS}
+		    ;;
+		*)
+		    ;;
+	    esac
+	    ;;
+
+	external)
+	    case ${sense} in
+		ingress)
+		    echo ${IF_QOS_EXTERNAL_INGRESS}
+		    ;;
+		egress)
+		    echo ${IF_QOS_EXTERNAL_EGRESS}
+		    ;;
+		*)
+		    ;;
+	    esac
+	    ;;
+
+	vpnipsec)
+	    case ${sense} in
+		ingress)
+		    echo ${IF_QOS_EXTERNAL_INGRESS}
+		    ;;
+		egress)
+		    echo ${IF_QOS_EXTERNAL_EGRESS}
+		    ;;
+		*)
+		    ;;
+	    esac
+	    ;;
+
+	auxiliary)
+	    case ${sense} in
+		ingress)
+		    echo ${IF_QOS_AUXILIARY_INGRESS}
+		    ;;
+		egress)
+		    echo ${IF_QOS_AUXILIARY_EGRESS}
+		    ;;
+		*)
+		    ;;
+	    esac
+	    ;;
+	*)
+	    return 11
+	    ;;
+    esac
+}
+
+is-percent-qos()
+{
+    test -n "${1}" || return 1
+    local qos=${1}
+
+    local len=${#qos} ; ((len--))
+    if test ${qos:${len}} == '%' ; then
+	echo "${qos:0:${len}}"
+	return 0
+    else
+	echo "${qos}"
+	return 1
+    fi
+}
+
+get-qos-percent()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    local in_rate=${1}
+    local in_pct=${2}
+
+    local rate=$[${in_rate} * ${in_pct} / 100]
+    test ${rate} -gt 0 || rate=1
+
+    echo ${rate}
+}
+
+get-basic-rate()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    local in_rate=${1}
+    local in_bw=${2}
+
+    local rate
+
+    rate=$(is-percent-qos ${in_rate})
+    if test ${?} -eq 0 ; then
+	rate=$[${rate} * ${in_bw} / 100]
+	test ${rate} -gt 0 || rate=1
+    fi
+    echo ${rate}
+}
+
+get-qos-rate()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    local interface=${1}
+    local sense=${2}
+    local flow=${3}
+
+    local qos=$(get-qos-shape ${interface} ${sense} ${flow})
+    local bw=$(get-qos-bw ${interface} ${sense})
+
+    test -n "${qos}" || return 11
+    test -n "${bw}" || return 13
+
+    qos=$(get-basic-rate ${qos} ${bw})
+    echo ${qos}
+}
+
+get-qos-ceil()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    test -n "${3}" || return 3
+    local interface=${1}
+    local sense=${2}
+    local rate=${3}
+
+    local bw borrow=$(get-qos-borrow ${interface} ${sense})
+
+    if test ${borrow} == False ; then
+	bw=${rate}
+    else
+	bw=$(get-qos-bw ${interface} ${sense})
+    fi
+
+    echo ${bw}
+}
+
+gen-tc-qos-gateway-default()
+{
+    test -n "${1}" || return 1
+    local interface=${1}
+
+    local idev=$(get-qos-dev ${interface} ingress)
+    local odev=$(get-qos-dev ${interface} egress)
+    local irate=$(get-qos-rate ${interface} ingress default)
+    local orate=$(get-qos-rate ${interface} egress default)
+    local iceil=$(get-qos-ceil ${interface} ingress ${irate})
+    local oceil=$(get-qos-ceil ${interface} egress ${orate})
+    local handle="$[1000 + ${QOS_HANDLE_DEFAULT}]:"
+
+    if nic-exist ${idev} ; then
+	echo "class add dev ${idev} parent ${QOS_HANDLE_TOP_GW}: classid ${QOS_CLASS_DEFAULT} htb rate ${irate}kbit ceil ${iceil}kbit ${QOS_HTB_QUANTUM}"
+	echo "qdisc add dev ${idev} parent ${QOS_CLASS_DEFAULT} handle ${handle} prio bands 3 priomap 1 2 2 2 1 2 0 0 1 1 1 1 1 1 1 1"
+    fi
+
+    if nic-exist ${odev} ; then
+	echo "class add dev ${odev} parent ${QOS_HANDLE_TOP_GW}: classid ${QOS_CLASS_DEFAULT} htb rate ${orate}kbit ceil ${oceil}kbit ${QOS_HTB_QUANTUM}"
+	echo "qdisc add dev ${odev} parent ${QOS_CLASS_DEFAULT} handle ${handle} prio bands 3 priomap 1 2 2 2 1 2 0 0 1 1 1 1 1 1 1 1"
+    fi
+
+    gen-qos-index default: prio ${interface} ${idev} ${odev} ${handle}
+}
+
+gen-tc-qos-router()
+{
+    local interface interfaces="internal external"
+    test -z "${IF_AUXILIARY}" -o ${IP_AUXILIARY_IP} == 0.0.0.0 || interfaces="${interfaces} auxiliary"
+
+    for interface in ${interfaces}
+    do
+	local ${interface}_idev=$(get-qos-dev ${interface} ingress)
+	local ${interface}_odev=$(get-qos-dev ${interface} egress)
+	local ${interface}_ibw=$(get-qos-bw ${interface} ingress)
+	local ${interface}_obw=$(get-qos-bw ${interface} egress)
+    done
+
+    local i=0 elt range
+    local id protocol src_ip src_port dst_ip dst_port
+    local ingress_qos egress_qos dscp
+
+    local variable
+
+    local idev odev ibw obw
+    local irate orate iceil oceil
+
+    local filter_protocol handle
+    local filter_forth_src_ip filter_forth_src_port filter_forth_dst_ip filter_forth_dst_port
+    local filter_back_src_ip filter_back_src_port filter_back_dst_ip filter_back_dst_port
+    local filter_all
+
+    for elt in ${QOS_SHAPE_ROUTER_LIST}
+    do
+	range=$[${i} % 10]
+	case ${range} in
+	    0)
+		id=${elt}
+		;;
+	    1)
+		interface=${elt}
+		;;
+	    2)
+		protocol=${elt}
+		;;
+	    3)
+		src_ip=${elt}
+		;;
+	    4)
+		src_port=${elt}
+		;;
+	    5)
+		ingress_qos=${elt}
+		;;
+	    6)
+		dst_ip=${elt}
+		;;
+	    7)
+		dst_port=${elt}
+		;;
+	    8)
+		egress_qos=${elt}
+		;;
+	    9)
+		dscp=${elt}
+		
+		variable=${interface}_idev
+		idev=$(eval eval 'echo -n \$"${variable}"')
+
+		variable=${interface}_odev
+		odev=$(eval eval 'echo -n \$"${variable}"')
+
+		if test -z "${idev}" -o -z "${odev}" ; then
+		    ((i++))
+		    continue
+		fi
+
+		case ${protocol} in
+		    tcp)
+			filter_protocol=" ${QOS_FILTER_TCP}"
+			;;
+		    udp)
+			filter_protocol=" ${QOS_FILTER_UDP}"
+			;;
+		    any)
+			unset filter_protocol
+			;;
+		    *)
+			return 255
+			;;
+		esac
+
+		case ${src_ip} in
+		    any)
+			unset filter_forth_src_ip
+			unset filter_back_src_ip
+			;;
+		    *)
+			filter_forth_src_ip=" match ip src ${src_ip}"
+			filter_back_src_ip=" match ip dst ${src_ip}"
+			;;
+		esac
+
+		case ${dst_ip} in
+		    any)
+			unset filter_forth_dst_ip
+			unset filter_back_dst_ip
+			;;
+		    *)
+			if test ${interface} == 'external' -a ${SNAT_MODE} == True ; then
+			    filter_forth_dst_ip=" match ip dst ${IP_EXTERNAL_IP}"
+			    filter_back_dst_ip=" match ip src ${IP_EXTERNAL_IP}"
+			else
+			    filter_forth_dst_ip=" match ip dst ${dst_ip}"
+			    filter_back_dst_ip=" match ip src ${dst_ip}"
+			fi
+			;;
+		esac
+
+		case ${src_port} in
+		    any)
+			unset filter_forth_src_port
+			unset filter_back_src_port
+			;;
+		    *)
+			filter_forth_src_port=" match ip sport ${src_port} 0xffff"
+			filter_back_src_port=" match ip dport ${src_port} 0xffff"
+			;;
+		esac
+
+		case ${dst_port} in
+		    any)
+			unset filter_forth_dst_port
+			unset filter_back_dst_port
+			;;
+		    *)
+			filter_forth_dst_port=" match ip dport ${dst_port} 0xffff"
+			filter_back_dst_port=" match ip sport ${dst_port} 0xffff"
+			;;
+		esac
+
+		if test \
+		    -z "${filter_forth_protocol}" -a \
+		    -z "${filter_forth_src_ip}" -a \
+		    -z "${filter_forth_dst_ip}" -a \
+		    -z "${filter_forth_src_port}" -a \
+		    -z "${filter_forth_dst_port}" ; then
+		    filter_all=" ${QOS_FILTER_ALL}"
+		else
+		    unset filter_all
+		fi
+
+		variable=${interface}_ibw
+		ibw=$(eval eval 'echo -n \$"${variable}"')
+		variable=${interface}_obw
+		obw=$(eval eval 'echo -n \$"${variable}"')
+		
+		irate=$(get-basic-rate ${ingress_qos} ${ibw})
+		orate=$(get-basic-rate ${egress_qos} ${obw})
+		iceil=$(get-qos-ceil ${interface} ingress ${irate})
+		oceil=$(get-qos-ceil ${interface} egress ${orate})
+		
+		handle="$[${QOS_HANDLE}+1000]:"
+
+		if nic-exist ${idev} ; then
+		    echo "class add dev ${idev} parent ${QOS_HANDLE_TOP_GW}: classid ${QOS_HANDLE_TOP_GW}:${QOS_HANDLE} htb rate ${irate}kbit ceil ${iceil}kbit ${QOS_HTB_QUANTUM}"
+		    echo "qdisc add dev ${idev} parent ${QOS_HANDLE_TOP_GW}:${QOS_HANDLE} handle ${handle} ${QOS_QDISC_SFQ}"
+
+		    echo "filter add dev ${idev} parent ${QOS_HANDLE_TOP_GW}: protocol ip priority ${QOS_ROUTER_FILTER_PRIO} u32${filter_protocol}${filter_forth_src_ip}${filter_forth_src_port}${filter_forth_dst_ip}${filter_forth_dst_port}${filter_all} flowid ${QOS_HANDLE_TOP_GW}:${QOS_HANDLE}"
+		fi
+
+		if nic-exist ${odev} -a ${interface} != vpnipsec; then
+		    echo "class add dev ${odev} parent ${QOS_HANDLE_TOP_GW}: classid ${QOS_HANDLE_TOP_GW}:${QOS_HANDLE} htb rate ${orate}kbit ceil ${oceil}kbit ${QOS_HTB_QUANTUM}"
+		    echo "qdisc add dev ${odev} parent ${QOS_HANDLE_TOP_GW}:${QOS_HANDLE} handle ${handle} ${QOS_QDISC_SFQ}"
+
+		    echo "filter add dev ${odev} parent ${QOS_HANDLE_TOP_GW}: protocol ip priority ${QOS_ROUTER_FILTER_PRIO} u32${filter_protocol}${filter_back_src_ip}${filter_back_src_port}${filter_back_dst_ip}${filter_back_dst_port}${filter_all} flowid ${QOS_HANDLE_TOP_GW}:${QOS_HANDLE}"
+		fi
+
+		gen-qos-index router:${id} sfq ${interface} ${idev} ${odev} ${handle}
+
+		((QOS_HANDLE++))
+		;;
+	    *)
+		return 1
+		;;
+	esac
+	((i++))
+    done
+}
+
+gen-tc-qos-to-gateway-arp()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    test -n "${3}" || return 3
+    local idev=${1}
+    local odev=${2}
+    local prio=${3}
+
+    ! nic-exist ${idev} || echo "filter add dev ${idev} parent ${QOS_HANDLE_TOP_GW}: protocol arp priority ${prio} u32 ${QOS_FILTER_ALL} flowid ${QOS_CLASS_TOP_GW}"
+    ! nic-exist ${odev} || echo "filter add dev ${odev} parent ${QOS_HANDLE_TOP_GW}: protocol arp priority ${prio} u32 ${QOS_FILTER_ALL} flowid ${QOS_CLASS_TOP_GW}"
+}
+
+gen-tc-qos-to-gateway-vrrp-ah()
+{
+    test ${HA_MODE} == True || return 0
+
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    test -n "${3}" || return 3
+    test -n "${4}" || return 4
+    local interface=${1}
+    local idev=${2}
+    local odev=${3}
+    local prio=${4}
+
+    local net_prf net_prf_list
+
+    case ${interface} in
+	internal)
+	    net_prf_list="${IP_WEB_NET}/${IP_WEB_PRF}"
+	    test ${VLAN_MODE} == False || net_prf_list="${net_prf_list} ${IP_RWEB_NET}/${IP_RWEB_PRF}"
+	    ;;
+	external)
+	    net_prf_list="${IP_EXTERNAL_NET}/${IP_EXTERNAL_PRF}"
+	    ;;
+	auxiliary)
+	    net_prf_list="${IP_AUXILIARY_NET}/${IP_AUXILIARY_PRF}"
+	    ;;
+	*)
+	    return 11
+	    ;;
+    esac
+
+    for net_prf in ${net_prf_list}
+    do
+	! nic-exist ${idev} || echo "filter add dev ${idev} parent ${QOS_HANDLE_TOP_GW}: protocol ip priority ${prio} u32 ${QOS_FILTER_AH} match ip src ${net_prf} match ip dst ${VRRP_MULTICAST_IP}/32 flowid ${QOS_CLASS_TOP_GW}"
+	! nic-exist ${odev} || echo "filter add dev ${odev} parent ${QOS_HANDLE_TOP_GW}: protocol ip priority ${prio} u32 ${QOS_FILTER_AH} match ip src ${net_prf} match ip dst ${VRRP_MULTICAST_IP}/32 flowid ${QOS_CLASS_TOP_GW}"
+    done
+}
+
+gen-tc-qos-to-gateway-tweb()
+{
+    test ${TRANSPARENT_MODE} == True || return 0
+
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    local idev=${1}
+    local prio=${2}
+
+    nic-exist ${idev} || return 0
+
+    if test -z "${TRANSPARENT_IF_IP_PX_LIST}" ; then
+	echo "filter add dev ${idev} parent ${QOS_HANDLE_TOP_GW}: protocol ip priority ${prio} u32 match ip dport ${WWW_PORT} 0xffff flowid ${QOS_CLASS_TOP_GW}"
+	test ${SSLMEDIATE_TRANSPARENT_MODE} == False || echo "filter add dev ${idev} parent ${QOS_HANDLE_TOP_GW}: protocol ip priority ${prio} u32 match ip dport ${HTTPS_PORT} 0xffff flowid ${QOS_CLASS_TOP_GW}"
+	return 0
+    fi
+
+    local elt range i=0
+    local interface src_ip src_pr
+
+    for elt in ${TRANSPARENT_IF_IP_PX_LIST}
+    do
+	range=$[${i} % 4]
+	case ${range} in
+	    0)
+		interface=${elt}
+		;;
+	    1)
+		src_ip=${elt}
+		;;
+	    2)
+		src_pr=${elt}
+		;;
+	    3)
+		if test ${interface} != vpnipsec ; then
+		    echo "filter add dev ${idev} parent ${QOS_HANDLE_TOP_GW}: protocol ip priority ${prio} u32 match ip src ${src_ip}/${src_pr} match ip dport ${WWW_PORT} 0xffff flowid ${QOS_CLASS_TOP_GW}"
+		    test ${SSLMEDIATE_TRANSPARENT_MODE} == False || echo "filter add dev ${idev} parent ${QOS_HANDLE_TOP_GW}: protocol ip priority ${prio} u32 match ip src ${src_ip}/${src_pr} match ip dport ${HTTPS_PORT} 0xffff flowid ${QOS_CLASS_TOP_GW}"
+		fi
+		;;
+	    *)
+		return 1
+		;;
+	esac
+	((i++))
+    done
+}
+
+gen-tc-qos-to-gateway-rip()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    test -n "${3}" || return 3
+    local idev=${1}
+    local odev=${2}
+    local prio=${3}
+
+    local ip ips    
+    ips="${IP_EXTERNAL_IP} ${ALIAS_IP_EXTERNAL_LIST}"
+    test -z "${IF_AUXILIARY}" -o ${IP_AUXILIARY_IP} == 0.0.0.0 || ips="${ips} ${IP_AUXILIARY_IP}"
+
+    if test ${VLAN_MODE} == False ; then
+	ips="${IP_INTERNAL_IP} ${ips}"
+    else
+	local i=0 elt range
+
+	for elt in ${IP_VLAN_LIST}
+	do
+	    range=$[${i} % 3]
+	    case ${range} in
+		0)
+		    ;;
+		1)
+		    ip=${elt}
+		    ;;
+		2)
+		    ips="${ip} ${ips}"
+		    ;;
+		*)
+		    return 1
+		    ;;
+	    esac
+	    ((i++))
+	done	
+    fi
+
+    if nic-exist ${idev} ; then
+	for ip in ${ips}
+	do
+	    echo "filter add dev ${idev} parent ${QOS_HANDLE_TOP_GW}: protocol ip priority ${prio} u32 match ip dst ${ip}/32 flowid ${QOS_CLASS_TOP_GW}"
+	done
+    fi
+
+    if nic-exist ${odev} ; then
+	for ip in ${ips}
+	do
+	    echo "filter add dev ${odev} parent ${QOS_HANDLE_TOP_GW}: protocol ip priority ${prio} u32 match ip src ${ip}/32 flowid ${QOS_CLASS_TOP_GW}"
+	done
+    fi
+}
+
+gen-tc-qos-to-gateway-vrrp()
+{
+    test ${HA_MODE} == True || return 0
+
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    test -n "${3}" || return 3
+    local idev=${1}
+    local odev=${2}
+    local prio=${3}
+
+    local ip ips=" ${VRRP_EXTERNAL_IP_LIST} ${VRRP_AUXILIARY_IP_LIST} ${VRRP_WEB_IP_LIST}"
+
+    if test ${VLAN_MODE} == True ; then
+	test ${RWEB_MODE} == False || ips="${ips} ${VRRP_RWEB_IP_LIST}"
+	test ${AV_MODE} == False -o ${AV_INTERNAL} = False || ips="${ips} ${VRRP_AV_IP_LIST}"
+    fi
+
+    ips="${ips:1}"
+
+    if nic-exist ${idev} ; then
+	for ip in ${ips}
+	do
+	    echo "filter add dev ${idev} parent ${QOS_HANDLE_TOP_GW}: protocol ip priority ${prio} u32 match ip dst ${ip}/32 flowid ${QOS_CLASS_TOP_GW}"
+	done
+    fi
+
+    if nic-exist ${odev} ; then
+	for ip in ${ips}
+	do
+	    echo "filter add dev ${odev} parent ${QOS_HANDLE_TOP_GW}: protocol ip priority ${prio} u32 match ip src ${ip}/32 flowid ${QOS_CLASS_TOP_GW}"
+	done
+    fi
+}
+
+gen-tc-qos-to-gateway()
+{
+    test -n "${1}" || return 1
+    local interface=${1}
+
+    local idev=$(get-qos-dev ${interface} ingress)
+    local odev=$(get-qos-dev ${interface} egress)    
+
+    gen-tc-qos-to-gateway-arp     ${idev} ${odev} $[${QOS_GATEWAY_FILTER_PRIO}+1]
+    gen-tc-qos-to-gateway-vrrp-ah ${interface} ${idev} ${odev} $[${QOS_GATEWAY_FILTER_PRIO}+3]
+    gen-tc-qos-to-gateway-tweb    ${idev} $[${QOS_GATEWAY_FILTER_PRIO}+5]
+    gen-tc-qos-to-gateway-rip     ${idev} ${odev} $[${QOS_GATEWAY_FILTER_PRIO}+7]
+    gen-tc-qos-to-gateway-vrrp    ${idev} ${odev} $[${QOS_GATEWAY_FILTER_PRIO}+9]
+}
+
+gen-tc-qos-etc-ntp()
+{
+    test -n "${NTP_SERVER_LIST}" || return 0
+
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    test -n "${3}" || return 3
+    local idev=${1}
+    local odev=${2}
+    local prio=${3}
+
+    ! nic-exist ${idev} || echo "filter add dev ${idev} parent ${QOS_CLASS_TOP_GW} protocol ip priority ${prio} u32 ${QOS_FILTER_UDP} match ip sport ${NTP_PORT} 0xffff flowid ${QOS_CLASS_ETC}"
+    ! nic-exist ${odev} || echo "filter add dev ${odev} parent ${QOS_CLASS_TOP_GW} protocol ip priority ${prio} u32 ${QOS_FILTER_UDP} match ip dport ${NTP_PORT} 0xffff flowid ${QOS_CLASS_ETC}"
+}
+
+gen-tc-qos-etc-ocsp()
+{
+    test ${OCSP_MODE} == True || return 0
+
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    test -n "${3}" || return 3
+    local idev=${1}
+    local odev=${2}
+    local prio=${3}
+
+    ! nic-exist ${idev} || echo "filter add dev ${idev} parent ${QOS_CLASS_TOP_GW} protocol ip priority ${prio} u32 ${QOS_FILTER_TCP} match ip dport ${OCSP_PORT} 0xffff flowid ${QOS_CLASS_ETC}"
+    ! nic-exist ${odev} || echo "filter add dev ${odev} parent ${QOS_CLASS_TOP_GW} protocol ip priority ${prio} u32 ${QOS_FILTER_TCP} match ip sport ${OCSP_PORT} 0xffff flowid ${QOS_CLASS_ETC}"
+}
+
+gen-tc-qos-etc-email()
+{
+    test -n "${EMAIL_ACCOUNT_SERVER_NR_LIST}" || return 0
+    test -n "${EMAIL_ACCOUNT_SERVER_PORT}" || return 0
+
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    test -n "${3}" || return 3
+    local idev=${1}
+    local odev=${2}
+    local prio=${3}
+
+    local ip
+
+    for ip in ${EMAIL_ACCOUNT_SERVER_NR_LIST}
+    do
+	! nic-exist ${idev} || echo "filter add dev ${idev} parent ${QOS_CLASS_TOP_GW} protocol ip priority ${prio} u32 ${QOS_FILTER_TCP} match ip src ${ip}/32 match ip sport ${EMAIL_ACCOUNT_SERVER_PORT} 0xffff flowid ${QOS_CLASS_ETC}"
+	! nic-exist ${odev} || echo "filter add dev ${odev} parent ${QOS_CLASS_TOP_GW} protocol ip priority ${prio} u32 ${QOS_FILTER_TCP} match ip dst ${ip}/32 match ip dport ${EMAIL_ACCOUNT_SERVER_PORT} 0xffff flowid ${QOS_CLASS_ETC}"
+    done
+}
+
+gen-tc-drop()
+{
+    test -n "${1}" || return 1
+    local interface=${1}
+
+    test ${interface} != 'external' -o ${SNAT_MODE} == False || return 0
+
+    local idev=$(get-qos-dev ${interface} ingress)
+    local odev=$(get-qos-dev ${interface} egress)
+    local handle="$[1000 + ${QOS_HANDLE_DROP}]:"
+
+    echo "class add dev ${idev} parent ${QOS_CLASS_TOP_GW} classid ${QOS_CLASS_DROP} htb rate 1kbit ceil 1kbit ${QOS_HTB_QUANTUM}"
+    echo "class add dev ${odev} parent ${QOS_CLASS_TOP_GW} classid ${QOS_CLASS_DROP} htb rate 1kbit ceil 1kbit ${QOS_HTB_QUANTUM}"
+
+    echo "qdisc add dev ${idev} parent ${QOS_CLASS_DROP} handle ${handle} pfifo"
+    echo "qdisc add dev ${odev} parent ${QOS_CLASS_DROP} handle ${handle} pfifo"
+
+    gen-qos-index drop: pfifo ${interface} ${idev} ${odev} ${handle}
+
+    echo "filter add dev ${idev} parent ${QOS_CLASS_TOP_GW} protocol ip priority ${QOS_DROP_FILTER_PRIO} u32 ${QOS_FILTER_ALL} flowid ${QOS_CLASS_DROP} action drop"
+    echo "filter add dev ${odev} parent ${QOS_CLASS_TOP_GW} protocol ip priority ${QOS_DROP_FILTER_PRIO} u32 ${QOS_FILTER_ALL} flowid ${QOS_CLASS_DROP} action drop"
+}
+
+gen-tc-qos-etc-arp()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    test -n "${3}" || return 3
+    local idev=${1}
+    local odev=${2}
+    local prio=${3}
+
+    ! nic-exist ${idev} || echo "filter add dev ${idev} parent ${QOS_CLASS_TOP_GW} protocol arp priority ${prio} u32 ${QOS_FILTER_ALL} flowid ${QOS_CLASS_ETC}"
+    ! nic-exist ${odev} || echo "filter add dev ${odev} parent ${QOS_CLASS_TOP_GW} protocol arp priority ${prio} u32 ${QOS_FILTER_ALL} flowid ${QOS_CLASS_ETC}"
+}
+
+gen-tc-qos-etc-dhcp()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    test -n "${3}" || return 3
+    local idev=${1}
+    local odev=${2}
+    local prio=${3}
+
+    if test "${DHCP_MODE}" == "True" ; then
+	! nic-exist ${idev} || echo "filter add dev ${idev} parent ${QOS_CLASS_TOP_GW} protocol ip priority ${prio} u32 ${QOS_FILTER_UDP} match ip sport ${BOOTPC_PORT} 0xffff match ip dport ${BOOTPS_PORT} 0xffff flowid ${QOS_CLASS_ETC}"
+	! nic-exist ${odev} || echo "filter add dev ${odev} parent ${QOS_CLASS_TOP_GW} protocol ip priority ${prio} u32 ${QOS_FILTER_UDP} match ip sport ${BOOTPS_PORT} 0xffff match ip dport ${BOOTPC_PORT} 0xffff flowid ${QOS_CLASS_ETC}"
+    fi
+
+    case ${CLOUD_NAME} in
+	aws|azure)
+	    if nic-exist ${odev} ; then
+		echo "filter add dev ${odev} parent ${QOS_CLASS_TOP_GW} protocol ip priority ${prio} u32 ${QOS_FILTER_UDP} match ip sport ${BOOTPC_PORT} 0xffff match ip dport ${BOOTPS_PORT} 0xffff flowid ${QOS_CLASS_ETC}"
+	    fi
+
+	    if nic-exist ${idev} ; then
+		echo "filter add dev ${idev} parent ${QOS_CLASS_TOP_GW} protocol ip priority ${prio} u32 ${QOS_FILTER_UDP} match ip sport ${BOOTPS_PORT} 0xffff match ip dport ${BOOTPC_PORT} 0xffff flowid ${QOS_CLASS_ETC}"
+	    fi
+	    ;;
+	*)
+	    ;;
+    esac
+
+    case ${CLOUD_NAME} in
+	azure)
+	    if nic-exist ${odev} ; then
+		echo "filter add dev ${odev} parent ${QOS_CLASS_TOP_GW} protocol ip priority ${prio} u32 ${QOS_FILTER_TCP} match ip dst ${CLOUD_AZURE_FABRIC_IP}/32 match ip dport ${WWW_PORT} 0xffff flowid ${QOS_CLASS_ETC}"
+
+		echo "filter add dev ${odev} parent ${QOS_CLASS_TOP_GW} protocol ip priority ${prio} u32 ${QOS_FILTER_TCP} match ip dst ${CLOUD_AZURE_FABRIC_IP}/32 match ip dport ${HTTPS_PORT} 0xffff flowid ${QOS_CLASS_ETC}"
+
+		echo "filter add dev ${odev} parent ${QOS_CLASS_TOP_GW} protocol ip priority ${prio} u32 ${QOS_FILTER_TCP} match ip dst ${CLOUD_AZURE_FABRIC_IP}/32 match ip dport ${CLOUD_AZURE_PORT} 0xffff flowid ${QOS_CLASS_ETC}"
+	    fi
+
+	    if nic-exist ${idev} ; then
+		echo "filter add dev ${idev} parent ${QOS_CLASS_TOP_GW} protocol ip priority ${prio} u32 ${QOS_FILTER_TCP} match ip src ${CLOUD_AZURE_FABRIC_IP}/32 match ip sport ${WWW_PORT} 0xffff flowid ${QOS_CLASS_ETC}"
+
+		echo "filter add dev ${idev} parent ${QOS_CLASS_TOP_GW} protocol ip priority ${prio} u32 ${QOS_FILTER_TCP} match ip src ${CLOUD_AZURE_FABRIC_IP}/32 match ip sport ${HTTPS_PORT} 0xffff flowid ${QOS_CLASS_ETC}"
+
+		echo "filter add dev ${idev} parent ${QOS_CLASS_TOP_GW} protocol ip priority ${prio} u32 ${QOS_FILTER_TCP} match ip src ${CLOUD_AZURE_FABRIC_IP}/32 match ip sport ${CLOUD_AZURE_PORT} 0xffff flowid ${QOS_CLASS_ETC}"
+	    fi
+	    ;;
+	*)
+	    ;;
+    esac
+}
+
+gen-tc-qos-etc-vrrp()
+{
+    test ${HA_MODE} == True || return 0
+
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    test -n "${3}" || return 3
+    test -n "${4}" || return 4
+    local interface=${1}
+    local idev=${2}
+    local odev=${3}
+    local prio=${4}
+
+    local net_prf net_prf_list
+
+    case ${interface} in
+	internal)
+	    net_prf_list="${IP_WEB_NET}/${IP_WEB_PRF}"
+	    test ${VLAN_MODE} == False || net_prf_list="${net_prf_list} ${IP_RWEB_NET}/${IP_RWEB_PRF}"
+	    ;;
+	external)
+	    net_prf_list="${IP_EXTERNAL_NET}/${IP_EXTERNAL_PRF}"
+	    ;;
+	auxiliary)
+	    net_prf_list="${IP_AUXILIARY_NET}/${IP_AUXILIARY_PRF}"
+	    ;;
+	*)
+	    return 11
+	    ;;
+    esac
+
+    if nic-exist ${idev} ; then
+	for net_prf in ${net_prf_list}
+	do
+	    echo "filter add dev ${idev} parent ${QOS_CLASS_TOP_GW} protocol ip priority ${prio} u32 match ip src ${net_prf} match ip dst ${VRRP_MULTICAST_IP}/32 flowid ${QOS_CLASS_ETC}"
+	done
+    fi
+
+    if nic-exist ${odev} ; then
+	for net_prf in ${net_prf_list}
+	do
+	    echo "filter add dev ${odev} parent ${QOS_CLASS_TOP_GW} protocol ip priority ${prio} u32 match ip src ${net_prf} match ip dst ${VRRP_MULTICAST_IP}/32 flowid ${QOS_CLASS_ETC}"
+	done
+    fi
+}
+
+gen-tc-qos-etc-icmp()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    test -n "${3}" || return 3
+    local idev=${1}
+    local odev=${2}
+    local prio=${3}
+
+    ! nic-exist ${idev} || echo "filter add dev ${idev} parent ${QOS_CLASS_TOP_GW} protocol ip priority ${prio} u32 ${QOS_FILTER_ICMP} flowid ${QOS_CLASS_ETC}"
+    ! nic-exist ${odev} || echo "filter add dev ${odev} parent ${QOS_CLASS_TOP_GW} protocol ip priority ${prio} u32 ${QOS_FILTER_ICMP} flowid ${QOS_CLASS_ETC}"
+}
+
+gen-tc-qos-etc-ldap-auth-ip()
+{
+    test-ldap-auth-state || return 0
+
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    test -n "${3}" || return 3
+    local idev=${1}
+    local odev=${2}
+    local prio=${3}
+
+    local elt i=0 range
+    local ip port
+
+    if nic-exist ${idev} ; then
+	for elt in ${LDAP_SERVER_LIST}
+	do
+	    range=$[${i} % 4]
+	    case ${range} in
+		0|1)
+		;;
+		2)
+		    ip=${elt}
+		    ;;
+		3)
+		    port=${elt}
+
+		    echo "filter add dev ${idev} parent ${QOS_CLASS_TOP_GW} protocol ip priority ${prio} u32 ${QOS_FILTER_UDP} match ip src ${ip}/32 match ip sport ${port} 0xffff flowid ${QOS_CLASS_ETC}"
+		    echo "filter add dev ${idev} parent ${QOS_CLASS_TOP_GW} protocol ip priority ${prio} u32 ${QOS_FILTER_TCP} match ip src ${ip}/32 match ip sport ${port} 0xffff flowid ${QOS_CLASS_ETC}"
+		    ;;
+		*)
+		    ;;
+	    esac
+	    ((i++))
+	done
+    fi
+
+    i=0
+
+    if nic-exist ${odev} ; then
+	for elt in ${LDAP_SERVER_LIST}
+	do
+	    range=$[${i} % 4]
+	    case ${range} in
+		0|1)
+		;;
+		2)
+		    ip=${elt}
+		    ;;
+		3)
+		    port=${elt}
+
+		    echo "filter add dev ${odev} parent ${QOS_CLASS_TOP_GW} protocol ip priority ${prio} u32 ${QOS_FILTER_UDP} match ip dst ${ip}/32 match ip dport ${port} 0xffff flowid ${QOS_CLASS_ETC}"
+		    echo "filter add dev ${odev} parent ${QOS_CLASS_TOP_GW} protocol ip priority ${prio} u32 ${QOS_FILTER_TCP} match ip dst ${ip}/32 match ip dport ${port} 0xffff flowid ${QOS_CLASS_ETC}"
+		    ;;
+		*)
+		    ;;
+	    esac
+	    ((i++))
+	done
+    fi
+}
+
+gen-tc-qos-etc-kerberos-auth()
+{
+    test-kerberos-auth-state || return 0
+
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    test -n "${3}" || return 3
+    test -n "${4}" || return 0
+    local idev=${1}
+    local odev=${2}
+    local prio=${3}
+    local ips=${4}
+
+    local ip
+
+    if nic-exist ${idev} ; then
+	for ip in ${ips}
+	do
+	    echo "filter add dev ${idev} parent ${QOS_CLASS_TOP_GW} protocol ip priority ${prio} u32 ${QOS_FILTER_TCP} match ip src ${ip}/32 match ip sport ${KERBEROS_PORT} 0xffff flowid ${QOS_CLASS_ETC}"
+	    echo "filter add dev ${idev} parent ${QOS_CLASS_TOP_GW} protocol ip priority ${prio} u32 ${QOS_FILTER_TCP} match ip src ${ip}/32 match ip sport ${LDAP_PORT} 0xffff flowid ${QOS_CLASS_ETC}"
+	    echo "filter add dev ${idev} parent ${QOS_CLASS_TOP_GW} protocol ip priority ${prio} u32 ${QOS_FILTER_UDP} match ip src ${ip}/32 match ip sport ${KPASSWD_PORT} 0xffff flowid ${QOS_CLASS_ETC}"
+	done
+    fi
+
+    if nic-exist ${odev} ; then
+	for ip in ${ips}
+	do
+	    echo "filter add dev ${odev} parent ${QOS_CLASS_TOP_GW} protocol ip priority ${prio} u32 ${QOS_FILTER_TCP} match ip dst ${ip}/32 match ip dport ${KERBEROS_PORT} 0xffff flowid ${QOS_CLASS_ETC}"
+	    echo "filter add dev ${odev} parent ${QOS_CLASS_TOP_GW} protocol ip priority ${prio} u32 ${QOS_FILTER_TCP} match ip dst ${ip}/32 match ip dport ${LDAP_PORT} 0xffff flowid ${QOS_CLASS_ETC}"
+	    echo "filter add dev ${odev} parent ${QOS_CLASS_TOP_GW} protocol ip priority ${prio} u32 ${QOS_FILTER_UDP} match ip dst ${ip}/32 match ip dport ${KPASSWD_PORT} 0xffff flowid ${QOS_CLASS_ETC}"
+	done
+    fi
+}
+
+gen-tc-qos-etc-kerberos-auth-ip()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    test -n "${3}" || return 3
+    local idev=${1}
+    local odev=${2}
+    local prio=${3}
+
+    gen-tc-qos-etc-kerberos-auth ${idev} ${odev} ${prio} "${KERBEROS_SERVER_IP_LIST}"
+}
+
+gen-tc-qos-etc-auth-nr()
+{
+    test -n "${1}" || return 1
+    local interface=${1}
+
+    local idev=$(get-qos-dev ${interface} ingress)
+    local odev=$(get-qos-dev ${interface} egress)
+
+    gen-tc-qos-etc-kerberos-auth ${idev} ${odev} "${KERBEROS_SERVER_NR_LIST}"
+}
+
+gen-tc-qos-etc-auth-ip()
+{
+    gen-tc-qos-etc-ldap-auth-ip "${@}"
+    gen-tc-qos-etc-kerberos-auth-ip "${@}"
+}
+
+gen-tc-qos-etc()
+{
+    test -n "${1}" || return 1
+    local interface=${1}
+
+    local idev=$(get-qos-dev ${interface} ingress)
+    local odev=$(get-qos-dev ${interface} egress)
+    local handle="$[1000 + ${QOS_HANDLE_ETC}]:"
+
+    if nic-exist ${idev} ; then
+	echo "class add dev ${idev} parent ${QOS_CLASS_TOP_GW} classid ${QOS_CLASS_ETC} htb rate ${QOS_ETC_RATE} ${QOS_HTB_QUANTUM}"
+	echo "qdisc add dev ${idev} parent ${QOS_CLASS_ETC} handle ${handle} ${QOS_QDISC_SFQ}"
+    fi
+
+    if nic-exist ${odev} ; then
+	echo "class add dev ${odev} parent ${QOS_CLASS_TOP_GW} classid ${QOS_CLASS_ETC} htb rate ${QOS_ETC_RATE} ${QOS_HTB_QUANTUM}"
+	echo "qdisc add dev ${odev} parent ${QOS_CLASS_ETC} handle ${handle} ${QOS_QDISC_SFQ}"
+    fi
+
+    gen-qos-index etc: sfq ${interface} ${idev} ${odev} ${handle}
+
+    gen-tc-qos-etc-arp      ${idev} ${odev} ${QOS_ETC_FILTER_PRIO_ARP}
+    gen-tc-qos-etc-dhcp     ${idev} ${odev} ${QOS_ETC_FILTER_PRIO_DHCP}
+    gen-tc-qos-etc-vrrp     ${interface} ${idev} ${odev} ${QOS_ETC_FILTER_PRIO_VRRP}
+    gen-tc-qos-etc-icmp     ${idev} ${odev} ${QOS_ETC_FILTER_PRIO_ICMP}
+    gen-tc-qos-etc-auth-ip  ${idev} ${odev} ${QOS_ETC_FILTER_PRIO_AUTH}
+    gen-tc-qos-etc-ntp      ${idev} ${odev} ${QOS_ETC_FILTER_PRIO_NTP}
+    gen-tc-qos-etc-ocsp     ${idev} ${odev} ${QOS_ETC_FILTER_PRIO_OCSP}
+    gen-tc-qos-etc-email    ${idev} ${odev} ${QOS_ETC_FILTER_PRIO_EMAIL}
+}
+
+gen-tc-backend-rweb-top()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    test -n "${3}" || return 3
+    test -n "${4}" || return 4
+    test -n "${5}" || return 5
+    local interface=${1}
+    local flow=${2}
+    local idev=${3}
+    local odev=${4}
+    local class=${5}
+
+    local title
+
+    test ${flow} != vpnipsec || title=[sec]
+    
+    local irate=$(get-qos-rate ${interface} ingress ${flow})
+    local iceil=$(get-qos-ceil ${interface} ingress ${irate})
+    local orate=$(get-qos-rate ${interface} egress ${flow})
+    local oceil=$(get-qos-ceil ${interface} egress ${orate})
+
+    ! nic-exist ${idev} || echo "class add dev ${idev} parent ${QOS_CLASS_TOP_GW} classid ${class} htb rate ${irate}kbit ceil ${iceil}kbit ${QOS_HTB_QUANTUM}"
+    ! nic-exist ${odev} -o ${interface} == vpnipsec || echo "class add dev ${odev} parent ${QOS_CLASS_TOP_GW} classid ${class} htb rate ${orate}kbit ceil ${oceil}kbit ${QOS_HTB_QUANTUM}"
+
+    gen-qos-index rweb${title}: htb ${interface} ${idev} ${odev} ${class}
+}
+
+gen-tc-backend-rweb()
+{
+    test ${RWEB_MODE} == True || return 0
+
+    local elt range i=0
+    local interface ip port qos
+    local idev odev rweb_class if_name flow
+    local irate iceil orate oceil rate ceil
+    local handle title
+
+    gen-tc-backend-rweb-top internal rweb ${IF_QOS_INTERNAL_INGRESS} ${IF_QOS_INTERNAL_EGRESS} ${QOS_CLASS_RWEB_LOCAL}
+    test ${VPN_IPSEC_SITE_IS_ACTIVE} == False || gen-tc-backend-rweb-top external vpnipsec ${IF_QOS_EXTERNAL_INGRESS} ${IF_QOS_EXTERNAL_EGRESS} ${QOS_CLASS_RWEB_VPN_IPSEC}
+
+    for elt in ${ACCESS_RWEB_LIST}
+    do
+	range=$[${i} % 4]
+	case ${range} in
+	    0)
+		interface=${elt}
+		;;
+	    1)
+		ip=${elt}
+		;;
+	    2)
+		port=${elt}
+		;;
+	    3)
+		qos=${elt}
+
+		handle=$[1000 + ${QOS_HANDLE}]:
+		unset title
+
+		case ${interface} in
+		    rweb)
+			idev=${IF_QOS_INTERNAL_INGRESS}
+			odev=${IF_QOS_INTERNAL_EGRESS}
+			rweb_class=${QOS_CLASS_RWEB_LOCAL}
+			if_name=internal
+			flow=rweb
+			;;
+		    vpnipsec)
+			if test ${VPN_IPSEC_SITE_IS_ACTIVE} == False ; then
+			    ((i++))
+			    continue
+			fi
+			idev=${IF_QOS_EXTERNAL_INGRESS}
+			odev=${IF_QOS_EXTERNAL_EGRESS}
+			rweb_class=${QOS_CLASS_RWEB_VPN_IPSEC}
+			if_name=external
+			flow=vpnipsec
+			title=[sec]
+			;;
+		    external)
+			idev=${IF_QOS_EXTERNAL_INGRESS}
+			odev=${IF_QOS_EXTERNAL_EGRESS}
+			rweb_class=${QOS_CLASS_RWEB_EXT}
+			if_name=external
+			flow=rweb
+			;;
+		    *)
+			;;
+		esac
+
+		irate=$(get-qos-rate ${if_name} ingress ${flow})
+		iceil=$(get-qos-ceil ${if_name} ingress ${irate})
+		orate=$(get-qos-rate ${if_name} egress ${flow})
+		oceil=$(get-qos-ceil ${if_name} egress ${orate})
+
+		if nic-exist ${idev} ; then
+		    rate=$(get-qos-percent ${irate} ${qos})
+		    ceil=$(get-qos-ceil ${if_name} ingress ${rate})
+		    echo "class add dev ${idev} parent ${rweb_class} classid ${QOS_HANDLE_TOP_GW}:${QOS_HANDLE} htb rate ${rate}kbit ceil ${ceil}kbit ${QOS_HTB_QUANTUM}"
+		    echo "qdisc add dev ${idev} parent ${QOS_HANDLE_TOP_GW}:${QOS_HANDLE} handle ${handle} ${QOS_QDISC_SFQ}"
+		    echo "filter add dev ${idev} parent ${QOS_CLASS_TOP_GW} protocol ip priority ${QOS_RWEB_FILTER_PRIO} u32 match ip src ${ip}/32 match ip sport ${port} 0xffff flowid ${QOS_HANDLE_TOP_GW}:${QOS_HANDLE}"
+		fi
+
+		if nic-exist ${odev} -a ${flow} != vpnipsec ; then
+		    rate=$(get-qos-percent ${orate} ${qos})
+		    ceil=$(get-qos-ceil ${if_name} egress ${rate})
+		    echo "class add dev ${odev} parent ${rweb_class} classid ${QOS_HANDLE_TOP_GW}:${QOS_HANDLE} htb rate ${rate}kbit ceil ${ceil}kbit ${QOS_HTB_QUANTUM}"
+		    echo "qdisc add dev ${odev} parent ${QOS_HANDLE_TOP_GW}:${QOS_HANDLE} handle ${handle} ${QOS_QDISC_SFQ}"
+		    echo "filter add dev ${odev} parent ${QOS_CLASS_TOP_GW} protocol ip priority ${QOS_RWEB_FILTER_PRIO} handle $(printf 0x%x/${QOS_MARK_MASK} ${QOS_HANDLE} 2> /dev/null) fw flowid ${QOS_HANDLE_TOP_GW}:${QOS_HANDLE}"
+		fi
+
+		gen-qos-index rweb${title}:${ip}/32 sfq ${if_name} ${idev} ${odev} ${handle}
+		((QOS_HANDLE++))
+		;;
+	    *)
+		return 255
+		;;
+	esac
+	((i++))
+    done
+}
+
+gen-tc-internal-ha-share-peer()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    local irate=${1}
+    local orate=${2}
+
+    local i=0 elt range
+    local ip qos
+    local rate ceil
+
+    for elt in ${PEER_SHARE_LIST} ${PEER_HA_LIST}
+    do
+	range=$[${i} % 2]
+	case ${range} in
+	    0)
+		ip=${elt}
+		;;
+	    1)
+		qos=${elt}
+
+		if nic-exist ${IF_QOS_INTERNAL_INGRESS} ; then
+		    rate=$(get-qos-percent ${irate} ${qos})
+		    ceil=$(get-qos-ceil internal ingress ${rate})
+		    echo "class add dev ${IF_QOS_INTERNAL_INGRESS} parent ${QOS_CLASS_PEER} classid ${QOS_HANDLE_TOP_GW}:${QOS_HANDLE} htb rate ${rate}kbit ceil ${ceil}kbit ${QOS_HTB_QUANTUM}"
+		    echo "qdisc add dev ${IF_QOS_INTERNAL_INGRESS} parent ${QOS_HANDLE_TOP_GW}:${QOS_HANDLE} handle ${QOS_HANDLE}: pfifo"
+		    echo "filter add dev ${IF_QOS_INTERNAL_INGRESS} parent ${QOS_CLASS_TOP_GW} protocol ip priority ${QOS_PEER_FILTER_PRIO} u32 match ip src ${ip}/32 flowid ${QOS_HANDLE_TOP_GW}:${QOS_HANDLE}"
+		fi
+
+		if nic-exist ${IF_QOS_INTERNAL_EGRESS} ; then
+		    rate=$(get-qos-percent ${orate} ${qos})
+		    ceil=$(get-qos-ceil internal egress ${rate})
+		    echo "class add dev ${IF_QOS_INTERNAL_EGRESS} parent ${QOS_CLASS_PEER} classid ${QOS_HANDLE_TOP_GW}:${QOS_HANDLE} htb rate ${rate}kbit ceil ${ceil}kbit ${QOS_HTB_QUANTUM}"
+		    echo "qdisc add dev ${IF_QOS_INTERNAL_EGRESS} parent ${QOS_HANDLE_TOP_GW}:${QOS_HANDLE} handle ${QOS_HANDLE}: pfifo"
+		    echo "filter add dev ${IF_QOS_INTERNAL_EGRESS} parent ${QOS_CLASS_TOP_GW} protocol ip priority ${QOS_PEER_FILTER_PRIO} handle $(printf 0x%x/${QOS_MARK_MASK} ${QOS_HANDLE} 2> /dev/null) fw flowid ${QOS_HANDLE_TOP_GW}:${QOS_HANDLE}"
+		fi
+
+		gen-qos-index peer:${ip} pfifo internal ${IF_QOS_INTERNAL_INGRESS} ${IF_QOS_INTERNAL_EGRESS} ${QOS_HANDLE}:
+		
+		((QOS_HANDLE++))
+		;;
+	    *)
+		return 1
+		;;
+	esac
+	((i++))
+    done
+}
+
+gen-tc-internal-dhcp-peer()
+{
+    test ${DHCP_IS_ACTIVE} = True -a -n "${DHCP_PEER_LIST}" || return 0
+
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    test -n "${3}" || return 3
+    test -n "${4}" || return 4
+    local irate=${1}
+    local orate=${2}
+    local iceil=${3}
+    local oceil=${4}
+
+    local handle="$[${QOS_HANDLE}+1000]:"
+    local ip=${DHCP_PEER_LIST/* }
+
+    if nic-exist ${IF_QOS_INTERNAL_INGRESS} ; then
+	echo "class add dev ${IF_QOS_INTERNAL_INGRESS} parent ${QOS_CLASS_PEER} classid ${QOS_HANDLE_TOP_GW}:${QOS_HANDLE} htb rate ${irate}kbit ceil ${iceil}kbit ${QOS_HTB_QUANTUM}"
+	echo "qdisc add dev ${IF_QOS_INTERNAL_INGRESS} parent ${QOS_HANDLE_TOP_GW}:${QOS_HANDLE} handle ${handle} pfifo"
+	echo "filter add dev ${IF_QOS_INTERNAL_INGRESS} parent ${QOS_CLASS_TOP_GW} protocol ip priority $[${QOS_PEER_FILTER_PRIO}+3] u32 match ip src ${ip}/32 flowid ${QOS_HANDLE_TOP_GW}:${QOS_HANDLE}"
+    fi
+
+    if nic-exist ${IF_QOS_INTERNAL_EGRESS} ; then
+	echo "class add dev ${IF_QOS_INTERNAL_EGRESS} parent ${QOS_CLASS_PEER} classid ${QOS_HANDLE_TOP_GW}:${QOS_HANDLE} htb rate ${orate}kbit ceil ${oceil}kbit ${QOS_HTB_QUANTUM}"
+	echo "qdisc add dev ${IF_QOS_INTERNAL_EGRESS} parent ${QOS_HANDLE_TOP_GW}:${QOS_HANDLE} handle ${handle} pfifo"
+	echo "filter add dev ${IF_QOS_INTERNAL_EGRESS} parent ${QOS_CLASS_TOP_GW} protocol ip priority $[${QOS_PEER_FILTER_PRIO}+3] handle $(printf 0x%x/${QOS_MARK_MASK} ${QOS_HANDLE} 2> /dev/null) fw flowid ${QOS_HANDLE_TOP_GW}:${QOS_HANDLE}"
+    fi
+
+    gen-qos-index dhcp: pfifo internal ${IF_QOS_INTERNAL_INGRESS} ${IF_QOS_INTERNAL_EGRESS} ${handle}
+
+    ((QOS_HANDLE++))
+}
+
+gen-tc-internal-previous-peer()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    local irate=${1}
+    local orate=${2}
+
+    local i=0 elt range
+    local ip qos
+    local rate ceil
+    local handle
+
+    for elt in ${PEER_PREVIOUS_LIST}
+    do
+	range=$[${i} % 2]
+	case ${range} in
+	    0)
+		ip=${elt}
+		;;
+	    1)
+		qos=${elt}
+		handle="$[${QOS_HANDLE}+1000]:"
+
+		if nic-exist ${IF_QOS_INTERNAL_INGRESS} ; then
+		    rate=$(get-qos-percent ${irate} ${qos})
+		    ceil=$(get-qos-ceil internal ingress ${rate})
+		    echo "class add dev ${IF_QOS_INTERNAL_INGRESS} parent ${QOS_CLASS_PEER} classid ${QOS_HANDLE_TOP_GW}:${QOS_HANDLE} htb rate ${rate}kbit ceil ${ceil}kbit ${QOS_HTB_QUANTUM}"
+		    echo "qdisc add dev ${IF_QOS_INTERNAL_INGRESS} parent ${QOS_HANDLE_TOP_GW}:${QOS_HANDLE} handle ${handle} ${QOS_QDISC_SFQ}"
+
+		    echo "filter add dev ${IF_QOS_INTERNAL_INGRESS} parent ${QOS_CLASS_TOP_GW} protocol ip priority $[${QOS_PEER_FILTER_PRIO}+5] u32 match ip src ${ip}/32 match ip dport ${PROXY_PORT} 0xffff flowid ${QOS_HANDLE_TOP_GW}:${QOS_HANDLE}"
+		    echo "filter add dev ${IF_QOS_INTERNAL_INGRESS} parent ${QOS_CLASS_TOP_GW} protocol ip priority $[${QOS_PEER_FILTER_PRIO}+5] u32 match ip src ${ip}/32 match ip dport ${WWW_PORT} 0xffff flowid ${QOS_HANDLE_TOP_GW}:${QOS_HANDLE}"
+		fi
+
+		if nic-exist ${IF_QOS_INTERNAL_EGRESS} ; then
+		    rate=$(get-qos-percent ${orate} ${qos})
+		    ceil=$(get-qos-ceil internal egress ${rate})
+		    echo "class add dev ${IF_QOS_INTERNAL_EGRESS} parent ${QOS_CLASS_PEER} classid ${QOS_HANDLE_TOP_GW}:${QOS_HANDLE} htb rate ${rate}kbit ceil ${ceil}kbit ${QOS_HTB_QUANTUM}"
+		    echo "qdisc add dev ${IF_QOS_INTERNAL_EGRESS} parent ${QOS_HANDLE_TOP_GW}:${QOS_HANDLE} handle ${handle} ${QOS_QDISC_SFQ}"
+
+		    echo "filter add dev ${IF_QOS_INTERNAL_EGRESS} parent ${QOS_CLASS_TOP_GW} protocol ip priority $[${QOS_PEER_FILTER_PRIO}+5] handle $(printf 0x%x/${QOS_MARK_MASK} ${QOS_HANDLE} 2> /dev/null) fw flowid ${QOS_HANDLE_TOP_GW}:${QOS_HANDLE}"
+		fi
+
+		gen-qos-index peer:${ip} sfq internal ${IF_QOS_INTERNAL_INGRESS} ${IF_QOS_INTERNAL_EGRESS} ${handle}
+		
+		((QOS_HANDLE++))
+		;;
+	    *)
+		return 1
+		;;
+	esac
+	((i++))
+    done
+}
+
+gen-tc-internal-peer()
+{
+    local irate=$(get-qos-rate internal ingress peer)
+    local iceil=$(get-qos-ceil internal ingress ${irate})
+    local orate=$(get-qos-rate internal egress peer)
+    local oceil=$(get-qos-ceil internal egress ${orate})
+
+    ! nic-exist ${IF_QOS_INTERNAL_INGRESS} || echo "class add dev ${IF_QOS_INTERNAL_INGRESS} parent ${QOS_CLASS_TOP_GW} classid ${QOS_CLASS_PEER} htb rate ${irate}kbit ceil ${iceil}kbit ${QOS_HTB_QUANTUM}"
+    ! nic-exist ${IF_QOS_INTERNAL_EGRESS} || echo "class add dev ${IF_QOS_INTERNAL_EGRESS} parent ${QOS_CLASS_TOP_GW} classid ${QOS_CLASS_PEER} htb rate ${orate}kbit ceil ${oceil}kbit ${QOS_HTB_QUANTUM}"
+
+    gen-qos-index peer: htb internal ${IF_QOS_INTERNAL_INGRESS} ${IF_QOS_INTERNAL_EGRESS} ${QOS_CLASS_PEER}
+
+    gen-tc-internal-ha-share-peer ${irate} ${orate}
+    gen-tc-internal-dhcp-peer ${irate} ${orate} ${iceil} ${oceil}
+    gen-tc-internal-previous-peer ${irate} ${orate}
+}
+
+gen-tc-web-top()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    test -n "${3}" || return 3
+    test -n "${4}" || return 4
+    local interface=${1}
+    local flow=${2}
+    local idev=${3}
+    local odev=${4}
+
+    local web_class
+
+    if test ${flow} == vpnipsec ; then
+	web_class=${QOS_CLASS_WEB_VPN_IPSEC}
+    else
+	web_class=${QOS_CLASS_WEB_LOCAL}
+    fi
+    
+    local irate=$(get-qos-rate ${interface} ingress ${flow})
+    local iceil=$(get-qos-ceil ${interface} ingress ${irate})
+    local orate=$(get-qos-rate ${interface} egress ${flow})
+    local oceil=$(get-qos-ceil ${interface} egress ${orate})
+
+    ! nic-exist ${idev} || echo "class add dev ${idev} parent ${QOS_CLASS_TOP_GW} classid ${web_class} htb rate ${irate}kbit ceil ${iceil}kbit ${QOS_HTB_QUANTUM}"
+    ! nic-exist ${odev} -o ${interface} == vpnipsec || echo "class add dev ${odev} parent ${QOS_CLASS_TOP_GW} classid ${web_class} htb rate ${orate}kbit ceil ${oceil}kbit ${QOS_HTB_QUANTUM}"
+}
+
+gen-tc-web-sub-nil()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    test -n "${3}" || return 3
+    test -n "${4}" || return 4
+    local interface=${1}
+    local flow=${2}
+    local idev=${3}
+    local odev=${4}
+
+    local web_class title
+
+    if test ${flow} == vpnipsec ; then
+	web_class=${QOS_CLASS_WEB_VPN_IPSEC}
+	title=[sec]
+    else
+	web_class=${QOS_CLASS_WEB_LOCAL}
+    fi
+
+    local irate=$(get-qos-rate ${interface} ingress ${flow})
+    local iceil=$(get-qos-ceil ${interface} ingress ${irate})
+    local orate=$(get-qos-rate ${interface} egress ${flow})
+    local oceil=$(get-qos-ceil ${interface} egress ${orate})
+
+    local handle="$[${QOS_HANDLE}+1000]:"
+
+    if nic-exist ${idev} ; then
+	echo "class add dev ${idev} parent ${web_class} classid ${QOS_HANDLE_TOP_GW}:${QOS_HANDLE} htb rate ${irate}kbit ceil ${iceil}kbit ${QOS_HTB_QUANTUM}"
+	echo "qdisc add dev ${idev} parent ${QOS_HANDLE_TOP_GW}:${QOS_HANDLE} handle ${handle} ${QOS_QDISC_SFQ}"
+
+	if test ${WEB_MODE} == True ; then
+	    echo "filter add dev ${idev} parent ${QOS_CLASS_TOP_GW} protocol ip priority ${QOS_WEB_FILTER_PRIO} u32 match ip dport ${PROXY_PORT} 0xffff flowid ${QOS_HANDLE_TOP_GW}:${QOS_HANDLE}"
+	    echo "filter add dev ${idev} parent ${QOS_CLASS_TOP_GW} protocol ip priority ${QOS_WEB_FILTER_PRIO} u32 match ip dport ${WWW_PORT} 0xffff flowid ${QOS_HANDLE_TOP_GW}:${QOS_HANDLE}"
+	fi
+
+	if test ${DNS_MODE} == True ; then
+	    echo "filter add dev ${idev} parent ${QOS_CLASS_TOP_GW} protocol ip priority $[${QOS_WEB_FILTER_PRIO}+1] u32 ${QOS_FILTER_UDP} match ip dport ${DOMAIN_PORT} 0xffff flowid ${QOS_HANDLE_TOP_GW}:${QOS_HANDLE}"
+	    echo "filter add dev ${idev} parent ${QOS_CLASS_TOP_GW} protocol ip priority $[${QOS_WEB_FILTER_PRIO}+1] u32 ${QOS_FILTER_TCP} match ip dport ${DOMAIN_PORT} 0xffff flowid ${QOS_HANDLE_TOP_GW}:${QOS_HANDLE}"
+	fi
+
+	# Reverse Websites accessed from internal end-users
+	if test ${WEB_MODE} == True -a ${RWEB_MODE} == True ; then
+	    local rweb_ip
+	    for rweb_ip in ${RWEB_HTTP_IP_LIST}
+	    do
+		echo "filter add dev ${idev} parent ${QOS_CLASS_TOP_GW} protocol ip priority $[${QOS_WEB_FILTER_PRIO}+2] u32 match ip dst ${rweb_ip}/32 match ip dport ${WWW_PORT} 0xffff flowid ${QOS_HANDLE_TOP_GW}:${QOS_HANDLE}"
+	    done
+	    for rweb_ip in ${RWEB_HTTPS_IP_LIST}
+	    do
+		echo "filter add dev ${idev} parent ${QOS_CLASS_TOP_GW} protocol ip priority $[${QOS_WEB_FILTER_PRIO}+2] u32 match ip dst ${rweb_ip}/32 match ip dport ${HTTPS_PORT} 0xffff flowid ${QOS_HANDLE_TOP_GW}:${QOS_HANDLE}"
+	    done
+	fi
+    fi
+
+    if nic-exist ${odev} -a ${interface} != vpnipsec ; then
+	echo "class add dev ${odev} parent ${web_class} classid ${QOS_HANDLE_TOP_GW}:${QOS_HANDLE} htb rate ${orate}kbit ceil ${oceil}kbit ${QOS_HTB_QUANTUM}"
+	echo "qdisc add dev ${odev} parent ${QOS_HANDLE_TOP_GW}:${QOS_HANDLE} handle ${handle} ${QOS_QDISC_SFQ}"
+
+	echo "filter add dev ${odev} parent ${QOS_CLASS_TOP_GW} protocol ip priority $[${QOS_WEB_FILTER_PRIO}+3] handle $(printf 0x%x/${QOS_MARK_MASK} ${QOS_HANDLE} 2> /dev/null) fw flowid ${QOS_HANDLE_TOP_GW}:${QOS_HANDLE}"
+    fi
+
+    gen-qos-index web${title}: sfq ${interface} ${idev} ${odev} ${handle}
+}
+
+gen-tc-web-sub-list()
+{
+    test -n "${ACCESS_IF_IP_PX_WEB_LIST}" || return 0
+
+    local i=0 elt range
+    local interface ip px qos
+    local idev odev web_class if_name flow
+    local irate iceil orate oceil rate ceil
+    local handle title rweb_ip
+
+    for elt in ${ACCESS_IF_IP_PX_WEB_LIST}
+    do
+	range=$[${i} % 4]
+	case ${range} in
+	    0)
+		interface=${elt}
+		;;
+	    1)
+		ip=${elt}
+		;;
+	    2)
+		px=${elt}
+		;;
+	    3)
+		qos=${elt}
+
+		handle="$[${QOS_HANDLE}+1000]:"
+		unset title
+
+		case ${interface} in
+		    internal|admin|antivirus|file|mon|rweb|web)
+			idev=${IF_QOS_INTERNAL_INGRESS}
+			odev=${IF_QOS_INTERNAL_EGRESS}
+			web_class=${QOS_CLASS_WEB_LOCAL}
+			if_name=internal
+			flow=web
+			;;
+		    auxiliary)
+			idev=${IF_QOS_AUXILIARY_INGRESS}
+			odev=${IF_QOS_AUXILIARY_EGRESS}
+			web_class=${QOS_CLASS_WEB_LOCAL}
+			if_name=${interface}
+			flow=web
+			;;
+		    vpnipsec)
+			idev=${IF_QOS_EXTERNAL_INGRESS}
+			odev=${IF_QOS_EXTERNAL_EGRESS}
+			web_class=${QOS_CLASS_WEB_VPN_IPSEC}
+			if_name=external
+			flow=vpnipsec
+			title=[sec]
+			;;
+		    *)
+			;;
+		esac
+
+		irate=$(get-qos-rate ${if_name} ingress ${flow})
+		iceil=$(get-qos-ceil ${if_name} ingress ${irate})
+		orate=$(get-qos-rate ${if_name} egress ${flow})
+		oceil=$(get-qos-ceil ${if_name} egress ${orate})
+
+		if nic-exist ${idev} ; then
+		    rate=$(get-qos-percent ${irate} ${qos})
+		    ceil=$(get-qos-ceil ${if_name} ingress ${rate})
+		    echo "class add dev ${idev} parent ${web_class} classid ${QOS_HANDLE_TOP_GW}:${QOS_HANDLE} htb rate ${rate}kbit ceil ${ceil}kbit ${QOS_HTB_QUANTUM}"
+		    echo "qdisc add dev ${idev} parent ${QOS_HANDLE_TOP_GW}:${QOS_HANDLE} handle ${handle} ${QOS_QDISC_SFQ}"
+
+		    if test ${WEB_MODE} == True ; then
+			echo "filter add dev ${idev} parent ${QOS_CLASS_TOP_GW} protocol ip priority ${QOS_WEB_FILTER_PRIO} u32 match ip src ${ip}/${px} match ip dport ${PROXY_PORT} 0xffff flowid ${QOS_HANDLE_TOP_GW}:${QOS_HANDLE}"
+			echo "filter add dev ${idev} parent ${QOS_CLASS_TOP_GW} protocol ip priority ${QOS_WEB_FILTER_PRIO} u32 match ip src ${ip}/${px} match ip dport ${WWW_PORT} 0xffff flowid ${QOS_HANDLE_TOP_GW}:${QOS_HANDLE}"
+		    fi
+
+		    if test ${DNS_MODE} == True ; then
+			echo "filter add dev ${idev} parent ${QOS_CLASS_TOP_GW} protocol ip priority $[${QOS_WEB_FILTER_PRIO}+1] u32 ${QOS_FILTER_UDP} match ip src ${ip}/${px} match ip dport ${DOMAIN_PORT} 0xffff flowid ${QOS_HANDLE_TOP_GW}:${QOS_HANDLE}"
+			echo "filter add dev ${idev} parent ${QOS_CLASS_TOP_GW} protocol ip priority $[${QOS_WEB_FILTER_PRIO}+1] u32 ${QOS_FILTER_TCP} match ip src ${ip}/${px} match ip dport ${DOMAIN_PORT} 0xffff flowid ${QOS_HANDLE_TOP_GW}:${QOS_HANDLE}"
+		    fi
+
+		    # Reverse Websites accessed from internal end-users
+		    if test ${WEB_MODE} == True -a ${RWEB_MODE} == True ; then
+			for rweb_ip in ${RWEB_HTTP_IP_LIST}
+			do
+			    echo "filter add dev ${idev} parent ${QOS_CLASS_TOP_GW} protocol ip priority $[${QOS_WEB_FILTER_PRIO}+3] u32 match ip src ${ip}/${px} match ip dst ${rweb_ip}/32 match ip dport ${WWW_PORT} 0xffff flowid ${QOS_HANDLE_TOP_GW}:${QOS_HANDLE}"
+			done
+			for rweb_ip in ${RWEB_HTTPS_IP_LIST}
+			do
+			    echo "filter add dev ${idev} parent ${QOS_CLASS_TOP_GW} protocol ip priority $[${QOS_WEB_FILTER_PRIO}+3] u32 match ip src ${ip}/${px} match ip dst ${rweb_ip}/32 match ip dport ${HTTPS_PORT} 0xffff flowid ${QOS_HANDLE_TOP_GW}:${QOS_HANDLE}"	    
+			done
+		    fi
+		fi
+
+		if nic-exist ${odev} -a ${flow} != vpnipsec ; then
+		    rate=$(get-qos-percent ${orate} ${qos})
+		    ceil=$(get-qos-ceil ${if_name} egress ${rate})
+		    echo "class add dev ${odev} parent ${web_class} classid ${QOS_HANDLE_TOP_GW}:${QOS_HANDLE} htb rate ${rate}kbit ceil ${ceil}kbit ${QOS_HTB_QUANTUM}"
+		    echo "qdisc add dev ${odev} parent ${QOS_HANDLE_TOP_GW}:${QOS_HANDLE} handle ${handle} ${QOS_QDISC_SFQ}"
+
+		    echo "filter add dev ${odev} parent ${QOS_CLASS_TOP_GW} protocol ip priority $[${QOS_WEB_FILTER_PRIO}+2] handle $(printf 0x%x/${QOS_MARK_MASK} ${QOS_HANDLE} 2> /dev/null) fw flowid ${QOS_HANDLE_TOP_GW}:${QOS_HANDLE}"
+		fi
+
+		gen-qos-index web${title}:${ip}/${px} sfq ${if_name} ${idev} ${odev} ${handle}
+		((QOS_HANDLE++))
+		;;
+	    *)
+		return 1
+		;;
+	esac
+	((i++))
+    done
+}
+
+gen-tc-web()
+{
+    test ${WEB_MODE} == True -o ${DNS_MODE} == True || return 0
+
+    gen-tc-web-top internal web ${IF_QOS_INTERNAL_INGRESS} ${IF_QOS_INTERNAL_EGRESS}
+    test -z "${IF_AUXILIARY}" -o ${IP_AUXILIARY_IP} == 0.0.0.0 || gen-tc-web-top auxiliary web ${IF_QOS_AUXILIARY_INGRESS} ${IF_QOS_AUXILIARY_EGRESS}
+    test ${VPN_IPSEC_MODE} == False || gen-tc-web-top external vpnipsec ${IF_QOS_EXTERNAL_INGRESS} ${IF_QOS_EXTERNAL_EGRESS}
+
+    if test -n "${ACCESS_IF_IP_PX_WEB_LIST}" ; then
+	gen-tc-web-sub-list
+	return 0
+    fi
+
+    gen-tc-web-sub-nil internal web ${IF_QOS_INTERNAL_INGRESS} ${IF_QOS_INTERNAL_EGRESS}
+    test -z "${IF_AUXILIARY}" -o ${IP_AUXILIARY_IP} == 0.0.0.0 || gen-tc-web-sub-nil auxiliary web ${IF_QOS_AUXILIARY_INGRESS} ${IF_QOS_AUXILIARY_EGRESS}
+
+    if test ${VPN_IPSEC_MODE} == True ; then
+	((QOS_HANDLE++))
+	gen-tc-web-sub-nil external vpnipsec ${IF_QOS_EXTERNAL_INGRESS} ${IF_QOS_EXTERNAL_EGRESS}
+    fi
+
+    ((QOS_HANDLE++))
+}
+
+gen-tc-tweb-sub-nil()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    test -n "${3}" || return 3
+    test -n "${4}" || return 4
+    local interface=${1}
+    local flow=${2}
+    local idev=${3}
+    local odev=${4}
+
+    local web_class title
+
+    if test ${flow} == vpnipsec ; then
+	web_class=${QOS_CLASS_TWEB_VPN_IPSEC}
+	title=[sec]
+    else
+	web_class=${QOS_CLASS_TWEB}
+    fi
+
+    local irate=$(get-qos-rate ${interface} ingress ${flow})
+    local iceil=$(get-qos-ceil ${interface} ingress ${irate})
+    local orate=$(get-qos-rate ${interface} egress ${flow})
+    local oceil=$(get-qos-ceil ${interface} egress ${orate})
+
+    local handle="$[${QOS_HANDLE}+1000]:"
+
+    if nic-exist ${idev} ; then
+	echo "class add dev ${idev} parent ${web_class} classid ${QOS_HANDLE_TOP_GW}:${QOS_HANDLE} htb rate ${irate}kbit ceil ${iceil}kbit ${QOS_HTB_QUANTUM}"
+	echo "qdisc add dev ${idev} parent ${QOS_HANDLE_TOP_GW}:${QOS_HANDLE} handle ${handle} ${QOS_QDISC_SFQ}"
+
+	if test ${TRANSPARENT_MODE} == True ; then
+	    echo "filter add dev ${idev} parent ${QOS_CLASS_TOP_GW} protocol ip priority ${QOS_TWEB_FILTER_PRIO} u32 match ip dport ${WWW_PORT} 0xffff flowid ${QOS_HANDLE_TOP_GW}:${QOS_HANDLE}"
+	    test ${SSLMEDIATE_TRANSPARENT_MODE} == False || echo "filter add dev ${idev} parent ${QOS_CLASS_TOP_GW} protocol ip priority ${QOS_TWEB_FILTER_PRIO} u32 match ip dport ${HTTPS_PORT} 0xffff flowid ${QOS_HANDLE_TOP_GW}:${QOS_HANDLE}"
+	fi
+
+	if test ${DNS_MODE} == True ; then
+	    echo "filter add dev ${idev} parent ${QOS_CLASS_TOP_GW} protocol ip priority $[${QOS_TWEB_FILTER_PRIO}+1] u32 ${QOS_FILTER_UDP} match ip dport ${DOMAIN_PORT} 0xffff flowid ${QOS_HANDLE_TOP_GW}:${QOS_HANDLE}"
+	    echo "filter add dev ${idev} parent ${QOS_CLASS_TOP_GW} protocol ip priority $[${QOS_TWEB_FILTER_PRIO}+1] u32 ${QOS_FILTER_TCP} match ip dport ${DOMAIN_PORT} 0xffff flowid ${QOS_HANDLE_TOP_GW}:${QOS_HANDLE}"
+	fi
+    fi
+
+    if nic-exist ${odev} -a ${interface} != vpnipsec ; then
+	echo "class add dev ${odev} parent ${web_class} classid ${QOS_HANDLE_TOP_GW}:${QOS_HANDLE} htb rate ${orate}kbit ceil ${oceil}kbit ${QOS_HTB_QUANTUM}"
+	echo "qdisc add dev ${odev} parent ${QOS_HANDLE_TOP_GW}:${QOS_HANDLE} handle ${handle} ${QOS_QDISC_SFQ}"
+
+	# To catch the traffic at the upper level
+	echo "filter add dev ${odev} parent ${QOS_HANDLE_TOP_GW}: protocol ip priority ${QOS_GATEWAY_TWEB_FILTER_PRIO} handle $(printf 0x%x/${QOS_MARK_MASK} ${QOS_HANDLE} 2> /dev/null) fw flowid ${QOS_HANDLE_TOP_GW}:${QOS_HANDLE}"
+    fi
+
+    gen-qos-index tweb${title}: sfq ${interface} ${idev} ${odev} ${handle}
+}
+
+gen-tc-tweb-sub-list()
+{
+    test -n "${TRANSPARENT_IF_IP_PX_LIST}" || return 0
+
+    local elt range i=0
+    local interface ip px qos
+    local idev odev web_class if_name flow
+    local irate iceil orate oceil rate ceil
+    local handle rweb_ip title
+
+    for elt in ${TRANSPARENT_IF_IP_PX_LIST}
+    do
+	range=$[${i} % 4]
+	case ${range} in
+	    0)
+		interface=${elt}
+		;;
+	    1)
+		ip=${elt}
+		;;
+	    2)
+		px=${elt}
+		;;
+	    3)
+		qos=${elt}
+		handle="$[${QOS_HANDLE}+1000]:"
+
+		unset title
+
+		case ${interface} in
+		    internal)
+			idev=${IF_QOS_INTERNAL_INGRESS}
+			odev=${IF_QOS_INTERNAL_EGRESS}
+			web_class=${QOS_CLASS_TWEB}
+			if_name=${interface}
+			flow=web
+			;;
+		    auxiliary)
+			if test -z "${IF_AUXILIARY}" -o ${IP_AUXILIARY_IP} == 0.0.0.0 ; then
+			    ((i++))
+			    continue
+			fi
+			idev=${IF_QOS_AUXILIARY_INGRESS}
+			odev=${IF_QOS_AUXILIARY_EGRESS}
+			web_class=${QOS_CLASS_TWEB}
+			if_name=${interface}
+			flow=web
+			;;
+		    vpnipsec)
+			if test ${VPN_IPSEC_MODE} == False ; then
+			    ((i++))
+			    continue
+			fi
+			idev=${IF_QOS_EXTERNAL_INGRESS}
+			odev=${IF_QOS_EXTERNAL_EGRESS}
+			web_class=${QOS_CLASS_TWEB_VPN_IPSEC}
+			if_name=external
+			flow=vpnipsec
+			title=[sec]
+			;;
+		    *)
+			;;
+		esac
+
+		irate=$(get-qos-rate ${if_name} ingress ${flow})
+		iceil=$(get-qos-ceil ${if_name} ingress ${irate})
+		orate=$(get-qos-rate ${if_name} egress ${flow})
+		oceil=$(get-qos-ceil ${if_name} egress ${orate})
+
+		if nic-exist ${idev} ; then
+		    rate=$(get-qos-percent ${irate} ${qos})
+		    ceil=$(get-qos-ceil ${if_name} ingress ${rate})
+		    echo "class add dev ${idev} parent ${web_class} classid ${QOS_HANDLE_TOP_GW}:${QOS_HANDLE} htb rate ${rate}kbit ceil ${ceil}kbit ${QOS_HTB_QUANTUM}"
+		    echo "qdisc add dev ${idev} parent ${QOS_HANDLE_TOP_GW}:${QOS_HANDLE} handle ${handle} ${QOS_QDISC_SFQ}"
+
+		    if test ${TRANSPARENT_MODE} == True ; then
+			echo "filter add dev ${idev} parent ${QOS_CLASS_TOP_GW} protocol ip priority ${QOS_TWEB_FILTER_PRIO} u32 match ip src ${ip}/${px} match ip dport ${WWW_PORT} 0xffff flowid ${QOS_HANDLE_TOP_GW}:${QOS_HANDLE}"
+			test ${SSLMEDIATE_TRANSPARENT_MODE} == False || echo "filter add dev ${idev} parent ${QOS_CLASS_TOP_GW} protocol ip priority ${QOS_TWEB_FILTER_PRIO} u32 match ip src ${ip}/${px} match ip dport ${HTTPS_PORT} 0xffff flowid ${QOS_HANDLE_TOP_GW}:${QOS_HANDLE}"
+		    fi
+
+		    if test ${DNS_MODE} == True ; then
+			echo "filter add dev ${idev} parent ${QOS_CLASS_TOP_GW} protocol ip priority $[${QOS_TWEB_FILTER_PRIO}+1] u32 ${QOS_FILTER_UDP} match ip src ${ip}/${px} match ip dport ${DOMAIN_PORT} 0xffff flowid ${QOS_HANDLE_TOP_GW}:${QOS_HANDLE}"
+			echo "filter add dev ${idev} parent ${QOS_CLASS_TOP_GW} protocol ip priority $[${QOS_TWEB_FILTER_PRIO}+1] u32 ${QOS_FILTER_TCP} match ip src ${ip}/${px} match ip dport ${DOMAIN_PORT} 0xffff flowid ${QOS_HANDLE_TOP_GW}:${QOS_HANDLE}"
+		    fi
+		fi
+
+		if nic-exist ${odev} -a ${flow} != vpnipsec ; then
+		    rate=$(get-qos-percent ${orate} ${qos})
+		    ceil=$(get-qos-ceil ${if_name} egress ${rate})
+		    echo "class add dev ${odev} parent ${web_class} classid ${QOS_HANDLE_TOP_GW}:${QOS_HANDLE} htb rate ${rate}kbit ceil ${ceil}kbit ${QOS_HTB_QUANTUM}"
+		    echo "qdisc add dev ${odev} parent ${QOS_HANDLE_TOP_GW}:${QOS_HANDLE} handle ${handle} ${QOS_QDISC_SFQ}"
+
+		    if test ${TRANSPARENT_MODE} == True ; then
+			echo "filter add dev ${odev} parent ${QOS_CLASS_TOP_GW} protocol ip priority ${QOS_TWEB_FILTER_PRIO} handle $(printf 0x%x/${QOS_MARK_MASK} ${QOS_HANDLE} 2> /dev/null) fw flowid ${QOS_HANDLE_TOP_GW}:${QOS_HANDLE}"
+		    fi
+
+		    # To catch the traffic at the upper level
+		    echo "filter add dev ${odev} parent ${QOS_HANDLE_TOP_GW}: protocol ip priority ${QOS_GATEWAY_TWEB_FILTER_PRIO} handle $(printf 0x%x/${QOS_MARK_MASK} ${QOS_HANDLE} 2> /dev/null) fw flowid ${QOS_HANDLE_TOP_GW}:${QOS_HANDLE}"
+		fi
+
+		gen-qos-index tweb${title}:${ip}/${px} sfq ${if_name} ${idev} ${odev} ${handle}
+
+		((QOS_HANDLE++))
+		;;
+	    *)
+		return 1
+		;;
+	esac
+	((i++))
+    done
+}
+
+gen-tc-tweb-top()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    test -n "${3}" || return 3
+    test -n "${4}" || return 4
+    local interface=${1}
+    local flow=${2}
+    local idev=${3}
+    local odev=${4}
+
+    local web_class
+
+    if test ${flow} == vpnipsec ; then
+	web_class=${QOS_CLASS_TWEB_VPN_IPSEC}
+    else
+	web_class=${QOS_CLASS_TWEB}
+    fi
+    
+    local irate=$(get-qos-rate ${interface} ingress ${flow})
+    local iceil=$(get-qos-ceil ${interface} ingress ${irate})
+    local orate=$(get-qos-rate ${interface} egress ${flow})
+    local oceil=$(get-qos-ceil ${interface} egress ${orate})
+
+    ! nic-exist ${idev} || echo "class add dev ${idev} parent ${QOS_CLASS_TOP_GW} classid ${web_class} htb rate ${irate}kbit ceil ${iceil}kbit ${QOS_HTB_QUANTUM}"
+    ! nic-exist ${odev} -o ${interface} == vpnipsec || echo "class add dev ${odev} parent ${QOS_CLASS_TOP_GW} classid ${web_class} htb rate ${orate}kbit ceil ${oceil}kbit ${QOS_HTB_QUANTUM}"
+}
+
+gen-tc-tweb()
+{
+    test ${TRANSPARENT_MODE} == True -o ${DNS_MODE} == True || return 0
+
+    gen-tc-tweb-top internal tweb ${IF_QOS_INTERNAL_INGRESS} ${IF_QOS_INTERNAL_EGRESS}
+    test -z "${IF_AUXILIARY}" -o ${IP_AUXILIARY_IP} == 0.0.0.0 || gen-tc-tweb-top auxiliary tweb ${IF_QOS_AUXILIARY_INGRESS} ${IF_QOS_AUXILIARY_EGRESS}
+    test ${VPN_IPSEC_MODE} == False || gen-tc-tweb-top external vpnipsec ${IF_QOS_EXTERNAL_INGRESS} ${IF_QOS_EXTERNAL_EGRESS}
+
+    if test -n "${TRANSPARENT_IF_IP_PX_LIST}" ; then
+	gen-tc-tweb-sub-list
+	return 0
+    fi
+
+    gen-tc-tweb-sub-nil internal tweb ${IF_QOS_INTERNAL_INGRESS} ${IF_QOS_INTERNAL_EGRESS}
+    test -z "${IF_AUXILIARY}" -o ${IP_AUXILIARY_IP} == 0.0.0.0 || gen-tc-tweb-sub-nil auxiliary tweb ${IF_QOS_AUXILIARY_INGRESS} ${IF_QOS_AUXILIARY_EGRESS}
+
+    if test ${VPN_IPSEC_MODE} == True ; then
+	((QOS_HANDLE++))
+	gen-tc-tweb-sub-nil external vpnipsec ${IF_QOS_EXTERNAL_INGRESS} ${IF_QOS_EXTERNAL_EGRESS}
+    fi
+
+    ((QOS_HANDLE++))
+}
+
+gen-tc-av()
+{
+    test ${AV_MODE} == True || return 0
+    test -n "${ACCESS_IF_IP_PX_AV_LIST}" || return 0
+
+    local i=0 elt range
+    local flow if_name av_class title
+    local ip px qos
+    local irate iceil orate oceil rate ceil handle
+    local interface if_name idev odev
+    local interfaces="internal external"
+    test -z "${IF_AUXILIARY}" -o ${IP_AUXILIARY_IP} == 0.0.0.0 || interfaces="${interfaces} auxiliary"
+    test ${VPN_IPSEC_MODE} == False || interfaces="${interfaces} vpnipsec"
+	
+    for interface in ${interfaces}
+    do
+	case ${interface} in
+	    internal)
+		test ${AV_INTERNAL} == True || continue
+		idev=${IF_QOS_INTERNAL_INGRESS}
+		odev=${IF_QOS_INTERNAL_EGRESS}
+		av_class=${QOS_CLASS_AV}
+		if_name=${interface}
+		flow=antivirus
+		;;
+	    external)
+		test ${AV_EXTERNAL} ==  True || continue
+		idev=${IF_QOS_EXTERNAL_INGRESS}
+		odev=${IF_QOS_EXTERNAL_EGRESS}
+		av_class=${QOS_CLASS_AV}
+		if_name=${interface}
+		flow=antivirus
+		;;
+	    auxiliary)
+		test ${AV_AUXILIARY} ==  True || continue
+		idev=${IF_QOS_AUXILIARY_INGRESS}
+		odev=${IF_QOS_AUXILIARY_EGRESS}
+		av_class=${QOS_CLASS_AV}
+		if_name=${interface}
+		flow=antivirus
+		;;
+	    vpnipsec)
+		test ${AV_VPN_IPSEC} ==  True || continue
+		idev=${IF_QOS_AUXILIARY_INGRESS}
+		odev=${IF_QOS_AUXILIARY_EGRESS}
+		av_class=${QOS_CLASS_AV_VPN_IPSEC}
+		if_name=external
+		flow=vpnipsec
+		;;
+	    *)
+		;;
+	esac
+
+	if nic-exist ${idev} ; then
+	    irate=$(get-qos-rate ${if_name} ingress ${flow})
+	    iceil=$(get-qos-ceil ${if_name} ingress ${irate})
+
+	    echo "class add dev ${idev} parent ${QOS_CLASS_TOP_GW} classid ${av_class} htb rate ${irate}kbit ceil ${iceil}kbit ${QOS_HTB_QUANTUM}"
+	fi
+
+	if nic-exist ${odev} -a ${flow} != vpnipsec ; then
+	    orate=$(get-qos-rate ${if_name} egress ${flow})
+	    oceil=$(get-qos-ceil ${if_name} egress ${orate})
+
+	    echo "class add dev ${odev} parent ${QOS_CLASS_TOP_GW} classid ${av_class} htb rate ${orate}kbit ceil ${oceil}kbit ${QOS_HTB_QUANTUM}"
+	fi
+    done
+
+    for elt in ${ACCESS_IF_IP_PX_AV_LIST}
+    do
+	range=$[${i} % 4]
+	case ${range} in
+	    0)
+		interface=${elt}
+		;;
+	    1)
+		ip=${elt}
+		;;
+	    2)
+		px=${elt}
+		;;
+	    3)
+		qos=${elt}
+
+		unset title
+
+		case ${interface} in
+		    internal)
+			idev=${IF_QOS_INTERNAL_INGRESS}
+			odev=${IF_QOS_INTERNAL_EGRESS}
+			av_class=${QOS_CLASS_AV}
+			if_name=${interface}
+			;;
+		    external)
+			idev=${IF_QOS_EXTERNAL_INGRESS}
+			odev=${IF_QOS_EXTERNAL_EGRESS}
+			av_class=${QOS_CLASS_AV}
+			if_name=${interface}
+			;;
+		    auxiliary)
+			idev=${IF_QOS_AUXILIARY_INGRESS}
+			odev=${IF_QOS_AUXILIARY_EGRESS}
+			av_class=${QOS_CLASS_AV}
+			if_name=${interface}
+			;;
+		    vpnipsec)
+			idev=${IF_QOS_EXTERNAL_INGRESS}
+			odev=${IF_QOS_EXTERNAL_EGRESS}
+			av_class=${QOS_CLASS_AV_VPN_IPSEC}
+			if_name=external
+			title=[sec]
+			;;
+		    *)
+			;;
+		esac
+
+		handle="$[${QOS_HANDLE}+1000]:"
+
+		if nic-exist ${idev} ; then
+		    rate=$(get-qos-percent ${irate} ${qos})
+		    ceil=$(get-qos-ceil ${if_name} ingress ${rate})
+		    echo "class add dev ${idev} parent ${av_class} classid ${QOS_HANDLE_TOP_GW}:${QOS_HANDLE} htb rate ${rate}kbit ceil ${ceil}kbit ${QOS_HTB_QUANTUM}"
+		    echo "qdisc add dev ${idev} parent ${QOS_HANDLE_TOP_GW}:${QOS_HANDLE} handle ${handle} ${QOS_QDISC_SFQ}"
+
+		    echo "filter add dev ${idev} parent ${QOS_CLASS_TOP_GW} protocol ip priority ${QOS_AV_FILTER_PRIO} u32 match ip src ${ip}/${px} match ip dport ${AV_PORT} 0xffff flowid ${QOS_HANDLE_TOP_GW}:${QOS_HANDLE}"
+		    echo "filter add dev ${idev} parent ${QOS_CLASS_TOP_GW} protocol ip priority ${QOS_AV_FILTER_PRIO} u32 match ip src ${ip}/${px} match ip dport ${AV_STREAM_MIN_PORT} 0xf000 flowid ${QOS_HANDLE_TOP_GW}:${QOS_HANDLE}"
+
+		fi
+
+		if nic-exist ${odev} -a ${interface} != vpnipsec ; then
+		    rate=$(get-qos-percent ${orate} ${qos})
+		    ceil=$(get-qos-ceil ${if_name} egress ${rate})
+		    echo "class add dev ${odev} parent ${av_class} classid ${QOS_HANDLE_TOP_GW}:${QOS_HANDLE} htb rate ${rate}kbit ceil ${ceil}kbit ${QOS_HTB_QUANTUM}"
+		    echo "qdisc add dev ${odev} parent ${QOS_HANDLE_TOP_GW}:${QOS_HANDLE} handle ${handle} ${QOS_QDISC_SFQ}"
+
+		    echo "filter add dev ${odev} parent ${QOS_CLASS_TOP_GW} protocol ip priority ${QOS_AV_FILTER_PRIO} handle $(printf 0x%x/${QOS_MARK_MASK} ${QOS_HANDLE} 2> /dev/null) fw flowid ${QOS_HANDLE_TOP_GW}:${QOS_HANDLE}"
+		fi
+
+		gen-qos-index antivirus${title}:${ip}/${px} sfq ${if_name} ${idev} ${odev} ${handle}
+
+		((QOS_HANDLE++))
+		;;
+	    *)
+		return 1
+		;;
+	esac
+	((i++))
+    done
+}
+
+gen-tc-vpnipsec()
+{
+    test ${VPN_IPSEC_MODE} == True || return 0
+
+    local idev=$(get-qos-dev external ingress)
+    local odev=$(get-qos-dev external egress)
+
+    local irate=$(get-qos-rate external ingress vpnipsec)
+    local iceil=$(get-qos-ceil external ingress ${irate})
+    local orate=$(get-qos-rate external egress vpnipsec)
+    local oceil=$(get-qos-ceil external egress ${orate})
+    local handle="$[1000 + ${QOS_HANDLE_IPSEC}]:"
+
+    if nic-exist ${idev} ; then
+	echo "class add dev ${idev} parent ${QOS_HANDLE_TOP_GW} classid ${QOS_CLASS_IPSEC} htb rate ${irate}kbit ceil ${iceil}kbit ${QOS_HTB_QUANTUM}"
+	echo "qdisc add dev ${idev} parent ${QOS_CLASS_IPSEC} handle ${handle}: pfifo"
+	
+	# For ESP traffic
+	echo "filter add dev ${idev} parent ${QOS_CLASS_TOP_GW} protocol ip priority ${QOS_ESP_FILTER_PRIO} u32 ${QOS_FILTER_ESP} flowid ${QOS_CLASS_IPSEC}"
+
+	# For IKE traffic
+	echo "filter add dev ${idev} parent ${QOS_CLASS_TOP_GW} protocol ip priority ${QOS_IKE_FILTER_PRIO} u32 ${QOS_FILTER_UDP} match ip dport ${ISAKMP_PORT} 0xffff flowid ${QOS_CLASS_IPSEC}"
+	echo "filter add dev ${idev} parent ${QOS_CLASS_TOP_GW} protocol ip priority ${QOS_IKE_FILTER_PRIO} u32 ${QOS_FILTER_UDP} match ip dport ${NATT_PORT} 0xffff flowid ${QOS_CLASS_IPSEC}"
+    fi
+
+    if nic-exist ${odev} ; then
+	echo "class add dev ${odev} parent ${QOS_HANDLE_TOP_GW} classid ${QOS_CLASS_IPSEC} htb rate ${orate}kbit ceil ${oceil}kbit ${QOS_HTB_QUANTUM}"
+	echo "qdisc add dev ${odev} parent ${QOS_CLASS_IPSEC} handle ${handle}: pfifo"
+
+	echo "filter add dev ${odev} parent ${QOS_CLASS_TOP_GW} protocol ip priority ${QOS_ESP_FILTER_PRIO} handle $(printf 0x%x/${QOS_MARK_MASK} ${QOS_ESP_MARK} 2> /dev/null) fw flowid ${QOS_CLASS_IPSEC}"
+
+	echo "filter add dev ${odev} parent ${QOS_CLASS_TOP_GW} protocol ip priority ${QOS_IKE_FILTER_PRIO} u32 ${QOS_FILTER_UDP} match ip sport ${ISAKMP_PORT} 0xffff flowid ${QOS_CLASS_IPSEC}"
+	echo "filter add dev ${odev} parent ${QOS_CLASS_TOP_GW} protocol ip priority ${QOS_IKE_FILTER_PRIO} u32 ${QOS_FILTER_UDP} match ip sport ${NATT_PORT} 0xffff flowid ${QOS_CLASS_IPSEC}"
+
+    fi
+
+    gen-qos-index vpnipsec: htb external ${idev} ${odev} ${handle}
+}
+
+gen-tc-external-rweb-top()
+{
+    test ${RWEB_MODE} == True || return 0
+
+    local irate=$(get-qos-rate external ingress rweb)
+    local iceil=$(get-qos-ceil external ingress ${irate})
+    local orate=$(get-qos-rate external egress rweb)
+    local oceil=$(get-qos-ceil external egress ${orate})
+
+    ! nic-exist ${IF_QOS_EXTERNAL_INGRESS} || echo "class add dev ${IF_QOS_EXTERNAL_INGRESS} parent ${QOS_CLASS_TOP_GW} classid ${QOS_CLASS_RWEB_EXT} htb rate ${irate}kbit ceil ${iceil}kbit ${QOS_HTB_QUANTUM}"
+    ! nic-exist ${IF_QOS_EXTERNAL_EGRESS} || echo "class add dev ${IF_QOS_EXTERNAL_EGRESS} parent ${QOS_CLASS_TOP_GW} classid ${QOS_CLASS_RWEB_EXT} htb rate ${orate}kbit ceil ${oceil}kbit ${QOS_HTB_QUANTUM}"
+}
+
+gen-tc-external-rweb()
+{
+    test ${RWEB_MODE} == True || return 0
+
+    local elt range i=0
+    local ip_protocol qos
+    local ip protocol
+
+    local irate=$(get-qos-rate external ingress rweb)
+    local orate=$(get-qos-rate external egress rweb)
+
+    local handle
+
+    gen-qos-index rweb: htb external ${IF_QOS_EXTERNAL_INGRESS} ${IF_QOS_EXTERNAL_EGRESS} ${QOS_CLASS_RWEB_EXT}
+
+    for elt in ${RWEB_QOS_LIST}
+    do
+	range=$[${i} % 2]
+	case ${range} in
+	    0)
+		ip_protocol=${elt}
+		ip=${ip_protocol/:*}
+		protocol=${ip_protocol/*:}
+		;;
+	    1)
+		qos=${elt}
+		handle="$[${QOS_HANDLE}+1000]:"
+
+		if nic-exist ${IF_QOS_EXTERNAL_INGRESS} ; then
+		    rate=$(get-qos-percent ${irate} ${qos})
+		    ceil=$(get-qos-ceil external ingress ${rate})
+		    echo "class add dev ${IF_QOS_EXTERNAL_INGRESS} parent ${QOS_CLASS_RWEB_EXT} classid ${QOS_HANDLE_TOP_GW}:${QOS_HANDLE} htb rate ${rate}kbit ceil ${ceil}kbit ${QOS_HTB_QUANTUM}"
+		    echo "qdisc add dev ${IF_QOS_EXTERNAL_INGRESS} parent ${QOS_HANDLE_TOP_GW}:${QOS_HANDLE} handle ${handle} ${QOS_QDISC_SFQ}"
+
+		    case ${protocol} in
+			http)
+			    echo "filter add dev ${IF_QOS_EXTERNAL_INGRESS} parent ${QOS_CLASS_TOP_GW} protocol ip priority ${QOS_RWEB_FILTER_PRIO} u32 match ip dst ${ip}/32 match ip dport ${WWW_PORT} 0xffff flowid ${QOS_HANDLE_TOP_GW}:${QOS_HANDLE}"
+			    ;;
+			https)
+			    echo "filter add dev ${IF_QOS_EXTERNAL_INGRESS} parent ${QOS_CLASS_TOP_GW} protocol ip priority ${QOS_RWEB_FILTER_PRIO} u32 match ip dst ${ip}/32 match ip dport ${HTTPS_PORT} 0xffff flowid ${QOS_HANDLE_TOP_GW}:${QOS_HANDLE}"
+			    ;;
+			*)
+			    ;;
+		    esac
+		fi
+
+		if nic-exist ${IF_QOS_EXTERNAL_EGRESS} ; then
+		    rate=$(get-qos-percent ${orate} ${qos})
+		    ceil=$(get-qos-ceil external egress ${rate})
+		    echo "class add dev ${IF_QOS_EXTERNAL_EGRESS} parent ${QOS_CLASS_RWEB_EXT} classid ${QOS_HANDLE_TOP_GW}:${QOS_HANDLE} htb rate ${rate}kbit ceil ${ceil}kbit ${QOS_HTB_QUANTUM}"
+		    echo "qdisc add dev ${IF_QOS_EXTERNAL_EGRESS} parent ${QOS_HANDLE_TOP_GW}:${QOS_HANDLE} handle ${handle} ${QOS_QDISC_SFQ}"
+
+		    echo "filter add dev ${IF_QOS_EXTERNAL_EGRESS} parent ${QOS_CLASS_TOP_GW} protocol ip priority ${QOS_RWEB_FILTER_PRIO} handle $(printf 0x%x/${QOS_MARK_MASK} ${QOS_HANDLE} 2> /dev/null) fw flowid ${QOS_HANDLE_TOP_GW}:${QOS_HANDLE}"
+		fi
+
+		case ${protocol} in
+		    http)
+			gen-qos-index rweb:${ip}/32 sfq external ${IF_QOS_EXTERNAL_INGRESS} ${IF_QOS_EXTERNAL_EGRESS} ${handle}
+			;;
+		    https)
+			gen-qos-index rwebs:${ip}/32 sfq external ${IF_QOS_EXTERNAL_INGRESS} ${IF_QOS_EXTERNAL_EGRESS} ${handle}
+			;;
+		    *)
+			;;
+		esac
+
+		((QOS_HANDLE++))
+		;;
+	    *)
+		return 1
+		;;
+	esac
+	((i++))
+    done
+}
+
+gen-tc-external-web()
+{
+    test ${WEB_MODE} == True -o ${AV_MODE} == True || return 0
+
+    local irate=$(get-qos-rate external ingress web)
+    local iceil=$(get-qos-ceil external ingress ${irate})
+    local orate=$(get-qos-rate external egress web)
+    local oceil=$(get-qos-ceil external egress ${orate})
+    local handle="$[${QOS_HANDLE_WEB_EXT}+1000]:"
+
+    if nic-exist ${IF_QOS_EXTERNAL_INGRESS} ; then
+	echo "class add dev ${IF_QOS_EXTERNAL_INGRESS} parent ${QOS_CLASS_TOP_GW} classid ${QOS_CLASS_WEB_EXT} htb rate ${irate}kbit ceil ${iceil}kbit ${QOS_HTB_QUANTUM}"
+	echo "qdisc add dev ${IF_QOS_EXTERNAL_INGRESS} parent ${QOS_CLASS_WEB_EXT} handle ${handle} ${QOS_QDISC_SFQ}"
+
+	echo "filter add dev ${IF_QOS_EXTERNAL_INGRESS} parent ${QOS_CLASS_TOP_GW} protocol ip priority ${QOS_WEB_FILTER_PRIO} u32 ${QOS_FILTER_TCP} match ip sport ${WWW_PORT} 0xffff flowid ${QOS_CLASS_WEB_EXT}"
+	echo "filter add dev ${IF_QOS_EXTERNAL_INGRESS} parent ${QOS_CLASS_TOP_GW} protocol ip priority ${QOS_WEB_FILTER_PRIO} u32 ${QOS_FILTER_TCP} match ip sport ${HTTPS_PORT} 0xffff flowid ${QOS_CLASS_WEB_EXT}"
+	echo "filter add dev ${IF_QOS_EXTERNAL_INGRESS} parent ${QOS_CLASS_TOP_GW} protocol ip priority ${QOS_WEB_FILTER_PRIO} u32 ${QOS_FILTER_TCP} match ip sport ${DOMAIN_PORT} 0xffff flowid ${QOS_CLASS_WEB_EXT}"
+	echo "filter add dev ${IF_QOS_EXTERNAL_INGRESS} parent ${QOS_CLASS_TOP_GW} protocol ip priority ${QOS_WEB_FILTER_PRIO} u32 ${QOS_FILTER_UDP} match ip sport ${DOMAIN_PORT} 0xffff flowid ${QOS_CLASS_WEB_EXT}"
+    fi
+
+    if nic-exist ${IF_QOS_EXTERNAL_EGRESS} ; then
+	echo "class add dev ${IF_QOS_EXTERNAL_EGRESS} parent ${QOS_CLASS_TOP_GW} classid ${QOS_CLASS_WEB_EXT} htb rate ${orate}kbit ceil ${oceil}kbit ${QOS_HTB_QUANTUM}"
+	echo "qdisc add dev ${IF_QOS_EXTERNAL_EGRESS} parent ${QOS_CLASS_WEB_EXT} handle ${handle} ${QOS_QDISC_SFQ}"
+
+	echo "filter add dev ${IF_QOS_EXTERNAL_EGRESS} parent ${QOS_CLASS_TOP_GW} protocol ip priority ${QOS_WEB_FILTER_PRIO} u32 ${QOS_FILTER_TCP} match ip dport ${WWW_PORT} 0xffff flowid ${QOS_CLASS_WEB_EXT}"
+	echo "filter add dev ${IF_QOS_EXTERNAL_EGRESS} parent ${QOS_CLASS_TOP_GW} protocol ip priority ${QOS_WEB_FILTER_PRIO} u32 ${QOS_FILTER_TCP} match ip dport ${HTTPS_PORT} 0xffff flowid ${QOS_CLASS_WEB_EXT}"
+	echo "filter add dev ${IF_QOS_EXTERNAL_EGRESS} parent ${QOS_CLASS_TOP_GW} protocol ip priority ${QOS_WEB_FILTER_PRIO} u32 ${QOS_FILTER_TCP} match ip dport ${DOMAIN_PORT} 0xffff flowid ${QOS_CLASS_WEB_EXT}"
+	echo "filter add dev ${IF_QOS_EXTERNAL_EGRESS} parent ${QOS_CLASS_TOP_GW} protocol ip priority ${QOS_WEB_FILTER_PRIO} u32 ${QOS_FILTER_UDP} match ip dport ${DOMAIN_PORT} 0xffff flowid ${QOS_CLASS_WEB_EXT}"
+    fi
+
+    gen-qos-index web[pub]: sfq external ${IF_QOS_EXTERNAL_INGRESS} ${IF_QOS_EXTERNAL_EGRESS} ${handle}
+}
+
+gen-tc-qos-file-top()
+{
+    local interface interfaces="internal external"
+    test -z "${IF_AUXILIARY}" -o ${IP_AUXILIARY_IP} == 0.0.0.0 || interfaces="${interfaces} auxiliary"
+    test ${VPN_IPSEC_MODE} == False || interfaces="${interfaces} vpnipsec"
+
+    local flow file_class file_handle if_name title
+
+    for interface in ${interfaces}
+    do
+	case ${interface} in
+	    internal)
+		file_class=${QOS_CLASS_FILE}
+		file_handle=${QOS_HANDLE_FILE}
+		if_name=${interface}
+		flow=file
+		unset title
+		;;
+	    external)
+		file_class=${QOS_CLASS_FILE}
+		file_handle=${QOS_HANDLE_FILE}
+		if_name=${interface}
+		flow=file
+		unset title
+		;;
+	    auxiliary)
+		file_class=${QOS_CLASS_FILE}
+		file_handle=${QOS_HANDLE_FILE}
+		if_name=${interface}
+		flow=file
+		unset title
+		;;
+	    vpnipsec)
+		file_class=${QOS_CLASS_FILE_VPN_IPSEC}
+		file_handle=${QOS_HANDLE_FILE_VPN_IPSEC}
+		if_name=external
+		flow=vpnipsec
+		title=[sec]
+		;;
+	    *)
+		;;
+	esac
+
+    
+	local idev=$(get-qos-dev ${interface} ingress)
+	local odev=$(get-qos-dev ${interface} egress)
+	local irate=$(get-qos-rate ${interface} ingress ${flow})
+	local iceil=$(get-qos-ceil ${interface} ingress ${irate})
+	local orate=$(get-qos-rate ${interface} egress ${flow})
+	local oceil=$(get-qos-ceil ${interface} egress ${orate})
+	local handle="$[1000 + ${file_handle}]:"
+
+	if nic-exist ${idev} ; then
+	    echo "class add dev ${idev} parent ${QOS_CLASS_TOP_GW} classid ${file_class} htb rate ${irate}kbit ceil ${iceil}kbit ${QOS_HTB_QUANTUM}"
+	    echo "qdisc add dev ${idev} parent ${file_class} handle ${handle} pfifo"
+	fi
+
+	if nic-exist ${odev} -a ${interface} != vpnipsec ; then
+	    echo "class add dev ${odev} parent ${QOS_CLASS_TOP_GW} classid ${file_class} htb rate ${orate}kbit ceil ${oceil}kbit ${QOS_HTB_QUANTUM}"
+	    echo "qdisc add dev ${odev} parent ${file_class} handle ${handle} pfifo"
+	fi
+
+	gen-qos-index file${title}: pfifo ${if_name} ${idev} ${odev} ${handle}
+    done
+}
+
+gen-tc-qos-file-filter()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 0
+    local resolution_type=${1}
+    local access_file_if_ip_list=${2}
+
+    local interfaces interface
+    local if_ip ip idev odev qos_mark file_flow
+
+    case ${resolution_type} in
+	ip)
+	    interfaces=${ACCESS_FILE_USED_IF_LIST}
+	    ;;
+	nr)
+	    ;;
+	*)
+	    ;;
+    esac
+
+    for if_ip in ${access_file_if_ip_list}
+    do
+	interface=${if_ip/:*}
+	ip=${if_ip#*:}
+
+	case ${interface} in
+	    internal)
+		file_flow=${QOS_CLASS_FILE}
+		;;
+	    external)
+		file_flow=${QOS_CLASS_FILE}
+		;;
+	    auxiliary)
+		file_flow=${QOS_CLASS_FILE}
+		;;
+	    vpnipsec)
+		file_flow=${QOS_CLASS_FILE_VPN_IPSEC}
+		;;
+	    *)
+		continue
+		;;
+	esac
+
+	test ${resolution_type} == ip || member "${ACCESS_FILE_USED_IF_LIST}" ${interface} || interfaces="${interfaces} ${interface}"
+	idev=$(get-qos-dev ${interface} ingress)
+
+	! nic-exist ${idev} || echo "filter add dev ${idev} parent ${QOS_CLASS_TOP_GW} protocol ip priority ${QOS_FILE_FILTER_PRIO} u32 match ip src ${ip}/32 flowid ${file_flow}"
+    done
+
+    for interface in ${interfaces}
+    do
+	case ${interface} in
+	    internal)
+		file_flow=${QOS_CLASS_FILE}
+		qos_mark=${QOS_FILE_MARK}
+		;;
+	    external)
+		file_flow=${QOS_CLASS_FILE}
+		qos_mark=${QOS_FILE_MARK}
+		;;
+	    auxiliary)
+		file_flow=${QOS_CLASS_FILE}
+		qos_mark=${QOS_FILE_MARK}
+		;;
+	    vpnipsec)
+		continue
+		;;
+	    *)
+		continue
+		;;
+	esac
+
+	odev=$(get-qos-dev ${interface} egress)
+	! nic-exist ${odev} || echo "filter add dev ${odev} parent ${QOS_CLASS_TOP_GW} protocol ip priority ${QOS_FILE_FILTER_PRIO} handle ${qos_mark}/${QOS_MARK_MASK} fw flowid ${file_flow}"
+    done
+}
+
+gen-tc-qos-file-filter-ip()
+{
+    gen-tc-qos-file-filter ip "${ACCESS_FILE_IF_IP_LIST}"
+}
+
+gen-tc-qos-file-filter-nr()
+{
+    gen-tc-qos-file-filter nr "${ACCESS_FILE_IF_NR_LIST}"
+}
+
+gen-tc-qos-gateway()
+{
+    test -n "${1}" || return 1
+    local interface=${1}
+
+    gen-tc-qos-to-gateway ${interface}
+    gen-tc-qos-etc ${interface}
+
+    case ${interface} in
+	internal)
+	    gen-tc-backend-rweb
+	    gen-tc-internal-peer
+	    ;;
+	external)
+	    gen-tc-external-rweb
+	    gen-tc-external-web
+	    ;;
+	*)
+	    return 11
+	    ;;
+    esac
+}
+
+gen-tc-ingress-admin()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    local dev=${1}
+    local apl_ip=${2}
+
+    test ${ADMIN_SSH} == False || echo "filter add dev ${dev} parent ${QOS_HANDLE_ROOT}: protocol ip priority ${QOS_ADMIN_FILTER_PRIO} u32 ${QOS_FILTER_TCP} match ip dst ${apl_ip}/32 match ip dport ${SSH_PORT} 0xffff flowid ${QOS_PARENT_ADMIN}"
+    test ${ADMIN_WADMIN} == False || echo "filter add dev ${dev} parent ${QOS_HANDLE_ROOT}: protocol ip priority ${QOS_ADMIN_FILTER_PRIO} u32 ${QOS_FILTER_TCP} match ip dst ${apl_ip}/32 match ip dport ${WADMIN_PORT} 0xffff flowid ${QOS_PARENT_ADMIN}"
+    test ${ADMIN_WAUDIT} == False || echo "filter add dev ${dev} parent ${QOS_HANDLE_ROOT}: protocol ip priority ${QOS_ADMIN_FILTER_PRIO} u32 ${QOS_FILTER_TCP} match ip dst ${apl_ip}/32 match ip dport ${WAUDIT_PORT} 0xffff flowid ${QOS_PARENT_ADMIN}"
+}
+
+gen-tc-ingress-snmp-trap()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 0
+
+    local dev=${1}
+    local ip_ports=${2}
+
+    local ip port
+    
+    for ip_port in ${ip_ports}
+    do
+	ip=${ip_port/:*/}
+	port=${ip_port/*:/}
+	echo "filter add dev ${dev} parent ${QOS_HANDLE_ROOT}: protocol ip priority ${QOS_ADMIN_SNMP_TRAP_FILTER_PRIO} u32 ${QOS_FILTER_TCP} match ip src ${ip}/32 match ip sport ${port} 0xffff flowid ${QOS_PARENT_ADMIN}"
+    done
+}
+
+gen-tc-ingress-snmp-trap-ip()
+{
+    test ${ADMIN_SNMP} == True || return 0
+
+    test -n "${1}" || return 1
+    local dev=${1}
+
+    gen-tc-ingress-snmp-trap ${dev} "${SNMP_TRAP_SERVER_IP_LIST}"
+}
+
+gen-tc-ingress-snmp-trap-nr()
+{
+    test -n "${1}" || return 1
+    local dev=${1}
+
+    ! nic-exist ${dev} || gen-tc-ingress-snmp-trap ${dev} "${SNMP_TRAP_SERVER_IP_LIST}"
+}
+
+gen-tc-ingress-syslog()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 0
+
+    local dev=${1}
+    local syslog_server_ip_list=${2}
+
+    local elt range i=0
+    local protocol ip port
+    local filter
+
+    for elt in ${syslog_server_ip_list}
+    do
+	range=$[${i} % 3]
+	case ${range} in
+	    0)
+		protocol=${elt}
+		;;
+	    1)
+		ip=${elt}
+		;;
+	    2)
+		port=${elt}
+
+		case ${protocol} in
+		    udp)
+			filter=${QOS_FILTER_UDP}
+			;;
+		    tcp)
+			filter=${QOS_FILTER_TCP}
+			;;
+		    *)
+			;;
+		esac
+	    
+		echo "filter add dev ${dev} parent ${QOS_HANDLE_ROOT}: protocol ip priority ${QOS_ADMIN_SYSLOG_FILTER_PRIO} u32 ${filter} match ip src ${ip}/32 match ip sport ${port} 0xffff flowid ${QOS_PARENT_ADMIN}"
+
+		;;
+	    *)
+		return 255
+		;;
+	esac
+	((i++))
+    done
+}
+
+gen-tc-ingress-syslog-ip()
+{
+    test ${REMOTE_SYSLOG_MODE} == True || return 0
+
+    test -n "${1}" || return 1
+    local dev=${1}
+
+    ! nic-exist ${dev} || gen-tc-ingress-syslog ${dev} "${SYSLOG_SERVER_IP_LIST}"
+}
+
+gen-tc-ingress-syslog-nr()
+{
+    test -n "${1}" || return 1
+    local dev=${1}
+
+    ! nic-exist ${dev} || gen-tc-ingress-syslog ${dev} "${SYSLOG_SERVER_NR_LIST}"
+}
+
+gen-tc-ingress-snmp-agent()
+{
+    test ${ADMIN_SNMP} == True || return 0
+
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    local dev=${1}
+    local apl_ip=${2}
+
+    test ${SNMP_UDP} == False || echo "filter add dev ${dev} parent ${QOS_HANDLE_ROOT}: protocol ip priority ${QOS_ADMIN_SNMP_FILTER_PRIO} u32 ${QOS_FILTER_UDP} match ip dst ${apl_ip}/32 match ip dport ${SNMP_PORT} 0xffff flowid ${QOS_PARENT_ADMIN}"
+    test ${SNMP_TCP} == False || echo "filter add dev ${dev} parent ${QOS_HANDLE_ROOT}: protocol ip priority ${QOS_ADMIN_SNMP_FILTER_PRIO} u32 ${QOS_FILTER_TCP} match ip dst ${apl_ip}/32 match ip dport ${SNMP_PORT} 0xffff flowid ${QOS_PARENT_ADMIN}"
+    test ${SNMP_TLS} == False || echo "filter add dev ${dev} parent ${QOS_HANDLE_ROOT}: protocol ip priority ${QOS_ADMIN_SNMP_FILTER_PRIO} u32 ${QOS_FILTER_TCP} match ip dst ${apl_ip}/32 match ip dport ${SNMP_TLS_PORT} 0xffff flowid ${QOS_PARENT_ADMIN}"
+}
+
+gen-tc-ingress-non-admin-dev()
+{
+    test -n "${1}" || return 1
+    local dev=${1}
+
+    echo "filter add dev ${dev} parent ${QOS_HANDLE_ROOT}: protocol arp priority ${QOS_ARP_FILTER_PRIO} u32 ${QOS_FILTER_ALL} flowid ${QOS_PARENT_GW}"
+    echo "filter add dev ${dev} parent ${QOS_HANDLE_ROOT}: protocol ip priority ${QOS_NON_ADMIN_FILTER_PRIO} u32 ${QOS_FILTER_ALL} flowid ${QOS_PARENT_GW}"
+}
+
+gen-tc-all-top()
+{
+    local interface interfaces="internal"
+    test ${APL_ROLE} == 'manager' || interfaces="${interfaces} external"
+    test -z "${IF_AUXILIARY}" -o ${IP_AUXILIARY_IP} == 0.0.0.0 || interfaces="${interfaces} auxiliary"
+
+    local idev odev admin_ip mon_ip
+
+    for interface in ${interfaces}
+    do
+	case ${interface} in
+
+	    internal)
+		idev=${IF_QOS_INTERNAL_INGRESS}
+		odev=${IF_QOS_INTERNAL_EGRESS}
+		admin_ip=${IP_ADMIN_IP}
+		mon_ip=${IP_MON_IP}
+		;;
+
+	    external)
+		idev=${IF_QOS_EXTERNAL_INGRESS}
+		odev=${IF_QOS_EXTERNAL_EGRESS}
+		admin_ip=${IP_EXTERNAL_IP}
+		mon_ip=${admin_ip}
+		;;
+
+	    auxiliary)
+		idev=${IF_QOS_AUXILIARY_INGRESS}
+		odev=${IF_QOS_AUXILIARY_EGRESS}
+		admin_ip=${IP_AUXILIARY_IP}
+		mon_ip=${admin_ip}
+		;;
+	    *)
+		return 11
+		;;
+	esac
+
+	if nic-exist ${idev} ; then
+	    echo "qdisc add dev ${idev} parent ${QOS_PARENT_ADMIN} handle ${QOS_HANDLE_TOP_ADMIN}: pfifo"
+
+	    gen-tc-ingress-admin ${idev} ${admin_ip}
+	    gen-tc-ingress-snmp-trap-ip ${idev}
+	    gen-tc-ingress-syslog-ip ${idev}
+	    gen-tc-ingress-snmp-agent ${idev} ${mon_ip}
+	    gen-tc-ingress-non-admin-dev ${idev}
+
+	fi
+
+	if nic-exist ${odev} -a ${interface} != vpnipsec ; then
+	    echo "qdisc add dev ${odev} parent ${QOS_PARENT_ADMIN} handle ${QOS_HANDLE_TOP_ADMIN}: pfifo"
+	    echo "filter add dev ${odev} parent ${QOS_HANDLE_ROOT}: protocol arp priority ${QOS_ARP_FILTER_PRIO} u32 ${QOS_FILTER_ALL} flowid ${QOS_PARENT_GW}"
+	    echo "filter add dev ${odev} parent ${QOS_HANDLE_ROOT}: protocol ip priority ${QOS_ADMIN_FILTER_PRIO} handle ${QOS_ADMIN_MARK}/${QOS_MARK_MASK} fw flowid ${QOS_PARENT_ADMIN}"
+	    echo "filter add dev ${odev} parent ${QOS_HANDLE_ROOT}: protocol ip priority ${QOS_NON_ADMIN_FILTER_PRIO} u32 ${QOS_FILTER_ALL} flowid ${QOS_PARENT_GW}"
+	fi
+
+	gen-qos-index admin: pfifo ${interface} ${idev} ${odev} ${QOS_HANDLE_TOP_ADMIN}:
+
+    done
+}
+
+gen-tc-qos-gateway-top()
+{
+    test -n "${1}" || return 1
+    local interface=${1}
+
+    local idev=$(get-qos-dev ${interface} ingress)
+    local odev=$(get-qos-dev ${interface} egress)
+    local ibw=$(get-qos-bw ${interface} ingress)
+    local obw=$(get-qos-bw ${interface} egress)
+
+    if nic-exist ${idev} ; then
+	echo "qdisc add dev ${idev} parent ${QOS_PARENT_GW} handle ${QOS_HANDLE_TOP_GW}: htb default ${QOS_HANDLE_DEFAULT}"
+	echo "class add dev ${idev} parent ${QOS_HANDLE_TOP_GW}: classid ${QOS_CLASS_TOP_GW} htb rate ${ibw}kbit ${QOS_HTB_QUANTUM}"
+    fi
+
+    if nic-exist ${odev} ; then
+	echo "qdisc add dev ${odev} parent ${QOS_PARENT_GW} handle ${QOS_HANDLE_TOP_GW}: htb default ${QOS_HANDLE_DEFAULT}"
+	echo "class add dev ${odev} parent ${QOS_HANDLE_TOP_GW}: classid ${QOS_CLASS_TOP_GW} htb rate ${obw}kbit ${QOS_HTB_QUANTUM}"
+    fi
+
+    gen-qos-index gateway: htb ${interface} ${idev} ${odev} ${QOS_HANDLE_TOP_GW}:
+}
+
+gen-tc-qos-nr()
+{
+    local interface interfaces="internal"
+    test ${APL_ROLE} == 'manager' || interfaces="${interfaces} external"
+    test -z "${IF_AUXILIARY}" -o ${IP_AUXILIARY_IP} == 0.0.0.0 || interfaces="${interfaces} auxiliary"
+    test ${VPN_IPSEC_MODE} == False || interfaces="${interfaces} vpnipsec"
+
+    for interface in ${interfaces}
+    do
+	case ${interface} in
+	    internal)
+		idev=${IF_QOS_INTERNAL_INGRESS}
+		;;
+	    external)
+		idev=${IF_QOS_EXTERNAL_INGRESS}
+		;;
+	    auxiliary)
+		idev=${IF_QOS_AUXILIARY_INGRESS}
+		;;
+	    vpnipsec)
+		idev=${IF_QOS_EXTERNAL_INGRESS}
+
+		;;
+	    *)
+		return 11
+		;;
+	esac
+
+	test ${ADMIN_SNMP} == False || gen-tc-ingress-snmp-trap-nr ${idev}
+	test ${REMOTE_SYSLOG_MODE} == False || gen-tc-ingress-syslog-nr ${idev}
+
+	test ${QOS_MODE} == False || gen-tc-qos-etc-auth-nr ${interface}
+    done
+
+    test ${QOS_MODE} == False || gen-tc-qos-file-filter-nr
+}
+
+gen-tc-ingress()
+{
+    local interface interfaces="internal"
+    test ${APL_ROLE} == 'manager' || interfaces="${interfaces} external"
+    test -z "${IF_AUXILIARY}" -o ${IP_AUXILIARY_IP} == 0.0.0.0 || interfaces="${interfaces} auxiliary"
+
+    local dev if_qos
+
+    for interface in ${interfaces}
+    do
+	case ${interface} in
+	    internal)
+		dev=${IF_INTERNAL}
+		if_qos=${IF_QOS_INTERNAL_INGRESS}
+		;;
+	    external)
+		dev=${IF_EXTERNAL}
+		if_qos=${IF_QOS_EXTERNAL_INGRESS}
+		;;
+	    auxiliary)
+		dev=${IF_AUXILIARY}
+		if_qos=${IF_QOS_AUXILIARY_INGRESS}
+		;;
+	    *)
+		return 11
+		;;
+	esac
+
+	nic-exist ${dev} || continue
+
+	case ${interface} in
+	    external|auxiliary)
+		echo "qdisc add dev ${dev} ingress handle ffff:"
+		echo "filter add dev ${dev} parent ffff: protocol arp priority 10 u32 ${QOS_FILTER_ALL} flowid ${QOS_HANDLE_ROOT}: action mirred egress redirect dev ${if_qos}"
+		echo "filter add dev ${dev} parent ffff: protocol ip priority 11 u32 ${QOS_FILTER_ALL} flowid ${QOS_HANDLE_ROOT}: action mirred egress redirect dev ${if_qos}"
+		;;
+	    internal)
+		if test ${VLAN_MODE} == False ; then	
+		    echo "qdisc add dev ${dev} ingress handle ffff:"
+		    echo "filter add dev ${dev} parent ffff: protocol arp priority 10 u32 ${QOS_FILTER_ALL} flowid ${QOS_HANDLE_ROOT}: action mirred egress redirect dev ${if_qos}"
+		    echo "filter add dev ${dev} parent ffff: protocol ip priority 11 u32 ${QOS_FILTER_ALL} flowid ${QOS_HANDLE_ROOT}: action mirred egress redirect dev ${if_qos}"
+		elif test ${interface} == internal ; then
+
+		    local i=0 elt range
+		    local vlan
+    
+		    for elt in ${VLAN_FLOW_LIST}
+		    do
+			range=$[${i} % 2]
+			case ${range} in
+			    0)
+				vlan=${elt}
+				;;
+			    1)
+				echo "qdisc add dev ${dev}.${vlan} ingress handle ffff:"
+				echo "filter add dev ${dev}.${vlan} parent ffff: protocol arp priority 10 u32 ${QOS_FILTER_ALL} flowid ${QOS_HANDLE_ROOT}: action mirred egress redirect dev ${if_qos}"
+				echo "filter add dev ${dev}.${vlan} parent ffff: protocol ip priority 11 u32 ${QOS_FILTER_ALL} flowid ${QOS_HANDLE_ROOT}: action mirred egress redirect dev ${if_qos}"
+
+				echo "qdisc add dev ${dev}.${vlan} root handle ${QOS_HANDLE_ROOT}: htb default 0"
+				echo "filter add dev ${dev}.${vlan} parent ${QOS_HANDLE_ROOT}: protocol arp priority 10 u32 ${QOS_FILTER_ALL} flowid ${QOS_HANDLE_ROOT}: action mirred egress redirect dev ${IF_QOS_INTERNAL_EGRESS}"
+				echo "filter add dev ${dev}.${vlan} parent ${QOS_HANDLE_ROOT}: protocol ip priority 11 u32 ${QOS_FILTER_ALL} flowid ${QOS_HANDLE_ROOT}: action mirred egress redirect dev ${IF_QOS_INTERNAL_EGRESS}"
+				;;
+			    *)
+				return 1
+				;;
+			esac
+			((i++))
+		    done
+		fi
+		;;
+	    *)
+		;;
+	esac
+    done
+}
+
+gen-tc-prio-top()
+{
+    local interface interfaces="internal"
+    test ${APL_ROLE} == 'manager' || interfaces="${interfaces} external"
+    test -z "${IF_AUXILIARY}" -o ${IP_AUXILIARY_IP} == 0.0.0.0 || interfaces="${interfaces} auxiliary"
+
+    local idev odev
+
+    for interface in ${interfaces}
+    do
+	case ${interface} in
+	    internal)
+		idev=${IF_QOS_INTERNAL_INGRESS}
+		odev=${IF_QOS_INTERNAL_EGRESS}
+		;;
+	    external)
+		idev=${IF_QOS_EXTERNAL_INGRESS}
+		odev=${IF_QOS_EXTERNAL_EGRESS}
+		;;
+	    auxiliary)
+		idev=${IF_QOS_AUXILIARY_INGRESS}
+		odev=${IF_QOS_AUXILIARY_EGRESS}
+		;;
+	    *)
+		return 11
+		;;
+	esac
+
+	! nic-exist ${idev} || echo "qdisc add dev ${idev} root handle ${QOS_HANDLE_ROOT}: prio bands 2 priomap 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1"
+	! nic-exist ${odev} || echo "qdisc add dev ${odev} root handle ${QOS_HANDLE_ROOT}: prio bands 2 priomap 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1"
+
+	gen-qos-index all: prio ${interface} ${idev} ${odev} ${QOS_HANDLE_ROOT}:
+    done
+}
+
+gen-tc-no-warning()
+{
+    if test ${VLAN_MODE} == False ; then
+	echo "qdisc add dev ifb${IFB_INTERNAL_EGRESS} root handle 1: pfifo"
+    fi
+
+    if test -z "${IF_AUXILIARY}" -o ${IP_AUXILIARY_IP} == 0.0.0.0 ; then
+       echo "qdisc add dev ifb${IFB_AUXILIARY_INGRESS} root handle 1: pfifo"
+    fi
+}
+
+gen-tc-without-qos()
+{
+    test ${QOS_MODE} == False || return 0
+
+    local interface interfaces="internal"
+    test ${APL_ROLE} == 'manager' || interfaces="${interfaces} external"
+    test -z "${IF_AUXILIARY}" -o ${IP_AUXILIARY_IP} == 0.0.0.0 || interfaces="${interfaces} auxiliary"
+
+    local idev odev
+
+    for interface in ${interfaces}
+    do
+	idev=$(get-qos-dev ${interface} ingress)
+	odev=$(get-qos-dev ${interface} egress)
+
+	! nic-exist ${idev} || echo "qdisc add dev ${idev} parent ${QOS_PARENT_GW} handle ${QOS_HANDLE_TOP_GW}: prio bands 3 priomap 1 2 2 2 1 2 0 0 1 1 1 1 1 1 1 1"
+	! nic-exist ${odev} || echo "qdisc add dev ${odev} parent ${QOS_PARENT_GW} handle ${QOS_HANDLE_TOP_GW}: prio bands 3 priomap 1 2 2 2 1 2 0 0 1 1 1 1 1 1 1 1"
+
+	gen-qos-index nonadmin: prio ${interface} ${idev} ${odev} ${QOS_HANDLE_TOP_GW}:
+    done
+}
+
+gen-tc-with-qos()
+{
+    test ${QOS_MODE} == True || return 0
+
+    local interface interfaces="internal external"
+    test -z "${IF_AUXILIARY}" -o ${IP_AUXILIARY_IP} == 0.0.0.0 || interfaces="${interfaces} auxiliary"
+
+    ########################################################################################################
+    # Mangled traffic should be treated in the same order as in apl_fw:gen-iptables-mangle-qos-non-admin() #
+    ########################################################################################################
+
+    QOS_HANDLE=${QOS_HANDLE_INIT}
+
+    for interface in ${interfaces}
+    do
+	gen-tc-qos-gateway-top ${interface}
+    done
+
+    gen-tc-external-rweb-top
+
+    for interface in ${interfaces}
+    do
+	gen-tc-qos-gateway-default ${interface}
+	gen-tc-qos-gateway ${interface}
+
+	# Debug only: to test if all packets go to a known queue drop all default traffic
+	# gen-tc-drop ${interface}
+    done
+
+    gen-tc-vpnipsec
+    gen-tc-av
+    gen-tc-web
+    gen-tc-tweb
+    gen-tc-qos-file-top
+    gen-tc-qos-file-filter-ip
+    gen-tc-qos-router
+}
+
+################################################################################
+
+gen-tc()
+{
+    gen-tc-ingress
+    gen-tc-prio-top
+    gen-tc-all-top
+    gen-tc-no-warning
+    gen-tc-with-qos
+    gen-tc-without-qos
+}
+
+gen-tc-resolved()
+{
+    cat sysconfig.tc
+    gen-tc-qos-nr
+}
+
+LIB_APL_QOS=Yes

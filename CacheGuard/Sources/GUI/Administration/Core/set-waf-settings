@@ -1,0 +1,68 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       GUI
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+set-waf-settings()
+{
+    local errors=off
+    local imethods=off
+    local transaction=/tmp/${TRANSACTION_FILE}.wadmin.${REMOTE_USER}.${$}
+    rm -f ${transaction}
+
+    echo "waf level ${VALUES[0]}" >> ${transaction}
+    echo "waf score request ${VALUES[1]}" >> ${transaction}
+    echo "waf score response ${VALUES[2]}" >> ${transaction}
+    echo "waf reputation rbl set '${VALUES[3]}'" >> ${transaction}
+
+    for ((i=4 ; i<${ATTRIBUTE_NB} ; i++))
+    do
+	mode=${ATTRIBUTES[${i}]}
+	local ${mode}=on
+    done
+
+    case ${errors} in
+	on)
+	    echo waf errors deny >> ${transaction}
+	    ;;
+	off)
+	    echo waf errors allow >> ${transaction}
+	    ;;
+	*)
+	    ;;
+    esac
+
+    case ${imethods} in
+	on)
+	    echo waf imethods allow >> ${transaction}
+	    ;;
+	off)
+	    echo waf imethods deny >> ${transaction}
+	    ;;
+	*)
+	    ;;
+    esac
+
+    execute-transaction ${transaction}
+}
+
+set-waf-settings

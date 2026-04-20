@@ -1,0 +1,39 @@
+log-facility daemon;
+authorative;
+ddns-update-style none;
+
+min-lease-time 600;
+default-lease-time 43200;
+max-lease-time 86400;
+
+allow bootp;
+allow duplicates;
+deny declines;
+always-broadcast off;
+always-reply-rfc1048 off;
+get-lease-hostnames off;
+one-lease-per-client off;
+ping-check on;
+ping-timeout 1;
+stash-agent-options on;
+vendor-option-space appliance;
+
+option all-subnets-local off;
+option default-ip-ttl 64;
+option default-tcp-ttl 64;
+option dhcp-max-message-size 2048;
+option ieee802-3-encapsulation off;
+option ip-forwarding off;
+option mask-supplier off;
+option non-local-source-routing off;
+option path-mtu-aging-timeout 6000;
+option path-mtu-plateau-table 1492, 2002, 4352, 8166, 17914, 32000;
+option perform-mask-discovery off;
+option router-discovery off;
+option tcp-keepalive-garbage off;
+option tcp-keepalive-interval 0;
+option trailer-encapsulation off;
+
+option space appliance;
+option appliance.editor code 7 = text;
+option local-pac-server code 252 = text;

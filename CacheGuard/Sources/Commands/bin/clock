@@ -1,0 +1,97 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       Commands
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+source functions
+
+check-clock()
+{
+    test -n "${1}" || return 1
+    
+    local len=${#1}
+    local match_len=$(expr match \
+		"${1}" \
+		"[0-9][0-9][0-9][0-9]/[0-1][0-9]/[0-3][0-9]-[0-2][0-9]:[0-5][0-9]:[0-5][0-9]" 2> /dev/null)
+    if test ${len} -ne ${match_len} ; then return 1 ; fi
+    
+    local month=${1:5:2}
+    local day=${1:8:2}
+    local hour=${1:11:2}
+    local minute=${1:14:2}
+    local second=${1:17:2}
+
+    if test ${month} -lt 1 -o ${month} -gt 12 ; then return 1 ; fi
+    if test ${day} -lt 1 -o ${day} -gt 31 ; then return 1 ; fi
+    if test ${hour} -lt 0 -o ${hour} -gt 23 ; then return 1 ; fi
+    if test ${minute} -lt 0 -o ${minute} -gt 59 ; then return 1 ; fi
+    if test ${second} -lt 0 -o ${second} -gt 59 ; then return 1 ; fi
+    
+    return 0
+}
+
+show-clock() {
+    echo
+    clock=$(date +"%Y/%m/%d-%T" 2> /dev/null)
+    echo-command-form "clock"
+    echo-value "${clock}"
+    echo
+}
+
+is-clock-modification-allowed()
+{
+    local message
+
+    message=$(get-usage-message)
+    test ${?} -eq 0
+}
+
+run()
+{
+    if test -z "${ARGS[1]}" ; then show-clock ; return 0 ; fi
+
+    is-clock-modification-allowed || return 57
+
+    local da=${ARGS[1]}
+
+    check-clock ${da} || return 15
+    user-has-admin-rights || return 31
+
+    local year=${da:0:4}    
+    local month=${da:5:2}
+    local day=${da:8:2}
+    local hour=${da:11:2}
+    local minute=${da:14:2}
+    local second=${da:17:2}
+
+    local date="${month}${day}${hour}${minute}${year}.${second}"
+
+    local date1=$(date +"%s" 2> /dev/null)
+    date ${date} > /dev/null 2>&1 || return 98
+    local date2=$(date +"%s" 2> /dev/null)
+    vdate=$(cat ${HARD_DIR}/${VARIATION_DATE})
+    echo -n $[${vdate} + ${date2} - ${date1}] > ${HARD_DIR}/${VARIATION_DATE}
+    touch ${TMP_DIR}/${CLOCK_2SAVE}
+    NEWENV=1
+}
+
+main "${@}"

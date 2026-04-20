@@ -1,0 +1,3752 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       Commands
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+source functions
+
+factory-reset()
+{
+    factory-env || return 104
+    factory-configuration-db || return 104
+
+    urllist-auto-reset-current
+    db-waf-rule-raz-all
+    raz-tls-client
+
+    ! is-in-manager-conf-context || return 0
+
+    echo -n > ${USERENV_DIR}/${GUI_DASHBOARD_LAYOUT_FILENAME}
+}
+
+show-conf()
+{
+    local transaction_file=${ADMIN_TMP_DIR}/${USER}.transaction.conf.${$}
+    local apl_role=$(get-contextual-role)
+
+    echo hostname			 > ${transaction_file}
+    echo domainname			>> ${transaction_file}
+    echo timezone			>> ${transaction_file}
+
+    if contextual-command-is-allowed ; then
+	echo email			>> ${transaction_file}
+    fi
+
+    echo tls server			>> ${transaction_file}
+    echo tls server days		>> ${transaction_file}
+
+    if contextual-command-is-allowed ; then
+	echo tls ca third		>> ${transaction_file}
+	echo tls client			>> ${transaction_file}
+	echo tls client days		>> ${transaction_file}
+	echo tls ocsp			>> ${transaction_file}
+	echo admin tls			>> ${transaction_file}
+    fi
+
+    echo admin				>> ${transaction_file}
+    echo admin ssh password		>> ${transaction_file}
+    echo admin ssh key			>> ${transaction_file}
+    echo admin snmp community:show	>> ${transaction_file}
+    echo admin snmp privacy:show	>> ${transaction_file}
+    echo admin snmp user		>> ${transaction_file}
+    echo admin snmp tls			>> ${transaction_file}
+    echo admin snmp udp			>> ${transaction_file}
+    echo admin snmp tcp			>> ${transaction_file}
+    echo admin snmp trap		>> ${transaction_file}
+
+    if contextual-command-is-allowed ; then
+	echo admin topology		>> ${transaction_file}
+    fi
+
+    echo admin user			>> ${transaction_file}
+    echo link bond			>> ${transaction_file}
+
+    if contextual-command-is-allowed ; then
+	echo vlan			>> ${transaction_file}
+    fi
+
+    echo ip				>> ${transaction_file}
+    echo ip route			>> ${transaction_file}
+    echo ip via				>> ${transaction_file}
+    echo ip name			>> ${transaction_file}
+
+    if contextual-command-is-allowed ; then
+	echo vpnipsec authenticate		>> ${transaction_file}
+	echo vpnipsec access			>> ${transaction_file}
+	echo vpnipsec access authenticate	>> ${transaction_file}
+	echo vpnipsec access access		>> ${transaction_file}
+	echo vpnipsec site   			>> ${transaction_file}
+	echo vpnipsec network			>> ${transaction_file}
+	echo vpnipsec via			>> ${transaction_file}
+	echo vpnipsec to			>> ${transaction_file}
+	echo vpnipsec nat			>> ${transaction_file}
+	echo vrrp     				>> ${transaction_file}
+    fi
+
+    echo port				>> ${transaction_file}
+
+    if contextual-command-is-allowed ; then
+	echo dhcp			>> ${transaction_file}
+    fi
+
+    echo dns				>> ${transaction_file}
+    echo dynamicdns			>> ${transaction_file}
+    echo dynamicdns interval		>> ${transaction_file}
+    echo ntp				>> ${transaction_file}
+
+    if contextual-command-is-allowed ; then
+	echo peer			>> ${transaction_file}
+	echo transparent		>> ${transaction_file}
+    fi
+
+    echo access				>> ${transaction_file}
+
+    if contextual-command-is-allowed ; then
+	echo qos bandwidth		>> ${transaction_file}
+	echo qos shape			>> ${transaction_file}
+	echo qos borrow			>> ${transaction_file}
+    fi
+
+    echo mode				>> ${transaction_file}
+
+    if contextual-command-is-allowed ; then
+	echo log type 			>> ${transaction_file}
+	echo log syslog ca		>> ${transaction_file}
+	echo log syslog 		>> ${transaction_file}
+	echo rweb site			>> ${transaction_file}
+	echo rweb rhttp			>> ${transaction_file}
+	echo rweb host			>> ${transaction_file}
+	echo rweb balancer		>> ${transaction_file}
+	echo rweb via			>> ${transaction_file}
+	echo rweb standby		>> ${transaction_file}
+	echo cache object		>> ${transaction_file}
+	echo cache bigobject		>> ${transaction_file}
+    fi
+
+    echo urllist			>> ${transaction_file}
+    echo urllist auto			>> ${transaction_file}
+
+    if contextual-command-is-allowed ; then
+	echo guard filter		>> ${transaction_file}
+	echo guard policy		>> ${transaction_file}
+	echo guard rule			>> ${transaction_file}
+	echo guard ip			>> ${transaction_file}
+	echo firewall dos		>> ${transaction_file}
+	echo firewall			>> ${transaction_file}
+	echo waf			>> ${transaction_file}
+	echo antivirus			>> ${transaction_file}
+	echo antivirus whitelist domainname	>> ${transaction_file}
+	echo sslmediate			>> ${transaction_file}
+	echo sslmediate transparent	>> ${transaction_file}
+	echo sslmediate policy		>> ${transaction_file}
+	echo sslmediate exception	>> ${transaction_file}
+	echo authenticate		>> ${transaction_file}
+	echo authenticate ldap 		>> ${transaction_file}
+	echo authenticate ldaps ca 	>> ${transaction_file}
+	echo authenticate kerberos 	>> ${transaction_file}
+	echo authenticate ad 		>> ${transaction_file}
+    fi
+
+    if contextual-command-is-allowed ; then
+	echo embedded 		       >> ${transaction_file}
+    fi
+
+    if test ${apl_role} == manager ; then
+	echo antivirus extended		>> ${transaction_file}
+	echo manager template 		>> ${transaction_file}
+	echo manager gateway 		>> ${transaction_file}
+	echo manager sync 		>> ${transaction_file}
+    fi
+
+    echo password file 	   		>> ${transaction_file}
+
+    transaction close
+    test ! -s ${transaction_file} || transaction open < ${transaction_file}
+    transaction commit
+
+    rm -f ${transaction_file}
+}
+
+echo-conf-file-modified()
+{
+    local files
+
+    test ! -f ${TMP_DIR}/${LOADED}.os.tar.compressed || echo-mark-message "New OS patch file has been loaded."
+    test ! -f ${TMP_DIR}/${LOADED}.backup || echo-mark-message "New backup file has been loaded."
+
+    files=$(ls -1 ${TMP_DIR}/${LOADED}.${URLLIST}.*.*.{domains,urls,expressions}.gz 2>/dev/null)
+    test -z "${files}" || echo-mark-message "URL list contents have been loaded."
+
+    ! waf-rules-modified || echo-mark-message "Some custom WAF rules have been loaded or cleared."
+
+    files=$(ls -1 ${TMP_DIR}/${LOADED}.${SYSTEM_CA}.{key,certificate} 2>/dev/null)
+    test -z "${files}" || echo-mark-message "New system CA certificate and/or private key have been loaded."
+
+    files=$(ls -1 ${TMP_DIR}/${LOADED}.${TLS_SERVER}.{key,certificate,csr}.* 2>/dev/null)
+    test -z "${files}" || echo-mark-message "New SSL server certificates, keys or CSR have been loaded."
+
+    files=$(ls -1 ${TMP_DIR}/${LOADED}.${TLS_CLIENT}.certificate.* 2>/dev/null)
+    test -z "${files}" || echo-mark-message "New SSL client certificates have been loaded."
+
+    files=$(ls -1 ${TMP_DIR}/${LOADED}.${THIRD_CA}.* 2>/dev/null)
+    test -z "${files}" || echo-mark-message "New third party CA certificates have been loaded."
+
+    test ! -f ${TMP_DIR}/${LOADED}.${AV_WHITELIST_SIG} || echo-mark-message "New antivirus white list has been loaded."
+
+    files=$(ls -1 ${TMP_DIR}/${LOADED}.${SSH_KEY}.* 2>/dev/null)
+    test -z "${files}" || echo-mark-message "New public SSH keys have been loaded."
+
+    files=$(ls -1 ${TMP_DIR}/${LOADED}.manager.${SSH_KEY}.{private,public} 2>/dev/null)
+    test -z "${files}" || echo-mark-message "New manager SSH public and/or private keys have been loaded."
+
+    if test -f ${TMP_DIR}/${LOADED}.${SNMP_SSL}.certificate ; then
+	echo-mark-message "New SNMP client SSL certificate has been loaded."
+    else
+	if test ${SNMP_CLIENT_CERTIFICATE} != ${CURRENT_SNMP_CLIENT_CERTIFICATE} -a ${SNMP_CLIENT_CERTIFICATE} == False ; then
+	    echo-mark-message "New SNMP client SSL certificate is to be deleted."
+	fi
+    fi
+
+    test ! -f ${TMP_DIR}/${SYSTEM_CA}.conf || echo-mark-message "New system CA certificate is to be generated."
+
+    files=$(ls -1 ${TMP_DIR}/${TLS_SERVER}.*.conf 2>/dev/null)
+    test -z "${files}" || echo-mark-message "New SSL server certificates are to be generated."
+
+    files=$(ls -1 ${TMP_DIR}/${TLS_SERVER}.*.{2sign,2rev} 2>/dev/null)
+    test -z "${files}" || echo-mark-message "SSL certificates have been marked to be signed or revoked."
+
+    files=$(ls -1 ${SSL_CLIENT_DIR}/*.{new,2del} 2>/dev/null)
+    test -z "${files}" || echo-mark-message "New SSL client certificates are to be generated or deleted."
+
+    files=$(ls -1 ${TMP_DIR}/${TLS_CLIENT}.*.2rev 2>/dev/null)
+    test -z "${files}" || echo-mark-message "SSL client certificates are to be revoked."
+
+    test ! -f ${TMP_DIR}/${SSH_MANAGER_ARM_NEW} || echo-mark-message "New manager SSH Keys are to be generated."
+
+    test ! -f ${TMP_DIR}/${AV_WHITELIST_SIG}.2del || echo-mark-message "The antivirus white list is to deleted."
+
+    files=$(ls -1 ${TMP_DIR}/${URLLIST_CLEAR}.*.{domains,urls,expressions} 2>/dev/null)
+    test -z "${files}" || echo-mark-message "Some URL list contents have been cleared."
+
+    if test -f ${TMP_DIR}/${REGISTER_EMAIL} -o \
+	    -f ${TMP_DIR}/${REGISTER_OTP} ; then
+	echo-mark-message "The appliance is programmed to get its S/N."
+    fi
+    test ! -f ${TMP_DIR}/${REGISTER_KEY} || echo-mark-message "An OS license key is programmed to be registered."
+    test ! -f ${TMP_DIR}/${UNREGISTER_SN} || echo-mark-message "The appliance is programmed to be deregistered."
+    test ! -f ${TMP_DIR}/${EMBEDDED_VPNSUBSCR_REGISTER_KEY} || echo-mark-message "The ${EMBEDDED_VPNSUBSCR_COMMERCIAL_NAME} application license key is programmed to be registered."
+}
+
+show-diff()
+{
+    local transaction_file=${ADMIN_TMP_DIR}/${USER}.transaction.conf.diff.${$}
+    local files tmp_file=${ADMIN_TMP_DIR}/conf-file-modified.${$}
+
+    rm -f ${tmp_file}
+
+    echo-conf-file-modified >> ${tmp_file}
+
+    ! conf-not-resolved || echo-mark-message "Names have not been resolved to IP addresses." >> ${tmp_file} 
+    ! clock-modified || echo-mark-message "The clock has been modified and programmed to be saved." >> ${tmp_file}
+    ! name-resolution-to-ip-armed || echo-mark-message "IP address to name resolution has been armed." >> ${tmp_file}
+    ! ssh-host-key-generation-armed || echo-mark-message "New SSH server keys are to be generated." >> ${tmp_file}
+
+    if test -s ${tmp_file} ; then
+	echo-begin-show
+	cat ${tmp_file}
+	echo-end-show
+    fi
+    rm -f ${tmp_file}
+
+    test "${TIMEZONE}" == "${CURRENT_TIMEZONE}" || echo timezone > ${transaction_file}
+    test "${SHOSTNAME}" == "${CURRENT_SHOSTNAME}" || echo hostname >> ${transaction_file}
+    test "${DOMAIN_NAME}" == "${CURRENT_DOMAIN_NAME}" || echo domainname >> ${transaction_file}
+
+    test "${ANONYMOUS_FTP_EMAIL}" == "${CURRENT_ANONYMOUS_FTP_EMAIL}" || echo email ftp >> ${transaction_file}
+
+    test "${ADMINISTRATOR_EMAIL}" == "${CURRENT_ADMINISTRATOR_EMAIL}" -a \
+	 "${ADMINISTRATOR_NAME}" == "${CURRENT_ADMINISTRATOR_NAME}" || echo email admin >> ${transaction_file}
+
+    test "${EMAIL_ACCOUNT_SERVER_FQDN}" == "${CURRENT_EMAIL_ACCOUNT_SERVER_FQDN}" -a \
+	 "${EMAIL_ACCOUNT_SERVER_PORT}" == "${CURRENT_EMAIL_ACCOUNT_SERVER_PORT}" -a \
+	 "${EMAIL_ACCOUNT_USERNAME}" == "${CURRENT_EMAIL_ACCOUNT_USERNAME}" -a \
+	 "${EMAIL_ACCOUNT_PASSWORD}" == "${CURRENT_EMAIL_ACCOUNT_PASSWORD}" || echo email account >> ${transaction_file}
+    
+    test "${TLS_SERVER_LIST}" == "${CURRENT_TLS_SERVER_LIST}" || echo tls server >> ${transaction_file}
+    test "${TLS_SERVER_DAYS}" == "${CURRENT_TLS_SERVER_DAYS}" || echo tls server days >> ${transaction_file}
+    test "${TLS_CA_LIST}" == "${CURRENT_TLS_CA_LIST}" || echo tls ca third >> ${transaction_file}
+
+    ! tls-client-modified || echo tls client >> ${transaction_file}
+
+    test "${TLS_CLIENT_DAYS}" == "${CURRENT_TLS_CLIENT_DAYS}" || echo tls client days >> ${transaction_file}
+    test "${OCSP_HOST}" == "${CURRENT_OCSP_HOST}" || echo tls ocsp host >> ${transaction_file}
+    test "${OCSP_DAYS}" == "${CURRENT_OCSP_DAYS}" || echo tls ocsp days >> ${transaction_file}
+    test "${OCSP_TLS}" == "${CURRENT_OCSP_TLS}" || echo tls ocsp tls >> ${transaction_file}
+
+    test "${ADMIN_TLS}" == "${CURRENT_ADMIN_TLS}" || echo admin tls >> ${transaction_file}
+    test "${ADMIN_SSH}" == "${CURRENT_ADMIN_SSH}" || echo admin ssh >> ${transaction_file}
+    test "${ADMIN_SSH_PASSWORD}" == "${CURRENT_ADMIN_SSH_PASSWORD}" || echo admin ssh password >> ${transaction_file}
+    test "${ADMIN_SNMP}" == "${CURRENT_ADMIN_SNMP}" || echo admin snmp mode >> ${transaction_file}
+    test "${ADMIN_WADMIN}" == "${CURRENT_ADMIN_WADMIN}" || echo admin wadmin >> ${transaction_file}
+
+    local cur_2fa=$(get-admin-2fa ${USER} cur)
+    local new_2fa=$(get-admin-2fa ${USER} new)
+    test ${cur_2fa} == ${new_2fa} || echo admin 2fa >> ${transaction_file}
+
+    test "${ADMIN_WAUDIT}" == "${CURRENT_ADMIN_WAUDIT}" || echo admin waudit >> ${transaction_file}
+
+    test "${SSH_KEY_LIST}" == "${CURRENT_SSH_KEY_LIST}" || echo admin ssh key >> ${transaction_file}
+
+    test "${SNMP_COMMUNITY}" == "${CURRENT_SNMP_COMMUNITY}" || echo admin snmp community:show >> ${transaction_file}
+    test "${SNMP_PRIVACY}" == "${CURRENT_SNMP_PRIVACY}" || echo admin snmp privacy:show >> ${transaction_file}
+    test "${SNMP_USER}" == "${CURRENT_SNMP_USER}" || echo admin snmp user >> ${transaction_file}
+    test "${SNMP_TLS}" == "${CURRENT_SNMP_TLS}" || echo admin snmp tls >> ${transaction_file}
+    test "${SNMP_UDP}" == "${CURRENT_SNMP_UDP}" || echo admin snmp udp >> ${transaction_file}
+    test "${SNMP_TCP}" == "${CURRENT_SNMP_TCP}" || echo admin snmp tcp >> ${transaction_file}
+    test "${SNMP_TRAP_SERVER_LIST}" == "${CURRENT_SNMP_TRAP_SERVER_LIST}" || echo admin snmp trap >> ${transaction_file}
+
+    test "${ADMIN_INTERNAL}" == "${CURRENT_ADMIN_INTERNAL}" || echo admin topology internal >> ${transaction_file}
+    test "${ADMIN_EXTERNAL}" == "${CURRENT_ADMIN_EXTERNAL}" || echo admin topology external >> ${transaction_file}
+    test "${ADMIN_AUXILIARY}" == "${CURRENT_ADMIN_AUXILIARY}" || echo admin topology auxiliary >> ${transaction_file}
+    test "${ADMIN_VPN_IPSEC}" == "${CURRENT_ADMIN_VPN_IPSEC}" || echo admin topology vpnipsec >> ${transaction_file}
+
+    test "${ADMIN_USER_LIST}" == "${CURRENT_ADMIN_USER_LIST}" || echo admin user >> ${transaction_file}
+
+    test "${DHCP_MODE}" == "${CURRENT_DHCP_MODE}" || echo mode dhcp >> ${transaction_file}
+    test "${DNS_MODE}" == "${CURRENT_DNS_MODE}" || echo mode dns >> ${transaction_file}
+    test "${FIREWALL_MODE}" == "${CURRENT_FIREWALL_MODE}" || echo mode firewall >> ${transaction_file}
+    test "${FTP_PASSIVE_MODE}" == "${CURRENT_FTP_PASSIVE_MODE}" || echo mode ftppassive >> ${transaction_file}    
+    test "${HA_MODE}" == "${CURRENT_HA_MODE}" || echo mode ha >> ${transaction_file}
+    test "${QOS_MODE}" == "${CURRENT_QOS_MODE}" || echo mode qos >> ${transaction_file}
+    test "${ROUTER_MODE}" == "${CURRENT_ROUTER_MODE}" || echo mode router >> ${transaction_file}
+    test "${SNAT_MODE}" == "${CURRENT_SNAT_MODE}" || echo mode snat >> ${transaction_file}
+    test "${TNAT_MODE}" == "${CURRENT_TNAT_MODE}" || echo mode tnat >> ${transaction_file}
+    test "${TRANSPARENT_MODE}" == "${CURRENT_TRANSPARENT_MODE}" || echo mode tweb >> ${transaction_file}
+    test "${VLAN_MODE}" == "${CURRENT_VLAN_MODE}" || echo mode vlan >> ${transaction_file}
+
+    test "${ANONYMOUS_MODE}" == "${CURRENT_ANONYMOUS_MODE}" || echo mode anonymous >> ${transaction_file}
+    test "${AV_MODE}" == "${CURRENT_AV_MODE}" || echo mode antivirus >> ${transaction_file}
+    test "${AUTHENTICATE_MODE}" == "${CURRENT_AUTHENTICATE_MODE}" || echo mode authenticate >> ${transaction_file}
+    test "${CACHE_MODE}" == "${CURRENT_CACHE_MODE}" || echo mode cache >> ${transaction_file}
+    test "${COMPRESS_MODE}" == "${CURRENT_COMPRESS_MODE}" || echo mode compress >> ${transaction_file}
+    test "${GUARD_MODE}" == "${CURRENT_GUARD_MODE}" || echo mode guard >> ${transaction_file}
+    test "${LOG_MODE}" == "${CURRENT_LOG_MODE}" || echo mode log >> ${transaction_file}    
+    test "${OCSP_MODE}" == "${CURRENT_OCSP_MODE}" || echo mode ocsp >> ${transaction_file}
+    test "${RWEB_MODE}" == "${CURRENT_RWEB_MODE}" || echo mode rweb >> ${transaction_file}
+    test "${SSLMEDIATE_MODE}" == "${CURRENT_SSLMEDIATE_MODE}" || echo mode sslmediate >> ${transaction_file}
+    test "${VPN_IPSEC_MODE}" == "${CURRENT_VPN_IPSEC_MODE}" || echo mode vpnipsec >> ${transaction_file}
+    test "${WAF_MODE}" == "${CURRENT_WAF_MODE}" || echo mode waf >> ${transaction_file}
+    test "${WEB_MODE}" == "${CURRENT_WEB_MODE}" || echo mode web >> ${transaction_file}
+
+    test "${LOG_TYPE_WEB}" == "${CURRENT_LOG_TYPE_WEB}" || echo log type web >> ${transaction_file}
+    test "${LOG_TYPE_RWEB}" == "${CURRENT_LOG_TYPE_RWEB}" || echo log type rweb >> ${transaction_file}
+    test "${LOG_TYPE_GUARD}" == "${CURRENT_LOG_TYPE_GUARD}" || echo log type guard >> ${transaction_file}
+    test "${LOG_TYPE_ANTIVIRUS}" == "${CURRENT_LOG_TYPE_ANTIVIRUS}" || echo log type antivirus >> ${transaction_file}
+    test "${LOG_TYPE_ANTIVIRUS_SERVER}" == "${CURRENT_LOG_TYPE_ANTIVIRUS_SERVER}" || echo log type avserver >> ${transaction_file}
+    test "${LOG_TYPE_WAF}" == "${CURRENT_LOG_TYPE_WAF}" || echo log type waf >> ${transaction_file}
+    test "${LOG_TYPE_FIREWALL}" == "${CURRENT_LOG_TYPE_FIREWALL}" || echo log type firewall >> ${transaction_file}
+    test "${SYSLOG_CA}" == "${CURRENT_SYSLOG_CA}" || echo log syslog ca >> ${transaction_file}
+    test "${SYSLOG_SERVER_LIST}" == "${CURRENT_SYSLOG_SERVER_LIST}" || echo log syslog >> ${transaction_file}
+
+    test "${BOND_EXTERNALS}" == "${CURRENT_BOND_EXTERNALS}" || echo link bond external >> ${transaction_file}
+    test "${BOND_INTERNALS}" == "${CURRENT_BOND_INTERNALS}" || echo link bond internal >> ${transaction_file}
+    test "${BOND_AUXILIARIES}" == "${CURRENT_BOND_AUXILIARIES}" || echo link bond auxiliary >> ${transaction_file}
+    test "${VLAN_FLOW_LIST}" == "${CURRENT_VLAN_FLOW_LIST}" || echo vlan >> ${transaction_file}
+    test "${IP_INTERNAL_IP}" == "${CURRENT_IP_INTERNAL_IP}" -a "${IP_INTERNAL_MASK}" == "${CURRENT_IP_INTERNAL_MASK}" || echo ip internal >> ${transaction_file}
+    test "${IP_EXTERNAL_IP}" == "${CURRENT_IP_EXTERNAL_IP}" -a "${IP_EXTERNAL_MASK}" == "${CURRENT_IP_EXTERNAL_MASK}" || echo ip external >> ${transaction_file}
+    test "${IP_AUXILIARY_IP}" == "${CURRENT_IP_AUXILIARY_IP}" -a "${IP_AUXILIARY_MASK}" == "${CURRENT_IP_AUXILIARY_MASK}" || echo ip auxiliary >> ${transaction_file}
+    test "${IP_VLAN_LIST}" == "${CURRENT_IP_VLAN_LIST}" || echo ip vlan >> ${transaction_file}
+    test "${VRRP_INTERNAL_LIST}" == "${CURRENT_VRRP_INTERNAL_LIST}" || echo vrrp internal >> ${transaction_file}
+    test "${VRRP_EXTERNAL_LIST}" == "${CURRENT_VRRP_EXTERNAL_LIST}" || echo vrrp external >> ${transaction_file}
+    test "${VRRP_AUXILIARY_LIST}" == "${CURRENT_VRRP_AUXILIARY_LIST}" || echo vrrp auxiliary >> ${transaction_file}
+    test "${VRRP_WEB_LIST}" == "${CURRENT_VRRP_WEB_LIST}" || echo vrrp web >> ${transaction_file}
+    test "${VRRP_RWEB_LIST}" == "${CURRENT_VRRP_RWEB_LIST}" || echo vrrp rweb >> ${transaction_file}
+    test "${VRRP_AV_LIST}" == "${CURRENT_VRRP_AV_LIST}" || echo vrrp antivirus >> ${transaction_file}
+    test "${IP_ROUTE_LIST}" == "${CURRENT_IP_ROUTE_LIST}" || echo ip route >> ${transaction_file}
+    test "${IP_VIA_LIST}" == "${CURRENT_IP_VIA_LIST}" || echo ip via >> ${transaction_file}
+    test "${IP_NAME_IP_LIST}" == "${CURRENT_IP_NAME_IP_LIST}" || echo ip name >> ${transaction_file}
+    ! dynamic-dns-request-is-modified || echo dynamicdns >> ${transaction_file}
+    test "${DYNAMIC_DNS_INTERVAL}" == "${CURRENT_DYNAMIC_DNS_INTERVAL}" || echo dynamicdns interval >> ${transaction_file}
+    ! vpnipsec-authenticate-modified || echo vpnipsec authenticate >> ${transaction_file}
+    test "${VPN_IPSEC_ACCESS}" == "${CURRENT_VPN_IPSEC_ACCESS}" || echo vpnipsec access >> ${transaction_file}
+    test "${VPN_IPSEC_ACCESS_AUTHENTICATE}" == "${CURRENT_VPN_IPSEC_ACCESS_AUTHENTICATE}" || echo vpnipsec access authenticate >> ${transaction_file}
+    ! vpnipsec-access-access-soft-modified || echo vpnipsec access access >> ${transaction_file}
+    test "${VPN_IPSEC_SITE_LIST}" == "${CURRENT_VPN_IPSEC_SITE_LIST}" || echo vpnipsec site >> ${transaction_file}
+    test "${VPN_IPSEC_NETWORK_LIST}" == "${CURRENT_VPN_IPSEC_NETWORK_LIST}" || echo vpnipsec network >> ${transaction_file}
+    test "${VPN_IPSEC_VIA_LIST}" == "${CURRENT_VPN_IPSEC_VIA_LIST}" || echo vpnipsec via >> ${transaction_file}
+    test "${VPN_IPSEC_TO_LIST}" == "${CURRENT_VPN_IPSEC_TO_LIST}" || echo vpnipsec to >> ${transaction_file}
+    test "${VPN_IPSEC_BEHIND_NAT_ROLE_LIST}" == "${CURRENT_VPN_IPSEC_BEHIND_NAT_ROLE_LIST}" || echo vpnipsec nat role >> ${transaction_file}
+    test "${VPN_IPSEC_BEHIND_NAT_IP_LIST}" == "${CURRENT_VPN_IPSEC_BEHIND_NAT_IP_LIST}" || echo vpnipsec nat public >> ${transaction_file}
+
+    test "${PROXY_PORT}" == "${CURRENT_PROXY_PORT}" || echo port proxy >> ${transaction_file}
+    test "${THTTP_PORT}" == "${CURRENT_THTTP_PORT}" || echo port thttp >> ${transaction_file}
+    test "${AV_PORT}" == "${CURRENT_AV_PORT}" || echo port antivirus >> ${transaction_file}
+    test "${OCSP_PORT}" == "${CURRENT_OCSP_PORT}" || echo port ocsp >> ${transaction_file}
+    test "${ISAKMP_PORT}" == "${CURRENT_ISAKMP_PORT}" || echo port isakmp >> ${transaction_file}
+    test "${NATT_PORT}" == "${CURRENT_NATT_PORT}" || echo port natt >> ${transaction_file}
+    test "${PEER_HTTP_PORT}" == "${CURRENT_PEER_HTTP_PORT}" || echo port httppeer >> ${transaction_file}
+    test "${PEER_HTCP_PORT}" == "${CURRENT_PEER_HTCP_PORT}" || echo port htcppeer >> ${transaction_file}
+    test "${DHCP_PEER_PORT}" == "${CURRENT_DHCP_PEER_PORT}" || echo port dhcp >> ${transaction_file}
+    test "${WADMIN_PORT}" == "${CURRENT_WADMIN_PORT}" || echo port wadmin >> ${transaction_file}
+    test "${WAUDIT_PORT}" == "${CURRENT_WAUDIT_PORT}" || echo port waudit >> ${transaction_file}
+    test "${NAME_SERVER_LIST}" == "${CURRENT_NAME_SERVER_LIST}" || echo dns >> ${transaction_file}
+    test "${DHCP_FIXED_LIST}" == "${CURRENT_DHCP_FIXED_LIST}" || echo dhcp fixed >> ${transaction_file}
+    test "${DHCP_RANGE_LIST}" == "${CURRENT_DHCP_RANGE_LIST}" || echo dhcp range >> ${transaction_file}
+    test "${DHCP_PEER_LIST}" == "${CURRENT_DHCP_PEER_LIST}" || echo dhcp peer >> ${transaction_file}
+    test "${NTP_SERVER_LIST}" == "${CURRENT_NTP_SERVER_LIST}" || echo ntp >> ${transaction_file}
+    test "${PEER_SHARE_LIST}" == "${CURRENT_PEER_SHARE_LIST}" || echo peer share >> ${transaction_file}
+    test "${PEER_HA_LIST}" == "${CURRENT_PEER_HA_LIST}" || echo peer ha >> ${transaction_file}
+    test "${PEER_NEXT_LIST}" == "${CURRENT_PEER_NEXT_LIST}" || echo peer next >> ${transaction_file}
+    test "${PEER_PREVIOUS_LIST}" == "${CURRENT_PEER_PREVIOUS_LIST}" || echo peer previous >> ${transaction_file}
+    test "${TRANSPARENT_WEB_LIST}" == "${CURRENT_TRANSPARENT_WEB_LIST}" || echo transparent >> ${transaction_file}
+    test "${ACCESS_WEB_LIST}" == "${CURRENT_ACCESS_WEB_LIST}" || echo access web >> ${transaction_file}
+    test "${ACCESS_AV_LIST}" == "${CURRENT_ACCESS_AV_LIST}" || echo access antivirus >> ${transaction_file}
+    test "${ACCESS_FILE_LIST}" == "${CURRENT_ACCESS_FILE_LIST}" || echo access file >> ${transaction_file}
+    test "${ACCESS_ADMIN_LIST}" == "${CURRENT_ACCESS_ADMIN_LIST}" || echo access admin >> ${transaction_file}
+    test "${ACCESS_MON_LIST}" == "${CURRENT_ACCESS_MON_LIST}" || echo access mon >> ${transaction_file}
+    test "${ACCESS_MANAGER_LIST}" == "${CURRENT_ACCESS_MANAGER_LIST}" || echo access manager >> ${transaction_file}
+
+    test "${MANAGER_SYNC_ROLE}" == "${CURRENT_MANAGER_SYNC_ROLE}" || echo manager sync role >> ${transaction_file}
+    test "${MANAGER_SYNC_PEER_IP}" == "${CURRENT_MANAGER_SYNC_PEER_IP}" || echo manager sync peer >> ${transaction_file}
+
+    test "${CACHE_MIN_OBJECT_SZ}" == "${CURRENT_CACHE_MIN_OBJECT_SZ}" -a \
+	 "${CACHE_MAX_OBJECT_SZ}" == "${CURRENT_CACHE_MAX_OBJECT_SZ}" || echo cache object >> ${transaction_file}
+    test "${CACHE_BIG_OBJECT}" == "${CURRENT_CACHE_BIG_OBJECT}" -a \
+	 "${CACHE_BIG_MIN_OBJECT_SZ}" == "${CURRENT_CACHE_BIG_MIN_OBJECT_SZ}" -a \
+	 "${CACHE_BIG_MAX_OBJECT_SZ}" == "${CURRENT_CACHE_BIG_MAX_OBJECT_SZ}" || echo cache bigobject >> ${transaction_file}
+
+    test "${URLLIST_LIST}" == "${CURRENT_URLLIST_LIST}" || echo urllist >> ${transaction_file}
+    ! conf-urllist-autoupdate-modified || echo urllist auto >> ${transaction_file}
+
+    test "${GUARD_FILTER_IP_LIST}" == "${CURRENT_GUARD_FILTER_IP_LIST}" || echo guard filter ip >> ${transaction_file}
+    test "${GUARD_FILTER_TIME_LIST}" == "${CURRENT_GUARD_FILTER_TIME_LIST}" || echo guard filter time >> ${transaction_file}
+    test "${GUARD_FILTER_LDAP_LIST}" == "${CURRENT_GUARD_FILTER_LDAP_LIST}" || echo guard filter ldap >> ${transaction_file}
+    test "${GUARD_POLICY_LIST}" == "${CURRENT_GUARD_POLICY_LIST}" || echo guard policy >> ${transaction_file}
+    test "${GUARD_RULE_LIST}" == "${CURRENT_GUARD_RULE_LIST}" || echo guard rule >> ${transaction_file}
+    test "${GUARD_IP}" == "${CURRENT_GUARD_IP}" || echo guard ip >> ${transaction_file}
+
+    test "${RWEB_SITE_LIST}" == "${CURRENT_RWEB_SITE_LIST}" || echo rweb site >> ${transaction_file}
+    test "${RWEB_SITE_HTTPX_LIST}" == "${CURRENT_RWEB_SITE_HTTPX_LIST}" || echo rweb rhttp >> ${transaction_file}
+    test "${RWEB_SITE_HOSTS_LIST}" == "${CURRENT_RWEB_SITE_HOSTS_LIST}" || echo rweb host >> ${transaction_file}
+    test "${RWEB_SITE_BALANCER_LIST}" == "${CURRENT_RWEB_SITE_BALANCER_LIST}" || echo rweb balancer >> ${transaction_file}
+    test "${RWEB_SITE_VIA_LIST}" == "${CURRENT_RWEB_SITE_VIA_LIST}" || echo rweb via >> ${transaction_file}
+    test "${RWEB_SITE_STANDBY_LIST}" == "${CURRENT_RWEB_SITE_STANDBY_LIST}" || echo rweb standby >> ${transaction_file}
+
+    test "${QOS_BW_INTERNAL_INGRESS}" == "${CURRENT_QOS_BW_INTERNAL_INGRESS}" || echo qos bandwidth internal ingress >> ${transaction_file}
+    test "${QOS_BW_INTERNAL_EGRESS}" == "${CURRENT_QOS_BW_INTERNAL_EGRESS}" || echo qos bandwidth internal egress >> ${transaction_file}
+    test "${QOS_BW_EXTERNAL_INGRESS}" == "${CURRENT_QOS_BW_EXTERNAL_INGRESS}" || echo qos bandwidth external ingress >> ${transaction_file}
+    test "${QOS_BW_EXTERNAL_EGRESS}" == "${CURRENT_QOS_BW_EXTERNAL_EGRESS}" || echo qos bandwidth external egress >> ${transaction_file}
+    test "${QOS_BW_AUXILIARY_INGRESS}" == "${CURRENT_QOS_BW_AUXILIARY_INGRESS}" || echo qos bandwidth auxiliary ingress >> ${transaction_file}
+    test "${QOS_BW_AUXILIARY_EGRESS}" == "${CURRENT_QOS_BW_AUXILIARY_EGRESS}" || echo qos bandwidth auxiliary egress >> ${transaction_file}
+
+    local dev gress flow cur_qos new_qos
+
+    for flow in web antivirus file default
+    do
+	for dev in internal external auxiliary
+	do
+	    for gress in ingress egress
+	    do
+		cur_qos=$(get-qos-shape ${dev} ${gress} ${flow} current)
+		new_qos=$(get-qos-shape ${dev} ${gress} ${flow})
+		test "${new_qos}" == "${cur_qos}" || echo qos shape ${flow} ${dev} ${gress} >> ${transaction_file}
+	    done
+	done
+    done
+
+    for dev in internal auxiliary
+    do
+	for gress in ingress egress
+	do
+	    cur_qos=$(get-qos-shape ${dev} ${gress} tweb current)
+	    new_qos=$(get-qos-shape ${dev} ${gress} tweb)
+	    test "${new_qos}" == "${cur_qos}" || echo qos shape tweb ${dev} ${gress} >> ${transaction_file}
+	done
+    done
+
+    for dev in internal external
+    do
+	for gress in ingress egress
+	do
+	    cur_qos=$(get-qos-shape ${dev} ${gress} rweb current)
+	    new_qos=$(get-qos-shape ${dev} ${gress} rweb)
+	    test "${new_qos}" == "${cur_qos}" || echo qos shape rweb ${dev} ${gress} >> ${transaction_file}
+	done
+    done
+
+    for gress in ingress egress
+    do
+	cur_qos=$(get-qos-shape internal ${gress} peer current)
+	new_qos=$(get-qos-shape internal ${gress} peer)
+	test "${new_qos}" == "${cur_qos}" || echo qos shape peer internal ${gress} >> ${transaction_file}
+    done
+
+    for gress in ingress egress
+    do
+	cur_qos=$(get-qos-shape external ${gress} vpnipsec current)
+	new_qos=$(get-qos-shape external ${gress} vpnipsec)
+	test "${new_qos}" == "${cur_qos}" || echo qos shape vpnipsec external ${gress} >> ${transaction_file}
+    done
+
+    test "${QOS_SHAPE_ROUTER_LIST}" == "${CURRENT_QOS_SHAPE_ROUTER_LIST}" || echo qos shape router >> ${transaction_file}
+
+    test "${QOS_BORROW_INTERNAL_INGRESS}" == "${CURRENT_QOS_BORROW_INTERNAL_INGRESS}" || echo qos borrow internal ingress >> ${transaction_file}
+    test "${QOS_BORROW_INTERNAL_EGRESS}" == "${CURRENT_QOS_BORROW_INTERNAL_EGRESS}" || echo qos borrow internal egress >> ${transaction_file}
+    test "${QOS_BORROW_EXTERNAL_INGRESS}" == "${CURRENT_QOS_BORROW_EXTERNAL_INGRESS}" || echo qos borrow external ingress >> ${transaction_file}
+    test "${QOS_BORROW_EXTERNAL_EGRESS}" == "${CURRENT_QOS_BORROW_EXTERNAL_EGRESS}" || echo qos borrow external egress >> ${transaction_file}
+
+    test "${FW_DOS_TCP_FLOOD}" == "${CURRENT_FW_DOS_TCP_FLOOD}" || echo firewall dos tcpflood >> ${transaction_file}
+    test "${FW_DOS_UDP_FLOOD}" == "${CURRENT_FW_DOS_UDP_FLOOD}" || echo firewall dos udpflood >> ${transaction_file}
+    test "${FW_DOS_WEB_FLOOD}" == "${CURRENT_FW_DOS_WEB_FLOOD}" || echo firewall dos webflood >> ${transaction_file}
+    test "${FW_DOS_RWEB_FLOOD}" == "${CURRENT_FW_DOS_RWEB_FLOOD}" || echo firewall dos rwebflood >> ${transaction_file}
+    test "${FW_DOS_TCP_LIMIT}" == "${CURRENT_FW_DOS_TCP_LIMIT}" || echo firewall dos piptcp >> ${transaction_file}
+    test "${FW_DOS_WEB_LIMIT}" == "${CURRENT_FW_DOS_WEB_LIMIT}" || echo firewall dos pipweb >> ${transaction_file}
+    test "${FW_DOS_RWEB_LIMIT}" == "${CURRENT_FW_DOS_RWEB_LIMIT}" || echo firewall dos piprweb >> ${transaction_file}
+    test "${FW_DOS_DNS_LIMIT}" == "${CURRENT_FW_DOS_DNS_LIMIT}" || echo firewall dos pipdns >> ${transaction_file}
+    test "${FW_DOS_OCSP_LIMIT}" == "${CURRENT_FW_DOS_OCSP_LIMIT}" || echo firewall dos pipocsp >> ${transaction_file}
+
+    test "${FW_EXTERNAL_RULE_LIST}" == "${CURRENT_FW_EXTERNAL_RULE_LIST}" || echo firewall external >> ${transaction_file}
+    test "${FW_WEB_RULE_LIST}" == "${CURRENT_FW_WEB_RULE_LIST}" || echo firewall web >> ${transaction_file}
+    test "${FW_RWEB_RULE_LIST}" == "${CURRENT_FW_RWEB_RULE_LIST}" || echo firewall rweb >> ${transaction_file}
+    test "${FW_AV_RULE_LIST}" == "${CURRENT_FW_AV_RULE_LIST}" || echo firewall antivirus >> ${transaction_file}
+    test "${FW_ADMIN_RULE_LIST}" == "${CURRENT_FW_ADMIN_RULE_LIST}" || echo firewall admin >> ${transaction_file}
+    test "${FW_MON_RULE_LIST}" == "${CURRENT_FW_MON_RULE_LIST}" || echo firewall mon >> ${transaction_file}
+    test "${FW_FILE_RULE_LIST}" == "${CURRENT_FW_FILE_RULE_LIST}" || echo firewall file >> ${transaction_file}
+    test "${FW_PEER_RULE_LIST}" == "${CURRENT_FW_PEER_RULE_LIST}" || echo firewall peer >> ${transaction_file}
+    test "${FW_AUXILIARY_RULE_LIST}" == "${CURRENT_FW_AUXILIARY_RULE_LIST}" || echo firewall auxiliary >> ${transaction_file}
+    test "${FW_VPN_IPSEC_RULE_LIST}" == "${CURRENT_FW_VPN_IPSEC_RULE_LIST}" || echo firewall vpnipsec >> ${transaction_file}
+
+    test "${WAF_LEVEL}" == "${CURRENT_WAF_LEVEL}" || echo waf level >> ${transaction_file}
+    test "${WAF_REQUEST_SCORE}" == "${CURRENT_WAF_REQUEST_SCORE}" || echo waf score request >> ${transaction_file}
+    test "${WAF_RESPONSE_SCORE}" == "${CURRENT_WAF_RESPONSE_SCORE}" || echo waf score response >> ${transaction_file}
+
+    test "${WAF_GENERIC}" == "${CURRENT_WAF_GENERIC}" || echo waf generic >> ${transaction_file}
+
+    test "${WAF_REPUTATION_RBL_KEY}" == "${CURRENT_WAF_REPUTATION_RBL_KEY}" || echo waf reputation rbl >> ${transaction_file}
+
+    local waf_reputation_countries=$(sqlite3 ${USERENV_DIR}/${CONFIGURATION_DB_NAME} \
+					     "SELECT * FROM waf_reputation_country;")
+
+    local current_waf_reputation_countries=$(sqlite3 ${USERENV_DIR}/${CONFIGURATION_CURRENT_DB_NAME} \
+						     "SELECT * FROM waf_reputation_country;")
+
+    test "${waf_reputation_countries}" == "${current_waf_reputation_countries}" || echo waf reputation country >> ${transaction_file}
+    
+    test "${WAF_IMETHODS}" == "${CURRENT_WAF_IMETHODS}" || echo waf imethods >> ${transaction_file}
+    test "${WAF_REQUEST_BODY}" == "${CURRENT_WAF_REQUEST_BODY}" || echo waf limit request >> ${transaction_file}
+    test "${WAF_RESPONSE_BODY}" == "${CURRENT_WAF_RESPONSE_BODY}" || echo waf limit response >> ${transaction_file}
+    test "${WAF_NUM_ARG}" == "${CURRENT_WAF_NUM_ARG}" || echo waf limit assertions >> ${transaction_file}
+    test "${WAF_ARG_NAME_LENGTH}" == "${CURRENT_WAF_ARG_NAME_LENGTH}" || echo waf limit name >> ${transaction_file}
+    test "${WAF_ARG_LENGTH}" == "${CURRENT_WAF_ARG_LENGTH}" || echo waf limit value >> ${transaction_file}
+    test "${WAF_TOTAL_ARG_LENGTH}" == "${CURRENT_WAF_TOTAL_ARG_LENGTH}" || echo waf limit arguments >> ${transaction_file}
+    test "${WAF_FILES_SIZE}" == "${CURRENT_WAF_FILES_SIZE}" || echo waf limit files >> ${transaction_file}
+
+    test "${WAF_REWRITE_HTTP_ERRORS}" == "${CURRENT_WAF_REWRITE_HTTP_ERRORS}" || echo waf errors >> ${transaction_file}
+
+    test "${WAF_RWEB_REWRITE_HTTP_ERRORS_LIST}" == "${CURRENT_WAF_RWEB_REWRITE_HTTP_ERRORS_LIST}" || echo waf rweb errors >> ${transaction_file}
+    test "${WAF_RWEB_GENERIC}" == "${CURRENT_WAF_RWEB_GENERIC}" || echo waf rweb generic >> ${transaction_file}
+    test "${WAF_RWEB_BYPASS_RULE_LIST}" == "${CURRENT_WAF_RWEB_BYPASS_RULE_LIST}" || echo waf rweb bypass rule >> ${transaction_file}
+    test "${WAF_RWEB_BYPASS_APPLICATION_LIST}" == "${CURRENT_WAF_RWEB_BYPASS_APPLICATION_LIST}" || echo waf rweb bypass application >> ${transaction_file}
+    test "${WAF_RWEB_AUDIT_LIST}" == "${CURRENT_WAF_RWEB_AUDIT_LIST}" || echo waf rweb audit >> ${transaction_file}
+    test "${RWEB_SITE_DENYURL_LIST}" == "${CURRENT_RWEB_SITE_DENYURL_LIST}" || echo waf rweb denyurl >> ${transaction_file}
+
+    test "${WAF_DOS_LIMIT}" == "${CURRENT_WAF_DOS_LIMIT}" || echo waf dos >> ${transaction_file}
+
+    test "${SSLMEDIATE_TRANSPARENT}" == "${CURRENT_SSLMEDIATE_TRANSPARENT}" || echo sslmediate transparent >> ${transaction_file}
+    test "${SSLMEDIATE_EXPIRED}" == "${CURRENT_SSLMEDIATE_EXPIRED}" || echo sslmediate expired >> ${transaction_file}
+    test "${SSLMEDIATE_PREMATURE}" == "${CURRENT_SSLMEDIATE_PREMATURE}" || echo sslmediate premature >> ${transaction_file}
+    test "${SSLMEDIATE_SELFSIGNED}" == "${CURRENT_SSLMEDIATE_SELFSIGNED}" || echo sslmediate selfsigned >> ${transaction_file}
+    test "${SSLMEDIATE_POLICY}" == "${CURRENT_SSLMEDIATE_POLICY}" || echo sslmediate  policy >> ${transaction_file}
+    test "${SSLMEDIATE_EXCEPTION_URLLIST_LIST}" == "${CURRENT_SSLMEDIATE_EXCEPTION_URLLIST_LIST}" || echo sslmediate exception urllist >> ${transaction_file}
+    test "${SSLMEDIATE_EXCEPTION_DOMAINNAME_LIST}" == "${CURRENT_SSLMEDIATE_EXCEPTION_DOMAINNAME_LIST}" || echo sslmediate exception domainname >> ${transaction_file}
+
+    test "${AV_COUNTRY_CODE}" == "${CURRENT_AV_COUNTRY_CODE}" || echo antivirus auto >> ${transaction_file}
+    test "${AV_MAX_OBJECT_SZ}" == "${CURRENT_AV_MAX_OBJECT_SZ}" || echo antivirus maxobject >> ${transaction_file}
+    test "${AV_PUA}" == "${CURRENT_AV_PUA}" || echo antivirus pua >> ${transaction_file}
+    test "${AV_EXTENDED_METHOD}" == "${CURRENT_AV_EXTENDED_METHOD}" || echo antivirus extended method >> ${transaction_file}
+    test "${AV_EXTENDED_URL}" == "${CURRENT_AV_EXTENDED_URL}" || echo antivirus extended url >> ${transaction_file}
+    test "${AV_WHITELIST_DOMAINNAME_LIST}" == "${CURRENT_AV_WHITELIST_DOMAINNAME_LIST}" || echo antivirus whitelist domainname >> ${transaction_file}
+    test "${AV_INTERNAL}" == "${CURRENT_AV_INTERNAL}" || echo antivirus topology internal >> ${transaction_file}
+    test "${AV_EXTERNAL}" == "${CURRENT_AV_EXTERNAL}" || echo antivirus topology external >> ${transaction_file}
+    test "${AV_AUXILIARY}" == "${CURRENT_AV_AUXILIARY}" || echo antivirus topology auxiliary >> ${transaction_file}
+    test "${AV_VPN_IPSEC}" == "${CURRENT_AV_VPN_IPSEC}" || echo antivirus topology vpnipsec >> ${transaction_file}
+
+    test "${AUTHENTICATE_WEB}" == "${CURRENT_AUTHENTICATE_WEB}" || echo authenticate web >> ${transaction_file}
+    test "${AUTHENTICATE_RWEB}" == "${CURRENT_AUTHENTICATE_RWEB}" || echo authenticate rweb >> ${transaction_file}
+    test "${AUTHENTICATE_LDAP}" == "${CURRENT_AUTHENTICATE_LDAP}" || echo authenticate mode ldap >> ${transaction_file}
+    test "${AUTHENTICATE_KERBEROS}" == "${CURRENT_AUTHENTICATE_KERBEROS}" || echo authenticate mode kerberos >> ${transaction_file}
+
+    if test \
+	"${CURRENT_LDAP_BASE_DN}" != "${LDAP_BASE_DN}" -o \
+	"${CURRENT_LDAP_LOGIN}" != "${LDAP_LOGIN}" -o \
+	"${CURRENT_LDAP_PASSWORD}" != "${LDAP_PASSWORD}" -o \
+	"${CURRENT_LDAP_FILTER}" != "${LDAP_FILTER}" -o \
+	"${CURRENT_LDAP_GROUP_DN}" != "${LDAP_GROUP_DN}"
+    then
+	echo authenticate ldap request >> ${transaction_file}
+    fi
+
+    test "${LDAP_BIND_MODE}" == "${CURRENT_LDAP_BIND_MODE}" -a \
+	 "${LDAP_BIND_DN}" == "${CURRENT_LDAP_BIND_DN}" -a \
+	 "${LDAP_BIND_PASSWORD}" == "${CURRENT_LDAP_BIND_PASSWORD}" || \
+	echo authenticate ldap binddn >> ${transaction_file}
+
+    test "${LDAP_SERVER_LIST}" == "${CURRENT_LDAP_SERVER_LIST}" || echo authenticate ldap server >> ${transaction_file}
+    test "${LDAPS_CA}" == "${CURRENT_LDAPS_CA}" || echo authenticate ldaps ca >> ${transaction_file}
+    test "${KERBEROS_ENCRYPT_TYPE}" == "${CURRENT_KERBEROS_ENCRYPT_TYPE}" || echo authenticate kerberos encrypt >> ${transaction_file}
+    test "${KERBEROS_SERVICE_NAME}" == "${CURRENT_KERBEROS_SERVICE_NAME}" || echo authenticate kerberos web >> ${transaction_file}
+    test "${KERBEROS_HA_SHARED_PASSWORD}" == "${CURRENT_KERBEROS_HA_SHARED_PASSWORD}" || echo authenticate kerberos hapassword:show >> ${transaction_file}
+    test "${KERBEROS_SERVER_LIST}" == "${CURRENT_KERBEROS_SERVER_LIST}" || echo authenticate kerberos server >> ${transaction_file}
+    test "${KERBEROS_RWEB_LIST}" == "${CURRENT_KERBEROS_RWEB_LIST}" || echo authenticate kerberos rweb >> ${transaction_file}
+    test "${AD_WEBGATEWAY_RDN}" == "${CURRENT_AD_WEBGATEWAY_RDN}" || echo authenticate ad rdn >> ${transaction_file}
+    test "${FILE_SERVER_PASSWORD_LIST}" == "${CURRENT_FILE_SERVER_PASSWORD_LIST}" || echo password file >> ${transaction_file}
+
+    test \
+	${EMBEDDED_VPNSUBSCR_MODE} == ${CURRENT_EMBEDDED_VPNSUBSCR_MODE} -a \
+	"${EMBEDDED_VPNSUBSCR_RWEB_SITE_NAME}" == "${CURRENT_EMBEDDED_VPNSUBSCR_RWEB_SITE_NAME}" -a \
+	"${EMBEDDED_VPNSUBSCR_RWEB_TLS_ID}" == "${CURRENT_EMBEDDED_VPNSUBSCR_RWEB_TLS_ID}" || \
+	echo embedded ${EMBEDDED_VPNSUBSCR_COMMERCIAL_NAME,,} >> ${transaction_file}
+
+    transaction close
+    if test -s ${transaction_file} ; then
+	transaction open < ${transaction_file}
+	transaction commit
+    else
+	transaction commit
+    fi
+
+    rm -f ${transaction_file}
+}
+
+optimise-vpnipsec-whitelist()
+{
+    test -s ${VPN_IPSEC_DIR}/whitelist.diff || return 0
+ 
+    local diff_id diff id
+    local tmp_whitelist_file=${ADMIN_TMP_DIR}/vpnipsec-whitelist.${$}
+
+    if test -f ${VPN_IPSEC_DIR}/whitelist ; then
+	cp -f ${VPN_IPSEC_DIR}/whitelist ${tmp_whitelist_file}.1
+    else
+	echo -n > ${tmp_whitelist_file}.1
+    fi
+
+    while read diff_id
+    do
+	diff=${diff_id:0:1}
+	id=${diff_id:1}
+
+	case ${diff} in
+	    -)
+		sed -ie "/${id}/d" ${tmp_whitelist_file}.1
+		;;
+	    +)
+		echo "${id}" >> ${tmp_whitelist_file}.1
+		;;
+	    *)
+		;;
+	esac
+    done < ${VPN_IPSEC_DIR}/whitelist.diff
+
+    sort --uniq ${tmp_whitelist_file}.1 > ${tmp_whitelist_file}.2
+
+    if diff --brief ${VPN_IPSEC_DIR}/whitelist ${tmp_whitelist_file}.2 > /dev/null ; then
+	rm -f \
+	   ${VPN_IPSEC_DIR}/whitelist.raz \
+	   ${VPN_IPSEC_DIR}/whitelist.diff
+    fi
+
+    rm -f \
+       ${tmp_whitelist_file}.1 \
+       ${tmp_whitelist_file}.2
+}
+
+inject-conf()
+{
+    test -n "${1}" || return 255
+    local conf_file=${1}
+
+    local transaction_file=${ADMIN_TMP_DIR}/${USER}.transaction.conf.${$}
+    rm -f ${transaction_file}
+
+    local path=${PATH}
+    PATH=${COMMAND_PATH}:${path}
+
+    local cg_command
+    local args
+    declare -a args
+
+    while read -a args
+    do
+	cg_command=${args[0]}
+
+	test -n "${cg_command}" || continue
+	test ${cg_command:0:1} != "#" || continue
+	case ${cg_command} in
+	    apply|countrylist|cancel|conf|'exit'|file|halt|'help'|'history'|license|reboot|ping|quit|register|setup|timezonelist|transaction)
+		continue
+		;;
+	    tls)
+		test "${args[2]}" != generate || continue
+		;;
+	    admin)
+		test "${args[1]}" != ssh -o "${args[2]}" != generate || continue
+		;;
+	    manager)
+		test "${args[1]}" != ssh -o "${args[2]}" != generate || continue
+		;;
+	    log)
+		test "${args[1]}" == type -o "${args[1]}" == syslog || continue
+		;;
+	    cache)
+		test "${args[1]}" != clear || continue
+		;;
+	    password)
+		test "${args[1]}" == file || continue
+		;;
+	    antivirus)
+		case "${args[1]}" in
+		    update|clear)
+			continue
+			;;
+		    *)
+			;;
+		esac
+		;;
+	    *)
+		;;
+	esac
+
+	echo ${args[*]} >> ${transaction_file}
+	
+    done < ${conf_file}
+
+    transaction close
+    test ! -s ${transaction_file} || transaction open < ${transaction_file}
+    transaction commit log
+    rm -f ${transaction_file}
+
+    NEWENV=1
+    PATH=${path}
+
+    optimise-vpnipsec-whitelist
+}
+
+load-conf()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 1
+    test -n "${3}" || return 1
+    local protocol=${1}
+    local ip=${2}
+    local fn=${3}
+
+    local conf_file=${ADMIN_TMP_DIR}/${LOADED}.conf.${$}
+
+    load-files ${protocol} ${ip} "${fn} ${conf_file}" "" ascii
+    local ret=${?}
+
+    if test ${ret} -ne 0 ; then
+	rm -f ${conf_file}
+	return ${ret}
+    fi
+
+    test -f ${conf_file} || return 104
+
+    if ! check-ascii-file ${conf_file} ; then
+	rm -f ${conf_file}
+	return 184
+    fi
+
+    local file_size=$(file-size ${conf_file})
+    if test ${file_size} -gt 10240 ; then
+	rm -f ${conf_file}
+	return 153
+    fi
+
+    inject-conf ${conf_file}
+    ret=${?}
+    rm -f ${conf_file}
+    test ${ret} -eq 0 || return ${ret}
+}
+
+echo-conf-header()
+{
+    local date=$(date +"%Y/%m/%d-%T")
+    local role=$(get-contextual-role)
+    local context_reference=$(get-manager-context-reference)
+
+    echo "################################################################################"
+    echo "#"
+    echo "# Configuration file saved at ${date}"
+
+    echo-appliance-information-header ${role} ${context_reference}
+
+    echo "#"
+    echo '################################################################################'
+}
+
+create-vpnipsec-whitelist-conf()
+{
+    local whitelist_file=${1}
+    test -n "${whitelist_file}" || whitelist_file=${VPN_IPSEC_DIR}/whitelist
+    test -s ${whitelist_file} || return 0
+
+    local id
+
+    while read id
+    do
+	echo "vpnipsec access access add ${id}"
+    done < ${whitelist_file}
+}
+
+create-conf()
+{
+    test -n "${1}" || return 255
+    local in_state=${1}
+
+    local i j elt range interface
+    local ip netmask network gateway health
+    local dev gress flow cur_qos new_qos qos_state
+    local vlan access_types access_type at acl
+    local var_name variable
+    local prio vrrp_if vrrp_id vrrp_ips role
+    local guards guards_text action
+    local filters_col filters_lst filter_type filter_name
+    local qos port
+    local mac ip1 ip2
+    local name protocol tls browsing hosts
+    local host weight
+    local canonical_name site_name
+    local algorithm sticky mode cookie
+    local filter flag filters
+    local ext current
+    local g_file g_bool g_load g_op g_period g_protocol g_ip g_fn
+    local version server user login hash enc password privacy
+    local ldap_login ldap_filter ldap_gdn
+    local time_type time_value
+    local rset rule rules
+    local id state src_ip src_port dst_dev dst_ip dst_port dst_ports
+    local src_nat_ip dst_nat_ip dst_pat_port
+    local ingress_qos egress_qos dscp applied_dev
+    local url ids atype
+    local name_type
+    local tls_client_list
+    local vpn_id ipsec_type auth_type auth_key1 auth_key2 auth_key remote_address ike_encryption ike_integrity dh esp_encryption esp_integrity remote_isakmp_port remote_natt_port tls_id_type id_type
+    local vias via tos role_prio
+    local local_ip_mk_list remote_ip_mk_list ip_mk
+    local record action
+    local ssh_key_id ssh_key_file ssh_key
+    local dir templates domain uuid
+    local diff_id
+
+    local apl_role=$(get-contextual-role)
+
+    case ${in_state} in
+	current)
+	    current=CURRENT_
+	    ext=.current
+	    qos_state=" current"
+	    local _IPSEC_AUTHENTICATE_PSK_FILE=${VPN_IPSEC_DIR}/${IPSEC_AUTHENTICATE_PSK_FILENAME}.current
+	    local _CONFIGURATION_DB_NAME=${CONFIGURATION_CURRENT_DB_NAME}
+	    ;;
+	new)
+	    local _IPSEC_AUTHENTICATE_PSK_FILE=${VPN_IPSEC_DIR}/${IPSEC_AUTHENTICATE_PSK_FILENAME}
+	    local _CONFIGURATION_DB_NAME=${CONFIGURATION_DB_NAME}
+	    ;;
+	*)
+	    return 1
+	    ;;
+    esac
+
+    for variable in ${USERENV_VARS}
+    do
+	var_name=\${$(echo ${current}${variable})}
+	local _${variable}="$(eval echo ${var_name})"
+    done
+
+    echo-conf-header
+    echo
+    echo "timezone ${_TIMEZONE}"
+    echo
+    echo "hostname ${_SHOSTNAME}"
+    echo "domainname ${_DOMAIN_NAME}"
+
+    if contextual-command-is-allowed ; then
+
+	echo "email ftp ${_ANONYMOUS_FTP_EMAIL}"
+	if test -z "${_ADMINISTRATOR_NAME}" ; then
+	    echo "email admin ${_ADMINISTRATOR_EMAIL}"
+	else
+	    echo "email admin ${_ADMINISTRATOR_EMAIL} \"${_ADMINISTRATOR_NAME}\""
+	fi
+
+	password=$(encrypt-password "clear:${_EMAIL_ACCOUNT_PASSWORD}" "${EMAIL_PASSWD}")
+
+	if test -z "${_EMAIL_ACCOUNT_SERVER_PORT}" ; then
+	    port=587
+	else
+	    port=${_EMAIL_ACCOUNT_SERVER_PORT}
+	fi
+
+	if test -z "${_EMAIL_ACCOUNT_SERVER_FQDN}" ; then
+	    server=raz
+	else
+	    server=${_EMAIL_ACCOUNT_SERVER_FQDN}
+	fi
+
+	if test -z "${_EMAIL_ACCOUNT_USERNAME}" ; then
+	    unset user
+	else
+	    user=${_EMAIL_ACCOUNT_USERNAME}
+	fi
+
+	if test -z "${user}" ; then
+	    echo "email account:encrypted ${server} ${port}"
+	else
+	    password=${password/encrypted:}
+	    test -z "${password}" || password=" ${password}"
+	    echo "email account:encrypted ${server} ${port} ${user}${password}"
+	fi
+
+	echo
+	echo "admin tls default"
+	echo
+	echo "rweb site raz"
+	echo
+	echo "tls server raz"
+
+	for tls in ${_TLS_SERVER_LIST}
+	do
+	    test "${tls}" != default || continue
+	    echo "tls server add ${tls}"
+	done
+    fi
+
+    echo
+    echo "tls server days ${_TLS_SERVER_DAYS}"
+
+    if contextual-command-is-allowed ; then
+	echo
+	echo "tls ca third raz"
+	i=0
+	for elt in ${_TLS_CA_LIST}
+	do
+	    range=$[${i} % 2]
+	    case ${range} in
+		0)
+		    tls=${elt}
+		    ;;
+		1)
+		    browsing=${elt}
+		    echo "tls ca third add ${tls} ${browsing}"
+		    ;;
+		*)
+		    return 255
+		    ;;
+	    esac
+	    ((i++))
+	done
+	echo
+
+	cd ${SSL_CLIENT_DIR}
+
+	tls_client_list=$(ls -1d *.cur 2> /dev/null)
+	for elt in ${tls_client_list}
+	do
+	    tls=${elt%\.cur}
+	    case ${in_state} in
+		current)
+		    echo "tls client add ${tls}"
+		    ;;
+		new)
+		    test -f ${tls}.2del || echo "tls client add ${tls}"
+		    ;;
+		*)
+		    ;;
+	    esac
+	done
+	if test ${in_state} == new ; then
+	    tls_client_list=$(ls -1 *.new 2> /dev/null)
+	    for elt in ${tls_client_list}
+	    do
+		tls=${elt%\.new}
+		test -d ${tls}.cur || echo "tls client add ${tls}"
+	    done
+	    tls_client_list=$(ls -1 ${TMP_DIR}/${LOADED}.${TLS_CLIENT}.certificate.* 2> /dev/null)
+	    for elt in ${tls_client_list}
+	    do
+		tls=$(file-basename ${elt})
+		tls=${tls/${LOADED}\.${TLS_CLIENT}\.certificate\.}
+		echo "tls client add ${tls}"
+	    done
+	fi
+	
+	echo "tls client days ${_TLS_CLIENT_DAYS}"
+	echo
+	echo "tls ocsp host ${_OCSP_HOST}"
+	echo "tls ocsp days ${_OCSP_DAYS}"
+	if test -z "${_OCSP_TLS}" ; then
+	    echo "tls ocsp tls raz"
+	else
+	    echo "tls ocsp tls set ${_OCSP_TLS}"
+	fi
+	echo
+
+	cd ${HOME}
+
+	echo "admin tls ${_ADMIN_TLS}"
+	echo
+    fi
+
+    echo -n "admin snmp "
+    external-form ${_ADMIN_SNMP}
+    echo
+    echo -n "admin ssh "
+    external-form ${_ADMIN_SSH}
+    echo
+    echo -n "admin ssh password "
+    external-form ${_ADMIN_SSH_PASSWORD}
+    echo
+    echo -n "admin wadmin "
+    external-form ${_ADMIN_WADMIN}
+    echo
+
+    if contextual-command-is-allowed ; then
+	echo
+	echo -n "admin waudit "
+	external-form ${_ADMIN_WAUDIT}
+	echo
+    fi
+
+    echo "admin ssh key raz"
+    for id in ${_SSH_KEY_LIST}
+    do
+	echo "admin ssh key add ${id}"
+    done
+
+    password=$(encrypt-password "clear:${_SNMP_COMMUNITY}" "${SNMP_PASSWD}")
+    password=${password/encrypted:}
+    echo "admin snmp community:encrypted ${password}"
+
+    privacy=$(encrypt-password "clear:${_SNMP_PRIVACY}" "${SNMP_PASSWD}")
+    privacy=${privacy/encrypted:}
+    echo "admin snmp privacy:encrypted ${privacy}"
+
+    echo "admin snmp user ${_SNMP_USER}"
+    echo -n "admin snmp tls "
+    external-form ${_SNMP_TLS}
+    echo
+    echo -n "admin snmp udp "
+    external-form ${_SNMP_UDP}
+    echo
+    echo -n "admin snmp tcp "
+    external-form ${_SNMP_TCP}
+    echo
+    echo "admin snmp trap raz"
+
+    i=0
+    for elt in ${_SNMP_TRAP_SERVER_LIST}
+    do
+	range=$[${i} % 8]
+	case ${range} in
+	    0)
+		version=${elt}
+		;;
+	    1)
+		server=${elt}
+		;;
+	    2)
+		port=${elt}
+		;;
+	    3)
+		user=${elt}
+		;;
+	    4)
+		hash=${elt}
+		;;
+	    5)
+		enc=${elt}
+		;;
+	    6)
+		password=${elt}
+		;;
+	    7)
+		privacy=${elt}
+
+		password=$(encrypt-password "clear:${password}" "${SNMP_PASSWD}")
+		password=${password/encrypted:}
+
+		case ${version} in
+		    v1|v2c)
+			echo "admin snmp trap add:encrypted ${version} ${server} ${port} ${password}"
+			;;
+		    v3)
+			privacy=$(encrypt-password "clear:${privacy}" "${SNMP_PASSWD}")
+			privacy=${privacy/encrypted:}
+			echo "admin snmp trap add:encrypted ${version} ${server} ${port} ${user} ${hash} ${enc} ${password} ${privacy}"
+			;;
+		    *)
+			return 255
+			;;
+		esac
+		;;
+	    *)
+		return 1
+		;;
+	esac
+	((i++))
+    done
+
+    if contextual-command-is-allowed ; then
+	echo
+	echo -n "admin topology internal "
+	external-form ${_ADMIN_INTERNAL}
+	echo
+	echo -n "admin topology external "
+	external-form ${_ADMIN_EXTERNAL}
+	echo
+	echo -n "admin topology auxiliary "
+	external-form ${_ADMIN_AUXILIARY}
+	echo
+	echo -n "admin topology vpnipsec "
+	external-form ${_ADMIN_VPN_IPSEC}
+	echo
+    fi
+
+    echo
+    echo "admin user raz"
+    for elt in ${_ADMIN_USER_LIST}
+    do
+	echo "admin user add ${elt}"
+    done
+
+    echo
+
+    if contextual-command-is-allowed ; then
+	echo -n "mode dhcp "
+	external-form ${_DHCP_MODE}
+	echo
+	echo -n "mode dns "
+	external-form ${_DNS_MODE}
+	echo
+	echo -n "mode firewall "
+	external-form ${_FIREWALL_MODE}
+	echo
+	echo -n "mode ftppassive "
+	external-form ${_FTP_PASSIVE_MODE}
+	echo
+	echo -n "mode ha "
+	external-form ${_HA_MODE}
+	echo
+    fi
+
+
+    if contextual-command-is-allowed ; then
+	echo -n "mode qos "
+	external-form ${_QOS_MODE}
+	echo
+	echo -n "mode router "
+	external-form ${_ROUTER_MODE}
+	echo
+	echo -n "mode snat "
+	external-form ${_SNAT_MODE}
+	echo
+	echo -n "mode tnat "
+	external-form ${_TNAT_MODE}
+	echo
+	echo -n "mode tweb "
+	external-form ${_TRANSPARENT_MODE}
+	echo
+	echo -n "mode vlan "
+	external-form ${_VLAN_MODE}
+	echo
+	echo
+	echo -n "mode anonymous "
+	external-form ${_ANONYMOUS_MODE}
+	echo
+	echo -n "mode antivirus "
+	external-form ${_AV_MODE}
+	echo
+	echo -n "mode authenticate "
+	external-form ${_AUTHENTICATE_MODE}
+	echo
+	echo -n "mode cache "
+	external-form ${_CACHE_MODE}
+	echo
+	echo -n "mode compress "
+	external-form ${_COMPRESS_MODE}
+	echo
+	echo -n "mode guard "
+	external-form ${_GUARD_MODE}
+	echo
+	echo -n "mode log "
+	external-form ${_LOG_MODE}
+	echo
+	echo -n "mode ocsp "
+	external-form ${_OCSP_MODE}
+	echo
+	echo -n "mode rweb "
+	external-form ${_RWEB_MODE}
+	echo
+	echo -n "mode sslmediate "
+	external-form ${_SSLMEDIATE_MODE}
+	echo
+	echo -n "mode vpnipsec "
+	external-form ${_VPN_IPSEC_MODE}
+	echo
+	echo -n "mode waf "
+	external-form ${_WAF_MODE}
+	echo
+	echo -n "mode web "
+	external-form ${_WEB_MODE}
+	echo
+	echo
+	echo -n "log type web "
+	external-forms ${_LOG_TYPE_WEB/:*} ${_LOG_TYPE_WEB/*:}
+	echo
+	echo -n "log type rweb "
+	external-forms ${_LOG_TYPE_RWEB/:*} ${_LOG_TYPE_RWEB/*:}
+	echo
+	echo -n "log type guard "
+	external-forms ${_LOG_TYPE_GUARD/:*} ${_LOG_TYPE_GUARD/*:}
+	echo
+	echo -n "log type antivirus "
+	external-forms ${_LOG_TYPE_ANTIVIRUS/:*} ${_LOG_TYPE_ANTIVIRUS/*:}
+	echo
+	echo -n "log type avserver "
+	external-forms ${_LOG_TYPE_ANTIVIRUS_SERVER/:*} ${_LOG_TYPE_ANTIVIRUS_SERVER/*:}
+	echo
+	echo -n "log type waf "
+	external-forms ${_LOG_TYPE_WAF/:*} ${_LOG_TYPE_WAF/*:}
+	echo
+	echo -n "log type firewall "
+	external-forms ${_LOG_TYPE_FIREWALL/:*} ${_LOG_TYPE_FIREWALL/*:}
+	echo
+
+	echo
+
+	if test -z "${_SYSLOG_CA}" ; then
+	    echo "log syslog ca raz"
+	else
+	    echo "log syslog ca set ${_SYSLOG_CA}"
+	fi
+
+	echo "log syslog raz"
+
+	i=0
+	for elt in ${_SYSLOG_SERVER_LIST}
+	do
+	    range=$[${i} % 3]
+	    case ${range} in
+		0)
+		    protocol=${elt}
+		    ;;
+		1)
+		    server=${elt}
+		    ;;
+		2)
+		    port=${elt}
+		    echo "log syslog add ${protocol} ${server} ${port}"
+		    ;;
+		*)
+		    return 255
+		    ;;
+	    esac
+	    ((i++))
+	done
+    fi
+
+    echo
+    echo "link bond internal raz"
+
+    if contextual-command-is-allowed ; then
+	echo "link bond external raz"
+	echo "link bond auxiliary raz"
+    fi
+
+    for elt in ${_BOND_INTERNALS}
+    do
+	echo "link bond internal add ${elt}"
+    done
+
+    if contextual-command-is-allowed ; then
+	for elt in ${_BOND_EXTERNALS}
+	do
+	    echo "link bond external add ${elt}"
+	done
+	for elt in ${_BOND_AUXILIARIES}
+	do
+	    echo "link bond auxiliary add ${elt}"
+	done
+
+	echo
+    
+	i=0
+	for elt in ${_VLAN_FLOW_LIST}
+	do
+	    range=$[${i} % 2]
+	    case ${range} in
+		0)
+		    vlan=${elt}
+		    ;;
+		1)
+		    access_types=$(colon2space ${elt})
+		    for access_type in ${access_types}
+		    do
+			echo "vlan ${access_type} ${vlan}"
+		    done
+		    ;;
+		*)
+		    return 1
+		    ;;
+	    esac
+	    ((i++))
+	done
+    fi
+
+    echo
+    echo "ip internal ${_IP_INTERNAL_IP} ${_IP_INTERNAL_MASK}"
+
+    if contextual-command-is-allowed ; then
+	echo "ip external ${_IP_EXTERNAL_IP} ${_IP_EXTERNAL_MASK}"
+	echo "ip auxiliary ${_IP_AUXILIARY_IP} ${_IP_AUXILIARY_MASK}"
+	echo
+
+	i=0
+	for elt in ${_IP_VLAN_LIST}
+	do
+	    range=$[${i} % 3]
+	    case ${range} in
+		0)
+		    vlan=${elt}
+		;;
+		1)
+		    ip=${elt}
+		    ;;
+		2)
+		    netmask=${elt}
+		    if test "{ip}" != "0.0.0.0"
+		    then
+			echo "ip internal.${vlan} ${ip} ${netmask}"
+		    fi
+		    ;;
+		
+		*)
+		    return 1
+		    ;;
+	    esac
+	    ((i++))
+	done
+    fi
+
+    echo
+
+    if contextual-command-is-allowed ; then
+
+	echo "vrrp internal raz"
+	echo "vrrp external raz"
+	echo "vrrp auxiliary raz"
+	echo "vrrp web raz"
+	echo "vrrp rweb raz"
+	echo "vrrp antivirus raz"
+
+	for vrrp_if in internal external auxiliary web rweb antivirus
+	do
+	    i=0
+	    case ${vrrp_if} in
+		internal)
+		    vrrp_ips=${_VRRP_INTERNAL_LIST}
+		    ;;
+		external)
+		    vrrp_ips=${_VRRP_EXTERNAL_LIST}
+		    ;;
+		auxiliary)
+		    vrrp_ips=${_VRRP_AUXILIARY_LIST}
+		    ;;
+		web)
+		    vrrp_ips=${_VRRP_WEB_LIST}
+		    ;;
+		rweb)
+		    vrrp_ips=${_VRRP_RWEB_LIST}
+		    ;;
+		antivirus)
+		    vrrp_ips=${_VRRP_AV_LIST}
+		    ;;
+		*)
+		    return 255
+		    ;;
+	    esac
+    
+	    for elt in ${vrrp_ips}
+	    do
+		range=$[${i} % 4]
+		case ${range} in
+		    0)
+			ip=${elt}
+			;;
+		    1)
+			role=${elt}
+			;;
+		    
+		    2)
+			prio=${elt}
+			;;
+		    3)
+			vrrp_id=${elt}
+			echo "vrrp ${vrrp_if} add ${ip} ${role} ${prio} ${vrrp_id}"
+			;;
+		    *)
+			return 1
+			;;
+		esac
+		((i++))
+	    done
+	done
+    fi
+
+    echo
+
+    i=0
+    echo "ip route raz"
+    for elt in ${_IP_ROUTE_LIST}
+    do
+	range=$[${i} % 5]
+	case ${range} in
+	    0)
+		ip=${elt}
+		;;
+	    1)
+		netmask=${elt}
+		;;
+	    2)
+		gateway=${elt}
+		;;
+	    3)
+		weight=${elt}
+		;;
+	    4)
+		health=${elt}
+		if test ${health} == ${gateway} ; then
+		    unset health
+		else
+		    health=" ${health}"
+		fi
+
+		if test "${ip}" == "0.0.0.0" -a "${netmask}" != "0.0.0.0" ; then
+		    echo "ip route add default ${gateway} ${weight}${health}"
+		else
+		    echo "ip route add ${ip} ${netmask} ${gateway} ${weight}${health}"
+		fi
+		;;
+	    
+	    *)
+		return 1
+		;;
+	esac
+	((i++))
+    done
+
+    i=0
+    echo "ip via raz"
+    for elt in ${_IP_VIA_LIST}
+    do
+	range=$[${i} % 3]
+	case ${range} in
+	    0)
+		gateway=${elt}
+		;;
+	    1)
+		role=${elt}
+		;;
+	    2)
+		prio=${elt}
+		echo "ip via add ${gateway} ${role} ${prio}"
+		;;
+	    
+	    *)
+		return 255
+		;;
+	esac
+	((i++))
+    done
+
+    i=0
+    echo "ip name raz"
+    for elt in ${_IP_NAME_IP_LIST}
+    do
+	range=$[${i} % 2]
+	case ${range} in
+	    0)
+		name=${elt}
+		;;
+	    1)
+		ip=${elt}
+		echo "ip name add ${name} ${ip}"
+		;;
+	    
+	    *)
+		return 255
+		;;
+	esac
+	((i++))
+    done
+
+    echo
+
+    if contextual-command-is-allowed ; then    
+
+	if test ${_VPN_IPSEC_AUTHENTICATE:0:3} == 'psk' ; then
+	    password=$(cat ${_IPSEC_AUTHENTICATE_PSK_FILE} 2> /dev/null)
+	    password=${password/encrypted:}
+	    echo "vpnipsec authenticate psk:encrypted ${password}"
+	else
+	    if test ${_VPN_IPSEC_AUTHENTICATE:0:3} == 'tls' ; then
+		tls_id_type=${_VPN_IPSEC_AUTHENTICATE:4}
+		tls=${tls_id_type/:*}
+		id_type=${tls_id_type/*:}
+		echo "vpnipsec authenticate tls ${tls} ${id_type}"
+		
+	    elif test ${_VPN_IPSEC_AUTHENTICATE:0:6} == 'eaptls' ; then
+		tls_id_type=${_VPN_IPSEC_AUTHENTICATE:7}
+		tls=${tls_id_type/:*}
+		id_type=${tls_id_type/*:}
+		echo "vpnipsec authenticate eaptls ${tls} ${id_type}"
+	    else
+		return 255
+	    fi
+	fi
+
+	echo "vpnipsec access ${_VPN_IPSEC_ACCESS}"
+	echo "vpnipsec access authenticate ${_VPN_IPSEC_ACCESS_AUTHENTICATE}"
+	echo "vpnipsec access access raz"
+
+	case ${in_state} in
+	    current)
+		create-vpnipsec-whitelist-conf
+		;;
+	    new)
+		if test ! -s ${VPN_IPSEC_DIR}/whitelist.diff ; then
+		    test -f ${VPN_IPSEC_DIR}/whitelist.raz || create-vpnipsec-whitelist-conf
+		else
+		    local tmp_whitelist_file=${ADMIN_TMP_DIR}/vpnipsec-whitelist-conf.${$}
+
+		    if test -f ${VPN_IPSEC_DIR}/whitelist.raz ; then
+			echo -n > ${tmp_whitelist_file}.1
+		    else
+			cp -f ${VPN_IPSEC_DIR}/whitelist ${tmp_whitelist_file}.1
+		    fi
+
+		    while read diff_id
+		    do
+			diff=${diff_id:0:1}
+			id=${diff_id:1}
+
+			case ${diff} in
+			    -)
+				sed -ie "/${id}/d" ${tmp_whitelist_file}.1
+				;;
+			    +)
+				echo "${id}" >> ${tmp_whitelist_file}.1
+				;;
+			    *)
+				;;
+			esac
+		    done < ${VPN_IPSEC_DIR}/whitelist.diff
+
+		    sort --uniq ${tmp_whitelist_file}.1 > ${tmp_whitelist_file}.2
+		    create-vpnipsec-whitelist-conf ${tmp_whitelist_file}.2
+
+		    rm -f \
+		       ${tmp_whitelist_file}.1 \
+		       ${tmp_whitelist_file}.2
+		fi
+		;;
+	    *)
+		return 1
+		;;
+	esac
+
+	echo "vpnipsec network access raz"
+	echo "vpnipsec via access raz"
+	echo "vpnipsec site raz"
+
+	i=0
+	for elt in ${_VPN_IPSEC_SITE_LIST}
+	do
+	    range=$[${i} % 12]
+	    case ${range} in
+		0)
+ 		    vpn_id=${elt}
+		    ;;
+		1)
+		    remote_address=${elt}
+		    ;;
+		2)
+		    auth_type=${elt}
+		    ;;
+		3)
+		    auth_key1=${elt}
+		    ;;
+		4)
+		    auth_key2=${elt}
+		    ;;
+		5)
+		    ike_encryption=${elt}
+		    ;;
+		6)
+		    ike_integrity=${elt}
+		    ;;
+		7)
+		    dh=${elt}
+		    ;;
+		8)
+		    esp_encryption=${elt}
+		    ;;
+		9)
+		    esp_integrity=${elt}
+		    ;;
+		10)
+		    remote_isakmp_port=${elt}
+		    ;;
+		11)
+		    remote_natt_port=${elt}
+
+		    case ${auth_type} in
+			psk)
+			    action='add:encrypted'
+			    auth_key=$(encrypt-password "clear:${auth_key1}" "${IPSEC_PASSWD}")
+			    auth_key=${auth_key/encrypted:}
+			    ;;
+			eaptls|tls)
+			    case ${auth_key1} in
+				certificate|fqdn)
+				    auth_key="${auth_key1} ${auth_key2}"
+				    ;;
+				dn)
+				    auth_key2=$(decode-string ${auth_key2})
+				    auth_key="${auth_key1} '${auth_key2}'"
+				    ;;
+				*)
+				    return 255
+				    ;;
+			    esac
+			    action='add'
+			    ;;
+			*)
+			    return 255
+			    ;;
+		    esac
+
+		    record="${vpn_id} ${remote_address} ${auth_type} ${auth_key} ${ike_encryption} ${ike_integrity} ${dh} ${esp_encryption} ${esp_integrity} ${remote_isakmp_port} ${remote_natt_port}"
+		    echo "vpnipsec site ${action} ${record}"
+		    ;;
+		*)
+		    return 1
+		    ;;
+	    esac
+	    ((i++))
+	done
+
+	i=0
+	for elt in ${_VPN_IPSEC_NETWORK_LIST}
+	do
+	    range=$[${i} % 4]
+	    case ${range} in
+		0)
+		    ipsec_type=${elt}
+		    ;;
+		1)
+		    vpn_id=${elt}
+		    ;;
+		2)
+		    local_ip_mk_list=${elt}
+		    ;;
+		3)
+		    remote_ip_mk_list=${elt}
+		    
+		    if test -n "${local_ip_mk_list}" -a "${local_ip_mk_list}" != 'nil' ; then
+			local_ip_mk_list=${local_ip_mk_list//,/ }
+			for ip_mk in ${local_ip_mk_list}
+			do
+			    ip=${ip_mk/\/*}
+			    netmask=${ip_mk/*\/}
+			    if test ${ip} == '0.0.0.0' -a ${netmask} == '0.0.0.0' ; then
+				network='default'
+			    else
+				network="${ip} ${netmask}"
+			    fi
+			    case ${ipsec_type} in
+				site)
+				    echo "vpnipsec network ${ipsec_type} ${vpn_id} add local ${network}"
+				    ;;
+				access)
+				    echo "vpnipsec network ${ipsec_type} add local ${network}"
+				    ;;
+				*)
+				    return 255
+				    ;;
+			    esac
+			done
+		    fi
+
+		    if test -n "${remote_ip_mk_list}" -a "${remote_ip_mk_list}" != 'nil' ; then
+			remote_ip_mk_list=${remote_ip_mk_list//,/ }
+			for ip_mk in ${remote_ip_mk_list}
+			do
+			    ip=${ip_mk/\/*}
+			    netmask=${ip_mk/*\/}
+			    
+			    if test ${ip} == '0.0.0.0' -a ${netmask} == '0.0.0.0' ; then
+				network='default'
+			    else
+				network="${ip} ${netmask}"
+			    fi
+			    
+			    case ${ipsec_type} in
+				site)
+				    echo "vpnipsec network ${ipsec_type} ${vpn_id} add remote ${network}"
+				    ;;
+				access)
+				    echo "vpnipsec network ${ipsec_type} add remote ${network}"
+				    ;;
+				*)
+				    return 255
+				    ;;
+			    esac
+			done
+		    fi
+		    ;;
+		*)
+		    return 1
+		    ;;
+	    esac
+	    ((i++))
+	done
+
+	i=0
+	for elt in ${_VPN_IPSEC_VIA_LIST}
+	do
+	    range=$[${i} % 3]
+	    case ${range} in
+		0)
+		    ipsec_type=${elt}
+		    ;;
+		1)
+		    vpn_id=${elt}
+		    ;;
+		2)
+		    vias=$(colon2space ${elt})
+		    for via in ${vias}
+		    do
+			gateway=${via/_*}
+			role_prio=${via#*_}
+			role=${role_prio/_*}
+			prio=${role_prio/*_}
+			case ${ipsec_type} in
+			    site)
+				echo "vpnipsec via ${ipsec_type} ${vpn_id} add ${gateway} ${role} ${prio}"
+				;;
+			    access)
+				echo "vpnipsec via ${ipsec_type} add ${gateway} ${role} ${prio}"
+				;;
+			    *)
+				return 255
+				;;
+			esac
+		    done
+		    ;;
+		*)
+		    return 255
+		    ;;
+	    esac
+	    ((i++))
+	done
+
+	i=0
+	for elt in ${_VPN_IPSEC_TO_LIST}
+	do
+	    range=$[${i} % 2]
+	    case ${range} in
+		0)
+		    vpn_id=${elt}
+		    ;;
+		1)
+		    tos=$(colon2space ${elt})
+		    for ip in ${tos}
+		    do
+			echo "vpnipsec to ${vpn_id} add ${ip}"
+		    done
+		    ;;
+		*)
+		    return 255
+		    ;;
+	    esac
+	    ((i++))
+	done
+	
+	i=0
+	for elt in ${_VPN_IPSEC_BEHIND_NAT_ROLE_LIST}
+	do
+	    range=$[${i} % 2]
+	    case ${range} in
+		0)
+		    vpn_id=${elt}
+		    ;;
+		1)
+		    role=${elt}
+		    echo "vpnipsec nat role ${vpn_id} ${role}"
+		    ;;
+		*)
+		    return 255
+		    ;;
+	    esac
+	    ((i++))
+	done
+
+	echo "vpnipsec nat public raz"
+	for ip in ${_VPN_IPSEC_BEHIND_NAT_IP_LIST}
+	do
+	    echo "vpnipsec nat public add ${ip}"
+	done
+
+	echo
+    fi
+
+    if contextual-command-is-allowed ; then
+	echo "port proxy ${_PROXY_PORT}"
+	echo "port thttp ${_THTTP_PORT}"
+	echo "port antivirus ${_AV_PORT}"
+	echo "port ocsp ${_OCSP_PORT}"
+	echo "port isakmp ${_ISAKMP_PORT}"
+	echo "port natt ${_NATT_PORT}"
+	echo "port httppeer ${_PEER_HTTP_PORT}"
+	echo "port htcppeer ${_PEER_HTCP_PORT}"
+	echo "port dhcp ${_DHCP_PEER_PORT}"
+    fi
+
+    echo "port wadmin ${_WADMIN_PORT}"
+
+    ! contextual-command-is-allowed || echo "port waudit ${_WAUDIT_PORT}"
+
+    echo
+    echo "dns raz"
+    for elt in ${_NAME_SERVER_LIST}
+    do
+	echo "dns add ${elt}"
+    done
+
+    echo
+
+    if test ${_DYNAMIC_DNS_STATE} == False ; then
+	echo "dynamicdns off"
+    else
+	echo -n "dynamicdns on:encrypted ${_DYNAMIC_DNS_PROVIDER} ${_DYNAMIC_DNS_HOSTNAME}"
+	case ${_DYNAMIC_DNS_PROVIDER} in
+	    changeip|myonlineportal|noip)
+		echo -n " ${_DYNAMIC_DNS_USERNAME}"
+		;;
+	    dnshome|freemyip)
+		;;
+	*)
+	    ;;
+	esac
+	password=$(encrypt-password "clear:${_DYNAMIC_DNS_PASSWORD}" "${DYNDNS_PASSWD}")
+	password=${password/encrypted:}
+
+	echo " ${password}"
+    fi
+
+    echo "dynamicdns interval ${_DYNAMIC_DNS_INTERVAL}"
+
+    if contextual-command-is-allowed ; then
+	echo
+	echo "dhcp fixed raz"
+
+	i=0
+	for elt in ${_DHCP_FIXED_LIST}
+	do
+	    range=$[${i} % 3]
+	    case ${range} in
+		0)
+		    name=${elt}
+		    ;;
+		1)
+		    mac=${elt}
+		    ;;
+		2)
+		    ip=${elt}
+		    echo "dhcp fixed add ${name} ${mac} ${ip}"
+		    ;;
+		*)
+		    return 1
+		    ;;
+	    esac
+	    ((i++))
+	done
+
+	echo "dhcp range raz"
+
+	i=0
+	for elt in ${_DHCP_RANGE_LIST}
+	do
+	    range=$[${i} % 2]
+	    case ${range} in
+		0)
+		    ip1=${elt}
+		    ;;
+		1)
+		    ip2=${elt}
+		    echo "dhcp range add ${ip1} ${ip2}"
+		    ;;
+		*)
+		    return 1
+		    ;;
+	    esac
+	    ((i++))
+	done
+
+	echo "dhcp peer raz"
+	i=0
+	for elt in ${_DHCP_PEER_LIST}
+	do
+	    range=$[${i} % 2]
+	    case ${range} in
+		0)
+		    role=${elt}
+		    ;;
+		1)
+		    ip=${elt}
+		    echo "dhcp peer add ${role} ${ip}"
+		    ;;
+		*)
+		    return 1
+		    ;;
+	    esac
+	    ((i++))
+	done
+    fi
+
+    echo
+    echo "ntp raz"
+    for elt in ${_NTP_SERVER_LIST}
+    do
+	echo "ntp add ${elt}"
+    done
+
+    if contextual-command-is-allowed ; then
+	echo
+	echo "peer share raz"
+	echo "peer ha raz"
+	echo "peer next raz"
+	echo "peer previous raz"
+
+	i=0
+	for elt in ${_PEER_SHARE_LIST}
+	do
+	    range=$[${i} % 2]
+	    case ${range} in
+		0)
+		    ip=${elt}
+		    ;;
+		1)
+		    qos=${elt}
+		    echo "peer share add ${ip} ${qos}"
+		    ;;
+		*)
+		    return 1
+		    ;;
+	    esac
+	    ((i++))
+	done
+
+	i=0
+	for elt in ${_PEER_HA_LIST}
+	do
+	    range=$[${i} % 2]
+	    case ${range} in
+		0)
+		    ip=${elt}
+		    ;;
+		1)
+		    qos=${elt}
+		    echo "peer ha add ${ip} ${qos}"
+		    ;;
+		*)
+		    return 1
+		    ;;
+	    esac
+	    ((i++))
+	done
+
+	i=0
+	for elt in ${_PEER_NEXT_LIST}
+	do
+	    range=$[${i} % 2]
+	    case ${range} in
+		0)
+		    ip=${elt}
+		    ;;
+		1)
+		    port=${elt}
+		    if test "${port}" == nil ; then
+			echo "peer next add ${ip}"
+		    else
+			echo "peer next add ${ip} ${port}"
+		    fi
+		    ;;
+		*)
+		    return 1
+		    ;;
+	    esac
+	    ((i++))
+	done
+
+	i=0
+	for elt in ${_PEER_PREVIOUS_LIST}
+	do
+	    range=$[${i} % 2]
+	    case ${range} in
+		0)
+		    ip=${elt}
+		    ;;
+		1)
+		    qos=${elt}
+		    echo "peer previous add ${ip}"
+		    ;;
+		*)
+		    return 1
+		    ;;
+	    esac
+	    ((i++))
+	done
+	echo
+    fi
+
+    if contextual-command-is-allowed ; then
+	i=0
+	for elt in ${_RWEB_SITE_LIST}
+	do
+	    range=$[${i} % 5]
+	    case ${range} in
+		0)
+		    name=${elt}
+		    ;;
+		1)
+		    protocol=${elt}
+		    ;;
+		2)
+		    ip=${elt}
+		    ;;
+		3)
+		    tls=${elt}
+		    ;;
+		4)
+		    qos=${elt}
+		    case ${protocol} in
+			http)
+			    echo "rweb site add ${name} ${protocol} ${ip} ${qos}"
+			    ;;
+			https)
+			    echo "rweb site add ${name} ${protocol} ${tls} ${ip} ${qos}"
+			    ;;
+			*)
+			    ;;
+		    esac
+		    ;;
+		*)
+		    return 1
+		    ;;
+	    esac
+	    ((i++))
+	done
+
+	for name in ${_RWEB_SITE_HTTPX_LIST}
+	do
+	    echo "rweb rhttp ${name} off"
+	done
+
+	i=0
+	for elt in ${_RWEB_SITE_HOSTS_LIST}
+	do
+	    range=$[${i} % 2]
+	    case ${range} in
+		0)
+		    name=${elt}
+		    ;;
+		1)
+		    hosts=$(colon2space ${elt})
+		    for host in ${hosts}
+		    do
+			host=${host//_/ }
+
+			dev=$(get-nth-arg 1 ${host})
+			protocol=$(get-nth-arg 2 ${host})
+			ip=$(get-nth-arg 3 ${host})
+			port=$(get-nth-arg 4 ${host})
+			weight=$(get-nth-arg 5 ${host})
+			qos=$(get-nth-arg 6 ${host})
+
+			echo "rweb host ${name} add ${dev} ${protocol} ${ip} ${port} ${weight} ${qos}"
+		    done
+		    ;;
+		*)
+		    return 1
+		    ;;
+	    esac
+	    ((i++))
+	done
+
+	i=0
+	for elt in ${_RWEB_SITE_BALANCER_LIST}
+	do
+	    range=$[${i} % 5]
+	    case ${range} in
+		0)
+		    name=${elt}
+		    ;;
+		1)
+		    algorithm=${elt}
+		    ;;
+		2)
+		    sticky=${elt}
+		    ;;
+		3)
+		    mode=${elt}
+		    ;;
+		4)
+		    cookie=${elt}
+		    case ${sticky} in
+			sticky)
+			    echo "rweb balancer ${name} ${algorithm} ${sticky} ${mode} ${cookie}"
+			    ;;
+			nosticky)
+			    echo "rweb balancer ${name} ${algorithm} ${sticky}"
+			    ;;
+			*)
+			    ;;
+		    esac
+		    ;;
+		*)
+		    return 1
+		    ;;
+	    esac
+	    ((i++))
+	    
+	done
+
+	i=0
+	for elt in ${_RWEB_SITE_VIA_LIST}
+	do
+	    range=$[${i} % 3]
+	    case ${range} in
+		0)
+		    site_name=${elt}
+		    ;;
+		1)
+		    ip=${elt}
+		    ;;
+		2)
+		    vias=$(colon2space ${elt})
+		    for via in ${vias}
+		    do
+			gateway=${via/_*}
+			role_prio=${via#*_}
+			role=${role_prio/_*}
+			prio=${role_prio/*_}
+			
+			echo "rweb via ${site_name} ${ip} add ${gateway} ${role} ${prio}"
+		    done
+		    ;;
+		*)
+		    return 255
+		    ;;
+	    esac
+	    ((i++))
+	done
+
+	i=0
+	for elt in ${_RWEB_SITE_STANDBY_LIST}
+	do
+	    range=$[${i} % 3]
+	    case ${range} in
+		0)
+		    name=${elt}
+		    ;;
+		1)
+		    protocol=${elt}
+		    ;;
+		2)
+		    url=${elt}
+		    case ${protocol} in
+			none)
+			    echo "rweb standby ${name} on"
+			    ;;
+			*)
+			    echo "rweb standby ${name} on ${protocol}://${url}"
+			    ;;
+		    esac
+		    ;;
+		*)
+		    return 1
+		    ;;
+	    esac
+	    ((i++))
+	done
+
+	test -z "${_RWEB_SITE_LIST}" || echo
+    fi
+
+    if contextual-command-is-allowed ; then
+	echo "qos bandwidth internal ingress ${_QOS_BW_INTERNAL_INGRESS}"
+	echo "qos bandwidth internal egress ${_QOS_BW_INTERNAL_EGRESS}"
+	echo "qos bandwidth external ingress ${_QOS_BW_EXTERNAL_INGRESS}"
+	echo "qos bandwidth external egress ${_QOS_BW_EXTERNAL_EGRESS}"
+	echo "qos bandwidth auxiliary ingress ${_QOS_BW_AUXILIARY_INGRESS}"
+	echo "qos bandwidth auxiliary egress ${_QOS_BW_AUXILIARY_EGRESS}"
+
+	for flow in web antivirus file default
+	do
+	    for dev in internal external
+	    do
+		for gress in ingress egress
+		do
+		    qos=$(get-qos-shape ${dev} ${gress} ${flow}${qos_state})
+		    echo "qos shape ${flow} ${dev} ${gress} ${qos}"
+		done
+	    done
+	done
+
+	for dev in internal auxiliary
+	do
+	    for gress in ingress egress
+	    do
+		qos=$(get-qos-shape ${dev} ${gress} tweb${qos_state})
+		echo "qos shape tweb ${dev} ${gress} ${qos}"
+	    done
+	done
+
+	for dev in internal external
+	do
+	    for gress in ingress egress
+	    do
+		qos=$(get-qos-shape ${dev} ${gress} rweb${qos_state})
+		echo "qos shape rweb ${dev} ${gress} ${qos}"
+	    done
+	done
+
+	for gress in ingress egress
+	do
+	    qos=$(get-qos-shape internal ${gress} peer${qos_state})
+	    echo "qos shape peer internal ${gress} ${qos}"
+	done
+
+	for gress in ingress egress
+	do
+	    qos=$(get-qos-shape external ${gress} vpnipsec${qos_state})
+	    echo "qos shape vpnipsec external ${gress} ${qos}"
+	done
+
+	echo "qos shape router raz"
+	for elt in ${_QOS_SHAPE_ROUTER_LIST}
+	do
+	    range=$[${i} % 10]
+	    case ${range} in
+		0)
+		    id=${elt}
+		    ;;
+		1)
+		    dev=${elt}
+		    ;;
+		2)
+		    protocol=${elt}
+		    ;;
+		3)
+		    src_ip=${elt}
+		    ;;
+		4)
+		    src_port=${elt}
+		    ;;
+		5)
+		    ingress_qos=${elt}
+		    ;;
+		6)
+		    dst_ip=${elt}
+		    ;;
+		7)
+		    dst_port=${elt}
+		    ;;
+		8)
+		    egress_qos=${elt}
+		    ;;
+		9)
+		    dscp=${elt}
+		    if test ${dscp} == nil ; then
+			unset dscp
+		else
+		    dscp=" ${dscp}"
+		    fi
+		    echo "qos shape router add ${id} ${dev} ${protocol} ${src_ip} ${src_port} ${ingress_qos} ${dst_ip} ${dst_port} ${egress_qos}${dscp}"
+		    ;;
+		*)
+		    return 1
+		    ;;
+	    esac
+	    ((i++))
+	done
+    
+	echo -n "qos borrow internal ingress "
+	external-form ${_QOS_BORROW_INTERNAL_INGRESS}
+	echo
+	echo -n "qos borrow internal egress "
+	external-form ${_QOS_BORROW_INTERNAL_EGRESS}
+	echo
+	echo -n "qos borrow external ingress "
+	external-form ${_QOS_BORROW_EXTERNAL_INGRESS}
+	echo
+	echo -n "qos borrow external egress "
+	external-form ${_QOS_BORROW_EXTERNAL_EGRESS}
+	echo
+	echo -n "qos borrow auxiliary ingress "
+	external-form ${_QOS_BORROW_AUXILIARY_INGRESS}
+	echo
+	echo -n "qos borrow auxiliary egress "
+	external-form ${_QOS_BORROW_AUXILIARY_EGRESS}
+	echo
+    fi
+
+    if contextual-command-is-allowed ; then
+	i=0
+	echo
+	echo "transparent raz"
+	for elt in ${_TRANSPARENT_WEB_LIST}
+	do
+	    range=$[${i} % 4]
+	    case ${range} in
+		0)
+		    interface=${elt}
+		    ;;
+		1)
+		    ip=${elt}
+		    ;;
+		2)
+		    netmask=${elt}
+		    ;;
+		3)
+		    qos=${elt}
+		    echo "transparent add ${interface} ${ip} ${netmask} ${qos}"
+		    ;;
+		*)
+		    return 1
+		    ;;
+	    esac
+	    ((i++))
+	done
+    fi
+
+    if contextual-command-is-allowed ; then
+	access_types="web antivirus file admin mon"
+    else
+	access_types="file admin mon"
+    fi
+
+    for access_type in ${access_types}
+    do
+	i=0
+	case ${access_type} in
+	    antivirus)
+		at=AV
+		;;
+	    *)
+		at=${access_type^^}
+		;;
+	esac
+	acl=$(eval echo \${_ACCESS_${at}_LIST})
+	echo
+	echo "access ${access_type} raz"
+	for elt in ${acl}
+	do
+	    range=$[${i} % 4]
+	    case ${range} in
+		0)
+		    interface=${elt}
+		    ;;
+		1)
+		    ip=${elt}
+		    ;;
+		2)
+		    netmask=${elt}
+		    ;;
+		3)
+		    qos=${elt}
+		    case ${access_type} in
+			web|antivirus)
+			    echo "access ${access_type} add ${interface} ${ip} ${netmask} ${qos}"
+			    ;;
+			admin)
+			    echo "access ${access_type} add ${interface} ${ip} ${netmask}"
+			    ;;
+			mon|file)
+			    echo "access ${access_type} add ${interface} ${ip}"
+			    ;;
+		    esac
+		    ;;
+		*)
+		    return 1
+		    ;;
+	    esac
+	    ((i++))
+	done
+    done
+
+    if contextual-command-is-allowed ; then
+	echo "access manager raz"
+	i=0
+	for elt in ${_ACCESS_MANAGER_LIST}
+	do
+	    range=$[${i} % 3]
+	    case ${range} in
+		0)
+		    role=${elt}
+		    ;;
+		1)
+		    interface=${elt}
+		    ;;
+		2)
+		    ip=${elt}
+		    ssh_key_id=$(get-manager-key-id ${role})
+		    
+		    case ${in_state} in
+			current)
+			    ssh_key_file=${SSH_PUBLIC_KEY_DIR}/${ssh_key_id}
+			    ;;
+			new)
+			    ssh_key_file=${TMP_DIR}/${LOADED}.${SSH_KEY}.${ssh_key_id}
+			    ;;
+			*)
+			    ;;
+		    esac
+
+		    ssh_key=$(cat ${ssh_key_file} 2> /dev/null)
+
+		    if test -n "${ssh_key}" ; then
+			echo "access manager add master ${interface} ${ip} \"${ssh_key}\""
+		    else
+			echo "access manager add master ${interface} ${ip}"
+		    fi
+		    ;;
+		*)
+		    return 255
+		    ;;
+	    esac
+	    ((i++))
+	done
+    fi
+
+    if contextual-command-is-allowed ; then
+	echo
+	echo "cache object ${_CACHE_MIN_OBJECT_SZ} ${_CACHE_MAX_OBJECT_SZ}"
+	if test ${_CACHE_BIG_OBJECT} == False ; then
+	    echo "cache bigobject off"
+	else
+	    echo "cache bigobject on ${_CACHE_BIG_MIN_OBJECT_SZ} ${_CACHE_BIG_MAX_OBJECT_SZ}"
+	fi
+    fi
+
+    if contextual-command-is-allowed ; then
+	echo
+	echo -n "guard ip "
+	external-form ${_GUARD_IP}
+	echo
+	echo "guard rule raz"
+	echo "guard policy raz"
+	echo "guard filter ip raz"
+	echo "guard filter time raz"
+	echo "guard filter ldap raz"
+    fi
+
+    echo
+    echo "urllist raz"
+
+    for name in ${_URLLIST_LIST}
+    do
+	echo "urllist add ${name}"
+	case ${in_state} in
+	    current)
+		g_file=${URLLIST_DIR}/${name}.${URLLIST_AUTO}.current
+		if test -f ${g_file} ; then
+		    read g_bool g_load g_op g_period g_protocol g_ip g_fn < ${g_file}
+		    if test ${g_protocol} == push ; then
+			echo "urllist auto ${name} on ${g_load} ${g_op} ${g_period} ${g_protocol}"
+		    else
+			echo "urllist auto ${name} on ${g_load} ${g_op} ${g_period} ${g_protocol} ${g_ip} ${g_fn}"
+		    fi
+		else
+		    echo "urllist auto ${name} off"
+		fi
+		;;
+	    new)
+		g_file=${URLLIST_DIR}/${name}.${URLLIST_AUTO}
+		if test -f ${g_file} ; then
+		    read g_bool g_load g_op g_period g_protocol g_ip g_fn < ${g_file}
+		    if test "${g_bool}" == on ; then
+			if test ${g_protocol} == push ; then
+			    echo "urllist auto ${name} on ${g_load} ${g_op} ${g_period} ${g_protocol}"
+			else
+			    echo "urllist auto ${name} on ${g_load} ${g_op} ${g_period} ${g_protocol} ${g_ip} ${g_fn}"
+			fi
+		    else
+			echo "urllist auto ${name} off"
+		    fi
+		else
+		    g_file=${URLLIST_DIR}/${name}.${URLLIST_AUTO}.current
+		    if test -f ${g_file} ; then
+			read g_bool g_load g_op g_period g_protocol g_ip g_fn < ${g_file}
+			if test ${g_protocol} == push ; then
+			    echo "urllist auto ${name} on ${g_load} ${g_op} ${g_period} ${g_protocol}"
+			else
+			    echo "urllist auto ${name} on ${g_load} ${g_op} ${g_period} ${g_protocol} ${g_ip} ${g_fn}"
+			fi
+		    else
+			echo "urllist auto ${name} off"
+		    fi
+		fi
+		;;
+	    *)
+		;;
+	esac
+    done
+
+    if contextual-command-is-allowed ; then
+	i=0
+	for elt in ${GUARD_FILTER_IP_LIST}
+	do
+	    range=$[${i} % 4]
+	    case ${range} in
+		0)
+		    name=${elt}
+		    ;;
+		1)
+		    ip_key=${elt}
+		    ;;
+		2)
+		    ip1=${elt}
+		    ;;
+		3)
+		    ip2=${elt}
+		    case ${ip_key} in
+			range)
+			    if test ${ip1} == ${ip2} ; then
+				echo "guard filter ip add ${name} ${ip_key} ${ip1}"
+			    else
+				echo "guard filter ip add ${name} ${ip_key} ${ip1} ${ip2}"
+			    fi
+			    ;;
+			network)
+			    echo "guard filter ip add ${name} ${ip_key} ${ip1} ${ip2}"
+			    ;;
+			*)
+			    ;;
+		    esac
+		    ;;
+		*)
+		    echo ""
+		    return 1
+		    ;;
+	    esac
+	    ((i++))
+	done
+
+	i=0
+	for elt in ${GUARD_FILTER_TIME_LIST}
+	do
+	    range=$[${i} % 3]
+	    case ${range} in
+		0)
+		    name=${elt}
+		    ;;
+		1)
+		    time_type=${elt}
+		    ;;
+		2)
+		    time_value=${elt}
+		    echo "guard filter time add ${name} ${time_type} ${time_value}"
+		    ;;
+		*)
+		    echo ""
+		    return 1
+		    ;;
+	    esac
+	    ((i++))
+	done
+
+	i=0
+	for elt in ${GUARD_FILTER_LDAP_LIST}
+	do
+	    range=$[${i} % 4]
+	    case ${range} in
+		0)
+		    name=${elt}
+		    ;;
+		1)
+		    ldap_gdn=${elt}
+		    ;;
+		2)
+		    ldap_login=${elt}
+		    ;;
+		3)
+		    ldap_filter=${elt}
+		    echo "guard filter ldap add ${name} '${ldap_gdn}' '${ldap_login}' '${ldap_filter}'"
+		    ;;
+		*)
+		    echo
+		    return 1
+		    ;;
+	    esac
+	    ((i++))
+	done
+
+	i=0
+	for elt in ${_GUARD_POLICY_LIST}
+	do
+	    range=$[${i} % 2]
+	    case ${range} in
+		0)
+		    name=${elt}
+		    ;;
+		1)
+		    filters_col=${elt}
+		    if test "${filters_col}" == "self_self" ; then
+			echo "guard policy add ${name}"
+		    else
+			echo -n "guard policy add ${name}"
+			filters_lst=$(colon2space ${filters_col})
+			for filter in ${filters_lst}
+			do
+			    test ${filter} != "self_self" || continue
+			    filter_type=${filter/_*}
+			    filter_name=${filter#*_}
+			    echo -n " ${filter_type} ${filter_name}"
+			done
+			echo
+		    fi
+		    ;;
+		*)
+		    echo
+		    return 1
+		    ;;
+	    esac
+	    ((i++))
+	done
+
+	i=0
+	for elt in ${_GUARD_RULE_LIST}
+	do
+	    range=$[${i} % 3]
+	    case ${range} in
+		0)
+		    name=${elt}
+		    ;;
+		1)
+		    action=${elt}
+		    ;;
+		2)
+		    guards_text=${elt}
+		    guards=$(colon2space ${guards_text})
+		    echo "guard rule add ${name} ${action} ${guards}"
+		    ;;
+		*)
+		    echo
+		    return 1
+		    ;;
+	    esac
+	    ((i++))
+	done
+    fi
+
+    if contextual-command-is-allowed ; then
+
+	echo
+
+	if test -n "${_FW_DOS_TCP_FLOOD}" ; then
+	    echo "firewall dos tcpflood set ${_FW_DOS_TCP_FLOOD}"
+	else
+	    echo "firewall dos tcpflood default"
+	fi
+
+	if test -n "${_FW_DOS_UDP_FLOOD}" ; then
+	    echo "firewall dos udpflood set ${_FW_DOS_UDP_FLOOD}"
+	else
+	    echo "firewall dos udpflood default"
+	fi
+
+	if test -n "${_FW_DOS_WEB_FLOOD}" ; then
+	    echo "firewall dos webflood set ${_FW_DOS_WEB_FLOOD}"
+	else
+	    echo "firewall dos webflood default"
+	fi
+
+	if test -n "${_FW_DOS_RWEB_FLOOD}" ; then
+	    echo "firewall dos rwebflood set ${_FW_DOS_RWEB_FLOOD}"
+	else
+	    echo "firewall dos rwebflood default"
+	fi
+
+	if test -n "${_FW_DOS_TCP_LIMIT}" ; then
+	    echo "firewall dos piptcp set ${_FW_DOS_TCP_LIMIT}"
+	else
+	    echo "firewall dos piptcp default"
+	fi
+
+	if test -n "${_FW_DOS_WEB_LIMIT}" ; then
+	    echo "firewall dos pipweb set ${_FW_DOS_WEB_LIMIT}"
+	else
+	    echo "firewall dos pipweb default"
+	fi
+
+	if test -n "${_FW_DOS_RWEB_LIMIT}" ; then
+	    echo "firewall dos piprweb set ${_FW_DOS_RWEB_LIMIT}"
+	else
+	    echo "firewall dos piprweb default"
+	fi
+
+	if test -n "${_FW_DOS_DNS_LIMIT}" ; then
+	    echo "firewall dos pipdns set ${_FW_DOS_DNS_LIMIT}"
+	else
+	    echo "firewall dos pipdns default"
+	fi
+
+	if test -n "${_FW_DOS_OCSP_LIMIT}" ; then
+	    echo "firewall dos pipocsp set ${_FW_DOS_OCSP_LIMIT}"
+	else
+	    echo "firewall dos pipocsp default"
+	fi
+
+	echo
+
+	for rset in external web rweb admin mon file peer auxiliary vpnipsec
+	do
+	    i=0
+	    case "${rset}" in
+		external)
+		    rules=${_FW_EXTERNAL_RULE_LIST}
+		    ;;
+		web)
+		    rules=${_FW_WEB_RULE_LIST}
+		    ;;
+		rweb)
+		    rules=${_FW_RWEB_RULE_LIST}
+		    ;;
+		antivirus)
+		    rules=${_FW_AV_RULE_LIST}
+		    ;;
+		admin)
+		    rules=${_FW_ADMIN_RULE_LIST}
+		    ;;
+		mon)
+		    rules=${_FW_MON_RULE_LIST}
+		    ;;
+		file)
+		    rules=${_FW_FILE_RULE_LIST}
+		    ;;
+		peer)
+		    rules=${_FW_PEER_RULE_LIST}
+		    ;;
+		auxiliary)
+		    rules=${_FW_AUXILIARY_RULE_LIST}
+		    ;;
+		vpnipsec)
+		    rules=${_FW_VPN_IPSEC_RULE_LIST}
+		    ;;		
+		*)
+		    return 255
+		    ;;
+	    esac
+
+	    echo "firewall ${rset} raz"
+
+	    for elt in ${rules}
+	    do
+		range=$[${i} % 11]
+		case ${range} in
+		    0)
+			id=${elt}
+			;;
+		    1)
+			state=${elt}
+			;;
+		    2)
+			action=${elt}
+			;;
+		    3)
+			protocol=${elt}
+			;;
+		    4)
+			src_ip=${elt}
+			;;
+		    5)
+			dst_dev=${elt}
+			;;
+		    6)
+			dst_ip=${elt}
+			;;
+		    7)
+			dst_ports=${elt}
+			;;
+		    8)
+			src_nat_ip=${elt}
+			;;
+		    9)
+			dst_nat_ip=${elt}
+			;;
+		    10)
+			dst_pat_port=${elt}
+
+			rule="${id} ${action} ${protocol} ${src_ip} ${dst_dev} ${dst_ip} ${dst_ports}"
+
+			if test "${src_nat_ip}" != "nil" ; then
+			    if test "${dst_nat_ip}" != "nil" ; then
+				if test "${dst_pat_port}" != "nil" ; then
+				    rule="${rule} ${src_nat_ip} ${dst_nat_ip} ${dst_pat_port}"
+				else
+				    rule="${rule} ${src_nat_ip} ${dst_nat_ip}"
+				fi
+			    else
+				rule="${rule} ${src_nat_ip}"
+			    fi
+			else
+			    if test "${dst_nat_ip}" != "nil" ; then
+				if test "${dst_pat_port}" != "nil" ; then
+				    rule="${rule} ${src_nat_ip} ${dst_nat_ip} ${dst_pat_port}"
+				else
+				    rule="${rule} ${src_nat_ip} ${dst_nat_ip}"
+				fi
+			    fi
+			fi
+
+			echo "firewall ${rset} add ${rule}"
+			test ${state} == on || echo "firewall ${rset} off ${id}"
+			;;
+		    *)
+			return 255
+			;;
+		esac
+		((i++))
+	    done
+	done
+    fi
+
+    if contextual-command-is-allowed ; then
+	echo
+	for ((i=0;i<12;i++))
+	do
+	    filter=$(get-generic-waf-id ${i})
+	    flag=${_WAF_GENERIC:${i}:1}
+	    flag=$(waf-external-form ${flag})
+	    echo "waf generic ${filter} ${flag}"
+	done
+	echo
+	echo "waf reputation country raz"
+
+	local waf_reputation_countries=$(sqlite3 ${USERENV_DIR}/${_CONFIGURATION_DB_NAME} \
+						 "SELECT country FROM waf_reputation_country WHERE reputation = TRUE;")
+	for elt in ${waf_reputation_countries}
+	do
+	    echo "waf reputation country add ${elt}"
+	done
+
+	echo
+
+	if test -z "${_WAF_REPUTATION_RBL_KEY}" ; then
+	    echo "waf reputation rbl set"
+	else
+	    password=$(encrypt-password "clear:${_WAF_REPUTATION_RBL_KEY}" "${WAF_REPUTATION_RBL_PASSWD}")
+	    password=${password/encrypted:}
+	    echo "waf reputation rbl set:encrypted '${password}'"
+	fi
+
+	echo "waf imethods ${_WAF_IMETHODS}"
+	echo "waf level ${_WAF_LEVEL}"
+	echo "waf score request ${_WAF_REQUEST_SCORE}"
+	echo "waf score response ${_WAF_RESPONSE_SCORE}"
+	echo
+	echo "waf limit request ${_WAF_REQUEST_BODY}"
+	echo "waf limit response ${_WAF_RESPONSE_BODY}"
+	echo "waf limit assertions ${_WAF_NUM_ARG}"
+	echo "waf limit name ${_WAF_ARG_NAME_LENGTH}"
+	echo "waf limit value ${_WAF_ARG_LENGTH}"
+	echo "waf limit arguments ${_WAF_TOTAL_ARG_LENGTH}"
+	echo "waf limit files ${_WAF_FILES_SIZE}"
+	echo
+	echo "waf errors ${_WAF_REWRITE_HTTP_ERRORS}"
+	echo "waf rweb errors raz"
+	i=0
+	for elt in ${_WAF_RWEB_REWRITE_HTTP_ERRORS_LIST}
+	do
+	    range=$[${i} % 2]
+	    case ${range} in
+		0)
+		    name=${elt}
+		    ;;
+		1)
+		    state=${elt}
+		    echo "waf rweb errors add ${name} ${state}"
+		    ;;
+		*)
+		    return 1
+		    ;;
+	    esac
+	    ((i++))
+	done
+	echo
+
+	i=0
+	for elt in ${_WAF_RWEB_GENERIC}
+	do
+	    range=$[${i} % 2]
+	    case ${range} in
+		0)
+		    name=${elt}
+		    ;;
+		1)
+		    filters=${elt}
+		    for ((j=0;j<12;j++))
+		    do
+			filter=$(get-generic-waf-id ${j})
+			flag=${filters:${j}:1}
+			flag=$(waf-external-form ${flag})
+			echo "waf rweb generic ${name} ${filter} ${flag}"
+		    done
+		    echo
+		    ;;
+		*)
+		    return 1
+		    ;;
+	    esac
+	    ((i++))
+	done
+
+	i=0
+	echo "waf bypass rule raz"
+	echo "waf bypass application raz"
+	for elt in ${_WAF_RWEB_BYPASS_RULE_LIST}
+	do
+	    range=$[${i} % 2]
+	    case ${range} in
+		0)
+		    name=${elt}
+		    ;;
+		1)
+		    ids=${elt}
+		    echo "waf rweb bypass rule ${name} add ${ids//:/ }"
+		    ;;
+		*)
+		    return 1
+		    ;;
+	    esac
+	    ((i++))
+	done
+	i=0
+	for elt in ${_WAF_RWEB_BYPASS_APPLICATION_LIST}
+	do
+	    range=$[${i} % 2]
+	    case ${range} in
+		0)
+	      name=${elt}
+	      ;;
+		1)
+		    atype=${elt}
+		    echo "waf rweb bypass application ${name} set ${atype}"
+		    ;;
+		*)
+		    return 1
+		    ;;
+	    esac
+	    ((i++))
+	done
+	
+	echo
+
+	local sites=$(get-site-name-list "${_RWEB_SITE_LIST}")
+	for name in ${sites}
+	do
+	    if member "${_WAF_RWEB_AUDIT_LIST}" ${name} ; then
+		echo "waf rweb audit ${name} on"
+	    else
+		echo "waf rweb audit ${name} off"
+	    fi
+	done
+	test -z "${sites}" || echo
+
+	i=0
+	echo "waf rweb denyurl raz"
+	for elt in ${_RWEB_SITE_DENYURL_LIST}
+	do
+	    range=$[${i} % 2]
+	    case ${range} in
+		0)
+		    name=${elt}
+		    ;;
+		1)
+		    url=${elt}
+		    echo "waf rweb denyurl set ${name} ${url}"
+		    ;;
+		*)
+		    return 1
+		    ;;
+	    esac
+	    ((i++))
+	done
+
+	echo
+	echo "waf dos ${_WAF_DOS_LIMIT}"
+    fi
+
+    if contextual-command-is-allowed ; then
+	echo
+	echo -n "sslmediate transparent "
+	external-form ${_SSLMEDIATE_TRANSPARENT}
+	echo
+	echo -n "sslmediate expired "
+	external-form ${_SSLMEDIATE_EXPIRED}
+	echo
+	echo -n "sslmediate premature "
+	external-form ${_SSLMEDIATE_PREMATURE}
+	echo
+	echo -n "sslmediate selfsigned "
+	external-form ${_SSLMEDIATE_SELFSIGNED}
+	echo
+	echo "sslmediate policy ${_SSLMEDIATE_POLICY}"
+	
+	echo "sslmediate exception urllist raz"
+	echo "sslmediate exception domainname raz"
+	for name in ${_SSLMEDIATE_EXCEPTION_URLLIST_LIST}
+	do
+	    echo "sslmediate exception urllist add ${name}"
+	done
+	
+	for name in ${_SSLMEDIATE_EXCEPTION_DOMAINNAME_LIST}
+	do
+	    echo "sslmediate exception domainname add ${name}"
+	done
+    fi
+
+    echo
+    echo "antivirus auto ${_AV_COUNTRY_CODE}"
+    echo "antivirus extended method ${_AV_EXTENDED_METHOD}"
+    echo "antivirus extended url ${_AV_EXTENDED_URL}"
+
+    if contextual-command-is-allowed ; then
+	echo "antivirus whitelist domainname raz"
+	for name in ${_AV_WHITELIST_DOMAINNAME_LIST}
+	do
+	    echo "antivirus whitelist domainname add ${name}"
+	done
+	echo "antivirus maxobject ${_AV_MAX_OBJECT_SZ}"
+	echo -n "antivirus pua "
+	external-form ${_AV_PUA}
+	echo
+	echo -n "antivirus topology internal "
+	external-form ${_AV_INTERNAL}
+	echo
+	echo -n "antivirus topology external "
+	external-form ${_AV_EXTERNAL}
+	echo
+	echo -n "antivirus topology auxiliary "
+	external-form ${_AV_AUXILIARY}
+	echo
+	echo -n "antivirus topology vpnipsec "
+	external-form ${_AV_VPN_IPSEC}
+	echo
+    fi
+
+    if contextual-command-is-allowed ; then
+	echo
+	echo -n "authenticate web "
+	external-form ${_AUTHENTICATE_WEB}
+	echo
+	echo -n "authenticate rweb "
+	external-form ${_AUTHENTICATE_RWEB}
+	echo
+	echo -n "authenticate mode ldap "
+	external-form ${_AUTHENTICATE_LDAP}
+	echo
+	echo -n "authenticate mode kerberos "
+	external-form ${_AUTHENTICATE_KERBEROS}
+	echo
+
+	if test ${_LDAP_BIND_MODE} == False ; then
+	    echo "authenticate ldap binddn ${_LDAP_BIND_DN} off"
+	else
+	    password=$(encrypt-password "clear:${_LDAP_BIND_PASSWORD}" "${LDAP_PASSWD}")
+	    password=${password/encrypted:}
+	    echo "authenticate ldap binddn '${_LDAP_BIND_DN}' on:encrypted ${password}"
+	fi
+
+	echo -n "authenticate ldap request '${_LDAP_BASE_DN}' '${_LDAP_LOGIN}' '${_LDAP_PASSWORD}' '${_LDAP_FILTER}'"
+
+	if test -n "${_LDAP_GROUP_DN}" ; then
+	    echo " '${_LDAP_GROUP_DN}'"
+	else
+	    echo
+	fi
+
+	echo "authenticate ldap server raz"
+
+	i=0
+	for elt in ${_LDAP_SERVER_LIST}
+	do
+	    range=$[${i} % 4]
+	    case ${range} in
+		0)
+		    protocol=${elt}
+		    ;;
+		1)
+		    name=${elt}
+		    ;;
+		2)
+		    ip=${elt}
+		    ;;
+		3)
+		    port=${elt}
+		    echo "authenticate ldap server add ${protocol} ${name} ${ip} ${port}"
+		    ;;
+		*)
+		    return 1
+		    ;;
+	    esac
+	    ((i++))
+	done
+
+	if test -z "${_LDAPS_CA}" ; then
+	    echo "authenticate ldaps ca raz"
+	else
+	    echo "authenticate ldaps ca set ${_LDAPS_CA}"
+	fi
+
+	echo
+
+	echo "authenticate kerberos encrypt ${_KERBEROS_ENCRYPT_TYPE}"
+	echo "authenticate kerberos web ${_KERBEROS_SERVICE_NAME}"
+
+	password=$(encrypt-password "clear:${_KERBEROS_HA_SHARED_PASSWORD}" "${KERBEROS_SHARED_PASSWD}")
+	password=${password/encrypted:}
+	test -z "${password}" || password=" ${password}"
+	echo "authenticate kerberos hapassword:encrypted${password}"
+
+	echo "authenticate kerberos server raz"
+	for name in ${_KERBEROS_SERVER_LIST}
+	do
+	    echo "authenticate kerberos server add ${name}"
+	done
+	echo "authenticate ad rdn ${_AD_WEBGATEWAY_RDN}"
+
+	i=0
+	echo "authenticate kerberos rweb raz"
+	for elt in ${_KERBEROS_RWEB_LIST}
+	do
+	    range=$[${i} % 2]
+	    case ${range} in
+		0)
+		    site_name=${elt}
+		    ;;
+		1)
+		    canonical_name=${elt}
+		    echo "authenticate kerberos rweb add ${site_name} ${canonical_name}"
+		    ;;
+		*)
+		    return 1
+		    ;;
+	    esac
+	    ((i++))
+	done
+    fi
+
+    if test ${apl_role} == manager ; then
+
+	dir=$(get-manager-context-rdir template)
+	templates=$(ls -1 ${dir} 2> /dev/null)
+
+	test -z "${templates}" -a ! -s ${MANAGER_GATEWAY_INDEX} || echo
+
+	for id in ${templates}
+	do
+	    id=$(file-basename ${id})
+	    echo "manager template add ${id}"
+	done
+
+	if test -s ${MANAGER_GATEWAY_INDEX} ; then
+	    while read uuid domain id ip
+	    do
+		echo "manager gateway add ${domain} ${id} ${ip}"
+	    done < ${MANAGER_GATEWAY_INDEX}
+	fi
+
+	ssh_key_id=$(get-manager-key-id peer)
+
+	case ${in_state} in
+	    current)
+		ssh_key_file=${SSH_PUBLIC_KEY_DIR}/${ssh_key_id}
+		;;
+	    new)
+		ssh_key_file=${TMP_DIR}/${LOADED}.${SSH_KEY}.${ssh_key_id}
+		;;
+	    *)
+		;;
+	esac
+
+	ssh_key=$(cat ${ssh_key_file} 2> /dev/null)
+
+	echo
+	echo "manager sync role ${_MANAGER_SYNC_ROLE}"
+
+	if test -n "${ssh_key}" ; then
+	    echo "manager sync peer ${_MANAGER_SYNC_PEER_IP} \"${ssh_key}\""
+	else
+	    echo "manager sync peer ${_MANAGER_SYNC_PEER_IP}"
+	fi
+    fi
+
+    echo
+    echo "password file raz"
+    i=0
+    for elt in ${_FILE_SERVER_PASSWORD_LIST}
+    do
+	range=$[${i} % 4]
+	case ${range} in
+	    0)
+		protocol=${elt}
+		;;
+	    1)
+		ip=${elt}
+		;;
+	    2)
+		login=${elt}
+		;;
+	    3)
+		password=${elt}
+		password=$(encrypt-password "clear:${password}" "${FILE_PASSWD}")
+		password=${password/encrypted:}
+		echo "password file add:encrypted ${protocol} ${ip} ${login} ${password}"
+		;;
+	    *)
+		return 1
+		;;
+	esac
+	((i++))
+    done
+
+    echo
+
+    state=$(external-form ${_EMBEDDED_VPNSUBSCR_MODE})
+    name=${_EMBEDDED_VPNSUBSCR_RWEB_SITE_NAME}
+    tls=${_EMBEDDED_VPNSUBSCR_RWEB_TLS_ID}
+
+    if test -n "${name}" ; then
+	if test -n "${tls}" ; then
+	    echo "embedded ${EMBEDDED_VPNSUBSCR_COMMERCIAL_NAME,,} ${state} ${name} ${tls}"
+	else
+	    echo "embedded ${EMBEDDED_VPNSUBSCR_COMMERCIAL_NAME,,} ${state} ${name}"
+	fi
+    else
+	echo "embedded ${EMBEDDED_VPNSUBSCR_COMMERCIAL_NAME,,} ${state}"
+    fi
+}
+
+save-conf()
+{
+    test -n "${1}" || return 255
+    test -n "${2}" || return 255
+    test -n "${3}" || return 255
+    test -n "${4}" || return 255
+    local in_protocol=${1}
+    local in_ip=${2}
+    local in_fn=${3}
+    local in_state=${4}
+
+    local tmp_file=${ADMIN_TMP_DIR}/${SAVED}.conf.${$}
+    create-conf ${in_state} > ${tmp_file} || return 104
+
+    save-files ${in_protocol} ${in_ip} "${tmp_file} ${in_fn}" "" ascii
+    local ret=${?}
+    rm -f ${tmp_file}
+    return ${ret}
+}
+
+get-templates-merged-access-list()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    test -n "${3}" || return 3
+    local src_file=${1}
+    local old_file=${2}
+    local variable=${3}
+
+    local source_list=$(get-variable-value-from-file ${src_file} ${variable})
+    local old_list=$(get-variable-value-from-file ${old_file} ${variable})
+
+    local new_list elt range i=0
+
+    i=0
+    for elt in ${source_list}
+    do
+	range=$[${i} % 4]
+	case ${range} in
+	    0)
+		f0=${elt}
+		;;
+	    1)
+		f1=${elt}
+		;;
+	    2)
+		f2=${elt}
+		;;
+	    3)
+		f3=${elt}
+		case ${f0} in
+		    internal|auxiliary)
+			;;
+		    *)
+			new_list="${new_list} ${f0} ${f1} ${f2} ${f3}"
+			;;
+		esac
+		;;
+	    *)
+		return 1
+		;;
+	esac
+	((i++))
+    done
+
+    i=0
+    for elt in ${old_list}
+    do
+	range=$[${i} % 4]
+	case ${range} in
+	    0)
+		f0=${elt}
+		;;
+	    1)
+		f1=${elt}
+		;;
+	    2)
+		f2=${elt}
+		;;
+	    3)
+		f3=${elt}
+		case ${f0} in
+		    internal|auxiliary)
+			new_list="${new_list} ${f0} ${f1} ${f2} ${f3}"
+			;;
+		    *)
+			;;
+		esac
+		;;
+	    *)
+		return 1
+		;;
+	esac
+	((i++))
+    done
+    new_list=${new_list:1}
+
+    echo ${new_list}
+}
+
+get-templates-merged-manager-list()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    local src_file=${1}
+    local old_file=${2}
+
+    local source_list=$(get-variable-value-from-file ${src_file} ACCESS_MANAGER_LIST)
+    local old_list=$(get-variable-value-from-file ${old_file} ACCESS_MANAGER_LIST)
+
+    local new_list elt range i=0
+
+    i=0
+    for elt in ${source_list}
+    do
+	range=$[${i} % 3]
+	case ${range} in
+	    0)
+		f0=${elt}
+		;;
+	    1)
+		f1=${elt}
+		;;
+	    2)
+		f2=${elt}
+		case ${f0} in
+		    internal|auxiliary)
+			;;
+		    *)
+			new_list="${new_list} ${f0} ${f1} ${f2}"
+			;;
+		esac
+		;;
+	    *)
+		return 1
+		;;
+	esac
+	((i++))
+    done
+
+    i=0
+    for elt in ${old_list}
+    do
+	range=$[${i} % 3]
+	case ${range} in
+	    0)
+		f0=${elt}
+		;;
+	    1)
+		f1=${elt}
+		;;
+	    2)
+		f2=${elt}
+		case ${f0} in
+		    internal|auxiliary)
+			new_list="${new_list} ${f0} ${f1} ${f2}"
+			;;
+		    *)
+			;;
+		esac
+		;;
+	    *)
+		return 1
+		;;
+	esac
+	((i++))
+    done
+    new_list=${new_list:1}
+
+    echo ${new_list}
+}
+
+get-templates-merged-ipsec-networks()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    test -n "${3}" || return 3
+    local src_file=${1}
+    local old_file=${2}
+    local variable=${3}
+
+    local old_list=$(get-variable-value-from-file ${old_file} ${variable})
+    local source_list=$(get-variable-value-from-file ${src_file} ${variable})
+
+    local new_list elt range i=0
+    local networks
+
+    i=0
+    for elt in ${source_list}
+    do
+	range=$[${i} % 4]
+	case ${range} in
+	    0)
+		f0=${elt}
+		;;
+	    1)
+		f1=${elt}
+		;;
+	    2)
+		;;
+	    3)
+		f3=${elt}
+		networks=$(get-vpn-ipsec-networks ${f0} ${f1})
+		f2=${networks/ *}
+		new_list="${new_list} ${f0} ${f1} ${f2} ${f3}"
+		;;
+	    *)
+		return 1
+		;;
+	esac
+	((i++))
+    done
+    new_list=${new_list:1}
+
+    echo ${new_list}
+}
+
+conf-manager()
+{
+    test -n "${1}" || return 255
+    test -n "${2}" || return 255
+    local in_context=${1}
+    local in_id=${2}
+
+    local context_reference=$(get-manager-context-reference)
+    local context=${context_reference/ *}
+    local id=${context_reference/* }
+
+    local source_dir=$(get-manager-context-rdir ${in_context})
+    local destination_dir=$(get-manager-context-rdir ${context})
+
+    test -d ${source_dir} || return 104
+    test -d ${destination_dir} || return 104
+
+    test ${source_dir} != ${destination_dir} -o ${in_id} != ${id} || return 237
+
+    local old_destination=${ADMIN_TMP_DIR}/gateway.${id}.old.${$}
+
+    if test ${context} == gateway ; then
+	cp -rf ${destination_dir}/${id}/${HARD_DIR_NAME} ${ADMIN_TMP_DIR}/gateway.hard.${id}.${$} || return 104
+	cp -rf ${destination_dir}/${id}/${SSL_CLIENT_RDIR} ${ADMIN_TMP_DIR}/ssl.client.${id}.${$} || return 104
+    fi
+
+    cp -f ${destination_dir}/${id}/${VPN_IPSEC_RDIR}/${IPSEC_AUTHENTICATE_PSK_FILENAME} ${old_destination}.${IPSEC_AUTHENTICATE_PSK_FILENAME}
+    cp -f ${destination_dir}/${id}/${ENV_NAME} ${old_destination}.${ENV_NAME}
+
+    rm -rf ${destination_dir}/${id} ${destination_dir}/${id}.${$} || return 104
+    cp -rf ${source_dir}/${in_id} ${destination_dir}/${id}.${$} || return 104
+
+    local variable value
+
+    for variable in SHOSTNAME \
+		    IP_INTERNAL_IP \
+		    IP_INTERNAL_MASK \
+		    IP_EXTERNAL_IP \
+		    IP_EXTERNAL_MASK \
+		    IP_AUXILIARY_IP \
+		    IP_AUXILIARY_MASK \
+		    IP_VLAN_LIST \
+		    IP_ROUTE_LIST \
+		    IP_VIA_LIST \
+		    VRRP_INTERNAL_LIST \
+		    VRRP_EXTERNAL_LIST \
+		    VRRP_AUXILIARY_LIST \
+		    VRRP_WEB_LIST VRRP_\
+		    RWEB_LIST VRRP_AV_LIST \
+		    FW_AUXILIARY_RULE_LIST \
+		    FW_WEB_RULE_LIST \
+		    FW_RWEB_RULE_LIST \
+		    FW_FILE_RULE_LIST \
+		    FW_PEER_RULE_LIST \
+		    FW_MON_RULE_LIST \
+		    FW_ADMIN_RULE_LIST \
+		    FW_AV_RULE_LIST \
+		    DHCP_RANGE_LIST \
+		    DHCP_FIXED_LIST \
+		    DHCP_PEER_LIST \
+		    PEER_SHARE_LIST \
+		    PEER_HA_LIST \
+		    RWEB_SITE_VIA_LIST \
+		    VPN_IPSEC_VIA_LIST
+    do
+	value=$(get-variable-value-from-file ${old_destination}.${ENV_NAME} ${variable})
+	sed -i -e "s@^export ${variable}=.*@export ${variable}='${value}'@" ${destination_dir}/${id}.${$}/${ENV_NAME}
+    done
+
+    for variable in TRANSPARENT_WEB_LIST \
+    		    ACCESS_WEB_LIST \
+		    ACCESS_FILE_LIST \
+		    ACCESS_ADMIN_LIST \
+		    ACCESS_MON_LIST
+    do
+	value=$(get-templates-merged-access-list ${source_dir}/${in_id}/${ENV_NAME} ${old_destination}.${ENV_NAME} ${variable})
+	sed -i -e "s@^export ${variable}=.*@export ${variable}='${value}'@" ${destination_dir}/${id}.${$}/${ENV_NAME}
+    done
+
+    value=$(get-templates-merged-manager-list ${source_dir}/${in_id}/${ENV_NAME} ${old_destination}.${ENV_NAME})
+    sed -i -e "s@^export ACCESS_MANAGER_LIST=.*@export ACCESS_MANAGER_LIST='${value}'@" ${destination_dir}/${id}.${$}/${ENV_NAME}
+
+    variable=VPN_IPSEC_NETWORK_LIST
+    value=$(get-templates-merged-ipsec-networks ${source_dir}/${in_id}/${ENV_NAME} ${old_destination}.${ENV_NAME} ${variable})
+    sed -i -e "s@^export ${variable}=.*@export ${variable}='${value}'@" ${destination_dir}/${id}.${$}/${ENV_NAME}
+
+    if test ${context} == gateway ; then
+
+	test ${PERSISTENT_CACHE} == True || \
+	    sed -i -e "s@^export CACHE_MODE=.*@export CACHE_MODE='False'@" ${destination_dir}/${id}.${$}/${ENV_NAME}
+
+	test ${PERSISTENT_WEB_LOG} == True || \
+	    sed -i -e "s@^export LOG_TYPE_WEB=.*@export LOG_TYPE_WEB='False:False'@" ${destination_dir}/${id}.${$}/${ENV_NAME}
+
+	test ${PERSISTENT_RWEB_LOG} == True || \
+	    sed -i -e "s@^export LOG_TYPE_RWEB=.*@export LOG_TYPE_RWEB='False:False'@" ${destination_dir}/${id}.${$}/${ENV_NAME}
+    fi
+
+    cp -f ${old_destination}.${IPSEC_AUTHENTICATE_PSK_FILENAME} ${destination_dir}/${id}.${$}/${VPN_IPSEC_RDIR}/${IPSEC_AUTHENTICATE_PSK_FILENAME}
+    mv -f ${destination_dir}/${id}.${$} ${destination_dir}/${id}
+
+    if test ${context} == gateway ; then
+
+	rm -rf ${destination_dir}/${id}/${HARD_DIR_NAME} || return 104
+	cp -rf ${ADMIN_TMP_DIR}/gateway.hard.${id}.${$} ${destination_dir}/${id}/${HARD_DIR_NAME} || return 104
+	rm -rf ${ADMIN_TMP_DIR}/gateway.hard.${id}.${$}
+
+	rm -rf ${destination_dir}/${id}/${SSL_CLIENT_RDIR}
+	cp -rf ${ADMIN_TMP_DIR}/ssl.client.${id}.${$} ${destination_dir}/${id}/${SSL_CLIENT_RDIR} || return 104
+	rm -rf ${ADMIN_TMP_DIR}/ssl.client.${id}.${$}
+    fi
+
+    generate-current-env-file-from-env ${destination_dir}/${id}/${ENV_NAME} > ${destination_dir}/${id}/${ENV_CURRENT_NAME} &&
+	cp -f ${destination_dir}/${id}/${ENV_NAME} ${destination_dir}/${id}/${ENV_CANCEL_NAME} &&
+	cp -f ${destination_dir}/${id}/${VPN_IPSEC_RDIR}/${IPSEC_AUTHENTICATE_PSK_FILENAME} ${destination_dir}/${id}/${VPN_IPSEC_RDIR}/${IPSEC_AUTHENTICATE_PSK_FILENAME}.current
+
+    rm -f ${old_destination}.*
+
+    return 0
+}
+
+run()
+{
+    test -z "${TRANSACTION}" || return 106
+
+    set-generic-rule-table
+
+    if test -z "${ARGS[1]}" ; then show-conf ; return ${?} ; fi
+    local op=${ARGS[1]}
+
+    case ${op} in
+	diff)
+	    show-diff
+	    return ${?}
+	    ;;
+	
+	factoryreset)
+	    user-has-admin-rights || return 31
+	    factory-reset
+	    return ${?}
+	    ;;
+
+	create)
+	    user-has-admin-rights || return 31
+	    test -n "${ARGS[2]}" || return 1
+	    local file_name=${ARGS[2]}
+
+	    case "${ARGS[3]}" in
+		"")
+		    create-conf current > ${ADMIN_TMP_DIR}/${file_name} 2> /dev/null || return 104
+		    ;;
+		new)
+		    create-conf new > ${ADMIN_TMP_DIR}/${file_name} 2> /dev/null || return 104
+		    ;;
+		*)
+		    return 1
+		    ;;
+	    esac
+
+	    return ${?}
+	    ;;
+	
+	inject)
+	    user-has-admin-rights || return 31
+	    test -n "${ARGS[2]}" || return 1
+	    local file_name=${ARGS[2]}
+	    test -f ${ADMIN_TMP_DIR}/${file_name} || return 104
+	    inject-conf ${ADMIN_TMP_DIR}/${file_name}
+	    return ${?}
+	    ;;
+
+	clear)
+	    test -n "${ARGS[2]}" || return 1
+	    local file_name=${ARGS[2]}
+	    rm -f ${ADMIN_TMP_DIR}/${file_name}
+	    return ${?}
+	    ;;
+
+	manager)
+	    test -n "${ARGS[2]}" || return 1
+	    local in_context=${ARGS[2]}
+
+	    case ${in_context} in
+		template|gateway)
+		    ;;
+		*)
+		    return 1
+		    ;;
+	    esac
+
+	    test -n "${ARGS[3]}" || return 1
+	    local in_id=${ARGS[3]}
+
+	    case ${APL_ROLE} in
+		gateway)
+		    return 206
+		    ;;
+		manager)
+		    is-in-manager-conf-context || return 214
+		    ;;
+		*)
+		    return 255
+		    ;;
+	    esac
+
+	    manager-context-exist ${in_context} ${in_id} || return 218
+	    init-env ${in_context} ${in_id} || return ${?}
+	    ! static-conf-modified template ${id} || return 236
+
+	    user-has-admin-rights || return 31
+
+	    conf-manager ${in_context} ${in_id}
+	    return ${?}
+	    ;;
+
+	load|save)
+	    user-has-admin-rights || return 31
+	    ;;
+	*)
+	    return 1
+	    ;;
+    esac
+
+    local pt=${ARGS[2]}
+    local ip=${ARGS[3]}
+    local fn=${ARGS[4]}
+
+    test -n "${pt}" || return 1
+    test -n "${ip}" || return 1
+    test -n "${fn}" || return 1
+
+    check-file-protocol ${pt} || return 63
+    check-ip-name ${ip} || return 113
+    check-filename ${fn} || return 19
+    check-file-ip ${ip} || return 27
+
+    case ${op} in
+	load)
+	    load-conf ${pt} ${ip} ${fn}
+	    ;;
+	
+	save)
+	    case "${ARGS[5]}" in
+		"")
+		    save-conf ${pt} ${ip} ${fn} current
+		    ;;
+		new)
+		    save-conf ${pt} ${ip} ${fn} new
+		    ;;
+		*)
+		    return 1
+		    ;;
+	    esac
+	    ;;
+	*)
+	    return 255
+	    ;;
+    esac
+}
+
+main "${@}"

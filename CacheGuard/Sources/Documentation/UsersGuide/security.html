@@ -1,0 +1,71 @@
+<a name='main' class='doc-title'></a>
+<h1>Network Security</h1>
+
+CacheGuard appliance distinguishes between two types of network traffic: traffic exchanged with the appliance itself, and traffic that is only routed via the appliance (for which the source or destination is not the appliance itself). To control the traffic exchanged with the appliance, you can use the <a href="/doc/command/access.html">access</a> command, while the <a href="/doc/command/firewall.html">firewall</a> command can be used to control routed traffic. Both types of traffic are managed by a stateful firewall integrated into the appliance.
+
+<center><img width='600' src="/doc/image/network_firewall.png" class="schema" /></center>
+
+<a name='admin' class='doc-title'></a><h2>Administration Access</h2>
+For security reasons, administration access (via SSH or the Web GUI) to a CacheGuard appliance is granted only to users or machines located within trusted networks. The same rule applies to file servers and monitoring systems that need to access the appliance. File servers are used to exchange files (via TFTP, FTP, or SSH) with the appliance for configuration or administration purposes (for instance, to load or save SSL certificates or perform a system backup). Monitoring managers can be used to monitor the appliance using SNMP.
+<p>
+In the example below, the appliance is configured to allow SSH and Web administration GUI access via its <strong>internal</strong> network interface to remote users or machines in the <i>172.18.2.0 255.255.255.0</i> network. In addition, the SNMP manager with the IP address <i>172.18.2.202</i> is authorised to send SNMP requests to the appliance via its <strong>internal</strong> network interface, and the file server <i>ftp.cacheguard.net</i> is authorised to exchange files with the appliance via its <strong>external</strong> network interface.
+<ul>
+  <li><i>access admin add internal 172.18.2.0 255.255.255.0</i></li>
+  <li><i>access file add external ftp.cacheguard.net</i></li>
+  <li><i>access mon add internal 172.18.2.202</i></li>
+  <li><i>apply</i></li>
+</ul>
+Note that to exchange files, CacheGuard appliance can use TFTP, FTP, or SFTP. As FTP and SFTP servers often require authentication (login and password), you can store authentication credentials in the appliance to avoid entering them interactively each time a file exchange is needed. Credentials may be defined using the <a href="/doc/command/access.html">access</a> command or the <a href="/doc/command/password.html">password</a> command. The following commands define credentials for FTP access to the <i>ftp.cacheguard.net</i> file server and SFTP access to the file server with IP address <i>172.18.2.203</i>:
+<ul>
+  <li><i>password file add ftp ftp.cacheguard.net john</i></li>
+  <li><i>access file add internal 172.18.2.203 sftp john</i></li>
+  <li><i>apply</i></li>
+</ul>
+
+<a name='web' class='doc-title'></a><h2>Web Browsing Access</h2>
+By default, the Web proxy is accessible to all devices except those located in the external zone (routed via the <strong>external</strong> network interface). This default access policy can be modified using the <a href="/doc/command/access.html">access web</a> command to restrict access to predefined networks only. To activate Web proxy access limitation, you must define at least one Web access rule. Note that when at least one previous peer or transparent network is defined, access limitation is implicitly activated, and you must explicitly specify permitted networks. Refer to the <a href="/doc/command/peer.html">peer</a> and <a href="/doc/command/transparent.html">transparent</a> command manuals for more information about peers and transparent networks.
+<p>
+To restrict Web proxy access to devices located in the <i>172.18.2.0 255.255.255.0</i> and <i>10.26.0.0 255.255.0.0</i> networks via the appliance’s <strong>internal</strong> network interface, use the following commands:
+<ul>
+  <li><i>access web raz</i></li>
+  <li><i>access web add internal 172.18.2.0 255.255.255.0</i></li>
+  <li><i>access web add internal 10.26.0.0 255.255.0.0</i></li>
+  <li><i>apply</i></li>
+</ul>
+
+<a name='fw' class='doc-title'></a><h2>The Firewall</h2>
+CacheGuard appliance can act as a stateful firewall with NAT capabilities to filter routed network traffic according to source and destination IP addresses and protocols. To filter network traffic, you must define firewall rules. A firewall rule is attached to a network interface and controls incoming traffic through that interface. Rules attached to a network interface form a rule set, and there is one rule set per interface. To use the firewall, you must first activate it using the <a href="/doc/command/mode.html">mode firewall on</a> command and then define rules using the <a href="/doc/command/firewall.html">firewall</a> command. In the absence of any rules, the following default rules are applied:
+<ul>
+  <li type='circle'>New connections incoming from the <strong>external</strong> zone and destined for the <strong>internal</strong>, <strong>auxiliary</strong>, and <strong>vpnipsec</strong> zones are denied.</li>
+  <li type='circle'>New connections incoming from the <strong>internal</strong> zone (the <strong>web</strong> zone in VLAN mode) and destined for other zones are permitted.</li>
+  <li type='circle'>New connections incoming from the <strong>auxiliary</strong> zone are denied by default. To allow such traffic, you must explicitly define rules.</li>
+  <li type='circle'>In VLAN mode (<a href="/doc/command/mode.html">mode vlan on</a>), new connections incoming from the <strong>rweb</strong>, <strong>antivirus</strong>, <strong>admin</strong>, <strong>mon</strong>, <strong>file</strong>, and <strong>peer</strong> zones are denied by default. In non-VLAN mode (<a href="/doc/command/mode.html">mode vlan off</a>), these are all considered part of the <strong>internal</strong> zone and therefore follow its rules.</li>
+  <li type='circle'>New connections incoming from the <strong>vpnipsec</strong> zone and destined for the <strong>internal</strong> zone (the <strong>web</strong> zone in VLAN mode) are permitted. Connections incoming from the <strong>vpnipsec</strong> zone and destined for other zones are denied by default.</li>
+</ul>
+If at least one firewall rule is present in a rule set, default rules no longer apply, and only explicitly defined traffic will be allowed (or denied). Each firewall rule set implicitly includes a <strong>deny any</strong> rule at its end. For example, the following commands allow all TCP traffic incoming from the <strong>web</strong> interface with a source IP address in the 172.18.2.0/24 network and outgoing via the <strong>external</strong> network interface:
+<ul>
+  <li><i>mode firewall on</i></li>
+  <li><i>mode router on</i></li>
+  <li><i>firewall web add allTCPToInternet allow tcp 172.18.2.0/24 external</i></li>
+  <li><i>apply</i></li>
+</ul>
+In the above example, if VLAN mode is activated, the defined rule applies exclusively to the <strong>web</strong> pseudo network interface (tagged VLAN). Otherwise, it applies to the native <strong>internal</strong> network interface.
+<p>
+When defining a firewall rule, you may also apply NAT (Network Address Translation) to the source and/or destination IP addresses of the traffic. For example, the following commands allow the IP address <i>192.168.44.55</i> to establish TCP connections via the <strong>external</strong> interface to the destination <i>192.168.22.11:80</i> and translate that destination to <i>10.0.10.11:81</i>:
+<ul>
+  <li><i>mode firewall on</i></li>
+  <li><i>mode router on</i></li>
+  <li><i>firewall external add allWeb allow tcp 192.168.44.55 admin 192.168.22.11 80 nil 10.0.10.11 81</i></li>
+  <li><i>apply</i></li>
+</ul>
+It is <strong>IMPORTANT</strong> to note that in firewall rules, source and destination NAT are always applied <strong>after</strong> filtering.
+
+<a name='ipsec' class='doc-title'></a><h2>IPsec VPN</h2>
+VPN stands for Virtual Private Network, and IPsec for Internet Protocol Security. An IPsec VPN allows you to authenticate and encrypt data packets between private networks over a public IP network (for instance, the Internet) to provide secure encrypted communication. You can create persistent IPsec VPNs between sites or enable remote workers to access your internal infrastructure securely via an IPsec VPN. CacheGuard appliance integrates an IPsec VPN server that you can activate using the <a href="/doc/command/mode.html">mode vpnipsec on</a> command. The <a href="/doc/command/vpnipsec.html">vpnipsec</a> command is then used to configure the IPsec VPN server.
+<p>
+<img width='400' src="/doc/image/vpnipsec_access.png" class="schema" align="right" />
+Two types of IPsec VPNs are supported: site-to-site VPNs and remote-access VPNs. A site-to-site (or inter-site) VPN enables a permanent secure tunnel between two sites, allowing computers in both locations to communicate securely as if they were in the same place. To establish such a VPN tunnel, you require two VPN servers: a local VPN server and a remote (peer) VPN server.
+<p>
+A remote-access VPN enables remote users to connect securely to a central VPN server. Such tunnels allow remote workers to access systems protected by the VPN server securely, as if they were physically connected to the internal network.
+<p>
+Please note that on a CacheGuard appliance, you must choose between site-to-site mode or remote-access mode; both cannot be activated simultaneously. The <a href="/doc/command/vpnipsec.html">vpnipsec access on</a> and <a href="/doc/command/vpnipsec.html">vpnipsec access off</a> commands enable you to switch between modes.

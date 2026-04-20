@@ -1,0 +1,58 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       GUI
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+set-vpnipsec-access-access()
+{
+    local pos=0 entry_pos op_pos id_pos del_pos
+    local op id
+
+    local transaction=/tmp/${TRANSACTION_FILE}.wadmin.${REMOTE_USER}.${$}
+    rm -f ${transaction}
+
+    while test ${pos} -lt ${ATTRIBUTE_NB}
+    do
+	entry_pos=${pos}
+	op_pos=$[${pos} + 1]
+	id_pos=$[${pos} + 2]
+	del_pos=$[${pos} + 3]
+
+	id=${VALUES[${id_pos}]}
+
+	if [[ "${ATTRIBUTES[${del_pos}]}" =~ ^del_[0-9]+$ ]] ; then
+	    id=$(decode-string "${id}")
+	    echo "vpnipsec access access del '${id}'" >> ${transaction}
+	    pos=$[${pos} + 4]
+	else
+	    op=${VALUES[${op_pos}]}
+	    if test "${VALUES[${entry_pos}]}" == anew -a -n "${op}" -a -n "${id}" ; then
+		echo "vpnipsec access access ${op} '${id}'" >> ${transaction}
+	    fi
+	    pos=$[${pos} + 3]
+	fi
+    done
+
+    execute-transaction ${transaction}
+}
+
+set-vpnipsec-access-access

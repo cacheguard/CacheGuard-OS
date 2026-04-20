@@ -1,0 +1,89 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       Commands
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+source functions
+
+print-areas()
+{
+    local i
+    for ((i=0 ; i<${AREAS_NB} ; i++))
+    do
+	echo-value "[${i}] ${AREAS[${i}]}"
+    done
+}
+
+print-tzs()
+{
+    test -n "${1}" || return 1
+    local area_code=${1}
+
+    local in_area=${AREAS[${area_code}]}
+
+    local tz i j area
+
+    for ((i=0 ; i<${TIMEZONES_NB} ; i++))
+    do
+	tz=${TIMEZONES[${i}]}
+	area=${tz/\/*/}
+	test "${area}" != "${in_area}" || break
+    done
+    
+    for ((j=${i} ; j<${TIMEZONES_NB} ; j++))
+    do
+	tz=${TIMEZONES[${j}]}
+	area=${tz/\/*/}
+	if test "${area}" == "${in_area}" ; then
+	    echo-value "[${j}] ${tz}"
+	else
+	    break
+	fi
+    done
+}
+
+run()
+{
+    test -z "${TRANSACTION}" || return 106
+    test ${TERM} != ${WADMIN_TERM} || return 0
+    test "${__BATCH_MODE}" != yes || error 111
+
+    init-global-variables
+
+    load-timezones
+    print-areas
+
+    local len match_len area area_code
+
+    while true
+    do
+	echo -n "Enter an area code: "
+	read area_code
+	[[ "${area_code}" =~ ^[0-9][0-9]{0,3}$ ]] || return 2
+	area=${AREAS[${area_code}]}
+	test -z "${area}" || break
+    done
+    
+    print-tzs ${area_code}
+}
+
+main __noenv "${@}"

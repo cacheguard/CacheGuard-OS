@@ -1,0 +1,1014 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       Commands
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+__complete-qos()
+{
+    test -n "${COMP_CWORD-1}" || return 1
+
+    case ${COMP_CWORD} in
+	1)
+	    case ${COMP_WORDS[1]} in
+		b)
+		    COMPREPLY=('' bandwidth borrow)
+		    ;;
+		ba|ban|band|bandw|bandwi|bandwid|bandwidt|bandwidth)
+		    COMPREPLY=(bandwidth)
+		    ;;
+		bo|bor|borr|borro|borrow)
+		    COMPREPLY=(borrow)
+		    ;;
+		r|re|rep|repo|repor|report)
+		    COMPREPLY=(report)
+		    ;;
+		s|sh|sha|shap|shape)
+		    COMPREPLY=(shape)
+		    ;;
+		'')
+		    COMPREPLY=('' '<RET>' bandwidth borrow shape report)
+		    ;;
+		*)
+		    COMPREPLY=()
+		    ;;
+	    esac
+	    ;;
+	2)
+	    case ${COMP_WORDS[1]} in
+		bandwidth|borrow)
+		    case ${COMP_WORDS[2]} in
+			i|'in'|int|inte|inter|intern|interna|internal)
+			    COMPREPLY=(internal)
+			    ;;
+			e|ex|ext|exte|exter|extern|externa|external)
+			    COMPREPLY=(external)
+			    ;;
+			a|au|aux|auxi|auxil|auxili|auxilia|auxiliar|auxiliary)
+			    COMPREPLY=(auxiliary)
+			    ;;
+			'')
+			    COMPREPLY=('' '<RET>' internal external auxiliary)
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		report)
+		    case ${COMP_WORDS[2]} in
+			a)
+			    COMPREPLY=('' admin all antivirus)
+			    ;;
+			ad|adm|admi|admin)
+			    COMPREPLY=(admin)
+			    ;;
+			al|all)
+			    COMPREPLY=(all)
+			    ;;
+			an|ant|anti|antiv|antivi|antivir|antiviru|antivirus)
+			    COMPREPLY=(antivirus)
+			    ;;
+			d)
+			    COMPREPLY=('' default diff)
+			    ;;
+			di|dif|diff)
+			    COMPREPLY=(diff)
+			    ;;
+			de|def|defa|defau|defaul|default)
+			    COMPREPLY=(default)
+			    ;;
+			e|et|etc)
+			    COMPREPLY=(etc)
+			    ;;			    
+			f|'fi'|fil|file)
+			    COMPREPLY=(file)
+			    ;;
+			g|ga|gat|gate|gatew|gatewa|gateway)
+			    COMPREPLY=(gateway)
+			    ;;
+			p|pe|pee|peer)
+			    COMPREPLY=(peer)
+			    ;;
+			w|we|web)
+			    COMPREPLY=(web)
+			    ;;
+			t|tw|twe|tweb)
+			    COMPREPLY=(tweb)
+			    ;;
+			r)
+			    COMPREPLY=('' rweb router)
+			    ;;
+			ro|rou|rout|route|router)
+			    COMPREPLY=(router)
+			    ;;
+			rw|rwe|rweb)
+			    COMPREPLY=(rweb)
+			    ;;
+			v|vp|vpn|vpni|vpnip|vpnips|vpnipse|vpnipsec)
+			    COMPREPLY=(vpnipsec)
+			    ;;
+			'')
+			    COMPREPLY=('' '<RET>' admin all antivirus default diff etc file gateway peer router rweb tweb vpnipsec web)
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		shape)
+		    case ${COMP_WORDS[2]} in
+			a|an|ant|anti|antiv|antivi|antivir|antiviru|antivirus)
+			    COMPREPLY=(antivirus)
+			    ;;
+			d|de|def|defa|defau|defaul|default)
+			    COMPREPLY=(default)
+			    ;;
+			f|'fi'|fil|file)
+			    COMPREPLY=(file)
+			    ;;
+			p|pe|pee|peer)
+			    COMPREPLY=(peer)
+			    ;;
+			w|we|web)
+			    COMPREPLY=(web)
+			    ;;
+			t|tw|twe|tweb)
+			    COMPREPLY=(tweb)
+			    ;;
+			r)
+			    COMPREPLY=('' rweb router)
+			    ;;
+			ro|rou|rout|route|router)
+			    COMPREPLY=(router)
+			    ;;
+			rw|rwe|rweb)
+			    COMPREPLY=(rweb)
+			    ;;
+			v|vp|vpn|vpni|vpnip|vpnips|vpnipse|vpnipsec)
+			    COMPREPLY=(vpnipsec)
+			    ;;
+			'')
+			    COMPREPLY=('' '<RET>' antivirus default file peer router rweb tweb vpnipsec web)
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		*)
+		    COMPREPLY=()
+		    ;;
+	    esac
+	    ;;
+	3)
+	    case ${COMP_WORDS[1]} in
+		bandwidth|borrow)
+		    case ${COMP_WORDS[2]} in
+			internal|external|auxiliary)
+			    case ${COMP_WORDS[3]} in
+				e|eg|egr|egre|egres|egress)
+				    COMPREPLY=(egress)
+				    ;;
+				i|'in'|ing|ingr|ingre|ingres|ingress)
+				    COMPREPLY=(ingress)
+				    ;;
+				'')
+				    COMPREPLY=('' '<RET>' egress ingress)
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		report)
+		    case ${COMP_WORDS[2]} in
+			admin|all|antivirus|default|etc|file|gateway|peer|router|rweb|tweb|web|vpnipsec)
+			    case ${COMP_WORDS[3]} in
+				d|di|dif|diff)
+				    COMPREPLY=(diff)
+				    ;;
+				'')
+				    COMPREPLY=('' '<RET>' diff)
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		shape)
+		    case ${COMP_WORDS[2]} in
+			web|antivirus|file|default)
+			    case ${COMP_WORDS[3]} in
+				i|'in'|int|inte|inter|intern|interna|internal)
+				    COMPREPLY=(internal)
+				    ;;
+				e|ex|ext|exte|exter|extern|externa|external)
+				    COMPREPLY=(external)
+				    ;;
+				a|au|aux|auxi|auxil|auxili|auxilia|auxiliar|auxiliary)
+				    COMPREPLY=(auxiliary)
+				    ;;
+				'')
+				    COMPREPLY=('' '<RET>' internal external auxiliary)
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			peer)
+			    case ${COMP_WORDS[3]} in
+				i|'in'|int|inte|inter|intern|interna|internal)
+				    COMPREPLY=(internal)
+				    ;;
+				'')
+				    COMPREPLY=('' '<RET>' internal)
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			tweb)
+			    case ${COMP_WORDS[3]} in
+				i|'in'|int|inte|inter|intern|interna|internal)
+				    COMPREPLY=(internal)
+				    ;;
+				a|au|aux|auxi|auxil|auxili|auxilia|auxiliar|auxiliary)
+				    COMPREPLY=(auxiliary)
+				    ;;
+				'')
+				    COMPREPLY=('' '<RET>' internal auxiliary)
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			rweb)
+			    case ${COMP_WORDS[3]} in
+				i|'in'|int|inte|inter|intern|interna|internal)
+				    COMPREPLY=(internal)
+				    ;;
+				e|ex|ext|exte|exter|extern|externa|external)
+				    COMPREPLY=(external)
+				    ;;
+				'')
+				    COMPREPLY=('' '<RET>' internal external)
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			vpnipsec)
+			    case ${COMP_WORDS[3]} in
+				e|ex|ext|exte|exter|extern|externa|external)
+				    COMPREPLY=(external)
+				    ;;
+				'')
+				    COMPREPLY=('' '<RET>' external)
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			router)
+			    case ${COMP_WORDS[3]} in
+				r|ra|raz)
+				    COMPREPLY=(raz)
+				    ;;
+				a|ad|add)
+				    COMPREPLY=(add)
+				    ;;
+				d|de|del)
+				    COMPREPLY=(del)
+				    ;;
+				i|'in'|ins|inse|inser|insert|insert:)
+				    COMPREPLY=(insert:)
+				    ;;
+				m|mo|mov|move|move:)
+				    COMPREPLY=(move:)
+				    ;;
+				'')
+				    COMPREPLY=('' '<RET>' add 'add:<rule-name>' 'insert:<rule-name>' 'move:<position>' 'move:(-|+)<rule-name>' del raz)
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		*)
+		    COMPREPLY=()
+		    ;;
+	    esac
+	    ;;
+	4)
+	    case ${COMP_WORDS[1]} in
+		bandwidth)
+		    case ${COMP_WORDS[2]} in
+			internal|external|auxiliary)
+			    case ${COMP_WORDS[3]} in
+				egress|ingress)
+				    COMPREPLY=('' '<RET>' '<bandwidth>')
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		shape)
+		    case ${COMP_WORDS[2]} in
+			web|antivirus|file|default)
+			    case ${COMP_WORDS[3]} in
+				internal|external|auxiliary)
+				    case ${COMP_WORDS[4]} in
+					e|eg|egr|egre|egres|egress)
+					    COMPREPLY=(egress)
+					    ;;
+					i|'in'|ing|ingr|ingre|ingres|ingress)
+					    COMPREPLY=(ingress)
+					    ;;
+					'')
+					    COMPREPLY=('' '<RET>' egress ingress)
+					    ;;
+					*)
+					    COMPREPLY=()
+					    ;;
+				    esac
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			tweb)
+			    case ${COMP_WORDS[3]} in
+				internal|auxiliary)
+				    case ${COMP_WORDS[4]} in
+					e|eg|egr|egre|egres|egress)
+					    COMPREPLY=(egress)
+					    ;;
+					i|'in'|ing|ingr|ingre|ingres|ingress)
+					    COMPREPLY=(ingress)
+					    ;;
+					'')
+					    COMPREPLY=('' '<RET>' egress ingress)
+					    ;;
+					*)
+					    COMPREPLY=()
+					    ;;
+				    esac
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			peer)
+			    case ${COMP_WORDS[3]} in
+				internal)
+				    case ${COMP_WORDS[4]} in
+					e|eg|egr|egre|egres|egress)
+					    COMPREPLY=(egress)
+					    ;;
+					i|'in'|ing|ingr|ingre|ingres|ingress)
+					    COMPREPLY=(ingress)
+					    ;;
+					'')
+					    COMPREPLY=('' '<RET>' egress ingress)
+					    ;;
+					*)
+					    COMPREPLY=()
+					    ;;
+				    esac
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			rweb)			    
+			    case ${COMP_WORDS[3]} in
+				internal|external)
+				    case ${COMP_WORDS[4]} in
+					e|eg|egr|egre|egres|egress)
+					    COMPREPLY=(egress)
+					    ;;
+					i|'in'|ing|ingr|ingre|ingres|ingress)
+					    COMPREPLY=(ingress)
+					    ;;
+					'')
+					    COMPREPLY=('' '<RET>' egress ingress)
+					    ;;
+					*)
+					    COMPREPLY=()
+					    ;;
+				    esac
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			vpnipsec)
+			    case ${COMP_WORDS[3]} in
+				external)
+				    case ${COMP_WORDS[4]} in
+					e|eg|egr|egre|egres|egress)
+					    COMPREPLY=(egress)
+					    ;;
+					i|'in'|ing|ingr|ingre|ingres|ingress)
+					    COMPREPLY=(ingress)
+					    ;;
+					'')
+					    COMPREPLY=('' '<RET>' egress ingress)
+					    ;;
+					*)
+					    COMPREPLY=()
+					    ;;
+				    esac
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			router)
+			    if test ${COMP_WORDS[3]} == add -o \
+				${COMP_WORDS[3]} == del -o \
+				${COMP_WORDS[3]:0:4} == "add:" -o \
+				${COMP_WORDS[3]:0:5} == "move:" -o \
+				${COMP_WORDS[3]:0:7} == "insert:" ; then
+
+				COMPREPLY=('' '<rule-name>')
+			    else
+				COMPREPLY=()
+			    fi
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		borrow)
+		    case ${COMP_WORDS[2]} in
+			internal|external|auxiliary)
+			    case ${COMP_WORDS[3]} in
+				egress|ingress)
+				    case ${COMP_WORDS[4]} in
+					o)
+					    COMPREPLY=('' on off)
+					    ;;
+					of|off)
+					    COMPREPLY=(off)
+					    ;;
+					on)
+					    COMPREPLY=(on)
+					    ;;
+					'')
+					    COMPREPLY=('' '<RET>' on off)
+					    ;;
+					*)
+					    COMPREPLY=()
+					    ;;
+				    esac
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		*)
+		    COMPREPLY=()
+		    ;;
+	    esac
+	    ;;
+	5)
+	    case ${COMP_WORDS[1]} in
+		shape)
+		    case ${COMP_WORDS[2]} in
+			web|antivirus|file|default)
+			    case ${COMP_WORDS[3]} in
+				internal|external|auxiliary)
+				    case ${COMP_WORDS[4]} in
+					egress|ingress)
+					    COMPREPLY=('' '<qos>')
+					    ;;
+					*)
+					    COMPREPLY=()
+					    ;;
+				    esac
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			tweb)
+			    case ${COMP_WORDS[3]} in
+				internal|auxiliary)
+				    case ${COMP_WORDS[4]} in
+					egress|ingress)
+					    COMPREPLY=('' '<qos>')
+					    ;;
+					*)
+					    COMPREPLY=()
+					    ;;
+				    esac
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			peer)
+			    case ${COMP_WORDS[3]} in
+				internal)
+				    case ${COMP_WORDS[4]} in
+					egress|ingress)
+					    COMPREPLY=('' '<qos>')
+					    ;;
+					*)
+					    COMPREPLY=()
+					    ;;
+				    esac
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			rweb)
+			    case ${COMP_WORDS[3]} in
+				internal|external)
+				    case ${COMP_WORDS[4]} in
+					egress|ingress)
+					    COMPREPLY=('' '<qos>')
+					    ;;
+					*)
+					    COMPREPLY=()
+					    ;;
+				    esac
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			vpnipsec)
+			    case ${COMP_WORDS[3]} in
+				external)
+				    case ${COMP_WORDS[4]} in
+					egress|ingress)
+					    COMPREPLY=('' '<qos>')
+					    ;;
+					*)
+					    COMPREPLY=()
+					    ;;
+				    esac
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			router)
+			    if test ${COMP_WORDS[3]} == add -o \
+				${COMP_WORDS[3]:0:4} == "add:" -o \
+				${COMP_WORDS[3]:0:7} == "insert:" ; then
+
+				case ${COMP_WORDS[5]} in
+				    i|'in'|int|inte|inter|intern|interna|internal)
+					COMPREPLY=(internal)
+					;;
+				    e|ex|ext|exte|exter|extern|externa|external)
+					COMPREPLY=(external)
+					;;
+				    a|au|aux|auxi|auxil|auxili|auxilia|auxiliar|auxiliary)
+					COMPREPLY=(auxiliary)
+					;;
+				    '')
+					COMPREPLY=('' internal external auxiliary)
+					;;
+				    *)
+					COMPREPLY=()
+					;;
+				esac
+			    else
+				COMPREPLY=()
+			    fi
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		*)
+		    COMPREPLY=()
+		    ;;
+	    esac
+	    ;;
+	6)
+	    case ${COMP_WORDS[1]} in
+		shape)
+		    case ${COMP_WORDS[2]} in
+			router)
+			    if test ${COMP_WORDS[3]} == add -o \
+				${COMP_WORDS[3]:0:4} == "add:" -o \
+				${COMP_WORDS[3]:0:7} == "insert:" ; then
+
+				case ${COMP_WORDS[5]} in
+				    internal|external|auxiliary)
+					case ${COMP_WORDS[6]} in
+					    t|tc|tcp)
+						COMPREPLY=(tcp)
+						;;
+					    u|ud|udp)
+						COMPREPLY=(udp)
+						;;
+					    a|an|any)
+						COMPREPLY=(any)
+						;;
+					    '')
+						COMPREPLY=('' tcp udp any)					    
+						;;
+					    *)
+						COMPREPLY=()
+						;;
+					esac
+					;;
+				    *)
+					COMPREPLY=()
+					;;
+				esac
+			    else
+				COMPREPLY=()
+			    fi
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		*)
+		    COMPREPLY=()
+		    ;;
+	    esac
+	    ;;
+	7)
+	    case ${COMP_WORDS[1]} in
+		shape)
+		    case ${COMP_WORDS[2]} in
+			router)
+			    if test ${COMP_WORDS[3]} == add -o \
+				    ${COMP_WORDS[3]:0:4} == "add:" -o \
+				    ${COMP_WORDS[3]:0:7} == "insert:" ; then
+
+				case ${COMP_WORDS[5]} in
+				    internal|external|auxiliary)
+					case ${COMP_WORDS[6]} in
+					    tcp|udp|any)
+						case ${COMP_WORDS[7]} in
+						    a|an|any)
+							COMPREPLY=(any)
+							;;
+						    '')
+							COMPREPLY=('' '<src-ip[/<mask-prefix>]>' any)
+							;;
+						    *)
+							COMPREPLY=()
+							;;
+						esac
+						;;
+					    *)
+						COMPREPLY=()
+						;;
+					esac
+					;;
+				    *)
+					COMPREPLY=()	    
+					;;
+				esac
+			    else
+				COMPREPLY=()
+			    fi
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		*)
+		    COMPREPLY=()
+		    ;;
+	    esac
+	    ;;
+	8)
+	    case ${COMP_WORDS[1]} in
+		shape)
+		    case ${COMP_WORDS[2]} in
+			router)
+			    if test ${COMP_WORDS[3]} == add -o \
+				${COMP_WORDS[3]:0:4} == "add:" -o \
+				${COMP_WORDS[3]:0:7} == "insert:" ; then
+
+				case ${COMP_WORDS[5]} in
+				    internal|external|auxiliary)
+					case ${COMP_WORDS[6]} in
+					    tcp|udp|any)
+						case ${COMP_WORDS[8]} in
+						    a|an|any)
+							COMPREPLY=(any)
+							;;
+						    '')
+							COMPREPLY=('' '<src-port>' any)
+							;;
+						    *)
+							COMPREPLY=()
+							;;
+						esac
+						;;
+					    *)
+						COMPREPLY=()
+						;;
+					esac
+					;;
+				    *)
+					COMPREPLY=()	    
+					;;
+				esac
+			    else
+				COMPREPLY=()
+			    fi
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		*)
+		    COMPREPLY=()
+		    ;;
+	    esac
+	    ;;
+	9)
+	    case ${COMP_WORDS[1]} in
+		shape)
+		    case ${COMP_WORDS[2]} in
+			router)
+			    if test ${COMP_WORDS[3]} == add -o \
+				${COMP_WORDS[3]:0:4} == "add:" -o \
+				${COMP_WORDS[3]:0:7} == "insert:" ; then
+
+				case ${COMP_WORDS[5]} in
+				    internal|external|auxiliary)
+					case ${COMP_WORDS[6]} in
+					    tcp|udp|any)
+						COMPREPLY=('' '<ingress-qos>')
+						;;
+					    *)
+						COMPREPLY=()
+						;;
+					esac
+					;;
+				    *)
+					COMPREPLY=()	    
+					;;
+				esac
+			    else
+				COMPREPLY=()
+			    fi
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		*)
+		    COMPREPLY=()
+		    ;;
+	    esac
+	    ;;
+	10)
+	    case ${COMP_WORDS[1]} in
+		shape)
+		    case ${COMP_WORDS[2]} in
+			router)
+			    if test ${COMP_WORDS[3]} == add -o \
+				    ${COMP_WORDS[3]:0:4} == "add:" -o \
+				    ${COMP_WORDS[3]:0:7} == "insert:" ; then
+
+				case ${COMP_WORDS[5]} in
+				    internal|external|auxiliary)
+					case ${COMP_WORDS[6]} in
+					    tcp|udp|any)
+						case ${COMP_WORDS[10]} in
+						    a|an|any)
+							COMPREPLY=(any)
+							;;
+						    '')
+							COMPREPLY=('' '<dst-ip[/<mask-prefix>]>' any)
+							;;
+						    *)
+							COMPREPLY=()
+							;;
+						esac
+						;;
+					    *)
+						COMPREPLY=()
+						;;
+					esac
+					;;
+				    *)
+					COMPREPLY=()	    
+					;;
+				esac
+			    else
+				COMPREPLY=()
+			    fi
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		*)
+		    COMPREPLY=()
+		    ;;
+	    esac
+	    ;;
+	11)
+	    case ${COMP_WORDS[1]} in
+		shape)
+		    case ${COMP_WORDS[2]} in
+			router)
+			    if test ${COMP_WORDS[3]} == add -o \
+				${COMP_WORDS[3]:0:4} == "add:" -o \
+				${COMP_WORDS[3]:0:7} == "insert:" ; then
+
+				case ${COMP_WORDS[5]} in
+				    internal|external|auxiliary)
+					case ${COMP_WORDS[6]} in
+					    tcp|udp|any)
+						case ${COMP_WORDS[11]} in
+						    a|an|any)
+							COMPREPLY=(any)
+							;;
+						    '')
+							COMPREPLY=('' '<dst-port>' any)
+							;;
+						    *)
+							COMPREPLY=()
+							;;
+						esac
+						;;
+					    *)
+						COMPREPLY=()
+						;;
+					esac
+					;;
+				    *)
+					COMPREPLY=()	    
+					;;
+				esac
+			    else
+				COMPREPLY=()
+			    fi
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		*)
+		    COMPREPLY=()
+		    ;;
+	    esac
+	    ;;
+	12)
+	    case ${COMP_WORDS[1]} in
+		shape)
+		    case ${COMP_WORDS[2]} in
+			router)
+			    if test ${COMP_WORDS[3]} == add -o \
+				    ${COMP_WORDS[3]:0:4} == "add:" -o \
+				    ${COMP_WORDS[3]:0:7} == "insert:" ; then
+
+				case ${COMP_WORDS[5]} in
+				    internal|external|auxiliary)
+					case ${COMP_WORDS[6]} in
+					    tcp|udp|any)
+						COMPREPLY=('' '<egress-qos>')
+						;;
+					    *)
+						COMPREPLY=()
+						;;
+					esac
+					;;
+				    *)
+					COMPREPLY=()	    
+					;;
+				esac
+			    else
+				COMPREPLY=()
+			    fi
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		*)
+		    COMPREPLY=()
+		    ;;
+	    esac
+	    ;;
+	13)
+	    case ${COMP_WORDS[1]} in
+		shape)
+		    case ${COMP_WORDS[2]} in
+			router)
+			    if test ${COMP_WORDS[3]} == add -o \
+				    ${COMP_WORDS[3]:0:4} == "add:" -o \
+				    ${COMP_WORDS[3]:0:7} == "insert:" ; then
+
+				case ${COMP_WORDS[5]} in
+				    internal|external|auxiliary)
+					case ${COMP_WORDS[6]} in
+					    tcp|udp|any)
+						COMPREPLY=('' '<RET>' '<DSCP>')
+						;;
+					    *)
+						COMPREPLY=()
+						;;
+					esac
+					;;
+				    *)
+					COMPREPLY=()	    
+					;;
+				esac
+			    else
+				COMPREPLY=()
+			    fi
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		*)
+		    COMPREPLY=()
+		    ;;
+	    esac
+	    ;;
+	*)
+	    COMPREPLY=()
+	    ;;
+    esac
+}

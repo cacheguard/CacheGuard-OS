@@ -1,0 +1,172 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       InitScript
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+source /lib/lsb/init-functions
+
+CACHEGUARD_DIR=/etc/sysconfig/cacheguard
+source ${CACHEGUARD_DIR}/constant
+source ${APPLIANCE_DIR}/etc/role
+source ${LOCAL_DIR}/lib/apl_common
+source ${LOCAL_DIR}/lib/apl_tools
+source ${LOCAL_DIR}/lib/apl_device
+
+SERV="Ethernet"
+RETVAL=0
+unset NETWORKS NETWORK_MODULES
+PATH=${PATH}:/usr/local/sbin:/usr/local/bin
+
+update-apl-links()
+{
+    test -n "${1}" || return 1
+    local prefix=${1}
+
+    local net_file=/tmp/${prefix}.network
+    test -f ${net_file} || return 11
+
+    backup-ethernet-file ${HARD_DIR}/hw-links ${STARTUP_BACKUP_DIR}/hw-links.save
+    mv -f ${net_file} ${HARD_DIR}/hw-links
+}
+
+update-sys-modules-conf()
+{
+    test -n "${1}" || return 1
+    local prefix=${1}
+
+    local module
+
+    backup-ethernet-file /etc/sysconfig/modules-network ${STARTUP_BACKUP_DIR}/modules-network.save
+    backup-ethernet-file /etc/sysconfig/modules ${STARTUP_BACKUP_DIR}/modules.save
+
+    local system=$(uname -r 2> /dev/null)
+    find-modules ${system} ${prefix}
+
+    set-network-drivers ${prefix} /dev/null
+    gen-network-modules > /tmp/${prefix}.modules-network
+    cp -f /etc/sysconfig/modules-network /tmp/${prefix}.modules-network.old
+
+    cp -f /tmp/${prefix}.modules-network /etc/sysconfig/modules-network
+    cat /etc/sysconfig/modules-constant /etc/sysconfig/modules-network > /tmp/${prefix}.modules &&
+	cp -f /tmp/${prefix}.modules /etc/sysconfig/modules
+}
+
+update-apl-model-conf()
+{
+    backup-ethernet-file ${HARD_DIR}/model.conf ${STARTUP_BACKUP_DIR}/model.conf.save
+
+    sed -e "s/NETWORK_DEVICES=.*/NETWORK_DEVICES=\"${NETWORKS}\"/" ${HARD_DIR}/model.conf > /tmp/model.conf.${$} &&
+	mv -f /tmp/model.conf.${$} ${HARD_DIR}/model.conf
+}
+
+update-network-files()
+{
+    test -n "${1}" || return 1
+    local prefix=${1}
+
+    backup-ethernet-file ${UDEV_RULES_DIR}/${UDEV_NETWORK_RULES_FILE_NAME} ${STARTUP_BACKUP_DIR}/${UDEV_NETWORK_RULES_FILE_NAME}.save
+    update-udev-network-rules ${prefix}
+    update-apl-links ${prefix}
+    update-apl-model-conf
+}
+
+remove-old-network-modules()
+{
+    test -n "${1}" || return 1
+    local prefix=${1}
+    test -f /tmp/${prefix}.modules-network.old || return 0
+
+    local modules
+
+    modules=$(cat /tmp/${prefix}.modules-network.old 2> /dev/null)
+    modules=$(get-inverted-list "${modules}")
+
+    rmmod ${modules} > /dev/null 2>&1
+}
+
+update-network()
+{
+    test -n "${1}" || return 1
+    local prefix=${1}
+
+    update-network-files ${prefix}
+    update-sys-modules-conf ${prefix}
+    udevadm control --reload-rules > /dev/null 2>&1
+    udevadm settle > /dev/null 2>&1
+}
+
+clean-tmp-ethernet()
+{
+    test -n "${1}" || return 1
+    local prefix=${1}
+
+    rm -f /tmp/${prefix}.*
+}
+
+start-ethernet()
+{
+    local prefix=ethernet.${$}
+
+    restore-ethernet-files
+    find-devices /dev/null ${prefix} no
+
+    local nic_nb=$(record-length-list 1 "${NETWORKS}")
+
+    if mac-address-is-changed ${prefix} ; then
+	update-network ${prefix}
+	remove-old-network-modules
+	reload-network-modules
+    fi
+
+    remove-ethernet-backup-files
+    clean-tmp-ethernet ${prefix}
+
+    test ${nic_nb} -ge ${MIN_NIC_NB}
+}
+
+# Main()
+
+MIN_NIC_NB=$(get-min-nic)
+
+case "${1}" in
+    start)
+	log_info_msg "Starting ${SERV}..."
+
+	start-ethernet
+	RETVAL=${?}
+
+	[ ${RETVAL} -eq 0 ]
+	evaluate_retval
+
+	if test ${RETVAL} -ne 0 ; then
+	    log_info_msg "Fatal Error! This appliance requires at least ${MIN_NIC_NB} Network Adapters"
+	    [ ${RETVAL} -eq 0 ]
+	    evaluate_retval
+	fi
+
+	exit ${RETVAL}
+	;;
+   *)
+	echo "Usage: ${0} {start}"
+	exit 1
+	;;
+esac

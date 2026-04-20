@@ -1,0 +1,283 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       Commands
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+source functions
+
+is-valid-dynamic-dns-provider()
+{
+    test -n "${1}" || return 1
+    local provider=${1}
+
+    case ${provider} in
+	changeip|dnshome|freemyip|myonlineportal|noip)
+	    ;;
+	*)
+	    return 11
+	    ;;
+    esac
+
+    return 0
+}
+
+check-dynamic-dns-username()
+{
+    test -n "${1}" || return 1
+    local name=${1}
+
+    local len=${#name}
+    test ${len} -le ${MAX_LEN} || return 2
+
+    [[ "${name}" =~ ^[a-zA-Z0-9@._:,\;-]+$ ]]
+}
+
+show-dyndns-request1()
+{
+    test -n "${1}" || return 1
+    local istate=${1}
+
+    local estate=$(external-form ${istate})
+
+    case ${istate} in
+	False)
+	    echo-value "${estate}"
+	    ;;
+	True)
+	    test -n "${2}" || return 2
+	    test -n "${3}" || return 3
+	    local provider=${2}
+	    local hostname=${3}
+
+	    local credential
+
+	    case ${provider} in
+		changeip|myonlineportal|noip)
+		    test -n "${4}" || return 4
+		    local username=${4}
+		    credential=" ${username} ..."
+		    ;;
+		*)
+		    credential=" ..."
+		    ;;
+	    esac
+
+	    echo-value "${estate} ${provider} ${hostname}${credential}"
+	    ;;
+	*)
+	    return 255
+	    ;;
+    esac
+}
+
+show-dyndns-request()
+{
+    echo-begin-show
+
+    echo-command-form "dynamicdns"
+    echo-mark-cur
+    show-dyndns-request1 ${CURRENT_DYNAMIC_DNS_STATE} "${CURRENT_DYNAMIC_DNS_PROVIDER}" "${CURRENT_DYNAMIC_DNS_HOSTNAME}" "${CURRENT_DYNAMIC_DNS_USERNAME}"
+
+    if dynamic-dns-request-is-modified ; then
+	echo-command-form "dynamicdns"
+	echo-mark-new
+	show-dyndns-request1 ${DYNAMIC_DNS_STATE} "${DYNAMIC_DNS_PROVIDER}" "${DYNAMIC_DNS_HOSTNAME}" "${DYNAMIC_DNS_USERNAME}"
+    fi
+
+    echo-end-show
+}
+
+show-dyndns-interval()
+{
+    echo-begin-show
+
+    echo-command-form "dynamicdns interval"
+    echo-mark-cur
+    echo-value "${CURRENT_DYNAMIC_DNS_INTERVAL}"
+
+    if test ${DYNAMIC_DNS_INTERVAL} != ${CURRENT_DYNAMIC_DNS_INTERVAL} ; then
+	echo-command-form "dynamicdns interval"
+	echo-mark-new
+	echo-value "${DYNAMIC_DNS_INTERVAL}"
+    fi
+
+    echo-end-show
+}
+
+manage-interval()
+{
+    local interval=${1}
+
+    if test -z "${interval}" ; then
+	show-dyndns-interval
+	return ${?}
+    fi
+
+    check-digit ${interval} || return 190
+
+    if test ${interval} -lt ${MIN_DYNAMIC_DNS_INTERVAL} -o ${interval} -gt ${MAX_DYNAMIC_DNS_INTERVAL} ; then
+	INDIRECT_ERROR_CODE=530
+	return 254
+    fi
+
+    DYNAMIC_DNS_INTERVAL=${interval}
+    SAVENV=1
+    return 0
+}
+
+run()
+{
+    local op=${ARGS[1]}
+
+    if test -z "${op}" ; then
+	show-dyndns-request
+	return ${?}
+    fi
+
+    case ${op} in
+	report)
+	    if test ${CURRENT_DYNAMIC_DNS_STATE} == False ; then
+		INDIRECT_ERROR_CODE=529
+		return 254
+	    fi
+
+	    local report ret
+
+	    report=$(get-dynamic-dns-report)
+	    ret=${?}
+
+	    case ${ret} in
+		11)
+		    return 104
+		    ;;
+		13)
+		    INDIRECT_ERROR_CODE=532
+		    return 254
+		    ;;
+		15)
+		    INDIRECT_ERROR_CODE=533
+		    return 254
+		    ;;
+		*)
+		    local ip=${report/:*}
+		    report=${report#*:}
+		    ;;
+	    esac
+
+	    echo-begin-show
+
+	    echo-command-form "dynamicdns"
+	    echo-value "Hostname: ${CURRENT_DYNAMIC_DNS_HOSTNAME}"
+	    echo-value "Public IP: ${ip}"
+	    test -z "${report}" || echo-value "Report: ${report}"
+
+	    echo-end-show
+
+	    return 0
+	    ;;
+	interval)
+	    shift-args
+	    manage-interval ${ALLARGS}
+	    return ${?}
+	    ;;
+	*)
+	    ;;
+    esac
+
+    local state=${op}
+
+    test ${state} == "on:encrypted" || check-boolean ${state} || return 18
+
+    if test ${state} == off ; then
+	export DYNAMIC_DNS_STATE='False'
+	export DYNAMIC_DNS_PROVIDER=''
+	export DYNAMIC_DNS_HOSTNAME=''
+	export DYNAMIC_DNS_USERNAME=''
+	export DYNAMIC_DNS_PASSWORD=''
+	SAVENV=1
+	return 0
+    fi
+
+    local provider=${ARGS[2]}
+    local hostname=${ARGS[3]}
+
+    is-valid-dynamic-dns-provider ${provider} || return 244
+    check-domainname ${hostname} || return 16
+
+    local username password secret_title
+
+    case ${provider} in
+	changeip|myonlineportal|noip)
+	    username=${ARGS[4]}
+	    if ! check-dynamic-dns-username ${username} ; then
+		INDIRECT_ERROR_CODE=528
+		return 254
+	    fi
+	    secret_title='password'
+	    shift-args
+	    ;;
+	dnshome)
+	    secret_title='password'
+	    ;;
+	freemyip)
+	    secret_title='token'
+	    ;;
+	*)
+	    return 11
+	    ;;
+    esac
+
+    local password=${ARGS[4]}
+
+    if test ${state} == "on:encrypted" ; then
+	password=$(decrypt-password "encrypted:${password}" "${DYNDNS_PASSWD}")
+	test -n "${password}" || return 0
+	state='on'
+    fi
+
+    if test -z "${password}" ; then
+	test ${TERM} != ${WADMIN_TERM} || return 0
+	test "${__BATCH_MODE}" != yes || error 111
+	test -z "${TRANSACTION}" || return 106
+
+	echo -n "Please enter the ${secret_title}: "
+	stty -echo
+	read password
+	stty echo
+	echo
+    fi
+
+    if ! check-external-password-length "${password}" ; then
+	INDIRECT_ERROR_CODE=531
+	return 254
+    fi
+
+    export DYNAMIC_DNS_STATE=$(internal-form ${state})
+    export DYNAMIC_DNS_PROVIDER=${provider}
+    export DYNAMIC_DNS_HOSTNAME=${hostname}
+    export DYNAMIC_DNS_USERNAME=${username}
+    export DYNAMIC_DNS_PASSWORD=${password}
+
+    SAVENV=1
+}
+
+main "${@}"

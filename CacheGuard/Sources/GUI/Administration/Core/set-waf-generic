@@ -1,0 +1,56 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       GUI
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+set-filter-generic()
+{
+    set-generic-rule-table
+
+    local filter var
+    local i len=${#WAF_GENERIC_FILTER_ID[@]}
+
+    for ((i=0;i<len;i++))
+    do
+	filter=${WAF_GENERIC_FILTER_ID[${i}]}	
+	local ${filter}=off
+    done
+
+    for ((i=1 ; i<${ATTRIBUTE_NB} ; i++))
+    do
+	var=${ATTRIBUTES[${i}]:4}
+	local ${var}=on
+    done
+    
+    local transaction=/tmp/${TRANSACTION_FILE}.wadmin.${REMOTE_USER}.${$}
+    rm -f ${transaction}
+
+    for ((i=0;i<len;i++))
+    do
+	filter=${WAF_GENERIC_FILTER_ID[${i}]}
+	echo waf generic ${filter} $(eval echo \$${filter}) >> ${transaction}
+    done
+
+    execute-transaction ${transaction}
+}
+
+set-filter-generic

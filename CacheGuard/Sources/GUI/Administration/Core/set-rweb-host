@@ -1,0 +1,82 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       GUI
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+set-host()
+{
+    test "${ATTRIBUTES[0]}" != "site_select" || return 0
+
+    local name=${VALUES[0]}
+    local pos=1 entry_pos dev_pos protocol_pos ip_pos port_pos weight_pos qos_pos del_pos
+    local port weight qos
+
+    local transaction=/tmp/${TRANSACTION_FILE}.wadmin.${REMOTE_USER}.${$}
+    rm -f ${transaction}
+
+    while test ${pos} -lt ${ATTRIBUTE_NB}
+    do
+	entry_pos=${pos}
+	dev_pos=$[${pos} + 1]
+	protocol_pos=$[${pos} + 2]
+	ip_pos=$[${pos} + 3]
+	port_pos=$[${pos} + 4]
+	weight_pos=$[${pos} + 5]
+	qos_pos=$[${pos} + 6]
+	del_pos=$[${pos} + 7]
+	
+	[[ "${ATTRIBUTES[${del_pos}]}" =~ ^del_[0-9]+$ ]]
+	if test ${?} -ne 0 ; then
+	    if test "${VALUES[${entry_pos}]}" == anew -a -n "${VALUES[${dev_pos}]}" -a -n "${VALUES[${ip_pos}]}" ; then
+		port=${VALUES[${port_pos}]}
+		weight=${VALUES[${weight_pos}]}
+		qos=${VALUES[${qos_pos}]}
+
+		if test -z "${port}" ; then
+		    case ${VALUES[${protocol_pos}]} in
+			http)
+			    port=80
+			    ;;
+			https)
+			    port=443
+			    ;;
+			*)
+			    port=80
+			    ;;
+		    esac
+		fi
+		test -n "${weight}" || weight="50"
+		test -n "${qos}" || qos="100"
+
+		echo "rweb host ${name} add '${VALUES[${dev_pos}]}' '${VALUES[${protocol_pos}]}' '${VALUES[${ip_pos}]}' '${port}' '${weight}' '${qos}'" >> ${transaction}
+	    fi
+	    pos=$[${pos} + 7]
+	else
+	    echo "rweb host ${name} del '${VALUES[${dev_pos}]}' '${VALUES[${protocol_pos}]}' '${VALUES[${ip_pos}]}' '${VALUES[${port_pos}]}'" >> ${transaction}
+	    pos=$[${pos} + 8]
+	fi
+    done
+    
+    execute-transaction ${transaction}
+}
+
+set-host

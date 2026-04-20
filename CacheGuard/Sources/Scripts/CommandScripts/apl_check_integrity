@@ -1,0 +1,162 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       Scripts
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+CACHEGUARD_DIR=/etc/sysconfig/cacheguard
+source ${CACHEGUARD_DIR}/constant
+source ${APPLIANCE_DIR}/etc/role
+source ${HARD_DIR}/model.conf
+source ${LOCAL_DIR}/lib/apl_common
+
+check-sha1-file-integrity()
+{
+    test -n "${1}" || return 201
+    local sha1_file=${1}
+
+    local local_sha1 remote_sha1
+    local base=$(file-basename ${sha1_file})
+
+    local_sha1=$(openssl dgst -sha1 -c ${sha1_file} 2>/dev/null)
+    test ${?} -eq 0 || return 203
+    local_sha1=${local_sha1/* }
+    local_sha1="${base} ${local_sha1}"
+
+    remote_sha1=$(curl --disable --fail -4 --silent --connect-timeout 7 --max-time 10 --max-filesize 128 --cacert ${PROXY_SSL_CA_DIR}/ca-bundle.crt --capath ${PROXY_SSL_LOCAL_CA_DIR} --location --url ${FINGERPRINT_URL}/${base}.sha1 2>/dev/null)
+    local ret=${?}
+    test ${ret} -eq 0 || return ${ret}
+
+    test "${remote_sha1}" == "${local_sha1}"
+    ret=${?}
+
+    if test ${ret} -eq 0 ; then
+	return 0
+    else
+	return 205
+    fi
+}
+
+check-content-integrity()
+{
+    test -n "${1}" || return 1
+    local sha1_file=${1}
+    test -f ${sha1_file} || return 11
+
+    local file sha1
+    local live_sha1
+    local errors=0
+
+    cd /
+
+    while read file sha1
+    do
+	test -n "${file}" || continue
+	test ${file:0:1} != '#' || continue
+	
+	if test ! -f ${file} ; then
+            echo "*** $file: KO [0]"
+            continue
+        fi
+
+	if test -z "${sha1}" ; then
+	    echo "*** $file: KO [1]"
+            continue
+	fi
+
+	live_sha1=$(openssl dgst -sha1 -c ${file} 2>/dev/null)
+        live_sha1=${live_sha1/* }
+
+	if test -z "${live_sha1}" ; then
+	    echo "*** $file: KO [2]"
+            continue
+	fi
+
+	if test ${live_sha1} != ${sha1} ; then
+            echo "*** ${file}: KO [3]"
+	    ((errors++))
+	fi
+
+    done < ${sha1_file}
+
+    test ${errors} -eq 0
+}
+
+check-exec-integrity()
+{
+    test -n "${1}" || return 1
+    local exec_file=${1}
+    test -f ${exec_file} || return 11
+
+    local tmp_run_exec=/tmp/exec.run.${$}
+    local tmp_src_exec=/tmp/exec.src.${$}
+    local tmp_excl=/tmp/excl.${$}
+
+    local ret bin
+
+    for bin in ${WAUDIT_BINARY_FILES}
+    do
+	echo ${WEB_SERVER_DIR}${bin}
+    done > ${tmp_excl}
+
+    sort ${exec_file} > ${tmp_src_exec}
+    find / -type f -executable 2> /dev/null | sort > ${tmp_run_exec}.1
+    grep --invert-match --file=${tmp_excl} ${tmp_run_exec}.1 > ${tmp_run_exec}.2
+
+    rm -f \
+       ${tmp_run_exec}.1 \
+       ${tmp_excl}
+
+    diff --brief ${tmp_run_exec}.2 ${tmp_src_exec} > /dev/null 2>&1
+    ret=${?}
+
+    rm -f \
+       ${tmp_run_exec}.2 \
+       ${tmp_src_exec}
+
+    return ${ret}
+}
+
+main()
+{
+    local architecture_id
+    local os_version
+
+    local os_generation=${OS_GENERATION,,}
+    local os_version=$(cat ${HARD_DIR}/os-version)
+    local cpu_architecture=$(uname -m 2> /dev/null)
+
+    test ${cpu_architecture} != x86_64 || architecture_id="-64"
+
+    local sha1_file=${LOCAL_DIR}/etc/${TECHNICAL_NAME}-${os_generation}${architecture_id}-${os_version}.sha1
+    local exec_file=${LOCAL_DIR}/etc/${TECHNICAL_NAME}-${os_generation}${architecture_id}-${os_version}.exec
+
+    test -f ${sha1_file} || return 101
+    test -f ${exec_file} || return 103
+
+    check-sha1-file-integrity ${sha1_file} || return ${?}
+    check-sha1-file-integrity ${exec_file} || return ${?}
+
+    check-content-integrity ${sha1_file} || return 105
+    check-exec-integrity ${exec_file} || return 107
+}
+
+main "${@}"

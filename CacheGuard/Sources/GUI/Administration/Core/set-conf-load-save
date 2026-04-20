@@ -1,0 +1,120 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       GUI
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+set-conf-save()
+{
+    local i
+
+    local operation="${VALUES[0]}"
+    local protocol="${VALUES[1]:1}"
+
+    local version server filename
+
+    for ((i=2 ; i<ATTRIBUTE_NB ; i++))
+    do
+	case ${ATTRIBUTES[${i}]} in
+	    version)
+		version="${VALUES[${i}]}"
+		;;
+	    server)
+		server="${VALUES[${i}]}"
+		;;
+	    filename)
+		filename="${VALUES[${i}]}"
+		;;
+	    *)
+		;;
+	esac
+    done
+
+    case "${operation}" in
+	load|save)
+	    ;;
+	*)
+	    return 1
+	    ;;
+    esac
+    
+    case "${protocol}" in
+	ftp|sftp|tftp)
+	    if test -z "${filename}" ; then
+		gen-gui-error 6
+		return 0
+	    fi
+	    ;;
+	web)
+	    local filename="${DEFAULT_SHOSTNAME}.conf.${$}"
+	    ;;
+	*)
+	    return 3
+	    ;;
+    esac
+
+    case "${operation}" in
+	save)
+	    case "${version}" in
+		new)
+		    version=" ${version}"
+		    ;;
+		current)
+		    unset version
+		    ;;
+		*)
+		    unset version
+		    ;;
+	    esac
+	    
+	    case "${protocol}" in
+		ftp|sftp|tftp)
+		    log-command "conf" "save ${protocol} ${server} ${filename}${version}"
+		    execute-command "conf save ${protocol} ${server} ${filename}${version}"
+		    ;;
+		web)
+		    execute-command "conf create ${filename}${version}"
+		    ;;
+		*)
+		    return 255
+		    ;;
+	    esac
+	    ;;
+	load)
+	    case "${protocol}" in
+		ftp|sftp|tftp)
+		    log-command "conf" "load ${protocol} ${server} ${filename}"
+		    execute-command "conf load ${protocol} ${server} ${filename}"
+		    ;;
+		web)
+		    ;;
+		*)
+		    return 255
+		    ;;
+	    esac
+	    ;;
+	*)
+	    return 255
+	    ;;
+    esac
+}
+
+set-conf-save

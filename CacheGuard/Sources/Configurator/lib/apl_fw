@@ -1,0 +1,6310 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       Configurator
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+echo-firewall-destination-ip-mask()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    local ip=${1}
+    local mk=${2}
+
+    test ${ip} != 0.0.0.0 -o ${mk} != 0.0.0.0 || return 0
+
+    echo " -d ${ip}/${mk}"
+}
+
+echo-firewall-source-ip-mask()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    local ip=${1}
+    local mk=${2}
+
+    test ${ip} != 0.0.0.0 -o ${mk} != 0.0.0.0 || return 0
+
+    echo " -s ${ip}/${mk}"
+}
+
+echo-firewall-destination-ip()
+{
+    test -n "${1}" || return 1
+    local ip=${1}
+
+    test ${ip} != 0.0.0.0 || return 0
+
+    echo " -d ${ip}"
+}
+
+echo-firewall-source-ip()
+{
+    test -n "${1}" || return 1
+    local ip=${1}
+
+    test ${ip} != 0.0.0.0 || return 0
+
+    echo " -s ${ip}"
+}
+
+set-fw-rule-parameters()
+{
+    if test -z "${FW_DOS_TCP_LIMIT}" ; then
+	SINGLE_IP_TCP_CONNLIMIT=$(get-default-piptcp)
+    else
+	SINGLE_IP_TCP_CONNLIMIT=$(min-value ${FW_DOS_TCP_LIMIT} 4294967295)
+    fi
+
+    if test -z "${FW_DOS_WEB_LIMIT}" ; then
+	SINGLE_IP_WEB_CONNLIMIT=$(get-default-pipweb)
+    else
+	SINGLE_IP_WEB_CONNLIMIT=$(min-value ${FW_DOS_WEB_LIMIT} 4294967295)
+    fi
+
+    if test -z "${FW_DOS_RWEB_LIMIT}" ; then
+	SINGLE_IP_RWEB_CONNLIMIT=$(get-default-piprweb)
+    else
+	SINGLE_IP_RWEB_CONNLIMIT=$(min-value ${FW_DOS_RWEB_LIMIT} 4294967295)
+    fi
+
+    if test -z "${FW_DOS_DNS_LIMIT}" ; then
+	SINGLE_IP_DNS_CONNLIMIT=$(get-default-pipdns)
+    else
+	SINGLE_IP_DNS_CONNLIMIT=$(min-value ${FW_DOS_DNS_LIMIT} 4294967295)
+    fi
+
+    if test -z "${FW_DOS_OCSP_LIMIT}" ; then
+	SINGLE_IP_OCSP_CONNLIMIT=$(get-default-pipocsp)
+    else
+	SINGLE_IP_OCSP_CONNLIMIT=$(min-value ${FW_DOS_OCSP_LIMIT} 4294967295)
+    fi
+
+    if test ${LOG_MODE} == True -a ${LOG_TYPE_FIREWALL/:*} == True ; then
+	export FW_ACCEPT_ALLOW="LOGGING_ALLOW"
+	export FW_DROP_DENY="LOGGING_DENY"
+	export FW_DROP_INVALID="LOGGING_INVALID"
+	export FW_DROP_ILLEGAL_NEW="LOGGING_INVALID"
+	export FW_DROP_LOOPBACK="LOGGING_LOOPBACK"
+	export FW_DROP_MULTICAST="LOGGING_MULTICAST"
+	export FW_DROP_NULL="LOGGING_NULL"
+	export FW_DROP_ALLSTATE="LOGGING_ALLSTATE"
+	export FW_DROP_XMAS="LOGGING_XMAS"
+	export FW_DROP_ZERO="LOGGING_ZERO"
+	export FW_DROP_RESERVED="LOGGING_RESERVED"
+	export FW_DROP_SELFSPOOF="LOGGING_SELFSPOOF"
+	export FW_DROP_BROADCAST="LOGGING_BROADCAST"
+	export FW_DROP_SYNFLOOD="LOGGING_SYNFLOOD"
+	export FW_DROP_UDPFLOOD="LOGGING_UDPFLOOD"
+	export FW_DROP_RSTFLOOD="LOGGING_RSTFLOOD"
+	export FW_DROP_SMURF="LOGGING_SMURF"
+	export FW_DROP_TRACEROUTE="LOGGING_TRACEROUTE"
+	export FW_DROP_UPTIME="LOGGING_UPTIME"
+	export FW_DROP_BRUTEFORCE="LOGGING_BRUTEFORCE"
+	export FW_REJECT_LIMIT="LOGGING_LIMIT"
+    else
+	export FW_DROP_DENY="DROP"
+	export FW_DROP_INVALID="DROP"
+	export FW_DROP_ILLEGAL_NEW="DROP"
+	export FW_DROP_LOOPBACK="DROP"
+	export FW_DROP_MULTICAST="DROP"
+	export FW_DROP_NULL="DROP"
+	export FW_DROP_ALLSTATE="DROP"
+	export FW_DROP_XMAS="DROP"
+	export FW_DROP_ZERO="DROP"
+	export FW_DROP_RESERVED="DROP"
+	export FW_DROP_SELFSPOOF="DROP"
+	export FW_DROP_BROADCAST="DROP"
+	export FW_DROP_SYNFLOOD="DROP"
+	export FW_DROP_UDPFLOOD="DROP"
+	export FW_DROP_RSTFLOOD="DROP"
+	export FW_DROP_SMURF="DROP"
+	export FW_DROP_TRACEROUTE="DROP"
+	export FW_DROP_UPTIME="DROP"
+	export FW_DROP_BRUTEFORCE="DROP"
+	export FW_REJECT_LIMIT="REJECT --reject-with tcp-reset"
+    fi
+
+    export FW_ICMP_LIMIT="-m limit --limit 5/s --limit-burst 25 -m state --state NEW"
+    export FW_INVALID="-m state --state INVALID"
+    export FW_ILLEGAL_NEW="-p tcp ! --syn -m state --state NEW"
+    export FW_LOOPBACK_IP="127.0.0.0/255.0.0.0"
+    export FW_ZERO_NET="0.0.0.0/255.0.0.0"
+    export FW_XMAS="-p tcp --tcp-flags FIN,PSH,URG FIN,PSH,URG"
+    export FW_ALLSTATE="-p tcp --tcp-flags ALL ALL"
+    export FW_NULL="-p tcp --tcp-flags ALL NONE"
+    export FW_TCP_CONNLIMIT="-p tcp --syn -m connlimit --connlimit-saddr --connlimit-above ${SINGLE_IP_TCP_CONNLIMIT} --connlimit-mask 32"
+    export FW_WEB_CONNLIMIT="-p tcp -m connlimit --connlimit-saddr --connlimit-above ${SINGLE_IP_WEB_CONNLIMIT} --connlimit-mask 32"
+    export FW_RWEB_CONNLIMIT="-p tcp --syn -m connlimit --connlimit-saddr --connlimit-above ${SINGLE_IP_RWEB_CONNLIMIT} --connlimit-mask 32"
+    export FW_DNS_CONNLIMIT="-p tcp --syn --dport ${DOMAIN_PORT} -m connlimit --connlimit-saddr --connlimit-above ${SINGLE_IP_DNS_CONNLIMIT} --connlimit-mask 32"
+    export FW_OCSP_CONNLIMIT="-p tcp --syn --dport ${OCSP_PORT} -m connlimit --connlimit-saddr --connlimit-above ${SINGLE_IP_OCSP_CONNLIMIT} --connlimit-mask 32"
+    export FW_TCP_MSS="-p tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu"
+    export FW_IPSEC_POLICY="-m policy --pol ipsec --dir"
+    export FW_IPSEC_POLICY_IN="${FW_IPSEC_POLICY} in"
+    export FW_IPSEC_POLICY_OUT="${FW_IPSEC_POLICY} out"
+}
+
+gen-iptables-log1()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    test -n "${3}" || return 3
+    local chain=${1}
+    local reason=${2}
+    local action=${3}
+
+    echo "[0:0] -A LOGGING_${chain} -m limit --limit 12/min --limit-burst 30 -j LOG --log-prefix \"${FW_LOG_TAG}:${reason} \" --log-level 4"
+    echo "[0:0] -A LOGGING_${chain} -j ${action}"
+}
+
+gen-iptables-log-accept()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    local chain=${1}
+    local reason=${2}
+
+    gen-iptables-log1 "${chain}" "${reason}" RETURN
+}
+
+gen-iptables-log-reject()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    local chain=${1}
+    local reason=${2}
+
+    gen-iptables-log1 "${chain}" "${reason}" "REJECT -p tcp --reject-with tcp-reset"
+}
+
+gen-iptables-log-drop()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    local chain=${1}
+    local reason=${2}
+
+    gen-iptables-log1 "${chain}" "${reason}" DROP
+}
+
+get-iptables-dnat()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    test -n "${3}" || return 3
+    local protocol=${1}
+    local dst_nat_ip=${2}
+    local dst_pat_port=${3}
+
+    case ${protocol} in
+	tcp|udp|ftp_active|ftp_passive|ftp_trivial|sip)
+	    ;;
+	*)
+	    test ${dst_nat_ip} != nil || return 11
+	    echo "${dst_nat_ip}"
+	    return 0
+	    ;;
+    esac
+
+    if test ${dst_nat_ip} == nil ; then
+	if test ${dst_pat_port} == nil ; then
+	    return 13
+	else
+	    echo ":${dst_pat_port}"
+	fi
+    else
+	if test ${dst_pat_port} == nil ; then
+	    echo "${dst_nat_ip}"
+	else
+	    echo "${dst_nat_ip}:${dst_pat_port}"
+	fi
+    fi
+
+    return 0
+}
+
+gen-iptables-nat-ftp()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    test -n "${3}" || return 3
+    test -n "${4}" || return 4
+    test -n "${5}" || return 5
+    test -n "${6}" || return 6
+    test -n "${7}" || return 7
+    local mode=${1}
+    local input_dev_rule=${2}
+    local ip_client=${3}
+    local ip_server=${4}
+    local ftp_port=${5}
+    local dst_nat_ip=${6}
+    local dst_pat_port=${7}
+
+    test ${dst_nat_ip} != nil || return 11
+    local dnat
+    dnat=$(get-iptables-dnat tcp ${dst_nat_ip} ${dst_pat_port})
+    test ${?} -eq 0 || return 13
+
+    local src_client dst_server
+
+    test ${ftp_port} != any || ftp_port=${FTP_PORT}
+    test ${ip_server} == any || dst_server="-d ${ip_server}"
+    test ${ip_client} == any || src_client="-s ${ip_client}"
+
+    echo "[0:0] -A PREROUTING ${input_dev_rule} -p tcp -m state --state NEW,ESTABLISHED -m tcp ${src_client} --sport 1024:65535 ${dst_server} --dport ${ftp_port} -j DNAT --to-destination ${dnat}"
+
+    case ${mode} in
+	passive)
+	    echo "[0:0] -A PREROUTING ${input_dev_rule} -p tcp -m state --state RELATED,ESTABLISHED -m tcp ${src_client} --sport 1024:65535 ${dst_server} --dport 1024:65535 -j DNAT --to-destination ${dst_nat_ip}"
+	    ;;
+	active)
+	    echo "[0:0] -A PREROUTING ${input_dev_rule} -p tcp -m state --state ESTABLISHED -m tcp ${src_client} --sport 1024:65535 ${dst_server} -m multiport --dports ${FTP_DATA_PORTS} -j DNAT --to-destination ${dst_nat_ip}"
+	    ;;
+	*)
+	    return 255
+	    ;;
+    esac
+}
+
+gen-iptables-nat-tftp()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    test -n "${3}" || return 3
+    test -n "${4}" || return 4
+    test -n "${5}" || return 5
+    test -n "${6}" || return 6
+    local input_dev_rule=${1}
+    local ip_client=${2}
+    local ip_server=${3}
+    local tftp_port=${4}
+    local dst_nat_ip=${5}
+    local dst_pat_port=${6}
+
+    test ${dst_nat_ip} != nil || return 11
+    local dnat
+    dnat=$(get-iptables-dnat ftp_trivial ${dst_nat_ip} ${dst_pat_port})
+    test ${?} -eq 0 || return 13
+
+    local dst_server src_client
+
+    test ${tftp_port} != any || tftp_port=${TFTP_PORT}
+    test ${ip_server} == any || dst_server="-d ${ip_server}"
+    test ${ip_client} == any || src_client="-s ${ip_client}"
+    
+    echo "[0:0] -A PREROUTING ${input_dev_rule} -p udp -m state --state NEW,ESTABLISHED ${src_client} --sport 1024:65535 ${dst_server} --dport ${tftp_port} -j DNAT --to-destination ${dnat}"
+    echo "[0:0] -A PREROUTING ${input_dev_rule} -p udp -m state --state RELATED,ESTABLISHED ${src_client} --sport 1024:65535 ${dst_server} --dport 1024:65535 -j DNAT --to-destination ${dst_nat_ip}"
+}
+
+gen-iptables-nat-sip()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    test -n "${3}" || return 3
+    test -n "${4}" || return 4
+    test -n "${5}" || return 5
+    test -n "${6}" || return 6
+    local input_dev_rule=${1}
+    local ip_client=${2}
+    local ip_server=${3}
+    local sip_port=${4}
+    local dst_nat_ip=${5}
+    local dst_pat_port=${6}
+
+    test ${dst_nat_ip} != nil || return 11
+    local dnat
+    dnat=$(get-iptables-dnat sip ${dst_nat_ip} ${dst_pat_port})
+    test ${?} -eq 0 || return 13
+
+    local dst_server src_client
+
+    test ${sip_port} != any || sip_port=${SIP_PORT}
+    test ${ip_server} == any || dst_server="-d ${ip_server}"
+    test ${ip_client} == any || src_client="-s ${ip_client}"
+    
+    echo "[0:0] -A PREROUTING ${input_dev_rule} -p udp -m state --state NEW,ESTABLISHED ${src_client} --sport 1024:65535 ${dst_server} --dport ${sip_port} -j DNAT --to-destination ${dnat}"
+    echo "[0:0] -A PREROUTING ${input_dev_rule} -p udp -m state --state RELATED,ESTABLISHED ${src_client} --sport 1024:65535 ${dst_server} --dport 1024:65535 -j DNAT --to-destination ${dst_nat_ip}"
+}
+
+gen-iptables-transparent()
+{
+    test -n "${1}" || return 1
+    local tmode=${1}
+
+    local http_target https_target
+
+    case ${tmode} in
+	intercept)
+	    http_target="DNAT --to-destination ${IP_WEB_IP}:${THTTP_PORT}"
+	    https_target="DNAT --to-destination ${IP_WEB_IP}:${THTTPS_PORT}"
+	    ;;
+	tproxy)
+	    echo "[0:0] -A PREROUTING -p tcp -m socket -j OPEN_SOCKET"
+	    http_target="TPROXY --tproxy-mark ${ROUTE_TPROXY_MARK}/${ROUTE_TPROXY_MARK_MASK} --on-ip ${IP_WEB_IP} --on-port ${THTTP_PORT}"
+	    https_target="TPROXY --tproxy-mark ${ROUTE_TPROXY_MARK}/${ROUTE_TPROXY_MARK_MASK} --on-ip ${IP_WEB_IP} --on-port ${THTTPS_PORT}"
+
+	    ;;
+	*)
+	    return 255
+	    ;;
+    esac
+
+    local elt range i=0
+    local src_ip src_mk
+    local vrrp_ip rweb_ip
+
+    if test ${RWEB_MODE} == True ; then
+	if test -z "${TRANSPARENT_IF_IP_MK_LIST}" ; then
+	    for rweb_ip in ${RWEB_HTTP_IP_LIST}
+	    do
+		echo "[0:0] -A PREROUTING ! -i ${IF_EXTERNAL} -d ${rweb_ip} -p tcp -m tcp --dport ${WWW_PORT} -j RETURN"
+		test ${VPN_IPSEC_MODE} == False || echo "[0:0] -A PREROUTING ${FW_IPSEC_POLICY_IN} -d ${rweb_ip} -p tcp -m tcp --dport ${WWW_PORT} -j RETURN"
+	    done
+	    for rweb_ip in ${RWEB_HTTPS_IP_LIST}
+	    do
+		echo "[0:0] -A PREROUTING ! -i ${IF_EXTERNAL} -d ${rweb_ip} -p tcp -m tcp --dport ${HTTPS_PORT} -j RETURN"
+		test ${VPN_IPSEC_MODE} == False || echo "[0:0] -A PREROUTING ${FW_IPSEC_POLICY_IN} -d ${rweb_ip} -p tcp -m tcp --dport ${HTTPS_PORT} -j RETURN"
+	    done
+	else
+	    for elt in ${TRANSPARENT_IF_IP_MK_LIST}
+	    do
+		range=$[${i} % 4]
+		case ${range} in
+		    0)
+			;;
+		    1)
+			src_ip=${elt}
+			;;
+		    2)
+			src_mk=${elt}
+			;;
+		    3)
+			for rweb_ip in ${RWEB_HTTP_IP_LIST}
+			do
+			    echo "[0:0] -A PREROUTING ! -i ${IF_EXTERNAL} -d ${rweb_ip} -p tcp -s ${src_ip}/${src_mk} -m tcp --dport ${WWW_PORT} -j RETURN"
+			    test ${VPN_IPSEC_MODE} == False || echo "[0:0] -A PREROUTING ${FW_IPSEC_POLICY_IN} -d ${rweb_ip} -p tcp -s ${src_ip}/${src_mk} -m tcp --dport ${WWW_PORT} -j RETURN"
+			done
+
+			for rweb_ip in ${RWEB_HTTPS_IP_LIST}
+			do
+			    echo "[0:0] -A PREROUTING ! -i ${IF_EXTERNAL} -d ${rweb_ip} -p tcp -s ${src_ip}/${src_mk} -m tcp --dport ${HTTPS_PORT} -j RETURN"
+			    test ${VPN_IPSEC_MODE} == False || echo "[0:0] -A PREROUTING ${FW_IPSEC_POLICY_IN} -d ${rweb_ip} -p tcp -s ${src_ip}/${src_mk} -m tcp --dport ${HTTPS_PORT} -j RETURN"
+			done
+			;;
+		    *)
+			return 255
+			;;
+		esac
+		((i++))
+	    done
+	    i=0
+	fi
+    fi
+
+    if test ${HA_MODE} == False ; then
+	if test -z "${TRANSPARENT_IF_IP_MK_LIST}" ; then
+
+	    echo "[0:0] -A PREROUTING ! -i ${IF_EXTERNAL} -p tcp -d ${IP_WEB_IP} -m tcp --dport ${WWW_PORT} -j RETURN"
+	    echo "[0:0] -A PREROUTING ! -i ${IF_EXTERNAL} -p tcp -m tcp --dport ${WWW_PORT} -j ${http_target}"
+
+	    test ${SSLMEDIATE_TRANSPARENT_MODE} == False || echo "[0:0] -A PREROUTING ! -i ${IF_EXTERNAL} -p tcp -m tcp --dport ${HTTPS_PORT} -j ${https_target}"
+
+	    if test ${VPN_IPSEC_MODE} == True ; then
+		echo "[0:0] -A PREROUTING ${FW_IPSEC_POLICY_IN} -p tcp -d ${IP_WEB_IP} -m tcp --dport ${WWW_PORT} -j RETURN"
+		echo "[0:0] -A PREROUTING ${FW_IPSEC_POLICY_IN} -p tcp -m tcp --dport ${WWW_PORT} -j ${http_target}"
+		test ${SSLMEDIATE_TRANSPARENT_MODE} == False || echo "[0:0] -A PREROUTING ${FW_IPSEC_POLICY_IN} -p tcp -m tcp --dport ${HTTPS_PORT} -j ${https_target}"
+	    fi
+	else
+	    for elt in ${TRANSPARENT_IF_IP_MK_LIST}
+	    do
+		range=$[${i} % 4]
+		case ${range} in
+		    0)
+			;;
+		    1)
+			src_ip=${elt}
+			;;
+		    2)
+			src_mk=${elt}
+			;;
+		    3)
+			echo "[0:0] -A PREROUTING ! -i ${IF_EXTERNAL} -p tcp -d ${IP_WEB_IP} -s ${src_ip}/${src_mk} -m tcp --dport ${WWW_PORT} -j RETURN"
+			echo "[0:0] -A PREROUTING ! -i ${IF_EXTERNAL} -p tcp -s ${src_ip}/${src_mk} -m tcp --dport ${WWW_PORT} -j ${http_target}"
+
+			test ${SSLMEDIATE_TRANSPARENT_MODE} == False || echo "[0:0] -A PREROUTING ! -i ${IF_EXTERNAL} -p tcp -s ${src_ip}/${src_mk} -m tcp --dport ${HTTPS_PORT} -j ${https_target}"
+
+			if test ${VPN_IPSEC_MODE} == True ; then
+			    echo "[0:0] -A PREROUTING ${FW_IPSEC_POLICY_IN} -p tcp -d ${IP_WEB_IP} -s ${src_ip}/${src_mk} -m tcp --dport ${WWW_PORT} -j RETURN"
+			    echo "[0:0] -A PREROUTING ${FW_IPSEC_POLICY_IN} -p tcp -s ${src_ip}/${src_mk} -m tcp --dport ${WWW_PORT} -j ${http_target}"
+			    test ${SSLMEDIATE_TRANSPARENT_MODE} == False || echo "[0:0] -A PREROUTING ${FW_IPSEC_POLICY_IN} -p tcp -s ${src_ip}/${src_mk} -m tcp --dport ${HTTPS_PORT} -j ${https_target}"
+
+			fi
+			;;
+		    *)
+			return 255
+			;;
+		esac
+		((i++))
+	    done
+	fi
+    else
+	if test -z "${TRANSPARENT_IF_IP_MK_LIST}" ; then
+	    echo "[0:0] -A PREROUTING ! -i ${IF_EXTERNAL} -p tcp -d ${IP_WEB_IP} -m tcp --dport ${WWW_PORT} -j RETURN"
+	    for vrrp_ip in ${VRRP_WEB_IP_LIST}
+	    do
+		echo "[0:0] -A PREROUTING ! -i ${IF_EXTERNAL} -p tcp -d ${vrrp_ip} -m tcp --dport ${WWW_PORT} -j RETURN"
+	    done
+	    echo "[0:0] -A PREROUTING ! -i ${IF_EXTERNAL} -p tcp -m tcp --dport ${WWW_PORT} -j ${http_target}"
+	    test ${SSLMEDIATE_TRANSPARENT_MODE} == False || echo "[0:0] -A PREROUTING ! -i ${IF_EXTERNAL} -p tcp -m tcp --dport ${HTTPS_PORT} -j ${https_target}"
+
+	    if test ${VPN_IPSEC_MODE} == True ; then
+		echo "[0:0] -A PREROUTING ${FW_IPSEC_POLICY_IN} -p tcp -d ${IP_WEB_IP} -m tcp --dport ${WWW_PORT} -j RETURN"
+		for vrrp_ip in ${VRRP_WEB_IP_LIST}
+		do
+		    echo "[0:0] -A PREROUTING ${FW_IPSEC_POLICY_IN} -p tcp -d ${vrrp_ip} -m tcp --dport ${WWW_PORT} -j RETURN"
+		done
+		echo "[0:0] -A PREROUTING ${FW_IPSEC_POLICY_IN} -p tcp -m tcp --dport ${WWW_PORT} -j ${http_target}"
+		test ${SSLMEDIATE_TRANSPARENT_MODE} == False || echo "[0:0] -A PREROUTING ${FW_IPSEC_POLICY_IN} -p tcp -m tcp --dport ${HTTPS_PORT} -j ${https_target}"
+	    fi
+	else
+	    for elt in ${TRANSPARENT_IF_IP_MK_LIST}
+	    do
+		range=$[${i} % 4]
+		case ${range} in
+		    0)
+			;;
+		    1)
+			src_ip=${elt}
+			;;
+		    2)
+			src_mk=${elt}
+			;;
+		    3)
+			echo "[0:0] -A PREROUTING ! -i ${IF_EXTERNAL} -p tcp -d ${IP_WEB_IP} -s ${src_ip}/${src_mk} -m tcp --dport ${WWW_PORT} -j RETURN"
+			for vrrp_ip in ${VRRP_WEB_IP_LIST}
+			do
+			    echo "[0:0] -A PREROUTING ! -i ${IF_EXTERNAL} -p tcp -d ${vrrp_ip} -s ${src_ip}/${src_mk} -m tcp --dport ${WWW_PORT} -j RETURN"
+			done
+			echo "[0:0] -A PREROUTING ! -i ${IF_EXTERNAL} -p tcp -s ${src_ip}/${src_mk} -m tcp --dport ${WWW_PORT} -j ${http_target}"
+			test ${SSLMEDIATE_TRANSPARENT_MODE} == False || echo "[0:0] -A PREROUTING ! -i ${IF_EXTERNAL} -p tcp -s ${src_ip}/${src_mk} -m tcp --dport ${HTTPS_PORT} -j ${https_target}"
+
+			if test ${VPN_IPSEC_MODE} == True ; then
+			    echo "[0:0] -A PREROUTING ${FW_IPSEC_POLICY_IN} -p tcp -d ${IP_WEB_IP} -s ${src_ip}/${src_mk} -m tcp --dport ${WWW_PORT} -j RETURN"
+			    for vrrp_ip in ${VRRP_WEB_IP_LIST}
+			    do
+				echo "[0:0] -A PREROUTING ${FW_IPSEC_POLICY_IN} -p tcp -d ${vrrp_ip} -s ${src_ip}/${src_mk} -m tcp --dport ${WWW_PORT} -j RETURN"
+			    done
+			    echo "[0:0] -A PREROUTING ${FW_IPSEC_POLICY_IN} -p tcp -s ${src_ip}/${src_mk} -m tcp --dport ${WWW_PORT} -j ${http_target}"
+			    test ${SSLMEDIATE_TRANSPARENT_MODE} == False || echo "[0:0] -A PREROUTING ${FW_IPSEC_POLICY_IN} -p tcp -s ${src_ip}/${src_mk} -m tcp --dport ${HTTPS_PORT} -j ${https_target}"
+			fi
+			;;
+		    *)
+			return 255
+			;;
+		esac
+		((i++))
+	    done
+	fi
+    fi
+}
+
+gen-iptables-mangle-transparent()
+{
+    test ${TPROXY_MODE} == True || return 0
+    
+    echo ":OPEN_SOCKET - [0:0]"
+    test -z "${TRANSPARENT_IF_IP_MK_LIST}" || echo ":TPROXY_RP_FILTER - [0:0]"
+
+    echo "[0:0] -A OPEN_SOCKET -j MARK --set-mark ${ROUTE_TPROXY_MARK}/${ROUTE_TPROXY_MARK_MASK}"
+    echo "[0:0] -A OPEN_SOCKET -j ACCEPT"
+
+    if test -n "${TRANSPARENT_IF_IP_MK_LIST}" ; then
+
+	echo "[0:0] -A PREROUTING -i ${IF_EXTERNAL} -p tcp --sport ${WWW_PORT} -j TPROXY_RP_FILTER"
+	test ${SSLMEDIATE_TRANSPARENT_MODE} == False || echo "[0:0] -A PREROUTING -i ${IF_EXTERNAL} -p tcp --sport ${HTTPS_PORT} -j TPROXY_RP_FILTER"
+	test ${WEB_MODE} == False -a ${AV_MODE} == False || echo "[0:0] -A TPROXY_RP_FILTER -d ${IP_EXTERNAL_IP} -j RETURN"
+	local elt range i=0
+	local src_ip src_mk
+
+	for elt in ${TRANSPARENT_IF_IP_MK_LIST}
+	do
+	    range=$[${i} % 4]
+	    case ${range} in
+		0)
+		    ;;
+		1)
+		    src_ip=${elt}
+		    ;;
+		2)
+		    src_mk=${elt}
+		    ;;
+		3)
+		    echo "[0:0] -A TPROXY_RP_FILTER -d ${src_ip}/${src_mk} -j RETURN"
+		    ;;
+		*)
+		    return 255
+		    ;;
+	    esac
+	    ((i++))
+	done
+	echo "[0:0] -A TPROXY_RP_FILTER -j DROP"
+    fi
+
+    gen-iptables-transparent tproxy
+}
+
+
+gen-iptables-raw-rp()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    local ip=${1}
+    local action=${2}
+
+    echo "[0:0] -A PREROUTING -s ${ip} -m rpfilter --invert -j ${action}"
+    echo "[0:0] -A PREROUTING -s ${ip} -m rpfilter --invert --accept-local -j ${action}"
+}
+
+gen-iptables-raw-prerouting-loopback()
+{
+    gen-iptables-raw-rp ${FW_LOOPBACK_IP} ${FW_DROP_LOOPBACK}
+}
+
+gen-iptables-raw-prerouting-zero()
+{
+    test "${DHCP_MODE}" == "False" || echo "[0:0] -A PREROUTING -p udp -s 0.0.0.0 --sport ${BOOTPC_PORT} -d 255.255.255.255 --dport ${BOOTPS_PORT} -j ACCEPT"
+    gen-iptables-raw-rp ${FW_ZERO_NET} ${FW_DROP_ZERO}
+}
+
+gen-iptables-raw-prerouting-reserved()
+{
+    gen-iptables-raw-rp 240.0.0.0/240.0.0.0 ${FW_DROP_RESERVED}
+    gen-iptables-raw-rp 169.254.0.0/255.255.0.0 ${FW_DROP_RESERVED}
+    gen-iptables-raw-rp 255.255.255.255/255.255.255.255 ${FW_DROP_RESERVED}
+}
+
+gen-iptables-raw-prerouting-selfspoof()
+{
+    local elt i range
+    local ip
+
+    test ${APL_ROLE} == 'manager' || gen-iptables-raw-rp ${IP_EXTERNAL_IP} ${FW_DROP_SELFSPOOF}
+    test -z "${IF_AUXILIARY}" -o ${IP_AUXILIARY_IP} == 0.0.0.0 || gen-iptables-raw-rp ${IP_AUXILIARY_IP} ${FW_DROP_SELFSPOOF}
+    
+    if test ${VLAN_MODE} == True ; then
+	i=0
+	for elt in ${IP_VLAN_LIST}
+	do
+	    range=$[${i} % 3]
+	    case ${range} in
+		0)
+		    ;;
+		1)
+		    ip=${elt}
+		    ;;
+		2)
+		    gen-iptables-raw-rp ${ip} ${FW_DROP_SELFSPOOF}
+		    ;;
+		*)
+		    return 255
+		    ;;
+	    esac
+	    ((i++))
+	done
+    else
+	gen-iptables-raw-rp ${IP_INTERNAL_IP} ${FW_DROP_SELFSPOOF}
+    fi
+}
+
+gen-iptables-raw-log()
+{
+    gen-iptables-log-drop LOOPBACK "LoopbackIP"
+    gen-iptables-log-drop ZERO "ZeroIP"
+    gen-iptables-log-drop RESERVED "ReservedIP"
+    gen-iptables-log-drop SELFSPOOF "SelfSpoof"
+}
+
+gen-iptables-raw-conntrack-output-file()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    local dev=${1}
+    local ip_client=${2}
+    local ip_server=${3}
+
+    local dst_server
+    local odev
+
+    if test -n "${ip_server}" ; then
+	dst_server=" -d ${ip_server}"
+    fi
+
+    if test ${dev} == ipsec ; then
+	odev=${FW_IPSEC_POLICY_OUT}
+
+    elif test ${dev} != any ; then
+	odev="-o ${dev}"
+    fi
+
+    echo "[0:0] -A OUTPUT ${odev} -p udp -m udp -s ${ip_client}${dst_server} --dport ${TFTP_PORT} -j CT --helper tftp"
+
+    echo "[0:0] -A OUTPUT ${odev} -p tcp -m tcp -s ${ip_client}${dst_server} -m multiport --dports ${FTP_PORT},${FTPS_PORT} -j CT --helper ftp"
+}
+
+gen-iptables-raw-conntrack-file()
+{
+    test -n "${1}" || return 0
+    local if_ips=${1}
+
+    local if_ip interface ip apl_ip
+
+    for if_ip in ${if_ips}
+    do
+	interface=${if_ip/:*}
+	ip=${if_ip#*:}
+
+	case ${interface} in
+	    internal)
+		dev="${IF_FILE}"
+		apl_ip=${IP_FILE_IP}
+		;;
+	    
+	    external)
+		dev="${IF_EXTERNAL}"
+		apl_ip=${IP_EXTERNAL_IP}
+		;;
+	    
+	    auxiliary)
+		dev="${IF_AUXILIARY}"
+		apl_ip=${IP_AUXILIARY_IP}
+		;;
+	    vpnipsec)
+		dev=ipsec
+		apl_ip=${IP_FILE_IP}
+		;;
+	    *)
+		continue
+		;;
+	esac
+	gen-iptables-raw-conntrack-output-file ${dev} ${apl_ip} ${ip}
+    done
+}
+
+gen-iptables-raw-conntrack-file-ip()
+{
+    gen-iptables-raw-conntrack-file "${ACCESS_FILE_IF_IP_LIST}"
+}
+
+gen-iptables-raw-conntrack-file-nr()
+{
+    gen-iptables-raw-conntrack-file "${ACCESS_FILE_IF_NR_LIST}"
+}
+
+gen-iptables-raw-conntrack-forward()
+{
+    test ${FIREWALL_MODE} == True -a ${ROUTER_MODE} == True || return 0
+
+    local i=0 elt range
+    local rset rules
+
+    local id state action protocol src_ip dst_dev dst_ip dst_ports
+    local src_nat_ip
+
+    local output_dev input_dev
+    local input_dev_rule_in
+    local src_ip_rule dst_ip_rule dst_ports_rule
+    local helper_port
+
+    if test ${VLAN_MODE} == False ; then
+	if test \
+	       -z "${FW_WEB_RULE_LIST}" -a \
+	       -z "${FW_RWEB_RULE_LIST}" -a \
+	       -z "${FW_FILE_RULE_LIST}" -a \
+	       -z "${FW_PEER_RULE_LIST}" -a \
+	       -z "${FW_MON_RULE_LIST}" -a \
+	       -z "${FW_ADMIN_RULE_LIST}" -a \
+	       -z "${FW_AV_RULE_LIST}" ; then
+
+	    echo "[0:0] -A PREROUTING -i ${IF_INTERNAL} -p udp -j CT --helper tftp"
+	    echo "[0:0] -A PREROUTING -i ${IF_INTERNAL} -p tcp -j CT --helper ftp"
+
+	    if test ${VPN_IPSEC_MODE} == True ; then
+		echo "[0:0] -A PREROUTING -i ${IF_INTERNAL} ${FW_IPSEC_POLICY_IN} -p udp -j CT --helper tftp"
+		echo "[0:0] -A PREROUTING -i ${IF_INTERNAL} ${FW_IPSEC_POLICY_IN} -p tcp -j CT --helper ftp"
+	    fi
+	fi
+    fi
+
+    local rule_sets="external web rweb antivirus admin mon file peer"
+    test -z "${IF_AUXILIARY}" -o ${IP_AUXILIARY_IP} == 0.0.0.0 || rule_sets="${rule_sets} auxiliary"
+    test ${VPN_IPSEC_MODE} == False || rule_sets="${rule_sets} vpnipsec"
+
+    for rset in ${rule_sets}
+    do
+	case "${rset}" in
+	    external)
+		rules=${FW_EXTERNAL_RULE_LIST}
+		input_dev=${IF_EXTERNAL}
+		;;
+	    auxiliary)
+		rules=${FW_AUXILIARY_RULE_LIST}
+		input_dev=${IF_AUXILIARY}
+		;;
+	    web)
+		rules=${FW_WEB_RULE_LIST}
+		input_dev=${IF_WEB}
+
+		if test -z "${rules}" -a ${VLAN_MODE} == True ; then
+		    echo "[0:0] -A PREROUTING -i ${input_dev} -p udp -j CT --helper tftp"
+		    echo "[0:0] -A PREROUTING -i ${input_dev} -p tcp -j CT --helper ftp"
+		    continue
+		fi
+		;;
+	    rweb)
+		rules=${FW_RWEB_RULE_LIST}
+		input_dev=${IF_RWEB}
+		;;
+	    antivirus)
+		rules=${FW_AV_RULE_LIST}
+		input_dev=${IF_AV}
+		;;
+	    admin)
+		rules=${FW_ADMIN_RULE_LIST}
+		input_dev=${IF_ADMIN}
+		;;
+	    mon)
+		rules=${FW_MON_RULE_LIST}
+		input_dev=${IF_MON}
+		;;
+	    file)
+		rules=${FW_FILE_RULE_LIST}
+		input_dev=${IF_FILE}
+		;;
+	    peer)
+		rules=${FW_PEER_RULE_LIST}
+		input_dev=${IF_PEER}
+		;;
+	    vpnipsec)
+		rules=${FW_VPN_IPSEC_RULE_LIST}
+		input_dev=ipsec
+
+		if test -z "${rules}" -a ${VPN_IPSEC_MODE} == True ; then
+
+		    echo "[0:0] -A PREROUTING ${FW_IPSEC_POLICY_IN} -p udp -j CT --helper tftp"
+		    echo "[0:0] -A PREROUTING ${FW_IPSEC_POLICY_IN} -p tcp -j CT --helper ftp"
+
+		    continue
+		fi
+		;;
+	    *)
+		return 255
+		;;
+	esac
+
+	if test ${input_dev} == ipsec ; then
+	    input_dev_rule_in=${FW_IPSEC_POLICY_IN}
+	else
+	    input_dev_rule_in="-i ${input_dev}"
+	fi
+
+	i=0
+	for elt in ${rules}
+	do
+	    range=$[${i} % 11]
+	    case ${range} in
+		0)
+		    id=${elt}
+		    ;;
+		1)
+		    state=${elt}
+		    ;;
+		2)
+		    action=${elt}
+		    ;;
+		3)
+		    protocol=${elt}
+		    ;;
+		4)
+		    src_ip=${elt}
+		    ;;
+		5)
+		    dst_dev=${elt}
+		    output_dev=$(get-net-dev ${dst_dev})
+		    ;;
+		6)
+		    dst_ip=${elt}
+		    ;;
+		7)
+		    dst_ports=${elt}
+		    ;;
+		8)
+		    src_nat_ip=${elt}
+		    ;;
+		9)
+		    ;;
+		10)
+		    if test ${state} == off ; then
+			((i++))
+			continue
+		    fi
+
+		    if test ${action} == deny ; then
+			((i++))
+			continue
+		    fi
+
+		    case ${protocol} in
+			ftp_active|ftp_passive|ftp_trivial|sip)
+			    ;;
+			*)
+			    ((i++))
+			    continue
+			    ;;
+		    esac
+
+		    if test ${output_dev} == ipsec ; then
+			if test ${VPN_IPSEC_MODE} == False ; then
+			    ((i++))
+			    continue
+			fi
+		    fi
+
+		    if test ${input_dev} == ${output_dev} ; then
+			((i++))
+			continue
+		    fi
+
+		    if test ${src_ip} == any ; then
+			unset src_ip_rule
+		    else
+			src_ip_rule=" -s ${src_ip}"
+		    fi
+
+		    if test ${dst_ip} == any ; then
+			unset dst_ip_rule
+		    else
+			dst_ip_rule=" -d ${dst_ip}"
+		    fi
+
+		    if test ${dst_ports} == any ; then
+			unset dst_ports_rule
+			unset helper_port
+		    else
+			dst_ports_rule=" --dport ${dst_ports}"
+			helper_port="-${dst_ports}"
+		    fi
+
+		    case ${protocol} in
+			ftp_active|ftp_passive)
+			    echo "[0:0] -A PREROUTING ${input_dev_rule_in} -p tcp -m tcp${src_ip_rule}${dst_ip_rule}${dst_ports_rule} -j CT --helper ftp"
+			    ;;
+			ftp_trivial)
+			    echo "[0:0] -A PREROUTING ${input_dev_rule_in} -p udp -m udp${src_ip_rule}${dst_ip_rule}${dst_ports_rule} -j CT --helper tftp"
+			    ;;
+			sip)
+			    echo "[0:0] -A PREROUTING ${input_dev_rule_in} -p udp -m udp${src_ip_rule}${dst_ip_rule}${dst_ports_rule} -j CT --helper sip"
+			    ;;
+			*)
+			    ;;
+		    esac
+		    ;;
+		*)
+		    return 255
+		    ;;
+	    esac
+	    ((i++))
+	done
+    done
+}
+
+gen-iptables-raw-conntrack()
+{
+    gen-iptables-raw-conntrack-file-ip
+    gen-iptables-raw-conntrack-forward
+}
+
+gen-iptables-raw()
+{
+    echo "*raw"
+    echo ":PREROUTING ACCEPT [0:0]"
+    echo ":OUTPUT ACCEPT [0:0]"
+
+    echo ":LOGGING_LOOPBACK - [0:0]"
+    echo ":LOGGING_ZERO - [0:0]"
+    echo ":LOGGING_RESERVED - [0:0]"
+    echo ":LOGGING_SELFSPOOF - [0:0]"
+
+    gen-iptables-raw-prerouting-loopback
+    gen-iptables-raw-prerouting-zero
+    gen-iptables-raw-prerouting-reserved
+    gen-iptables-raw-prerouting-selfspoof
+    gen-iptables-raw-log
+    gen-iptables-raw-conntrack
+}
+
+gen-iptables-nat-vrrp-dns()
+{
+    test ${HA_MODE} == True || return 0
+
+    local ip
+
+    if test ${WEB_MODE} == True -o ${TRANSPARENT_MODE} == True ; then
+	for ip in ${VRRP_WEB_IP_LIST}
+	do
+	    echo "[0:0] -A PREROUTING ! -i ${IF_EXTERNAL} -p udp -d ${ip} --dport ${DOMAIN_PORT} -j DNAT --to-destination ${IP_WEB_IP}:${DOMAIN_PORT}"
+	    echo "[0:0] -A PREROUTING ! -i ${IF_EXTERNAL} -p tcp -d ${ip} --dport ${DOMAIN_PORT} -j DNAT --to-destination ${IP_WEB_IP}:${DOMAIN_PORT}"
+
+	    if test ${VPN_IPSEC_MODE} == True ; then
+		echo "[0:0] -A PREROUTING ${FW_IPSEC_POLICY_IN} -p udp -d ${ip} --dport ${DOMAIN_PORT} -j DNAT --to-destination ${IP_WEB_IP}:${DOMAIN_PORT}"
+		echo "[0:0] -A PREROUTING ${FW_IPSEC_POLICY_IN} -p tcp -d ${ip} --dport ${DOMAIN_PORT} -j DNAT --to-destination ${IP_WEB_IP}:${DOMAIN_PORT}"
+	    fi
+	done
+    fi
+
+    if test ${RWEB_MODE} == True ; then
+	for ip in ${VRRP_RWEB_IP_LIST}
+	do
+	    echo "[0:0] -A PREROUTING ! -i ${IF_EXTERNAL} -p udp -d ${ip} --dport ${DOMAIN_PORT} -j DNAT --to-destination ${IP_WEB_IP}:${DOMAIN_PORT}"
+	    echo "[0:0] -A PREROUTING ! -i ${IF_EXTERNAL} -p tcp -d ${ip} --dport ${DOMAIN_PORT} -j DNAT --to-destination ${IP_WEB_IP}:${DOMAIN_PORT}"
+
+	    if test ${VPN_IPSEC_MODE} == True ; then
+		echo "[0:0] -A PREROUTING ${FW_IPSEC_POLICY_IN} -p udp -d ${ip} --dport ${DOMAIN_PORT} -j DNAT --to-destination ${IP_WEB_IP}:${DOMAIN_PORT}"
+		echo "[0:0] -A PREROUTING ${FW_IPSEC_POLICY_IN} -p tcp -d ${ip} --dport ${DOMAIN_PORT} -j DNAT --to-destination ${IP_WEB_IP}:${DOMAIN_PORT}"
+	    fi
+	done
+    fi
+}
+
+gen-iptables-nat-transparent()
+{
+    test ${TRANSPARENT_MODE} == True -a ${TNAT_MODE} == True || return 0
+    gen-iptables-transparent intercept
+}
+
+gen-iptables-nat-forward()
+{
+    test ${FIREWALL_MODE} == True -a ${ROUTER_MODE} == True || return 0
+
+    local i=0 elt range
+    local rset rules
+
+    local id state action protocol src_ip dst_dev dst_ip dst_ports
+    local src_nat_ip dst_nat_ip dst_pat_port dnat
+
+    local input_dev output_dev output_dev_rule input_dev_rule
+    local protocol_rule src_ip_rule dst_ip_rule dst_ports_rule
+
+    local ipsec_in ipsec_out
+
+    local rule_sets="external web rweb antivirus admin mon file peer"
+    test -z "${IF_AUXILIARY}" -o ${IP_AUXILIARY_IP} == 0.0.0.0 || rule_sets="${rule_sets} auxiliary"
+    test ${VPN_IPSEC_MODE} == False || rule_sets="${rule_sets} vpnipsec"
+
+    for rset in ${rule_sets}
+    do    
+	case ${rset} in
+	    external)
+		rules=${FW_EXTERNAL_RULE_LIST}
+		input_dev=${IF_EXTERNAL}
+		;;
+	    web)
+		rules=${FW_WEB_RULE_LIST}
+		input_dev=${IF_WEB}
+		;;
+	    rweb)
+		rules=${FW_RWEB_RULE_LIST}
+		input_dev=${IF_RWEB}
+		;;
+	    antivirus)
+		rules=${FW_AV_RULE_LIST}
+		input_dev=${IF_AV}
+		;;
+	    admin)
+		rules=${FW_ADMIN_RULE_LIST}
+		input_dev=${IF_ADMIN}
+		;;
+	    mon)
+		rules=${FW_MON_RULE_LIST}
+		input_dev=${IF_MON}
+		;;
+	    file)
+		rules=${FW_FILE_RULE_LIST}
+		input_dev=${IF_FILE}
+		;;
+	    peer)
+		rules=${FW_PEER_RULE_LIST}
+		input_dev=${IF_PEER}
+		;;
+	    auxiliary)
+		rules=${FW_AUXILIARY_RULE_LIST}
+		input_dev=${IF_AUXILIARY}
+		;;
+	    vpnipsec)
+		test ${VPN_IPSEC_MODE} == True || continue
+		rules=${FW_VPN_IPSEC_RULE_LIST}
+		input_dev=ipsec
+		;;
+	    *)
+		return 255
+		;;
+	esac
+
+	if test ${input_dev} == ipsec ; then
+	    input_dev_rule=${FW_IPSEC_POLICY_IN}
+	else
+	    input_dev_rule="-i ${input_dev}"
+	fi
+
+	for elt in ${rules}
+	do
+	    range=$[${i} % 11]
+	    case ${range} in
+		0)
+		    id=${elt}
+		    ;;
+		1)
+		    state=${elt}
+		    ;;
+		2)
+		    action=${elt}
+		    ;;
+		3)
+		    protocol=${elt}
+		    ;;
+		4)
+		    src_ip=${elt}
+		    ;;
+		5)
+		    dst_dev=${elt}
+		    output_dev=$(get-net-dev ${dst_dev})
+		    ;;
+		6)
+		    dst_ip=${elt}
+		    ;;
+		7)
+		    dst_ports=${elt}
+		    ;;
+		8)
+		    src_nat_ip=${elt}
+		    ;;
+		9)
+		    dst_nat_ip=${elt}
+		    ;;
+		10)
+		    dst_pat_port=${elt}
+
+		    if test ${state} == off -o ${action} == deny -o -z "${output_dev}" ; then
+			((i++))
+			continue
+		    fi
+
+		    if test ${output_dev} == ipsec ; then
+			if test ${VPN_IPSEC_MODE} == False ; then
+			    ((i++))
+			    continue
+			fi
+		    fi
+
+		    if test ${input_dev} == ${output_dev} ; then
+			((i++))
+			continue
+		    fi
+
+		    if test ${src_nat_ip} == nil -a ${dst_nat_ip} == nil -a ${dst_pat_port} == nil ; then
+			((i++))
+			continue
+		    fi
+
+		    if test ${output_dev} == any ; then
+			unset output_dev_rule
+		    elif test ${output_dev} == ipsec ; then
+			output_dev_rule=" ${FW_IPSEC_POLICY_OUT}"
+		    else
+			output_dev_rule=" -o ${output_dev}"
+		    fi
+		    
+		    if test ${src_ip} == any ; then
+			unset src_ip_rule
+		    else
+			src_ip_rule=" -s ${src_ip}"
+		    fi
+
+		    if test ${dst_ip} == any ; then
+			unset dst_ip_rule
+		    else
+			dst_ip_rule=" -d ${dst_ip}"
+		    fi
+
+		    if test ${dst_ports} == any ; then
+			unset dst_ports_rule
+		    else
+			dst_ports_rule=" --dport ${dst_ports}"
+		    fi
+
+		    case ${protocol} in
+			ftp_active)
+			    gen-iptables-nat-ftp 'active'  "${input_dev_rule}" ${src_ip} ${dst_ip} ${dst_ports} ${dst_nat_ip} ${dst_pat_port}
+			    ;;
+			ftp_passive)
+			    gen-iptables-nat-ftp 'passive' "${input_dev_rule}" ${src_ip} ${dst_ip} ${dst_ports} ${dst_nat_ip} ${dst_pat_port}
+			    ;;
+			ftp_trivial)
+			    gen-iptables-nat-tftp          "${input_dev_rule}" ${src_ip} ${dst_ip} ${dst_ports} ${dst_nat_ip} ${dst_pat_port}
+			    ;;
+			sip)
+			    gen-iptables-nat-sip           "${input_dev_rule}" ${src_ip} ${dst_ip} ${dst_ports} ${dst_nat_ip} ${dst_pat_port}
+			    ;;
+			*)
+			    dnat=" $(get-iptables-dnat ${protocol} ${dst_nat_ip} ${dst_pat_port})"
+			    if test ${?} -eq 0 ; then
+				case ${protocol} in
+				    any)
+					unset protocol_rule
+					;;
+				    *)
+					protocol_rule=" -p ${protocol}"
+					;;
+				esac
+				
+				echo "[0:0] -A PREROUTING ${input_dev_rule}${protocol_rule}${src_ip_rule}${dst_ip_rule}${dst_ports_rule} -j DNAT --to-destination${dnat}"
+			    fi
+			    ;;
+		    esac
+
+		    if test ${src_nat_ip} != nil ; then
+
+			case ${protocol} in
+			    ftp_active)
+				protocol_rule=" -p tcp"
+				;;
+			    ftp_passive)
+				protocol_rule=" -p tcp"
+				;;
+			    ftp_trivial)
+				protocol_rule=" -p udp"
+				;;
+			    sip)
+				protocol_rule=" -p udp"
+				;;
+			    *)
+				test ${protocol} == any || protocol_rule=" -p ${protocol}"
+				;;
+			esac
+
+			test ${dst_nat_ip} == nil || dst_ip_rule=" -d ${dst_nat_ip}"
+
+			echo "[0:0] -A POSTROUTING${output_dev_rule}${protocol_rule}${src_ip_rule}${dst_ip_rule}${dst_ports_rule} -j SNAT --to-source ${src_nat_ip}"
+		    fi
+
+		    ;;
+		*)
+		    return 255
+		    ;;
+	    esac
+	    ((i++))
+	done
+    done
+}
+
+gen-iptables-snat()
+{
+    test ${SNAT_MODE} == True || return 0
+    test ${IP_EXTERNAL_IP} != "0.0.0.0" || return 0
+
+    if test ${TPROXY_MODE} == False ; then
+	test ${VPN_IPSEC_MODE} == False || echo "[0:0] -A POSTROUTING -o ${IF_EXTERNAL} ${FW_IPSEC_POLICY_OUT} -j ACCEPT"
+	echo "[0:0] -A POSTROUTING -o ${IF_EXTERNAL} -j SNAT --to-source ${IP_EXTERNAL_IP}"
+    else
+	echo ":TPROXY_SNAT - [0:0]"
+	echo "[0:0] -A TPROXY_SNAT -o ${IF_EXTERNAL} -p tcp -m tcp --dport ${WWW_PORT} -j RETURN"
+	test ${SSLMEDIATE_TRANSPARENT_MODE} == False || echo "[0:0] -A TPROXY_SNAT -o ${IF_EXTERNAL} -p tcp -m tcp --dport ${HTTPS_PORT} -j RETURN"
+	test ${VPN_IPSEC_MODE} == False || echo "[0:0] -A TPROXY_SNAT -o ${IF_EXTERNAL} ${FW_IPSEC_POLICY_OUT} -j RETURN"
+	echo "[0:0] -A TPROXY_SNAT -o ${IF_EXTERNAL} -j SNAT --to-source ${IP_EXTERNAL_IP}"
+	echo "[0:0] -A POSTROUTING -o ${IF_EXTERNAL} -j TPROXY_SNAT"
+    fi
+}
+
+gen-iptables-rweb-dnat()
+{
+    test ${HA_MODE} == False || return 0
+    test ${RWEB_MODE} == True || return 0
+
+    local rweb_site_ip
+
+    for rweb_site_ip in ${RWEB_SITE_IP_LIST}
+    do
+	test ${rweb_site_ip} != ${IP_EXTERNAL_IP} || continue
+	echo "[0:0] -A OUTPUT -o ${IF_EXTERNAL} -p tcp -m tcp -d ${rweb_site_ip} -m multiport --dports ${WEB_PORTS} -j DNAT --to-destination ${IP_EXTERNAL_IP}"
+    done
+}
+
+gen-iptables-nat()
+{
+    echo "*nat"
+    echo ":PREROUTING ACCEPT [0:0]"
+    echo ":POSTROUTING ACCEPT [0:0]"
+    echo ":OUTPUT ACCEPT [0:0]"
+
+    gen-iptables-nat-vrrp-dns
+    gen-iptables-nat-transparent
+    gen-iptables-nat-forward
+    gen-iptables-snat
+    gen-iptables-rweb-dnat
+}
+
+gen-qos-mark-out()
+{
+    local command=${1}
+    local mark=${2}
+
+    local fwmark=$(printf "0x%x" ${mark} 2> /dev/null)
+
+    echo "[0:0] -A QOS_OUT ${command} -j MARK --set-mark ${fwmark}/${QOS_MARK_MASK}"
+    echo "[0:0] -A QOS_OUT ${command} -j RETURN"
+}
+
+gen-iptables-mangle-qos-web()
+{
+    local vrrp_ip rweb_ip
+
+    if test -z "${ACCESS_IF_IP_MK_WEB_LIST}" ; then
+
+	if test ${HA_MODE} == False ; then
+	    if test ${WEB_MODE} == True ; then
+		gen-qos-mark-out "! -o ${IF_EXTERNAL} -p tcp -s ${IP_WEB_IP} -m multiport --sports ${WWW_PORT},${PROXY_PORT}" ${QOS_HANDLE}
+		test ${VPN_IPSEC_MODE} == False || gen-qos-mark-out "-o ${IF_EXTERNAL} -p tcp -s ${IP_WEB_IP} -m multiport --sports ${WWW_PORT},${PROXY_PORT}" $[${QOS_HANDLE} + 1]
+	    fi
+
+	    if test ${DNS_MODE} == True ; then
+		gen-qos-mark-out "! -o ${IF_EXTERNAL} -p udp -s ${IP_WEB_IP} --sport ${DOMAIN_PORT}" ${QOS_HANDLE}
+		gen-qos-mark-out "! -o ${IF_EXTERNAL} -p tcp -s ${IP_WEB_IP} --sport ${DOMAIN_PORT}" ${QOS_HANDLE}
+
+		if test ${VPN_IPSEC_MODE} == True ; then
+		    gen-qos-mark-out "-o ${IF_EXTERNAL} -p udp -s ${IP_WEB_IP} --sport ${DOMAIN_PORT}" $[${QOS_HANDLE} + 1]
+		    gen-qos-mark-out "-o ${IF_EXTERNAL} -p tcp -s ${IP_WEB_IP} --sport ${DOMAIN_PORT}" $[${QOS_HANDLE} + 1]
+		fi
+	    fi
+	else
+	    if test ${WEB_MODE} == True ; then
+		gen-qos-mark-out "! -o ${IF_EXTERNAL} -p tcp -s ${IP_WEB_IP} --sport ${WWW_PORT}" ${QOS_HANDLE}
+		test ${VPN_IPSEC_MODE} == False || gen-qos-mark-out "-o ${IF_EXTERNAL} -p tcp -s ${IP_WEB_IP} --sport ${WWW_PORT}" $[${QOS_HANDLE} + 1]
+	    fi
+
+	    for vrrp_ip in ${VRRP_WEB_IP_LIST}
+	    do
+		if test ${WEB_MODE} == True ; then
+		    gen-qos-mark-out "! -o ${IF_EXTERNAL} -p tcp -s ${vrrp_ip} -m multiport --sports ${WWW_PORT},${PROXY_PORT}" ${QOS_HANDLE}
+		    test ${VPN_IPSEC_MODE} == False || gen-qos-mark-out "-o ${IF_EXTERNAL} -p tcp -s ${vrrp_ip} -m multiport --sports ${WWW_PORT},${PROXY_PORT}" $[${QOS_HANDLE} + 1]
+		fi
+
+		if test ${DNS_MODE} == True ; then
+		    gen-qos-mark-out "! -o ${IF_EXTERNAL} -p udp -s ${vrrp_ip} --sport ${DOMAIN_PORT}" ${QOS_HANDLE}
+		    gen-qos-mark-out "! -o ${IF_EXTERNAL} -p tcp -s ${vrrp_ip} --sport ${DOMAIN_PORT}" ${QOS_HANDLE}
+
+		    if test ${VPN_IPSEC_MODE} == True ; then
+			gen-qos-mark-out "-o ${IF_EXTERNAL} -p udp -s ${vrrp_ip} --sport ${DOMAIN_PORT}" $[${QOS_HANDLE} + 1]
+			gen-qos-mark-out "-o ${IF_EXTERNAL} -p tcp -s ${vrrp_ip} --sport ${DOMAIN_PORT}" $[${QOS_HANDLE} + 1]
+		    fi
+		fi
+	    done
+	fi
+
+	# Reverse Websites accessed from internal end-users
+	if test ${WEB_MODE} == True -a ${RWEB_MODE} == True ; then
+	    for rweb_ip in ${RWEB_HTTP_IP_LIST}
+	    do
+		gen-qos-mark-out "! -o ${IF_EXTERNAL} -p tcp -s ${rweb_ip} --sport ${WWW_PORT}" ${QOS_HANDLE}
+	    done
+	    for rweb_ip in ${RWEB_HTTPS_IP_LIST}
+	    do
+		gen-qos-mark-out "! -o ${IF_EXTERNAL} -p tcp -s ${rweb_ip} --sport ${HTTPS_PORT}" ${QOS_HANDLE}
+	    done
+	fi
+
+	((QOS_HANDLE++))
+	test ${VPN_IPSEC_MODE} == False || ((QOS_HANDLE++))
+
+	return 0
+    fi
+
+    local elt range i=0
+    local interface ip mk odev dst_ip_mk
+
+    for elt in ${ACCESS_IF_IP_MK_WEB_LIST}
+    do
+	range=$[${i} % 4]
+	case ${range} in
+	    0)
+		interface=${elt}
+		;;
+	    1)
+		ip=${elt}
+		;;
+	    2)
+		mk=${elt}
+		;;
+	    3)
+		dst_ip_mk=$(echo-firewall-destination-ip-mask ${ip} ${mk})
+
+		case ${interface} in
+		    internal)
+			odev="-o ${IF_WEB}"
+			;;
+		    admin)
+			odev="-o ${IF_ADMIN}"
+			;;
+		    antivirus)
+			odev="-o ${IF_AV}"
+			;;
+		    file)
+			odev="-o ${IF_FILE}"
+			;;
+		    mon)
+			odev="-o ${IF_MON}"
+			;;
+		    rweb)
+			odev="-o ${IF_RWEB}"
+			;;
+		    web)
+			odev="-o ${IF_WEB}"
+			;;
+		    auxiliary)
+			odev="-o ${IF_AUXILIARY}"
+			;;
+		    vpnipsec)
+			((QOS_HANDLE++))
+			((i++))
+			continue
+			;;
+		    *)
+			;;
+		esac
+
+		if test ${HA_MODE} == False ; then
+		    test ${WEB_MODE} == False || gen-qos-mark-out "${odev} -p tcp -s ${IP_WEB_IP} -m multiport --sports ${WWW_PORT},${PROXY_PORT}${dst_ip_mk}" ${QOS_HANDLE}
+
+		    if test ${DNS_MODE} == True ; then
+			gen-qos-mark-out "${odev} -p udp -s ${IP_WEB_IP} --sport ${DOMAIN_PORT}${dst_ip_mk}" ${QOS_HANDLE}
+			gen-qos-mark-out "${odev} -p tcp -s ${IP_WEB_IP} --sport ${DOMAIN_PORT}${dst_ip_mk}" ${QOS_HANDLE}
+		    fi
+		else
+		    test ${WEB_MODE} == False || gen-qos-mark-out "${odev} -p tcp -s ${IP_WEB_IP} --sport ${WWW_PORT}${dst_ip_mk}" ${QOS_HANDLE}
+
+		    for vrrp_ip in ${VRRP_WEB_IP_LIST}
+		    do
+			test ${WEB_MODE} == False || gen-qos-mark-out "${odev} -p tcp -s ${vrrp_ip} -m multiport --sports ${WWW_PORT},${PROXY_PORT}${dst_ip_mk}" ${QOS_HANDLE}
+
+			if test ${DNS_MODE} == True ; then
+			    gen-qos-mark-out "${odev} -p udp -s ${vrrp_ip} --sport ${DOMAIN_PORT}${dst_ip_mk}" ${QOS_HANDLE}
+			    gen-qos-mark-out "${odev} -p tcp -s ${vrrp_ip} --sport ${DOMAIN_PORT}${dst_ip_mk}" ${QOS_HANDLE}
+			fi
+		    done
+		fi
+		
+		# Reverse Websites accessed from internal end-users
+		if test ${WEB_MODE} == True -a ${RWEB_MODE} == True ; then
+		    for rweb_ip in ${RWEB_HTTP_IP_LIST}
+		    do
+			gen-qos-mark-out "${odev} -p tcp -s ${rweb_ip} --sport ${WWW_PORT}${dst_ip_mk}" ${QOS_HANDLE}
+		    done
+		    for rweb_ip in ${RWEB_HTTPS_IP_LIST}
+		    do
+			gen-qos-mark-out "${odev} -p tcp -s ${rweb_ip} --sport ${HTTPS_PORT}${dst_ip_mk}" ${QOS_HANDLE}
+		    done
+		fi
+		
+		((QOS_HANDLE++))
+		;;
+	    *)
+		return 255
+		;;
+	esac
+	((i++))
+    done
+}
+
+gen-iptables-mangle-qos-tweb()
+{
+    local sports="${THTTP_PORT},${WWW_PORT}"
+    test ${SSLMEDIATE_TRANSPARENT_MODE} == False || sports="${sports},${HTTPS_PORT},${THTTPS_PORT}"
+    local command="-p tcp -s ${IP_WEB_IP} -m multiport --sports ${sports}"
+
+    if test -z "${TRANSPARENT_IF_IP_MK_LIST}" ; then
+	if test ${TRANSPARENT_MODE} == True ; then
+	    gen-qos-mark-out "! -o ${IF_EXTERNAL} ${command}" ${QOS_HANDLE}
+	    test ${VPN_IPSEC_MODE} == False || gen-qos-mark-out "-o ${IF_EXTERNAL} ${command}" $[${QOS_HANDLE} + 1]
+	fi
+	
+	if test ${DNS_MODE} == True ; then
+	    gen-qos-mark-out "! -o ${IF_EXTERNAL} -p udp -s ${IP_WEB_IP} --sport ${DOMAIN_PORT}" ${QOS_HANDLE}
+	    gen-qos-mark-out "! -o ${IF_EXTERNAL} -p tcp -s ${IP_WEB_IP} --sport ${DOMAIN_PORT}" ${QOS_HANDLE}
+
+	    if test ${VPN_IPSEC_MODE} == True ; then
+		gen-qos-mark-out "-o ${IF_EXTERNAL} -p udp -s ${IP_WEB_IP} --sport ${DOMAIN_PORT}" $[${QOS_HANDLE} + 1]
+		gen-qos-mark-out "-o ${IF_EXTERNAL} -p tcp -s ${IP_WEB_IP} --sport ${DOMAIN_PORT}" $[${QOS_HANDLE} + 1]
+	    fi
+	fi
+	((QOS_HANDLE++))
+	test ${VPN_IPSEC_MODE} == False || ((QOS_HANDLE++))
+	return 0
+    fi
+
+    local elt i=0 range
+    local interface src_ip src_mk odev
+
+    for elt in ${TRANSPARENT_IF_IP_MK_LIST}
+    do
+	range=$[${i} % 4]
+	case ${range} in
+	    0)
+		interface=${elt}
+		;;
+	    1)
+		src_ip=${elt}
+		;;
+	    2)
+		src_mk=${elt}
+		;;
+	    3)
+		case ${interface} in
+		    internal)
+			odev="-o ${IF_WEB}"
+			;;
+		    auxiliary)
+			odev="-o ${IF_AUXILIARY}"
+			;;
+		    vpnipsec)
+			((QOS_HANDLE++))
+			((i++))
+			continue
+			;;
+		    *)
+			;;
+		esac
+
+		test ${TRANSPARENT_MODE} == False || gen-qos-mark-out "${odev} ${command} -d ${src_ip}/${src_mk}" ${QOS_HANDLE}
+
+		if test ${DNS_MODE} == True ; then
+		    gen-qos-mark-out "${odev} -p udp -s ${IP_WEB_IP} --sport ${DOMAIN_PORT} -d ${src_ip}/${src_mk}" ${QOS_HANDLE}
+		    gen-qos-mark-out "${odev} -p tcp -s ${IP_WEB_IP} --sport ${DOMAIN_PORT} -d ${src_ip}/${src_mk}" ${QOS_HANDLE}
+		fi
+
+		((QOS_HANDLE++))
+		;;
+	    *)
+		return 255
+		;;
+	esac
+	((i++))
+    done
+}
+
+gen-iptables-mangle-qos-av()
+{
+    test ${AV_MODE} == True || return 0
+
+    local odev apl_ip ip_list
+    local elt i=0 range
+    local interface ip mk dst_ip_mk
+
+    for elt in ${ACCESS_IF_IP_MK_AV_LIST}
+    do
+	range=$[${i} % 4]
+	case ${range} in
+	    0)
+		interface=${elt}
+		;;
+	    1)
+		ip=${elt}
+		;;
+	    2)
+		mk=${elt}
+		;;
+	    3)
+		dst_ip_mk=$(echo-firewall-destination-ip-mask ${ip} ${mk})
+
+		case ${interface} in
+		    internal)
+			odev="-o ${IF_AV}"
+
+			if test ${HA_MODE} == False ; then
+			    ip_list=${IP_AV_IP}
+			else
+			    ip_list=${VRRP_AV_IP_LIST}
+			fi
+			;;
+		    external)
+			odev="-o ${IF_EXTERNAL}"
+
+			if test ${HA_MODE} == False ; then
+			    ip_list=${IP_EXTERNAL_IP}
+			else
+			    ip_list=${VRRP_EXTERNAL_IP_LIST}
+			fi
+			;;
+		    auxiliary)
+			odev="-o ${IF_AUXILIARY}"
+			apl_ip=${IP_AUXILIARY_IP}
+
+			if test ${HA_MODE} == False ; then
+			    ip_list=${IP_AUXILIARY_IP}
+			else
+			    ip_list=${VRRP_AUXILIARY_IP_LIST}
+			fi
+			;;
+		    vpnipsec)
+			((QOS_HANDLE++))
+			((i++))
+			continue
+			;;
+		    *)
+			;;
+		esac
+
+		for apl_ip in ${ip_list}
+		do
+		    gen-qos-mark-out "${odev} -p tcp -s ${apl_ip} --sport ${AV_PORT}${dst_ip_mk}" ${QOS_HANDLE}
+		    gen-qos-mark-out "${odev} -p tcp -s ${apl_ip} --sport ${AV_STREAM_MIN_PORT}:${AV_STREAM_MAX_PORT}${dst_ip_mk}" ${QOS_HANDLE}
+		done
+
+		((QOS_HANDLE++))
+		;;
+	    *)
+		return 255
+		;;
+	esac
+	((i++))
+    done
+}
+
+gen-iptables-mangle-qos-previous-peer()
+{
+    local elt i=0 range
+    local ip
+
+    for elt in ${PEER_PREVIOUS_LIST}
+    do
+	range=$[${i} % 2]
+	case ${range} in
+	    0)
+		ip=${elt}
+		;;
+	    1)
+		gen-qos-mark-out "-o ${IF_PEER} -p tcp -s ${IP_PEER_IP} --sport ${PROXY_PORT} -d ${ip}" ${QOS_HANDLE}
+		((QOS_HANDLE++))
+		;;
+	    *)
+		return 255
+		;;
+	esac
+	((i++))
+    done
+}
+
+gen-iptables-mangle-qos-rweb-backend()
+{
+    test ${RWEB_MODE} == True || return 0
+
+    local elt range i=0
+    local interface dst_ip port
+    local src_ip odev
+
+    for elt in ${ACCESS_RWEB_LIST}
+    do
+	range=$[${i} % 4]
+	case ${range} in
+	    0)
+		interface=${elt}
+		;;
+	    1)
+		dst_ip=${elt}
+		;;
+	    2)
+		port=${elt}
+		;;
+	    3)
+		case ${interface} in
+		    rweb)
+			odev="-o ${IF_RWEB}"
+			src_ip=${IP_RWEB_IP}
+			;;
+		    vpnipsec)
+			((QOS_HANDLE++))
+			((i++))
+			continue
+			;;
+		    external)
+			odev="-o ${IF_EXTERNAL}"
+			src_ip=${IP_EXTERNAL_IP}
+			;;
+  		    *)
+			unset odev
+			;;
+		esac
+
+		gen-qos-mark-out "${odev} -p tcp -s ${src_ip} --dport ${port} -d ${dst_ip}" ${QOS_HANDLE}
+		((QOS_HANDLE++))
+		;;
+	    *)
+		return 255
+		;;
+	esac
+	((i++))
+    done
+}
+
+gen-iptables-mangle-qos-rweb-external()
+{
+    local elt i=0 range
+    local ip_protocol
+    local ip protocol
+
+    for elt in ${RWEB_QOS_LIST}
+    do
+	range=$[${i} % 2]
+	case ${range} in
+	    0)
+		ip_protocol=${elt}
+		ip=${ip_protocol/:*}
+		protocol=${ip_protocol/*:}
+		;;
+	    1)
+		case ${protocol} in
+		    http)
+			gen-qos-mark-out "-o ${IF_EXTERNAL} -p tcp -s ${ip} --sport ${WWW_PORT}" ${QOS_HANDLE}
+			;;
+		    https)
+			gen-qos-mark-out "-o ${IF_EXTERNAL} -p tcp -s ${ip} --sport ${HTTPS_PORT}" ${QOS_HANDLE}
+			;;
+		    *)
+			;;
+		esac
+		((QOS_HANDLE++))
+		;;
+	    *)
+		return 255
+		;;
+	esac
+	((i++))
+    done
+}
+
+gen-iptables-mangle-qos-rweb()
+{
+    test ${RWEB_MODE} == True || return 0
+
+    test -n "${1}" || return 1
+    local interface=${1}
+
+    case ${interface} in
+	internal)
+	    gen-iptables-mangle-qos-rweb-backend
+	    ;;
+	external)
+	    gen-iptables-mangle-qos-rweb-external
+	    ;;
+	auxiliary)
+	    ;;
+	*)
+	    return 255
+	    ;;
+    esac
+}
+
+gen-iptables-mangle-qos-ha-share-peer()
+{
+    local elt i=0 range
+    local ip
+
+    for elt in ${PEER_SHARE_LIST} ${PEER_HA_LIST}
+    do
+	range=$[${i} % 2]
+	case ${range} in
+	    0)
+		ip=${elt}
+		;;
+	    1)
+		gen-qos-mark-out "-o ${IF_PEER} -s ${IP_PEER_IP} -d ${ip}" ${QOS_HANDLE}
+		((QOS_HANDLE++))
+		;;
+	    *)
+		return 255
+		;;
+	esac
+	((i++))
+    done
+}
+
+gen-iptables-mangle-qos-dhcp-peer()
+{
+    test ${DHCP_IS_ACTIVE} = True -a -n "${DHCP_PEER_LIST}" || return 0
+
+    local ip=${DHCP_PEER_LIST/* }
+    gen-qos-mark-out "-o ${IF_PEER} -s ${IP_PEER_IP} -d ${ip}" ${QOS_HANDLE}
+    ((QOS_HANDLE++))
+}
+
+gen-iptables-mangle-qos-mon-agent()
+{
+    local manager_if_ips=${1}
+
+    local if_ip interface ip
+
+    for if_ip in ${manager_if_ips}
+    do
+	interface=${if_ip/:*}
+	ip=${if_ip#*:}
+
+	case ${interface} in
+	    internal)
+		odev="-o ${IF_MON}"
+		mon_ip=${IP_MON_IP}
+		;;
+	    
+	    external)
+		odev="-o ${IF_EXTERNAL}"
+		mon_ip=${IP_EXTERNAL_IP}
+		;;
+	    
+	    auxiliary)
+		odev="-o ${IF_AUXILIARY}"
+		mon_ip=${IP_AUXILIARY_IP}
+		;;
+	    vpnipsec)
+		continue
+		;;
+	    *)
+		continue
+		;;
+	esac
+
+	test ${SNMP_UDP} == False || gen-qos-mark-out "${odev} -p udp -m udp -s ${mon_ip} --sport ${SNMP_PORT} -d ${ip}" ${QOS_ADMIN_MARK}
+	test ${SNMP_TCP} == False || gen-qos-mark-out "${odev} -p tcp -m tcp -s ${mon_ip} --sport ${SNMP_PORT} -d ${ip}" ${QOS_ADMIN_MARK}
+	test ${SNMP_TLS} == False || gen-qos-mark-out "${odev} -p tcp -m tcp -s ${mon_ip} --sport ${SNMP_TLS_PORT} -d ${ip}" ${QOS_ADMIN_MARK}
+    done
+}
+
+gen-iptables-mangle-qos-mon-trap()
+{
+    test -n "${1}" || return 0
+    local trap_ip_ports=${1}
+
+    local interface interfaces="internal"
+    test ${APL_ROLE} == 'manager' || interfaces="${interfaces} external"
+    test -z "${IF_AUXILIARY}" -o ${IP_AUXILIARY_IP} == 0.0.0.0 || interfaces="${interfaces} auxiliary"
+    test ${VPN_IPSEC_MODE} == False || interfaces="${interfaces} vpnipsec"
+
+    local ip port ip_port
+
+    for ip_port in ${trap_ip_ports}
+    do
+	ip=${ip_port/:*/}
+	port=${ip_port/*:/}
+
+	for interface in ${interfaces}
+	do
+	    case ${interface} in
+
+		internal)
+		    odev="-o ${IF_MON}"
+		    mon_ip=${IP_MON_IP}
+		    ;;
+	    
+		external)
+		    odev="-o ${IF_EXTERNAL}"
+		    mon_ip=${IP_EXTERNAL_IP}
+		    ;;
+	    
+		auxiliary)
+		    odev="-o ${IF_AUXILIARY}"
+		    mon_ip=${IP_AUXILIARY_IP}
+		    ;;
+
+		vpnipsec)
+		    continue
+		    ;;
+
+		*)
+		    return 255
+		    ;;
+	    esac
+
+	    gen-qos-mark-out "${odev} -p tcp -m tcp -s ${mon_ip} --dport ${port} -d ${ip}" ${QOS_ADMIN_MARK}
+	done
+    done
+}
+
+gen-iptables-mangle-qos-mon-ip()
+{
+    test ${ADMIN_SNMP} == True || return 0
+
+    gen-iptables-mangle-qos-mon-agent "${ACCESS_MON_IF_IP_LIST}"
+    gen-iptables-mangle-qos-mon-trap "${SNMP_TRAP_SERVER_IP_LIST}"
+}
+
+gen-iptables-mangle-qos-mon-nr()
+{
+    test ${ADMIN_SNMP} == True || return 0
+
+    gen-iptables-mangle-qos-mon-agent "${ACCESS_MON_IF_NR_LIST}"
+    gen-iptables-mangle-qos-mon-trap "${SNMP_TRAP_SERVER_NR_LIST}"
+}
+
+gen-iptables-mangle-qos-syslog()
+{
+    test -n "${1}" || return 0
+    local servers=${1}
+
+    local elt range i=0
+    local ip protocol port
+
+    for elt in ${servers}
+    do
+	range=$[${i} % 3]
+	case ${range} in
+	    0)
+		protocol=${elt}
+		;;
+	    1)
+		ip=${elt}
+		;;
+	    2)
+		port=${elt}
+		gen-qos-mark-out "-p ${protocol} -m ${protocol} -d ${ip} --dport ${port}" ${QOS_ADMIN_MARK}
+		;;
+	    *)
+		return 255
+		;;
+	esac
+	((i++))
+    done
+}
+
+gen-iptables-mangle-qos-syslog-ip()
+{
+   test ${REMOTE_SYSLOG_MODE} == True || return 0
+
+   gen-iptables-mangle-qos-syslog "${SYSLOG_SERVER_IP_LIST}"
+}
+
+gen-iptables-mangle-qos-syslog-nr()
+{
+    test ${REMOTE_SYSLOG_MODE} == True || return 0
+
+    gen-iptables-mangle-qos-syslog "${SYSLOG_SERVER_NR_LIST}"
+}
+
+gen-iptables-mangle-qos-admin()
+{
+    local odev apl_ip
+    local interface interfaces="internal"
+    test ${APL_ROLE} == 'manager' || interfaces="${interfaces} external"
+    test -z "${IF_AUXILIARY}" -o ${IP_AUXILIARY_IP} == 0.0.0.0 || interfaces="${interfaces} auxiliary"
+
+    for interface in ${interfaces}
+    do
+	case ${interface} in
+	    internal)
+		test ${ADMIN_INTERNAL} == True || continue
+		odev="-o ${IF_ADMIN}"
+		apl_ip=${IP_ADMIN_IP}
+		;;
+	    external)
+		test ${ADMIN_EXTERNAL} == True || continue
+		odev="-o ${IF_EXTERNAL}"
+		apl_ip=${IP_EXTERNAL_IP}
+		;;
+	    auxiliary)
+		test ${ADMIN_AUXILIARY} == True || continue
+		odev="-o ${IF_AUXILIARY}"
+		apl_ip=${IP_AUXILIARY_IP}
+		;;
+	    *)
+		return 255
+		;;
+	esac
+
+	test ${ADMIN_SSH} == False || gen-qos-mark-out "${odev} -p tcp -s ${apl_ip} --sport ${SSH_PORT}" ${QOS_ADMIN_MARK}
+	test ${ADMIN_WADMIN} == False || gen-qos-mark-out "${odev} -p tcp -s ${apl_ip} --sport ${WADMIN_PORT}" ${QOS_ADMIN_MARK}
+	test ${ADMIN_WAUDIT} == False || gen-qos-mark-out "${odev} -p tcp -s ${apl_ip} --sport ${WAUDIT_PORT}" ${QOS_ADMIN_MARK}
+    done
+}
+
+gen-iptables-mangle-qos-file()
+{
+    test -n "${1}" || return 0
+    local if_ips=${1}
+
+    local if_ip interface ip odev qos_mark
+
+    for if_ip in ${if_ips}
+    do
+	interface=${if_ip/:*}
+	ip=${if_ip#*:}
+
+	case ${interface} in
+	    internal)
+		qos_mark=${QOS_FILE_MARK}
+		odev="-o ${IF_FILE}"
+		;;
+	    external)
+		qos_mark=${QOS_FILE_MARK}
+		odev="-o ${IF_EXTERNAL}"
+		;;
+	    auxiliary)
+		qos_mark=${QOS_FILE_MARK}
+		odev="-o ${IF_AUXILIARY}"
+		;;
+	    vpnipsec)
+		continue
+		;;
+	    *)
+		continue
+		;;
+	esac
+
+	gen-qos-mark-out "${odev} -d ${ip}" ${qos_mark}
+    done
+}
+
+gen-iptables-mangle-qos-file-ip()
+{
+    gen-iptables-mangle-qos-file "${ACCESS_FILE_IF_IP_LIST}"
+}
+
+gen-iptables-mangle-qos-file-nr()
+{
+    gen-iptables-mangle-qos-file "${ACCESS_FILE_IF_NR_LIST}"
+}
+
+gen-iptables-mangle-qos-peer()
+{
+    test -n "${1}" || return 1
+    local interface=${1}
+
+    case ${interface} in
+	internal)
+	    gen-iptables-mangle-qos-ha-share-peer
+	    gen-iptables-mangle-qos-dhcp-peer
+	    gen-iptables-mangle-qos-previous-peer
+	    ;;
+	external)
+	    ;;
+	auxiliary)
+	    ;;
+	*)
+	    return 255
+	    ;;
+    esac
+}
+
+gen-iptables-mangle-qos-gateway()
+{
+    test -n "${1}" || return 1
+    local interface=${1}
+
+    gen-iptables-mangle-qos-rweb ${interface}
+    gen-iptables-mangle-qos-peer ${interface}
+}
+
+gen-iptables-mangle-qos-non-admin()
+{
+    test ${QOS_MODE} == True || return 0
+
+    local interface interfaces="internal external"
+    test -z "${IF_AUXILIARY}" -o ${IP_AUXILIARY_IP} == 0.0.0.0 || interfaces="${interfaces} auxiliary"
+
+    ########################################################################################
+    # Mangled traffic should be treated in the same order as in apl_qos: gen-tc-with-qos() #
+    ########################################################################################
+
+    QOS_HANDLE=${QOS_HANDLE_INIT}
+
+    for interface in ${interfaces}
+    do
+	gen-iptables-mangle-qos-gateway ${interface}
+    done
+
+    gen-iptables-mangle-qos-av
+    gen-iptables-mangle-qos-web
+    gen-iptables-mangle-qos-tweb
+    gen-iptables-mangle-qos-file-ip
+}
+
+gen-iptables-mangle-sticky-external-route-chain()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    local state=${1}
+    local gateway_nb=${2}
+
+    test ${gateway_nb} -ge 2 || return 0
+
+    case ${state} in
+	new)
+	    local tee_file=${IPTABLES_RUNTIME_MANGLE_EXTERNAL_ROUTE}.chains.new
+	    ;;
+	cur)
+	    local tee_file=/dev/null
+	    ;;
+	*)
+	    return 255
+	    ;;
+    esac
+    local i
+
+    for ((i=1 ; i <= gateway_nb ; i++))
+    do
+	tee-echo ${tee_file} ":${IPTABLES_STICKY_EXTERNAL_ROUTE_CHAIN}${i} - [0:0]"
+    done
+}
+
+gen-iptables-mangle-external-route-chain()
+{
+    is-multi-external-gateways new || return 0
+
+    local gateway_weight gateway weight gateway_nb
+
+    gateway_nb=$(record-length-list 1 "${EXTERNAL_GATEWAY_WEIGHTS}")
+
+    gen-iptables-mangle-sticky-external-route-chain new ${gateway_nb}
+}
+
+gen-iptables-mangle-sticky-default-route-chain()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    local state=${1}
+    local gateway_nb=${2}
+
+    test ${gateway_nb} -ge 2 || return 0
+
+    case ${state} in
+	new)
+	    local tee_file=${IPTABLES_RUNTIME_MANGLE_SDEFAULT_ROUTE}.chains.new
+	    ;;
+	cur)
+	    local tee_file=/dev/null
+	    ;;
+	*)
+	    return 255
+	    ;;
+    esac
+
+    local i
+
+    for ((i=1 ; i <= gateway_nb ; i++))
+    do
+	tee-echo ${tee_file} ":${IPTABLES_STICKY_DEFAULT_ROUTE_CHAIN}${i} - [0:0]"
+    done
+}
+
+gen-iptables-mangle-default-route-chain()
+{
+    is-multi-default-gateways new || return 0
+
+    local gateway_nb=$(record-length-list 1 "${DEFAULT_NOSTANDBY_GATEWAY_WEIGHTS}")
+    gen-iptables-mangle-sticky-default-route-chain new ${gateway_nb}
+}
+
+gen-iptables-mangle-policy-routing-chain()
+{
+    is-multi-default-gateways new || is-multi-external-gateways new || return 0
+
+    echo ":${IPTABLES_POLICY_ROUTING_CHAIN} - [0:0]"
+
+    test ${APL_ROLE} == 'manager' || gen-iptables-mangle-external-route-chain
+    gen-iptables-mangle-default-route-chain
+}
+
+get-elected-via-gateway()
+{
+    local vias=${1}
+
+    local len_vias=$(record-length-list 3 "${vias}")
+    test ${len_vias} -ge 2 || return 0
+
+    local elt range i=0
+    local via gateway role_prio role prio
+    local elected_master_gateway elected_master_prio
+    local elected_backup_gateway elected_backup_prio
+
+    for elt in ${vias}
+    do
+	range=$[${i} % 3]
+	case ${range} in
+	    0)
+		gateway=${elt}
+		;;
+	    1)
+		role=${elt}
+		;;
+	    2)
+		prio=${elt}
+
+		case ${role} in
+		    master)
+			if test -z "${elected_master_gateway}" ; then
+			    elected_master_gateway=${gateway}
+			    elected_master_prio=${prio}
+			else
+			    if test ${prio} -ge ${elected_master_prio} ; then
+				elected_master_gateway=${gateway}
+				elected_master_prio=${prio}
+			    fi
+			fi
+			;;
+		    backup)
+			if test -z "${elected_backup_gateway}" ; then
+			    elected_backup_gateway=${gateway}
+			    elected_backup_prio=${prio}
+			else
+			    if test ${prio} -ge ${elected_backup_prio} ; then
+				elected_backup_gateway=${gateway}
+				elected_backup_prio=${prio}
+			    fi
+			fi
+			;;
+		    *)
+			return 255
+			;;
+		esac
+		;;
+	    *)
+		return 255
+		;;
+	esac
+	((i++))
+    done
+
+    if test -n "${elected_master_gateway}" ; then
+	elected_gateway=${elected_master_gateway}
+    elif test -n "${elected_backup_gateway}" ; then
+	elected_gateway=${elected_backup_gateway}
+    fi
+
+    echo ${elected_gateway}
+    test -n "${elected_gateway}"
+}
+
+get-elected-via-gateway-for-id()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    local in_key1=${1}
+    local in_key2=${2}
+    local via_list=${3}
+
+    local elt range i=0
+    local key1 key2 vias
+    local elected_gateway
+
+    for elt in ${via_list}
+    do
+	range=$[${i} % 3]
+	case ${range} in
+	    0)
+		key1=${elt}
+		;;
+	    1)
+		key2=${elt}
+		;;
+	    2)
+		if test ${key1} == ${in_key1} -a ${key2} == ${in_key2} ; then
+		    vias=$(colon2space ${elt})
+		    vias=$(underscore2space "${vias}")
+		    elected_gateway=$(get-elected-via-gateway "${vias}")
+		    break
+		fi
+		;;
+	    *)
+		return 255
+		;;
+	esac
+	((i++))
+    done
+
+    echo ${elected_gateway}
+    test -n "${elected_gateway}"
+}
+
+get-mangle-index-file()
+{
+    test -n "${1}" || return 1
+    local state=${1}
+
+    local index_file
+
+    case ${state} in
+	new)
+	    index_file=${IPTABLES_RUNTIME_MANGLE_INDEX}.new
+	    test -f ${index_file} || index_file=${IPTABLES_RUNTIME_MANGLE_INDEX}
+	    ;;
+	cur)
+	    index_file=${IPTABLES_RUNTIME_MANGLE_INDEX}
+	    ;;
+	*)
+	    echo /dev/null
+	    return 255
+	    ;;
+    esac
+
+    echo ${index_file}
+}
+
+get-gateway-mark()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    test -n "${3}" || return 3
+    test -n "${4}" || return 4
+    local state=${1}
+    local in_gateway=${2}
+    local in_table_pname=${3}
+    local in_range=${4}
+
+    local index_file=$(get-mangle-index-file ${state})
+
+    if test ! -f ${index_file} ; then
+	echo 0
+	return 11
+    fi
+
+    local mtype gateway weight table_pname range mark
+
+    while read mtype gateway weight table_pname range mark
+    do
+	test -n "${mtype}" || continue
+	test ${mtype:0:1} != '#' || continue
+
+	if test ${mtype} == route -a \
+		${gateway} == ${in_gateway} -a \
+		${table_pname} == ${in_table_pname} -a \
+		${range} == ${in_range} ; then
+
+	    echo ${mark}
+	    return 0
+	fi
+    done < ${index_file}
+
+    echo 0
+    return 13
+}
+
+get-gateway-table-range()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    test -n "${3}" || return 3
+    local state=${1}
+    local in_gateway=${2}
+    local in_table_pname=${3}
+
+    local index_file=$(get-mangle-index-file ${state})
+
+    if test ! -f ${index_file} ; then
+	echo 0
+	return 11
+    fi
+
+    local mtype gateway weight table_pname range mark
+
+    while read mtype gateway weight table_pname range mark
+    do
+	test -n "${mtype}" || continue
+	test ${mtype:0:1} != '#' || continue
+
+	if test ${mtype} == route -a \
+		${gateway} == ${in_gateway} -a \
+		${table_pname} == ${in_table_pname} ; then
+
+	    echo ${range}
+	    return 0
+	fi
+    done < ${index_file}
+
+    echo 0
+    return 13
+}
+
+get-standby-gateway()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    local state=${1}
+    local in_table_pname=${2}
+
+    local index_file=$(get-mangle-index-file ${state})
+
+    test -f ${index_file} || return 11
+
+    local mtype gateway weight table_pname range mark
+
+    while read mtype gateway weight table_pname range mark
+    do
+	test -n "${mtype}" || continue
+	test ${mtype:0:1} != '#' || continue
+
+	if test ${mtype} == route -a \
+		${weight} == 0 -a \
+		${table_pname} == ${in_table_pname} ; then
+
+	    echo ${gateway}
+	    return 0
+	fi
+    done < ${index_file}
+
+    return 13
+}
+
+gen-iptables-mangle-sticky-external-route-mark()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    local tee_file=${1}
+    local state=${2}
+
+    local index_file=$(get-mangle-index-file ${state})
+
+    if test ! -f ${index_file} ; then
+	echo 0
+	return 11
+    fi
+
+    local mtype gateway weight table_pname range mark
+    local gateway_weight1 gateway1 fwmark
+
+    while read mtype gateway weight table_pname range mark
+    do
+	test -n "${mtype}" || continue
+	test ${mtype:0:1} != '#' || continue
+
+	test ${mtype} == route || continue
+	test ${table_pname} == ${EXTERNAL_ROUTE_TABLE_PNAME} || continue
+	test ${weight} != 0 || continue
+
+	for gateway_weight1 in ${EXTERNAL_GATEWAY_WEIGHTS}
+	do
+	    gateway1=${gateway_weight1/:*}
+
+	    if test ${gateway} == ${gateway1} ; then
+		fwmark=${mark}
+		let "fwmark <<= ${ROUTE_MARK_SHIFT}"
+		fwmark=$(printf "0x%x" ${fwmark} 2> /dev/null)
+
+		tee-echo ${tee_file} "[0:0] -A ${IPTABLES_STICKY_EXTERNAL_ROUTE_CHAIN}${range} -j MARK --set-mark ${fwmark}/${ROUTE_MARK_MASK}"
+		tee-echo ${tee_file} "[0:0] -A ${IPTABLES_STICKY_EXTERNAL_ROUTE_CHAIN}${range} -j CONNMARK --save-mark"
+	    fi
+	done
+    done < ${index_file}
+}
+
+gen-iptables-mangle-sticky-ipsec-route()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    local tee_file=${1}
+    local state=${2}
+    local vpn_ipsec_site_ip_list=${3}
+    local vpn_ipsec_via_list=${4}
+
+    local nb gateway elected_via_gateway_found
+
+    case ${state} in
+	new)
+	    local vpn_ipsec_access_mode=${VPN_IPSEC_ACCESS_MODE}
+	    local if_external=${IF_EXTERNAL}
+	    local ip_external_ip=${IP_EXTERNAL_IP}
+	    ;;
+	cur)
+	    local vpn_ipsec_access_mode=${CURRENT_VPN_IPSEC_ACCESS_MODE}
+	    local if_external=${CURRENT_IF_EXTERNAL}
+	    local ip_external_ip=${CURRENT_IP_EXTERNAL_IP}
+	    ;;
+	*)
+	    return 255
+	    ;;
+    esac
+
+    if test ${vpn_ipsec_access_mode} == True ; then
+	
+	gateway=$(get-elected-via-gateway-for-id access access "${vpn_ipsec_via_list}")
+
+	if test -n "${gateway}" ; then
+
+	    elected_via_gateway_found='yes'
+	    nb=$(get-gateway-table-range ${state} ${gateway} ${EXTERNAL_ROUTE_TABLE_PNAME})
+
+	    tee-echo ${tee_file} "[0:0] -A ${IPTABLES_POLICY_ROUTING_CHAIN} -o ${if_external} -p udp -s ${ip_external_ip} -m multiport --sports ${ISAKMP_PORT},${NATT_PORT} -j ${IPTABLES_STICKY_EXTERNAL_ROUTE_CHAIN}${nb}"
+	    tee-echo ${tee_file} "[0:0] -A ${IPTABLES_POLICY_ROUTING_CHAIN} -o ${if_external} -p esp -s ${ip_external_ip} -j ${IPTABLES_STICKY_EXTERNAL_ROUTE_CHAIN}${nb}"
+
+	fi
+    else
+	local elt range i=0
+	local vpn_id ips remote_isakmp_port remote_natt_port
+	local ip dst_ip
+
+	for elt in ${vpn_ipsec_site_ip_list}
+	do
+	    range=$[${i} % 4]
+	    case ${range} in
+		0)
+ 		    vpn_id=${elt}
+		    ;;
+		1)
+		    ips=${elt}
+		    ;;
+		2)
+		    remote_isakmp_port=${elt}
+		    ;;
+		3)
+		    remote_natt_port=${elt}
+
+		    gateway=$(get-elected-via-gateway-for-id site ${vpn_id} "${vpn_ipsec_via_list}")
+
+		    if test -n "${gateway}" ; then
+
+			elected_via_gateway_found='yes'
+			nb=$(get-gateway-table-range ${state} ${gateway} ${EXTERNAL_ROUTE_TABLE_PNAME})
+
+			ips=${ips//,/ }
+
+			for ip in ${ips}
+			do
+			    dst_ip=$(echo-firewall-destination-ip ${ip})
+
+			    tee-echo ${tee_file} "[0:0] -A ${IPTABLES_POLICY_ROUTING_CHAIN} -o ${if_external} -p udp -s ${ip_external_ip}${dst_ip} -m multiport --dports ${remote_isakmp_port},${remote_natt_port} -j ${IPTABLES_STICKY_EXTERNAL_ROUTE_CHAIN}${nb}"
+			    tee-echo ${tee_file} "[0:0] -A ${IPTABLES_POLICY_ROUTING_CHAIN} -o ${if_external} -p esp -s ${ip_external_ip} -d ${ip} -j ${IPTABLES_STICKY_EXTERNAL_ROUTE_CHAIN}${nb}"
+			done
+		    fi
+		    ;;
+		*)
+		    return 255
+		    ;;
+	    esac
+	    ((i++))
+	done
+    fi
+
+    test -n "${elected_via_gateway_found}" || return 111
+}
+
+gen-iptables-mangle-sticky-rweb-route()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    local tee_file=${1}
+    local state=${2}
+    local rweb_site_via_list=${3}
+
+    case ${state} in
+	new)
+	    local if_external=${IF_EXTERNAL}
+	    local rweb_site_list=${_RWEB_SITE_LIST}
+	    ;;
+	cur)
+	    local if_external=${CURRENT_IF_EXTERNAL}
+	    local rweb_site_list=${CURRENT_RWEB_SITE_LIST}
+	    ;;
+	*)
+	    return 255
+	    ;;
+    esac
+
+    local elt range i=0
+    local site_name site_ip site_protocol
+    local gateway dport nb elected_via_gateway_found
+
+    for elt in ${rweb_site_list}
+    do
+	range=$[${i} % 5]
+	case ${range} in
+	    0)
+		site_name=${elt}
+		;;
+	    1)
+		site_protocol=${elt}
+		;;
+	    2)
+		site_ip=${elt}
+		;;
+	    3)
+		;;
+	    4)
+		gateway=$(get-elected-via-gateway-for-id ${site_name} ${site_ip} "${rweb_site_via_list}")
+
+		if test -n "${gateway}" ; then
+		    elected_via_gateway_found='yes'
+		    nb=$(get-gateway-table-range ${state} ${gateway} ${EXTERNAL_ROUTE_TABLE_PNAME})
+
+		    case ${site_protocol} in
+			https)
+			    dport=${HTTPS_PORT}
+			    ;;
+			http)
+			    dport=${WWW_PORT}
+			    ;;
+			*)
+			    ;;
+		    esac
+
+		    tee-echo ${tee_file} "[0:0] -A ${IPTABLES_POLICY_ROUTING_CHAIN} -i ${if_external} -p tcp -d ${site_ip} --dport ${dport} -j ${IPTABLES_STICKY_EXTERNAL_ROUTE_CHAIN}${nb}"
+		fi
+		;;
+	    *)
+		return 255
+		;;
+	esac
+	((i++))
+    done
+
+    test -n "${elected_via_gateway_found}" || return 111
+}
+
+gen-iptables-mangle-sticky-ip-route()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    local tee_file=${1}
+    local state=${2}
+    local ip_via_list=${3}
+
+    local elected_via_gateway_found
+    local gateway=$(get-elected-via-gateway "${ip_via_list}")
+
+    if test -n "${gateway}" ; then
+	elected_via_gateway_found='yes'
+
+	case ${state} in
+	    new)
+		local ha_mode=${HA_MODE}
+		local if_external=${IF_EXTERNAL} ip_external_ip=${IP_EXTERNAL_IP} ip_external_net=${IP_EXTERNAL_NET} ip_external_mask=${IP_EXTERNAL_MASK}
+		local av_external=${AV_EXTERNAL} av_mode=${AV_MODE} av_port=${AV_PORT}
+		local ocsp_mode=${OCSP_MODE} ocsp_port=${OCSP_PORT}
+		local admin_external=${ADMIN_EXTERNAL} admin_ssh=${ADMIN_SSH} admin_snmp=${ADMIN_SNMP}
+		local admin_wadmin=${ADMIN_WADMIN} wadmin_port=${WADMIN_PORT} admin_waudit=${ADMIN_WAUDIT} waudit_port=${WAUDIT_PORT}
+		;;
+	    cur)
+		local ha_mode=${CURRENT_HA_MODE}
+		local if_external=${CURRENT_IF_EXTERNAL} ip_external_ip=${CURRENT_IP_EXTERNAL_IP} ip_external_net=${CURRENT_IP_EXTERNAL_NET} ip_external_mask=${CURRENT_IP_EXTERNAL_MASK}
+		local av_external=${CURRENT_AV_EXTERNAL} av_mode=${CURRENT_AV_MODE} av_port=${CURRENT_AV_PORT}
+		local ocsp_mode=${CURRENT_OCSP_MODE} ocsp_port=${CURRENT_OCSP_PORT}
+		local admin_external=${CURRENT_ADMIN_EXTERNAL} admin_ssh=${CURRENT_ADMIN_SSH} admin_snmp=${CURRENT_ADMIN_SNMP}
+		local admin_wadmin=${CURRENT_ADMIN_WADMIN} wadmin_port=${CURRENT_WADMIN_PORT} admin_waudit=${CURRENT_ADMIN_WAUDIT} waudit_port=${CURRENT_WAUDIT_PORT}
+		;;
+	    *)
+		return 255
+		;;
+	esac
+
+	nb=$(get-gateway-table-range ${state} ${gateway} ${EXTERNAL_ROUTE_TABLE_PNAME})
+
+	if test ${ha_mode} == False ; then
+	    test ${av_external} == False -o ${av_mode} == False ||
+		tee-echo ${tee_file} "[0:0] -A ${IPTABLES_POLICY_ROUTING_CHAIN} -i ${if_external} -p tcp -d ${ip_external_ip} --dport ${av_port} -j ${IPTABLES_STICKY_EXTERNAL_ROUTE_CHAIN}${nb}"
+
+	    test ${ocsp_mode} == False ||
+		tee-echo ${tee_file} "[0:0] -A ${IPTABLES_POLICY_ROUTING_CHAIN} -i ${if_external} -p tcp -d ${ip_external_ip} --dport ${ocsp_port} -j ${IPTABLES_STICKY_EXTERNAL_ROUTE_CHAIN}${nb}"
+	else
+	    test ${av_external} == False -o ${av_mode} == False ||
+		tee-echo ${tee_file} "[0:0] -A ${IPTABLES_POLICY_ROUTING_CHAIN} -i ${if_external} -p tcp -d ${ip_external_net}/${ip_external_mask} --dport ${av_port} -j ${IPTABLES_STICKY_EXTERNAL_ROUTE_CHAIN}${nb}"
+
+	    test ${ocsp_mode} == False ||
+		tee-echo ${tee_file} "[0:0] -A ${IPTABLES_POLICY_ROUTING_CHAIN} -i ${if_external} -p tcp -d ${ip_external_net}/${ip_external_mask} --dport ${ocsp_port} -j ${IPTABLES_STICKY_EXTERNAL_ROUTE_CHAIN}${nb}"
+	fi
+
+	if test ${admin_external} == True ; then
+
+	    test ${admin_ssh} == False ||
+		tee-echo ${tee_file} "[0:0] -A ${IPTABLES_POLICY_ROUTING_CHAIN} -i ${if_external} -p tcp -d ${ip_external_ip} --dport ${SSH_PORT} -j ${IPTABLES_STICKY_EXTERNAL_ROUTE_CHAIN}${nb}"
+
+	    test ${admin_snmp} == False ||
+		tee-echo ${tee_file} "[0:0] -A ${IPTABLES_POLICY_ROUTING_CHAIN} -i ${if_external} -p tcp -d ${ip_external_ip} --dport ${SNMP_PORT} -j ${IPTABLES_STICKY_EXTERNAL_ROUTE_CHAIN}${nb}"
+
+
+	    test ${admin_wadmin} == False ||
+		tee-echo ${tee_file} "[0:0] -A ${IPTABLES_POLICY_ROUTING_CHAIN} -i ${if_external} -p tcp -d ${ip_external_ip} --dport ${wadmin_port} -j ${IPTABLES_STICKY_EXTERNAL_ROUTE_CHAIN}${nb}"
+
+	    test ${admin_waudit} == False ||
+		tee-echo ${tee_file} "[0:0] -A ${IPTABLES_POLICY_ROUTING_CHAIN} -i ${if_external} -p tcp -d ${ip_external_ip} --dport ${waudit_port} -j ${IPTABLES_STICKY_EXTERNAL_ROUTE_CHAIN}${nb}"
+	fi
+    fi
+
+    test -n "${elected_via_gateway_found}" || return 111
+}
+
+gen-iptables-mangle-sticky-default-route-mark()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    local tee_file=${1}
+    local state=${2}
+
+    local index_file=$(get-mangle-index-file ${state})
+
+    if test ! -f ${index_file} ; then
+	echo 0
+	return 11
+    fi
+
+    local mtype gateway weight table_pname range mark
+    local gateway_weight1 gateway1 fwmark
+
+    while read mtype gateway weight table_pname range mark
+    do
+	test -n "${mtype}" || continue
+	test ${mtype:0:1} != '#' || continue
+
+	test ${mtype} == route || continue
+	test ${table_pname} == ${STICKY_DEFAULT_ROUTE_TABLE_PNAME} || continue
+
+	for gateway_weight1 in ${DEFAULT_NOSTANDBY_GATEWAY_WEIGHTS}
+	do
+	    gateway1=${gateway_weight1/:*}
+
+	    if test ${gateway} == ${gateway1} ; then
+
+		fwmark=${mark}
+		let "fwmark <<= ${ROUTE_MARK_SHIFT}"
+		fwmark=$(printf "0x%x" ${fwmark} 2> /dev/null)
+
+		tee-echo ${tee_file} "[0:0] -A ${IPTABLES_STICKY_DEFAULT_ROUTE_CHAIN}${range} -j MARK --set-mark ${fwmark}/${ROUTE_MARK_MASK}"
+		tee-echo ${tee_file} "[0:0] -A ${IPTABLES_STICKY_DEFAULT_ROUTE_CHAIN}${range} -j CONNMARK --save-mark"
+	    fi
+	done
+    done < ${index_file}
+}
+
+get-probability()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    local part=${1}
+    local total=${2}
+
+    local probability=$[${part} * 100 / ${total}]
+    case ${#probability} in
+	1)
+	    probability="0.0${probability}"
+	    ;;
+	2)
+	    probability="0.${probability}"
+	    ;;
+	*)
+	    probability="0.0"
+	    ;;
+    esac
+
+    echo -n "${probability}"
+}
+
+gen-iptables-mangle-nosticky-traffic()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    local tee_file=${1}
+    local state=${2}
+
+    local elt range i
+    local ip network netmask
+
+    case ${state} in
+	new)
+	    local ip_external_net=${IP_EXTERNAL_NET}
+	    local ip_external_mask=${IP_EXTERNAL_MASK}
+	    local if_auxiliary=${IF_AUXILIARY}
+	    local ip_auxiliary_ip=${IP_AUXILIARY_IP}
+	    local ip_auxiliary_net=${IP_AUXILIARY_NET}
+	    local ip_auxiliary_mask=${IP_AUXILIARY_MASK}
+	    local vlan_mode=${VLAN_MODE}
+	    local ip_internal_net=${IP_INTERNAL_NET}
+	    local ip_internal_mask=${IP_INTERNAL_MASK}
+	    local ip_vlan_list=${IP_VLAN_LIST}
+	    local ip_route_gw_wt_pg_list=${IP_ROUTE_GW_WT_PG_LIST}
+	    ;;
+	cur)
+	    local ip_external_net=${CURRENT_IP_EXTERNAL_NET}
+	    local ip_external_mask=${CURRENT_IP_EXTERNAL_MASK}
+	    local if_auxiliary=${CURRENT_IF_AUXILIARY}
+	    local ip_auxiliary_ip=${CURRENT_IP_AUXILIARY_IP}
+	    local ip_auxiliary_net=${CURRENT_IP_AUXILIARY_NET}
+	    local ip_auxiliary_mask=${CURRENT_IP_AUXILIARY_MASK}
+	    local vlan_mode=${CURRENT_VLAN_MODE}
+	    local ip_internal_net=${CURRENT_IP_INTERNAL_NET}
+	    local ip_internal_mask=${CURRENT_IP_INTERNAL_MASK}
+	    local ip_vlan_list=${CURRENT_IP_VLAN_LIST}
+	    local ip_route_gw_wt_pg_list=${CURRENT_IP_ROUTE_GW_WT_PG_LIST}
+	    ;;
+	*)
+	    return 255
+	    ;;
+    esac
+
+    tee-echo ${tee_file} "[0:0] -A ${IPTABLES_POLICY_ROUTING_CHAIN} -d ${ip_external_net}/${ip_external_mask} -j RETURN"
+    test -z "${if_auxiliary}" -o ${ip_auxiliary_ip} == 0.0.0.0 || tee-echo ${tee_file} "[0:0] -A ${IPTABLES_POLICY_ROUTING_CHAIN} -d ${ip_auxiliary_net}/${ip_auxiliary_mask} -j RETURN"
+
+    if test ${vlan_mode} == False ; then
+	tee-echo ${tee_file} "[0:0] -A ${IPTABLES_POLICY_ROUTING_CHAIN} -d ${ip_internal_net}/${ip_internal_mask} -j RETURN"
+    else
+	i=0
+	for elt in ${ip_vlan_list}
+	do
+	    range=$[${i} % 3]
+	    case ${range} in
+		0)
+		    ;;
+		1)
+		    ip=${elt}
+		    ;;
+		2)
+		    netmask=${elt}
+		    network=$(ipcalc -s ${ip} ${netmask} -n) ; network=${network/NETWORK=}
+		    tee-echo ${tee_file} "[0:0] -A ${IPTABLES_POLICY_ROUTING_CHAIN} -d ${network}/${netmask} -j RETURN"
+		    ;;
+		*)
+		    return 255
+		    ;;
+	    esac
+	    ((i++))
+	done
+    fi
+
+    i=0
+    for elt in ${ip_route_gw_wt_pg_list}
+    do
+	range=$[${i} % 3]
+	case ${range} in
+	    0)
+		network=${elt}
+		;;
+	    1)
+		netmask=${elt}
+		;;
+	    2)
+		if test ${network} != "0.0.0.0" -o ${netmask} != "0.0.0.0" ; then
+		    tee-echo ${tee_file} "[0:0] -A ${IPTABLES_POLICY_ROUTING_CHAIN} -d ${network}/${netmask} -j RETURN"
+		fi
+		;;
+	    *)
+		return 255
+		;;
+	esac
+	((i++))
+    done
+}
+
+gen-iptables-mangle-sticky-default-route()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    test -n "${3}" || return 3
+    local state=${1}
+    local default_gateway_nb=${2}
+    local total_weight=${3}
+    local default_gateway_weights=${4}
+
+    test ${default_gateway_nb} -ge 2 || return 0
+
+    case ${state} in
+	new)
+	    local tee_file=${IPTABLES_RUNTIME_MANGLE_SDEFAULT_ROUTE}.rules.new
+	    ;;
+	cur)
+	    local tee_file=/dev/null
+	    ;;
+	*)
+	    return 255
+	    ;;
+    esac
+
+    local gateway_weight gateway weight
+    local weight_probability
+    local fwmark range nb=1
+    local previous_weight_probabilities=0
+
+    # No persistency for non default routes
+    gen-iptables-mangle-nosticky-traffic ${tee_file} ${state}
+
+    # Persistent routes for default gateways (first select a gateway according to its weight and stick to it for the same connection)
+    for gateway_weight in ${default_gateway_weights}
+    do
+	test ${nb} -lt ${default_gateway_nb} || break
+	gateway=${gateway_weight/:*}
+	weight=${gateway_weight/*:}
+	
+	weight_probability=$(get-probability ${weight} $((total_weight - previous_weight_probabilities)))
+	((previous_weight_probabilities += weight))
+	
+	range=$(get-gateway-table-range ${state} ${gateway} ${STICKY_DEFAULT_ROUTE_TABLE_PNAME})
+
+	tee-echo ${tee_file} "[0:0] -A ${IPTABLES_POLICY_ROUTING_CHAIN} -m state --state NEW -m mark --mark 0x0/${ROUTE_MARK_MASK} -m statistic --mode random --probability ${weight_probability} -j ${IPTABLES_STICKY_DEFAULT_ROUTE_CHAIN}${range}"
+	((nb++))
+    done
+
+    gateway_weight=${default_gateway_weights/* }
+    gateway=${gateway_weight/:*}
+    range=$(get-gateway-table-range ${state} ${gateway} ${STICKY_DEFAULT_ROUTE_TABLE_PNAME})
+
+    tee-echo ${tee_file} "[0:0] -A ${IPTABLES_POLICY_ROUTING_CHAIN} -m state --state NEW -m mark --mark 0x0/${ROUTE_MARK_MASK} -j ${IPTABLES_STICKY_DEFAULT_ROUTE_CHAIN}${range}"
+    tee-echo ${tee_file} "[0:0] -A ${IPTABLES_POLICY_ROUTING_CHAIN} -m state --state RELATED,ESTABLISHED -j CONNMARK --mask ${ROUTE_MARK_MASK} --restore-mark"
+
+    gen-iptables-mangle-sticky-default-route-mark ${tee_file} ${state}
+}
+
+gen-iptables-mangle-default-route()
+{
+    local gateway_weight weight
+    local total_weight=0 default_gateway_nb=0
+
+    for gateway_weight in ${DEFAULT_NOSTANDBY_GATEWAY_WEIGHTS}
+    do
+	weight=${gateway_weight/*:}
+	test ${weight} != 0 || continue
+	total_weight=$[${total_weight} + ${weight}]
+	((default_gateway_nb++))
+    done
+
+    gen-iptables-mangle-sticky-default-route new ${default_gateway_nb} ${total_weight} "${DEFAULT_NOSTANDBY_GATEWAY_WEIGHTS}"
+}
+
+gen-iptables-mangle-return-route()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    local tee_file=${1}
+    local state=${2}
+
+    case ${state} in
+	new)
+	    local if_external=${IF_EXTERNAL}
+	    ;;
+	cur)
+	    local if_external=${CURRENT_IF_EXTERNAL}
+	    ;;
+	*)
+	    return 255
+	    ;;
+    esac
+
+    tee-echo ${tee_file} "[0:0] -A ${IPTABLES_POLICY_ROUTING_CHAIN} -o ${if_external} -m mark ! --mark 0x0/${ROUTE_MARK_MASK} -j RETURN"
+    tee-echo ${tee_file} "[0:0] -A ${IPTABLES_POLICY_ROUTING_CHAIN} -i ${if_external} -m mark ! --mark 0x0/${ROUTE_MARK_MASK} -j RETURN"
+}
+
+get-available-vpn-ipsec-via-list()
+{
+    test -n "${1}" || return 0
+    local available_gateways=${1}
+
+    local elt range i=0
+    local ipsec_type vpn_id vias
+    local out_list out_vias
+
+    for elt in ${CURRENT_VPN_IPSEC_VIA_LIST}
+    do
+	range=$[${i} % 3]
+	case ${range} in
+	    0)
+		ipsec_type=${elt}
+		;;
+	    1)
+		vpn_id=${elt}
+		;;
+	    2)
+		vias=$(colon2space ${elt})
+		unset out_vias
+		for via in ${vias}
+		do
+		    gateway=${via/_*}
+		    ! member "${available_gateways}" ${gateway} || out_vias="${out_vias}:${via}"
+		done
+		out_vias=${out_vias:1}
+		test -z "${out_vias}" || out_list="${out_list} ${ipsec_type} ${vpn_id} ${out_vias}"
+		;;
+	    *)
+		return 255
+		;;
+	esac
+	((i++))
+    done
+    
+    echo ${out_list:1}
+}
+
+get-available-rweb-site-via-list()
+{
+    local available_gateways=${1}
+
+    local elt range i=0
+    local site_name site_ip vias
+    local out_list out_vias
+
+    for elt in ${CURRENT_RWEB_SITE_VIA_LIST}
+    do
+	range=$[${i} % 3]
+	case ${range} in
+	    0)
+		site_name=${elt}
+		;;
+	    1)
+		site_ip=${elt}
+		;;
+	    2)
+		vias=$(colon2space ${elt})
+		unset out_vias
+		for via in ${vias}
+		do
+		    gateway=${via/_*}
+		    ! member "${available_gateways}" ${gateway} || out_vias="${out_vias}:${via}"
+		done
+		out_vias=${out_vias:1}
+		test -z "${out_vias}" || out_list="${out_list} ${site_name} ${site_ip} ${out_vias}"
+		;;
+	    *)
+		return 255
+		;;
+	esac
+	((i++))
+    done
+    
+    echo ${out_list:1}
+}
+
+get-available-ip-via-list()
+{
+    local available_gateways=${1}
+
+    local elt range i=0
+    local gateway role prio
+    local out_list
+
+    for elt in ${CURRENT_IP_VIA_LIST}
+    do
+	range=$[${i} % 3]
+	case ${range} in
+	    0)
+		gateway=${elt}
+		;;
+	    1)
+		role=${elt}
+		;;
+	    2)
+		prio=${elt}
+		! member "${available_gateways}" ${gateway} || out_list="${out_list} ${gateway} ${role} ${prio}"
+		;;
+	    *)
+		return 255
+		;;
+	esac
+	((i++))
+    done
+    
+    echo ${out_list:1}
+}
+
+gen-iptables-mangle-external-route()
+{
+    test -n "${1}" || return 1
+    local state=${1}
+    local vpn_ipsec_site_ip_list=${2}
+    local available_gateways=${3}
+
+    case ${state} in
+	new)
+	    local tee_file=${IPTABLES_RUNTIME_MANGLE_EXTERNAL_ROUTE}.rules.new
+
+	    local vpn_ipsec_mode=${VPN_IPSEC_MODE}
+	    local rweb_mode=${RWEB_MODE}
+	    
+	    local vpn_ipsec_via_list=${VPN_IPSEC_VIA_LIST}
+	    local rweb_site_via_list=${RWEB_SITE_VIA_LIST}
+	    local ip_via_list=${IP_VIA_LIST}
+	    ;;
+	cur)
+	    local tee_file=/dev/null
+
+	    local vpn_ipsec_mode=${CURRENT_VPN_IPSEC_MODE}
+	    local rweb_mode=${CURRENT_RWEB_MODE}
+
+	    local vpn_ipsec_via_list=$(get-available-vpn-ipsec-via-list "${available_gateways}")
+	    local rweb_site_via_list=$(get-available-rweb-site-via-list "${available_gateways}")
+	    local ip_via_list=$(get-available-ip-via-list "${available_gateways}")
+	    ;;
+	*)
+	    return 255
+	    ;;
+    esac
+
+    local elected_via_gateway_found
+
+    if test ${vpn_ipsec_mode} == True ; then
+	gen-iptables-mangle-sticky-ipsec-route ${tee_file} ${state} "${vpn_ipsec_site_ip_list}" "${vpn_ipsec_via_list}"
+	test ${?} -eq 111 || elected_via_gateway_found='yes'
+    fi
+
+    if test ${rweb_mode} == True ; then
+	gen-iptables-mangle-sticky-rweb-route ${tee_file} ${state} "${rweb_site_via_list}"
+	test ${?} -eq 111 || elected_via_gateway_found='yes'
+    fi
+
+    gen-iptables-mangle-sticky-ip-route ${tee_file} ${state} "${ip_via_list}"
+    test ${?} -eq 111 || elected_via_gateway_found='yes'
+
+    if test -n "${elected_via_gateway_found}" ; then
+	gen-iptables-mangle-return-route ${tee_file} ${state}
+	gen-iptables-mangle-sticky-external-route-mark ${tee_file} ${state}
+    fi
+}
+
+gen-iptables-mangle-external-route-ip()
+{
+    test ${APL_ROLE} == 'gateway' || return 0
+    is-multi-external-gateways new || return 0
+
+    gen-iptables-mangle-external-route new "${VPN_IPSEC_SITE_IP_LIST}"
+}
+
+gen-iptables-mangle-external-route-nr()
+{
+    test ${APL_ROLE} == 'gateway' || return 0
+    is-multi-external-gateways new || return 0
+
+    gen-iptables-mangle-external-route new "${VPN_IPSEC_SITE_NR_LIST}"
+}
+
+gen-iptables-mangle-policy-routing-main()
+{
+    is-multi-default-gateways new || is-multi-external-gateways new || return 0
+
+    echo "[0:0] -A OUTPUT -j ${IPTABLES_POLICY_ROUTING_CHAIN}"
+    echo "[0:0] -A FORWARD -j ${IPTABLES_POLICY_ROUTING_CHAIN}"
+    echo "[0:0] -A INPUT -j ${IPTABLES_POLICY_ROUTING_CHAIN}"
+
+    ! is-multi-default-gateways new || gen-iptables-mangle-default-route
+}
+
+gen-iptables-mangle-dscp()
+{
+    local i=0 elt range
+    local interface dev protocol src_ip src_port dst_ip dst_port dscp
+
+    local protocol_rule
+    local forth_src_ip_rule forth_dst_ip_rule forth_src_port_rule forth_dst_port_rule
+    local back_src_ip_rule back_dst_ip_rule back_src_port_rule back_dst_port_rule
+
+    for elt in ${QOS_SHAPE_ROUTER_LIST}
+    do
+	range=$[${i} % 10]
+	case ${range} in
+	    0|5|8)
+		;;
+	    1)
+		interface=${elt}
+		;;
+	    2)
+		protocol=${elt}
+		;;
+	    3)
+		src_ip=${elt}
+		;;
+	    4)
+		src_port=${elt}
+		;;
+	    6)
+		dst_ip=${elt}
+		;;
+	    7)
+		dst_port=${elt}
+		;;
+	    9)
+		dscp=${elt}
+		if test ${dscp} == nil ; then
+		    ((i++))
+		    continue
+		fi
+
+		case ${interface} in
+		    external)
+			dev=${IF_EXTERNAL}
+			;;
+		    internal)
+			dev=${IF_WEB}
+			;;
+		    auxiliary)
+			if test -z "${IF_AUXILIARY}" -o ${IP_AUXILIARY_IP} == 0.0.0.0 ; then
+			    ((i++))
+			    continue
+			fi
+			dev=${IF_AUXILIARY}
+			;;
+		    *)
+			return 255
+			;;
+		esac
+
+		unset protocol_rule
+
+		unset forth_src_ip_rule forth_dst_ip_rule forth_src_port_rule forth_dst_port_rule
+		unset back_src_ip_rule back_dst_ip_rule back_src_port_rule back_dst_port_rule
+
+		if test ${src_ip} != any ; then
+		    forth_src_ip_rule=" -s ${src_ip}"
+		    back_src_ip_rule=" -d ${src_ip}"
+		fi
+
+		if test ${dst_ip} != any ; then
+		    forth_dst_ip_rule=" -d ${dst_ip}"
+		    back_dst_ip_rule=" -s ${dst_ip}"
+		fi
+
+		if test ${protocol} != any ; then
+		    protocol_rule=" -p ${protocol}"
+
+		    if test ${src_port} != any ; then
+			forth_src_port_rule=" --sport ${src_port}"
+			back_src_port_rule=" --dport ${src_port}"
+		    fi
+
+		    if test ${dst_port} != any ; then
+			forth_dst_port_rule=" --dport ${dst_port}"
+			back_dst_port_rule=" --sport ${dst_port}"
+		    fi
+		fi
+
+		echo "[0:0] -A PREROUTING -i ${dev}${protocol_rule}${forth_src_ip_rule}${forth_src_port_rule}${forth_dst_ip_rule}${forth_dst_port_rule} -j DSCP --set-dscp ${dscp}"
+		echo "[0:0] -A POSTROUTING -o ${dev}${protocol_rule}${back_src_ip_rule}${back_src_port_rule}${back_dst_ip_rule}${back_dst_port_rule} -j DSCP --set-dscp ${dscp}"
+		;;
+	    *)
+		return 255
+		;;
+	esac
+	((i++))
+    done
+}
+
+gen-iptables-mangle-ipsec-limit-tcpmss()
+{
+    test ${VPN_IPSEC_MODE} == True || return 0
+
+    local mss_range_min_sz mss_range_max_sz=65535
+    local mss_max_sz=1400
+
+    (( mss_range_min_sz = mss_max_sz + 1))
+
+    echo "[0:0] -A PREROUTING ${FW_IPSEC_POLICY_IN} -p tcp -m tcp --tcp-flags SYN,RST SYN -m tcpmss --mss ${mss_range_min_sz}:${mss_range_max_sz} -j TCPMSS --set-mss ${mss_max_sz}"
+    echo "[0:0] -A POSTROUTING ${FW_IPSEC_POLICY_OUT} -p tcp -m tcp --tcp-flags SYN,RST SYN -m tcpmss --mss ${mss_range_min_sz}:${mss_range_max_sz} -j TCPMSS --set-mss ${mss_max_sz}"
+}
+
+gen-iptables-mangle()
+{
+    echo "*mangle"
+    echo ":PREROUTING ACCEPT [0:0]"
+    echo ":POSTROUTING ACCEPT [0:0]"
+    echo ":INPUT ACCEPT [0:0]"
+    echo ":FORWARD ACCEPT [0:0]"
+    echo ":OUTPUT ACCEPT [0:0]"
+    echo ":QOS_OUT - [0:0]"
+
+    local file files=${IPTABLES_RUNTIME_MANGLE_SDEFAULT_ROUTE}
+    test ${APL_ROLE} == 'manager' || files="${files} ${IPTABLES_RUNTIME_MANGLE_EXTERNAL_ROUTE}"
+
+    for file in ${files}
+    do
+	echo -n > ${file}.chains.new
+	echo -n > ${file}.rules.new
+    done
+
+    gen-iptables-mangle-ipsec-limit-tcpmss
+    gen-iptables-mangle-policy-routing-chain
+
+    echo "[0:0] -A OUTPUT -j QOS_OUT"
+
+    gen-iptables-mangle-qos-admin
+    gen-iptables-mangle-qos-mon-ip
+    gen-iptables-mangle-qos-syslog-ip
+    gen-iptables-mangle-qos-non-admin
+    gen-iptables-mangle-dscp
+    gen-iptables-mangle-policy-routing-main
+    gen-iptables-mangle-external-route-ip
+    gen-iptables-mangle-transparent
+}
+
+gen-iptables-filter-input-output-loopback()
+{
+    echo "[0:0] -A INPUT -i lo -j ACCEPT"
+    echo "[0:0] -A OUTPUT -o lo -j ACCEPT"
+}
+
+gen-iptables-filter-input-output-multicast-vrrp-1()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    test -n "${3}" || return 3
+    test -n "${4}" || return 4
+    local dev=${1}
+    local ip=${2}
+    local net=${3}
+    local mask=${4}
+
+    test ${ip} != 0.0.0.0 || return 0
+
+    echo "[0:0] -A INPUT -i ${dev} -p ah -s ${net}/${mask} -d ${VRRP_MULTICAST_IP}/32 -j ACCEPT"
+    echo "[0:0] -A OUTPUT -o ${dev} -p ah -s ${net}/${mask} -d ${VRRP_MULTICAST_IP}/32 -j ACCEPT"
+
+    echo "[0:0] -A INPUT -i ${dev} -p igmp -s ${net}/${mask} -d ${VRRP_MULTICAST_IP}/32 -j ACCEPT"
+    echo "[0:0] -A OUTPUT -o ${dev} -p igmp -s ${net}/${mask} -d ${VRRP_MULTICAST_IP}/32 -j ACCEPT"
+
+    echo "[0:0] -A INPUT -i ${dev} -p igmp -s ${net}/${mask} -d ${LVS_MULTICAST_IP}/32 -j ACCEPT"
+    echo "[0:0] -A OUTPUT -o ${dev} -p igmp -s ${net}/${mask} -d ${LVS_MULTICAST_IP}/32 -j ACCEPT"
+
+    echo "[0:0] -A INPUT -i ${dev} -p igmp -s ${net}/${mask} -d ${ALL_ROUTERS_MULTICAST_IP}/32 -j ACCEPT"
+    echo "[0:0] -A OUTPUT -o ${dev} -p igmp -s ${net}/${mask} -d ${ALL_ROUTERS_MULTICAST_IP}/32 -j ACCEPT"
+
+    echo "[0:0] -A INPUT -i ${dev} -p igmp -s ${net}/${mask} -d ${ALL_HOSTS_MULTICAST_IP}/32 -j ACCEPT"
+    echo "[0:0] -A OUTPUT -o ${dev} -p igmp -s ${net}/${mask} -d ${ALL_HOSTS_MULTICAST_IP}/32 -j ACCEPT"
+
+    echo "[0:0] -A INPUT -i ${dev} -p igmp -s ${net}/${mask} -d ${IGMP_MULTICAST_IP}/32 -j ACCEPT"
+    echo "[0:0] -A OUTPUT -o ${dev} -p igmp -s ${net}/${mask} -d ${IGMP_MULTICAST_IP}/32 -j ACCEPT"
+}
+
+gen-iptables-filter-input-output-multicast-vrrp()
+{
+    test -z "${VRRP_EXTERNAL_IP_LIST}" || \
+	gen-iptables-filter-input-output-multicast-vrrp-1 ${IF_EXTERNAL} ${IP_EXTERNAL_IP} ${IP_EXTERNAL_NET} ${IP_EXTERNAL_MASK}
+
+    test -z "${IF_AUXILIARY}" -o ${IP_AUXILIARY_IP} == 0.0.0.0 -o -z "${VRRP_AUXILIARY_IP_LIST}" || \
+	gen-iptables-filter-input-output-multicast-vrrp-1 ${IF_AUXILIARY} ${IP_AUXILIARY_IP} ${IP_AUXILIARY_NET} ${IP_AUXILIARY_MASK}
+
+    if test ${VLAN_MODE} == False ; then
+	test -z "${VRRP_INTERNAL_LIST}" || \
+	    gen-iptables-filter-input-output-multicast-vrrp-1 ${IF_INTERNAL} ${IP_INTERNAL_IP} ${IP_INTERNAL_NET} ${IP_INTERNAL_MASK}
+    else
+	local interfaces
+
+	if test ${WEB_MODE} == True ; then
+	    test -z "${VRRP_WEB_LIST}" || \
+		gen-iptables-filter-input-output-multicast-vrrp-1 ${IF_WEB} ${IP_WEB_IP} ${IP_WEB_NET} ${IP_WEB_MASK}
+	    interfaces="${IF_WEB}"
+	fi
+	
+	if test ${RWEB_MODE} == True ; then
+	    if ! member "${interfaces}" ${IF_RWEB} ; then
+		test -z "${VRRP_RWEB_LIST}" || \
+		    gen-iptables-filter-input-output-multicast-vrrp-1 ${IF_RWEB} ${IP_RWEB_IP} ${IP_RWEB_NET} ${IP_RWEB_MASK}
+		if test -z "${interfaces}" ; then
+		    interfaces="${IF_RWEB}"
+		else
+		    interfaces="${interfaces} ${IF_RWEB}"
+		fi
+	    fi
+	fi
+
+	if test ${AV_MODE} == True -a ${AV_INTERNAL} == True ; then
+	    if ! member "${interfaces}" ${IF_AV} ; then
+		test -z "${VRRP_AV_LIST}" || \
+		    gen-iptables-filter-input-output-multicast-vrrp-1 ${IF_AV} ${IP_AV_IP} ${IP_AV_NET} ${IP_AV_MASK}
+		if test -z "${interfaces}" ; then
+		    interfaces="${IF_AV}"
+		else
+		    interfaces="${interfaces} ${IF_AV}"
+		fi
+	    fi
+	fi
+    fi
+}
+
+gen-iptables-filter-input-output-multicast()
+{
+    if test ${HA_MODE} == True ; then
+	echo "[0:0] -A INPUT -p igmp -s 0.0.0.0/255.255.255.255 -j ACCEPT"
+	gen-iptables-filter-input-output-multicast-vrrp
+    else
+	echo "[0:0] -A INPUT -p igmp -s 0.0.0.0/255.255.255.255 -d ${ALL_HOSTS_MULTICAST_IP}/255.255.255.255 -j ACCEPT"
+	echo "[0:0] -A INPUT -p igmp -s 0.0.0.0/255.255.255.255 -j ${FW_DROP_MULTICAST}"
+    fi
+
+    echo "[0:0] -A INPUT  -m pkttype --pkt-type multicast -j ${FW_DROP_MULTICAST}"
+    echo "[0:0] -A OUTPUT -m pkttype --pkt-type multicast -j ${FW_DROP_MULTICAST}"
+}
+
+gen-iptables-filter-input-output-null()
+{
+    echo "[0:0] -A INPUT ${FW_NULL} -j ${FW_DROP_NULL}"
+    test ${VPN_IPSEC_MODE} == True || return 0
+    echo "[0:0] -A INPUT ${FW_IPSEC_POLICY_IN} ${FW_NULL} -j ${FW_DROP_NULL}"
+}
+
+gen-iptables-filter-input-output-allstate()
+{
+    echo "[0:0] -A INPUT ${FW_ALLSTATE} -j ${FW_DROP_ALLSTATE}"
+    test ${VPN_IPSEC_MODE} == True || return 0
+    echo "[0:0] -A INPUT ${FW_IPSEC_POLICY_IN} ${FW_ALLSTATE} -j ${FW_DROP_ALLSTATE}"
+}
+
+gen-iptables-filter-input-output-xmas()
+{
+    echo "[0:0] -A INPUT ${FW_XMAS} -j ${FW_DROP_XMAS}"
+    test ${VPN_IPSEC_MODE} == True || return 0
+    echo "[0:0] -A INPUT ${FW_IPSEC_POLICY_IN} ${FW_XMAS} -j ${FW_DROP_XMAS}"
+}
+
+gen-iptables-filter-input-output-invalid()
+{
+    echo "[0:0] -A INPUT ${FW_INVALID} -j ${FW_DROP_INVALID}"
+    test ${VPN_IPSEC_MODE} == True || return 0
+    echo "[0:0] -A INPUT ${FW_IPSEC_POLICY_IN} ${FW_INVALID} -j ${FW_DROP_INVALID}"
+}
+
+gen-iptables-filter-input-output-illegal()
+{
+    echo "[0:0] -A INPUT ${FW_ILLEGAL_NEW} -j ${FW_DROP_ILLEGAL_NEW}"
+    test ${VPN_IPSEC_MODE} == True || return 0
+    echo "[0:0] -A INPUT ${FW_IPSEC_POLICY_IN} ${FW_ILLEGAL_NEW} -j ${FW_DROP_ILLEGAL_NEW}"
+}
+
+gen-iptables-filter-input-output-broadcast()
+{
+    test ${APL_ROLE} == 'manager' -o ${IP_EXTERNAL_MASK} == 255.255.255.254 || echo "[0:0] -A INPUT -i ${IF_EXTERNAL} -d ${IP_EXTERNAL_BRD} -j ${FW_DROP_BROADCAST}"
+    test -z "${IF_AUXILIARY}" -o ${IP_AUXILIARY_IP} == 0.0.0.0 -o ${IP_AUXILIARY_MASK} == 255.255.255.254 || echo "[0:0] -A INPUT -i ${IF_AUXILIARY} -d ${IP_AUXILIARY_BRD} -j ${FW_DROP_BROADCAST}"
+
+    if test ${VLAN_MODE} == False ; then
+	test ${IP_INTERNAL_MASK} == 255.255.255.254 || echo "[0:0] -A INPUT -i ${IF_INTERNAL} -d ${IP_INTERNAL_BRD} -j ${FW_DROP_BROADCAST}"
+	test ${VPN_IPSEC_MODE} == False -o ${IP_INTERNAL_MASK} == 255.255.255.254 || echo "[0:0] -A INPUT ${FW_IPSEC_POLICY_IN} -d ${IP_INTERNAL_BRD} -j ${FW_DROP_BROADCAST}"
+    else
+	local elt range i=0
+	local vlan netmask broadcast
+
+	for elt in ${VLAN_IP_MASK_PREFIX_NETWORK_BROADCAST_LIST}
+	do
+	    range=$[${i} % 6]
+	    case ${range} in
+		0)
+		    vlan=${elt}
+		    ;;
+		2)
+		    netmask=${elt}
+		    ;;		    
+		1|3|4)
+		    ;;
+		5)
+		    broadcast=${elt}
+		    test ${netmask} == 255.255.255.254 || echo "[0:0] -A INPUT -i ${IF_INTERNAL}.${vlan} -d ${broadcast} -j ${FW_DROP_BROADCAST}"
+		    test ${VPN_IPSEC_MODE} == False -o ${netmask} == 255.255.255.254 || echo "[0:0] -A INPUT ${FW_IPSEC_POLICY_IN} -d ${broadcast} -j ${FW_DROP_BROADCAST}"
+		    ;;
+		*)
+		    return 255
+		    ;;
+	    esac
+	    ((i++))
+	done
+    fi
+}
+
+gen-iptables-filter-input-output-traceroute()
+{
+    echo "[0:0] -A OUTPUT -p udp --dport 33434:33523 -m state --state NEW,ESTABLISHED -j ACCEPT"
+    echo "[0:0] -A INPUT -p udp --sport 33434:33523 -m state --state ESTABLISHED -j ACCEPT"
+    echo "[0:0] -A INPUT -p udp --dport 33434:33523 -m state --state NEW -j ${FW_DROP_TRACEROUTE}"
+
+    test ${VPN_IPSEC_MODE} == True || return 0
+
+    echo "[0:0] -A OUTPUT ${FW_IPSEC_POLICY_OUT} -p udp --dport 33434:33523 -j ${FW_DROP_TRACEROUTE}"
+    echo "[0:0] -A INPUT ${FW_IPSEC_POLICY_IN} -p udp --dport 33434:33523 -j ${FW_DROP_TRACEROUTE}"
+}
+
+gen-iptables-filter-input-flood-1()
+{
+    local dev=${1}
+    local ip=${2}
+    local port=${3}
+    local chain=${4}
+
+    if test -n "${dev}" ; then
+	if test "${dev:0:1}" == '!' ; then
+	    dev="! -i ${dev} "
+	else
+	    dev="-i ${dev} "
+	fi
+    fi
+
+    test -z "${ip}" || ip="-d ${ip} "
+
+    echo "[0:0] -A INPUT ${dev}-p tcp ${ip}--dport ${port} --syn -j SYN${chain}"
+    echo "[0:0] -A INPUT ${dev}-p tcp ${ip}--dport ${port} --tcp-flags RST RST -j RST${chain}"
+}
+
+gen-iptables-filter-input-flood-dev()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    test -n "${3}" || return 3
+    test -n "${4}" || return 4
+    local dev=${1}
+    local ip=${2}
+    local port=${3}
+    local chain=${4}
+
+    gen-iptables-filter-input-flood-1 "${dev}" ${ip} ${port} ${chain}
+}
+
+gen-iptables-filter-input-flood-ip()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    test -n "${3}" || return 3
+    local ip=${1}
+    local port=${2}
+    local chain=${3}
+
+    gen-iptables-filter-input-flood-1 '' ${ip} ${port} ${chain}
+}
+
+gen-iptables-filter-input-flood-port()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    local port=${1}
+    local chain=${2}
+
+    gen-iptables-filter-input-flood-1 '' '' ${port} ${chain}
+}
+
+gen-iptables-filter-input-flood()
+{
+    local ip port
+
+    if test ${ADMIN_SSH} == True ; then
+	test ${ADMIN_INTERNAL} == False || gen-iptables-filter-input-flood-dev ${IF_ADMIN} ${IP_ADMIN_IP} ${SSH_PORT} FLOODMGT
+	test ${ADMIN_EXTERNAL} == False || gen-iptables-filter-input-flood-dev ${IF_EXTERNAL} ${IP_EXTERNAL_IP} ${SSH_PORT} FLOODMGT
+	test -z "${IF_AUXILIARY}" -o ${IP_AUXILIARY_IP} == 0.0.0.0 || test ${ADMIN_AUXILIARY} == False || gen-iptables-filter-input-flood-dev ${IF_AUXILIARY} ${IP_AUXILIARY_IP} ${SSH_PORT} FLOODMGT
+
+	if test ${VPN_IPSEC_MODE} == True -a ${ADMIN_VPN_IPSEC} == True ; then
+	    echo "[0:0] -A INPUT ${FW_IPSEC_POLICY_IN} -p tcp --dport ${SSH_PORT} --syn -j SYNFLOODMGT"
+	    echo "[0:0] -A INPUT ${FW_IPSEC_POLICY_IN} -p tcp --dport ${SSH_PORT} --tcp-flags RST RST -j RSTFLOODMGT"
+	fi
+    fi
+
+    if test ${ADMIN_WADMIN} == True ; then
+	test ${ADMIN_INTERNAL} == False || gen-iptables-filter-input-flood-dev ${IF_ADMIN} ${IP_ADMIN_IP} ${WADMIN_PORT} FLOODMGT
+	test ${ADMIN_EXTERNAL} == False || gen-iptables-filter-input-flood-dev ${IF_EXTERNAL} ${IP_EXTERNAL_IP} ${WADMIN_PORT} FLOODMGT
+	test -z "${IF_AUXILIARY}" -o ${IP_AUXILIARY_IP} == 0.0.0.0 || test ${ADMIN_AUXILIARY} == False || gen-iptables-filter-input-flood-dev ${IF_AUXILIARY} ${IP_AUXILIARY_IP} ${WADMIN_PORT} FLOODMGT
+
+	if test ${VPN_IPSEC_MODE} == True -a ${ADMIN_VPN_IPSEC} == True ; then
+	    echo "[0:0] -A INPUT ${FW_IPSEC_POLICY_IN} -p tcp --dport ${WADMIN_PORT} --syn -j SYNFLOODMGT"
+	    echo "[0:0] -A INPUT ${FW_IPSEC_POLICY_IN} -p tcp --dport ${WADMIN_PORT} --tcp-flags RST RST -j RSTFLOODMGT"
+	fi
+    fi
+
+    if test ${ADMIN_SNMP} == True ; then
+	if test ${ADMIN_INTERNAL} == True ; then
+	    test ${SNMP_TCP} == False || gen-iptables-filter-input-flood-dev ${IF_ADMIN} ${IP_ADMIN_IP} ${SNMP_PORT} FLOODMGT
+	    test ${SNMP_TLS} == False || gen-iptables-filter-input-flood-dev ${IF_ADMIN} ${IP_ADMIN_IP} ${SNMP_TLS_PORT} FLOODMGT
+	fi
+	if test ${VPN_IPSEC_MODE} == True -a ${ADMIN_VPN_IPSEC} == True ; then
+	    if test ${SNMP_TCP} == True ; then
+		echo "[0:0] -A INPUT ${FW_IPSEC_POLICY_IN} -p tcp --dport ${SNMP_PORT} --syn -j SYNFLOODMGT"
+		echo "[0:0] -A INPUT ${FW_IPSEC_POLICY_IN} -p tcp --dport ${SNMP_PORT} --tcp-flags RST RST -j RSTFLOODMGT"
+	    fi
+	    if test ${SNMP_TLS} == True ; then
+		echo "[0:0] -A INPUT ${FW_IPSEC_POLICY_IN} -p tcp --dport ${SNMP_TLS_PORT} --syn -j SYNFLOODMGT"
+		echo "[0:0] -A INPUT ${FW_IPSEC_POLICY_IN} -p tcp --dport ${SNMP_TLS_PORT} --tcp-flags RST RST -j RSTFLOODMGT"
+	    fi
+	fi
+
+	if test ${ADMIN_EXTERNAL} == True ; then
+	    test ${SNMP_TCP} == False || gen-iptables-filter-input-flood-dev ${IF_EXTERNAL} ${IP_EXTERNAL_IP} ${SNMP_PORT} FLOODMGT
+	    test ${SNMP_TLS} == False || gen-iptables-filter-input-flood-dev ${IF_EXTERNAL} ${IP_EXTERNAL_IP} ${SNMP_TLS_PORT} FLOODMGT
+	fi
+
+	if test -n "${IF_AUXILIARY}" -a ${IP_AUXILIARY_IP} != 0.0.0.0 -a ${ADMIN_AUXILIARY} == True ; then
+	    test ${SNMP_TCP} == False || gen-iptables-filter-input-flood-dev ${IF_AUXILIARY} ${IP_AUXILIARY_IP} ${SNMP_PORT} FLOODMGT
+	    test ${SNMP_TLS} == False || gen-iptables-filter-input-flood-dev ${IF_AUXILIARY} ${IP_AUXILIARY_IP} ${SNMP_TLS_PORT} FLOODMGT
+	fi
+    fi
+
+    test ${APL_ROLE} == gateway || return 0
+
+    if test ${ADMIN_WAUDIT} == True ; then
+	test ${ADMIN_INTERNAL} == False || gen-iptables-filter-input-flood-dev ${IF_ADMIN} ${IP_ADMIN_IP} ${WAUDIT_PORT} FLOODMGT
+	test ${ADMIN_EXTERNAL} == False || gen-iptables-filter-input-flood-dev ${IF_EXTERNAL} ${IP_EXTERNAL_IP} ${WAUDIT_PORT} FLOODMGT
+	test -z "${IF_AUXILIARY}" -o ${IP_AUXILIARY_IP} == 0.0.0.0 || test ${ADMIN_AUXILIARY} == False || gen-iptables-filter-input-flood-dev ${IF_AUXILIARY} ${IP_AUXILIARY_IP} ${WAUDIT_PORT} FLOODMGT
+
+	if test ${VPN_IPSEC_MODE} == True -a ${ADMIN_VPN_IPSEC} == True ; then
+	    echo "[0:0] -A INPUT ${FW_IPSEC_POLICY_IN} -p tcp --dport ${WAUDIT_PORT} --syn -j SYNFLOODMGT"
+	    echo "[0:0] -A INPUT ${FW_IPSEC_POLICY_IN} -p tcp --dport ${WAUDIT_PORT} --tcp-flags RST RST -j RSTFLOODMGT"
+	fi
+    fi
+
+    test -z "${PEER_SHARE_LIST}" -a -z "${PEER_HA_LIST}" || gen-iptables-filter-input-flood-dev ${IF_PEER} ${IP_PEER_IP} ${PEER_HTTP_PORT} FLOODWEB
+
+    if test ${OCSP_MODE} == True ; then
+	gen-iptables-filter-input-flood-port ${OCSP_PORT} FLOODWEB
+	test ${SINGLE_IP_OCSP_CONNLIMIT} -eq 0 || echo "[0:0] -A INPUT ${FW_OCSP_CONNLIMIT} -j ${FW_REJECT_LIMIT}"
+    fi
+
+    if test ${DNS_MODE} == True ; then
+
+	echo "[0:0] -A INPUT ! -i ${IF_EXTERNAL} -p udp --dport ${DOMAIN_PORT} -m state --state NEW -j UDPFLOOD"
+	gen-iptables-filter-input-flood-port ${DOMAIN_PORT} FLOODWEB
+	test ${SINGLE_IP_DNS_CONNLIMIT} -eq 0 || echo "[0:0] -A INPUT ${FW_DNS_CONNLIMIT} -j ${FW_REJECT_LIMIT}"
+
+	if test ${VPN_IPSEC_MODE} == True ; then
+	    echo "[0:0] -A INPUT ${FW_IPSEC_POLICY_IN} -p udp --dport ${DOMAIN_PORT} -m state --state NEW -j UDPFLOOD"
+	    echo "[0:0] -A INPUT ${FW_IPSEC_POLICY_IN} -p tcp --syn --dport ${DOMAIN_PORT} -j SYNFLOODWEB"
+	    test ${SINGLE_IP_DNS_CONNLIMIT} -eq 0 || echo "[0:0] -A INPUT ${FW_IPSEC_POLICY_IN} ${FW_DNS_CONNLIMIT} -j ${FW_REJECT_LIMIT}"
+	fi
+    fi
+
+    if test ${TPROXY_MODE} == True ; then
+
+	echo "[0:0] -A INPUT ! -i ${IF_EXTERNAL} -p tcp --syn --dport ${WWW_PORT} -j SYNFLOODWEB"
+	echo "[0:0] -A INPUT ! -i ${IF_EXTERNAL} -p tcp --tcp-flags RST RST --dport ${WWW_PORT} -j RSTFLOODWEB"
+	test ${SINGLE_IP_WEB_CONNLIMIT} -eq 0 || echo "[0:0] -A INPUT ! -i ${IF_EXTERNAL} -p tcp --syn --dport ${WWW_PORT} -j CONNLIMITWEB"
+
+	if test ${VPN_IPSEC_MODE} == True ; then
+	    echo "[0:0] -A INPUT ${FW_IPSEC_POLICY_IN} -p tcp --syn --dport ${WWW_PORT} -j SYNFLOODWEB"
+	    echo "[0:0] -A INPUT ${FW_IPSEC_POLICY_IN} -p tcp --tcp-flags RST RST --dport ${WWW_PORT} -j RSTFLOODWEB"
+	    test ${SINGLE_IP_WEB_CONNLIMIT} -eq 0 || echo "[0:0] -A INPUT ${FW_IPSEC_POLICY_IN} -p tcp --syn --dport ${WWW_PORT} -j CONNLIMITWEB"
+	fi
+
+	if test ${SSLMEDIATE_TRANSPARENT_MODE} == True ; then
+
+	    echo "[0:0] -A INPUT ! -i ${IF_EXTERNAL} -p tcp --syn --dport ${HTTPS_PORT} -j SYNFLOODWEB"
+	    echo "[0:0] -A INPUT ! -i ${IF_EXTERNAL} -p tcp --tcp-flags RST RST --dport ${HTTPS_PORT} -j RSTFLOODWEB"
+	    test ${SINGLE_IP_WEB_CONNLIMIT} -eq 0 || echo "[0:0] -A INPUT ! -i ${IF_EXTERNAL} -p tcp --syn --dport ${HTTPS_PORT} -j CONNLIMITWEB"
+
+	    if test ${VPN_IPSEC_MODE} == True ; then
+		echo "[0:0] -A INPUT ${FW_IPSEC_POLICY_IN} -p tcp --syn --dport ${HTTPS_PORT} -j SYNFLOODWEB"
+		echo "[0:0] -A INPUT ${FW_IPSEC_POLICY_IN} -p tcp --tcp-flags RST RST --dport ${HTTPS_PORT} -j RSTFLOODWEB"
+		test ${SINGLE_IP_WEB_CONNLIMIT} -eq 0 || echo "[0:0] -A INPUT ${FW_IPSEC_POLICY_IN} -p tcp --syn --dport ${HTTPS_PORT} -j CONNLIMITWEB"
+	    fi
+	fi
+    else
+	gen-iptables-filter-input-flood-dev "!${IF_EXTERNAL}" ${IP_WEB_IP} ${WWW_PORT} FLOODWEB
+	test ${SINGLE_IP_WEB_CONNLIMIT} -eq 0 || echo "[0:0] -A INPUT ! -i ${IF_EXTERNAL} -p tcp --syn -d ${IP_WEB_IP} --dport ${WWW_PORT} -j CONNLIMITWEB"
+
+	if test ${VPN_IPSEC_MODE} == True ; then
+	    echo "[0:0] -A INPUT ${FW_IPSEC_POLICY_IN} -p tcp --syn -d ${IP_WEB_IP} --dport ${WWW_PORT} -j SYNFLOODWEB"
+	    echo "[0:0] -A INPUT ${FW_IPSEC_POLICY_IN} -p tcp -d ${IP_WEB_IP} --tcp-flags RST RST --dport ${WWW_PORT} -j RSTFLOODWEB"
+	    test ${SINGLE_IP_WEB_CONNLIMIT} -eq 0 || echo "[0:0] -A INPUT ${FW_IPSEC_POLICY_IN} -p tcp --syn -d ${IP_WEB_IP} --dport ${WWW_PORT} -j CONNLIMITWEB"
+	fi
+    fi
+
+    if test ${WEB_MODE} == True ; then
+
+	gen-iptables-filter-input-flood-port ${PROXY_PORT} FLOODWEB
+	test ${SINGLE_IP_WEB_CONNLIMIT} -eq 0 || echo "[0:0] -A INPUT ! -i ${IF_EXTERNAL} -p tcp --syn --dport ${PROXY_PORT} -j CONNLIMITWEB"
+
+	if test ${VPN_IPSEC_MODE} == True ; then
+	    echo "[0:0] -A INPUT ${FW_IPSEC_POLICY_IN} -p tcp --syn --dport ${PROXY_PORT} -j SYNFLOODWEB"
+	    echo "[0:0] -A INPUT ${FW_IPSEC_POLICY_IN} -p tcp --tcp-flags RST RST --dport ${PROXY_PORT} -j RSTFLOODWEB"
+	    test ${SINGLE_IP_WEB_CONNLIMIT} -eq 0 || echo "[0:0] -A INPUT ${FW_IPSEC_POLICY_IN} -p tcp --syn --dport ${PROXY_PORT} -j CONNLIMITWEB"
+	fi
+    fi
+
+    if test ${TRANSPARENT_MODE} == True -a ${TNAT_MODE} == True ; then
+
+	gen-iptables-filter-input-flood-port ${THTTP_PORT} FLOODWEB
+	test ${SINGLE_IP_WEB_CONNLIMIT} -eq 0 || echo "[0:0] -A INPUT ! -i ${IF_EXTERNAL} -p tcp --syn --dport ${THTTP_PORT} -j CONNLIMITWEB"
+
+	if test ${VPN_IPSEC_MODE} == True ; then
+	    echo "[0:0] -A INPUT ${FW_IPSEC_POLICY_IN} -p tcp --syn --dport ${THTTP_PORT} -j SYNFLOODWEB"
+	    echo "[0:0] -A INPUT ${FW_IPSEC_POLICY_IN} -p tcp --tcp-flags RST RST --dport ${THTTP_PORT} -j RSTFLOODWEB"
+	    test ${SINGLE_IP_WEB_CONNLIMIT} -eq 0 || echo "[0:0] -A INPUT ${FW_IPSEC_POLICY_IN} -p tcp --syn --dport ${THTTP_PORT} -j CONNLIMITWEB"
+	fi
+
+	if test ${SSLMEDIATE_TRANSPARENT_MODE} == True ; then
+	    gen-iptables-filter-input-flood-port ${THTTPS_PORT} FLOODWEB
+	    test ${SINGLE_IP_WEB_CONNLIMIT} -eq 0 || echo "[0:0] -A INPUT ! -i ${IF_EXTERNAL} -p tcp --syn --dport ${THTTPS_PORT} -j CONNLIMITWEB"
+
+	    if test ${VPN_IPSEC_MODE} == True ; then
+		echo "[0:0] -A INPUT ${FW_IPSEC_POLICY_IN} -p tcp --syn --dport ${THTTPS_PORT} -j SYNFLOODWEB"
+		echo "[0:0] -A INPUT ${FW_IPSEC_POLICY_IN} -p tcp --tcp-flags RST RST --dport ${THTTPS_PORT}  -j RSTFLOODWEB"
+		test ${SINGLE_IP_WEB_CONNLIMIT} -eq 0 || echo "[0:0] -A INPUT ${FW_IPSEC_POLICY_IN} -p tcp --syn --dport ${THTTPS_PORT} -j CONNLIMITWEB"
+	    fi
+	fi
+    fi
+
+    if test ${RWEB_MODE} == True ; then
+
+	for ip in ${RWEB_HTTP_IP_LIST}
+	do
+	    gen-iptables-filter-input-flood-ip ${ip} ${WWW_PORT} FLOODRWEB
+            test ${SINGLE_IP_RWEB_CONNLIMIT} -eq 0 || echo "[0:0] -A INPUT ${FW_RWEB_CONNLIMIT} -d ${ip} --dport ${WWW_PORT} -j ${FW_REJECT_LIMIT}"
+	done
+
+	for ip in ${RWEB_HTTPS_IP_LIST}
+	do
+	    gen-iptables-filter-input-flood-ip ${ip} ${HTTPS_PORT} FLOODRWEB
+            test ${SINGLE_IP_RWEB_CONNLIMIT} -eq 0 || echo "[0:0] -A INPUT ${FW_RWEB_CONNLIMIT} -d ${ip} --dport ${HTTPS_PORT} -j ${FW_REJECT_LIMIT}"
+	done
+    fi
+}
+
+gen-iptables-filter-input-output-ftp()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    local dev=${1}
+    local ip_client=${2}
+    local ip_server=${3}
+
+    local dst_server src_server
+    local idev odev
+
+    if test -n "${ip_server}" ; then
+	dst_server="-d ${ip_server}"
+	src_server="-s ${ip_server}"
+    fi
+
+    if test ${dev} == ipsec ; then
+	idev=${FW_IPSEC_POLICY_IN}
+	odev=${FW_IPSEC_POLICY_OUT}
+
+    elif test ${dev} != any ; then
+	idev="-i ${dev}"
+	odev="-o ${dev}"
+    fi
+
+    echo "[0:0] -A OUTPUT ${odev} -p tcp -m conntrack --ctstate NEW,ESTABLISHED -m tcp -s ${ip_client} --sport 1024:65535 ${dst_server} -m multiport --dports ${FTP_PORT},${FTPS_PORT} -j ACCEPT"
+    echo "[0:0] -A INPUT ${idev} -p tcp -m conntrack --ctstate ESTABLISHED -m tcp ${src_server} -m multiport --sports ${FTP_PORT},${FTPS_PORT} -d ${ip_client} --dport 1024:65535 -j ACCEPT"
+
+    if test ${FTP_PASSIVE_MODE} == True ; then
+	echo "[0:0] -A OUTPUT ${odev} -p tcp -m conntrack --ctstate RELATED,ESTABLISHED -m tcp -s ${ip_client} --sport 1024:65535 ${dst_server} --dport 1024:65535 -j ACCEPT"
+	echo "[0:0] -A INPUT ${idev} -p tcp -m conntrack --ctstate ESTABLISHED -m tcp ${src_server} --sport 1024:65535 -d ${ip_client} --dport 1024:65535 -j ACCEPT"
+    else
+	echo "[0:0] -A INPUT ${idev} -p tcp -m conntrack --ctstate RELATED,ESTABLISHED -m tcp ${src_server} -m multiport --sports ${FTP_DATA_PORTS} -d ${ip_client} --dport 1024:65535 -j ACCEPT"
+	echo "[0:0] -A OUTPUT ${odev} -p tcp -m conntrack --ctstate ESTABLISHED -m tcp -s ${ip_client} --sport 1024:65535 ${dst_server} -m multiport --dports ${FTP_DATA_PORTS} -j ACCEPT"
+    fi
+}
+
+gen-iptables-filter-forward-ftp()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    test -n "${3}" || return 3
+    test -n "${4}" || return 4
+    test -n "${5}" || return 5
+    test -n "${6}" || return 6
+    test -n "${7}" || return 7
+    local mode=${1}
+    local action=${2}
+    local dev1=${3}
+    local dev2=${4}
+    local ip_client=${5}
+    local ip_server=${6}
+    local ftp_port=${7}
+
+    local idev1 odev1
+    local idev2 odev2
+
+    if test ${dev1} == ipsec ; then
+	idev1=" ${FW_IPSEC_POLICY_IN}"
+	odev1=" ${FW_IPSEC_POLICY_OUT}"
+    else
+	idev1=" -i ${dev1}"
+	odev1=" -o ${dev1}"
+    fi
+
+    if test ${dev2} == any ; then
+	unset idev2
+	unset odev2
+    elif test ${dev2} == ipsec ; then
+	idev2=" ${FW_IPSEC_POLICY_IN}"
+	odev2=" ${FW_IPSEC_POLICY_OUT}"
+    else
+	idev2=" -i ${dev2}"
+	odev2=" -o ${dev2}"
+    fi
+    
+    local dst_server src_server
+    local dst_client src_client
+
+    test ${ftp_port} != any || ftp_port=${FTP_PORT}
+
+    if test ${ip_server} != any ; then
+	dst_server=" -d ${ip_server}"
+	src_server="-s ${ip_server}"
+    fi
+
+    if test ${ip_client} != any ; then
+	dst_client="-d ${ip_client}"
+	src_client="-s ${ip_client}"
+    fi
+
+    if test ${action} == deny ; then
+	echo "[0:0] -A FORWARD${idev1}${odev2} -p tcp -m conntrack --ctstate NEW,ESTABLISHED -m tcp ${src_client} --sport 1024:65535${dst_server} --dport ${ftp_port} -j ${FW_DROP_DENY}"
+	return 0
+    fi
+
+    echo "[0:0] -A FORWARD${idev1}${odev2} -p tcp -m conntrack --ctstate NEW,ESTABLISHED -m tcp ${src_client} --sport 1024:65535${dst_server} --dport ${ftp_port} -j ACCEPT"
+
+    echo "[0:0] -A FORWARD${odev1}${idev2} -p tcp -m conntrack --ctstate ESTABLISHED -m tcp ${src_server} --sport ${ftp_port} ${dst_client} --dport 1024:65535 -j ACCEPT"
+
+    case ${mode} in
+	passive)
+	    echo "[0:0] -A FORWARD${idev1}${odev2} -p tcp -m conntrack --ctstate RELATED,ESTABLISHED -m tcp ${src_client} --sport 1024:65535${dst_server} --dport 1024:65535 -j ACCEPT"
+	    echo "[0:0] -A FORWARD${odev1}${idev2} -p tcp -m conntrack --ctstate ESTABLISHED -m tcp ${src_server} --sport 1024:65535 ${dst_client} --dport 1024:65535 -j ACCEPT"
+	    ;;
+	active)
+	    echo "[0:0] -A FORWARD${odev1}${idev2} -p tcp -m conntrack --ctstate RELATED,ESTABLISHED -m tcp ${src_server} -m multiport --sports ${FTP_DATA_PORTS} ${dst_client} --dport 1024:65535 -j ACCEPT"
+	    echo "[0:0] -A FORWARD${idev1}${odev2} -p tcp -m conntrack --ctstate ESTABLISHED -m tcp ${src_client} --sport 1024:65535${dst_server} -m multiport --dports ${FTP_DATA_PORTS} -j ACCEPT"
+	    ;;
+	*)
+	    return 255
+	    ;;
+    esac
+}
+
+gen-iptables-filter-input-output-tftp()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    local dev=${1}
+    local ip_client=${2}
+    local ip_server=${3}
+
+    local dst_server src_server
+    local idev odev
+
+    if test -n "${ip_server}" ; then
+	dst_server="-d ${ip_server}"
+	src_server="-s ${ip_server}"
+    fi
+
+    if test ${dev} == ipsec ; then
+	idev=${FW_IPSEC_POLICY_IN}
+	odev=${FW_IPSEC_POLICY_OUT}
+
+    elif test ${dev} != any ; then
+	idev="-i ${dev}"
+	odev="-o ${dev}"
+    fi
+
+    echo "[0:0] -A OUTPUT ${odev} -p udp -m conntrack --ctstate NEW,ESTABLISHED -s ${ip_client} --sport 1024:65535 ${dst_server} --dport ${TFTP_PORT} -j ACCEPT"
+    echo "[0:0] -A INPUT ${idev} -p udp -m conntrack --ctstate ESTABLISHED ${src_server} --sport ${TFTP_PORT} -d ${ip_client} --dport 1024:65535 -j ACCEPT"
+    echo "[0:0] -A INPUT ${idev} -p udp -m conntrack --ctstate RELATED,ESTABLISHED ${src_server} --sport 1024:65535 -d ${ip_client} --dport 1024:65535 -j ACCEPT"
+    echo "[0:0] -A OUTPUT ${odev} -p udp -m conntrack --ctstate ESTABLISHED -s ${ip_client} --sport 1024:65535 ${dst_server} --dport 1024:65535 -j ACCEPT"
+}
+
+gen-iptables-filter-input-output-sftp()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 1
+    local dev=${1}
+    local ip_client=${2}
+    local ip_server=${3}
+
+    local dst_server src_server
+    local idev odev
+
+    if test -n "${ip_server}" ; then
+	dst_server="-d ${ip_server}"
+	src_server="-s ${ip_server}"
+    fi
+
+    if test ${dev} == ipsec ; then
+	idev=${FW_IPSEC_POLICY_IN}
+	odev=${FW_IPSEC_POLICY_OUT}
+
+    elif test ${dev} != any ; then
+	idev="-i ${dev}"
+	odev="-o ${dev}"
+    fi
+
+    echo "[0:0] -A OUTPUT ${odev} -p tcp -m state --state NEW,ESTABLISHED -s ${ip_client} --sport 1024:65535 ${dst_server} --dport ${SFTP_PORT} -j ACCEPT"
+    echo "[0:0] -A INPUT ${idev} -p tcp -m state --state ESTABLISHED ${src_server} --sport ${SFTP_PORT} -d ${ip_client} --dport 1024:65535 -j ACCEPT"
+}
+
+gen-iptables-filter-forward-tftp()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    test -n "${3}" || return 3
+    test -n "${4}" || return 4
+    test -n "${5}" || return 5
+    test -n "${6}" || return 6
+    local action=${1}
+    local dev1=${2}
+    local dev2=${3}
+    local ip_client=${4}
+    local ip_server=${5}
+    local tftp_port=${6}
+
+    local idev1 odev1
+    local idev2 odev2
+
+    if test ${dev1} == ipsec ; then
+	idev1=" ${FW_IPSEC_POLICY_IN}"
+	odev1=" ${FW_IPSEC_POLICY_OUT}"
+    else
+	idev1=" -i ${dev1}"
+	odev1=" -o ${dev1}"
+    fi
+    
+    if test ${dev2} == any ; then
+	unset idev2
+	unset odev2
+    elif test ${dev2} == ipsec ; then
+	idev2=" ${FW_IPSEC_POLICY_IN}"
+	odev2=" ${FW_IPSEC_POLICY_OUT}"
+    else
+	idev2=" -i ${dev2}"
+	odev2=" -o ${dev2}"
+    fi
+
+    test ${tftp_port} != any || tftp_port=${TFTP_PORT}
+
+    local dst_server src_server
+    local dst_client src_client
+
+    if test ${ip_server} != any ; then
+	dst_server="-d ${ip_server}"
+	src_server="-s ${ip_server}"
+    fi
+
+    if test ${ip_client} != any ; then
+	dst_client="-d ${ip_client}"
+	src_client="-s ${ip_client}"
+    fi
+
+    if test ${action} == deny ; then
+	echo "[0:0] -A FORWARD${idev1}${odev2} -p udp -m conntrack --ctstate NEW,ESTABLISHED ${src_client} --sport 1024:65535 ${dst_server} --dport ${tftp_port} -j ${FW_DROP_DENY}"
+	return 0
+    fi
+
+    echo "[0:0] -A FORWARD${idev1}${odev2} -p udp -m conntrack --ctstate NEW,ESTABLISHED ${src_client} --sport 1024:65535 ${dst_server} --dport ${tftp_port} -j ACCEPT"
+    echo "[0:0] -A FORWARD${idev2}${odev1} -p udp -m conntrack --ctstate ESTABLISHED ${src_server} --sport ${tftp_port} ${dst_client} --dport 1024:65535 -j ACCEPT"
+
+    echo "[0:0] -A FORWARD${odev1}${idev2} -p udp -m conntrack --ctstate RELATED,ESTABLISHED ${src_server} --sport 1024:65535 ${dst_client} --dport 1024:65535 -j ACCEPT"
+    echo "[0:0] -A FORWARD${idev1}${odev2} -p udp -m conntrack --ctstate ESTABLISHED ${src_client} --sport 1024:65535 ${dst_server} --dport 1024:65535 -j ACCEPT"
+}
+
+gen-iptables-filter-forward-sip()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    test -n "${3}" || return 3
+    test -n "${4}" || return 4
+    test -n "${5}" || return 5
+    test -n "${6}" || return 6
+    local action=${1}
+    local dev1=${2}
+    local dev2=${3}
+    local ip_client=${4}
+    local ip_server=${5}
+    local sip_port=${6}
+
+    local idev1 odev1
+    local idev2 odev2
+
+    if test ${dev1} == ipsec ; then
+	idev1=" ${FW_IPSEC_POLICY_IN}"
+	odev1=" ${FW_IPSEC_POLICY_OUT}"
+    else
+	idev1=" -i ${dev1}"
+	odev1=" -o ${dev1}"
+    fi
+    
+    if test ${dev2} == any ; then
+	unset idev2
+	unset odev2
+    elif test ${dev2} == ipsec ; then
+	idev2=" ${FW_IPSEC_POLICY_IN}"
+	odev2=" ${FW_IPSEC_POLICY_OUT}"
+    else
+	idev2=" -i ${dev2}"
+	odev2=" -o ${dev2}"
+    fi
+
+    test ${sip_port} != any || sip_port=${SIP_PORT}
+
+    local dst_server src_server
+    local dst_client src_client
+
+    local idev odev
+
+    if test ${ip_server} != any ; then
+	dst_server="-d ${ip_server}"
+	src_server="-s ${ip_server}"
+    fi
+
+    if test ${ip_client} != any ; then
+	dst_client="-d ${ip_client}"
+	src_client="-s ${ip_client}"
+    fi
+
+    if test ${action} == deny ; then
+	echo "[0:0] -A FORWARD${idev1}${odev2} -p udp -m conntrack --ctstate NEW,ESTABLISHED ${src_client} --sport 1024:65535 ${dst_server} --dport ${sip_port} -j ${FW_DROP_DENY}"
+	return 0
+    fi
+
+    echo "[0:0] -A FORWARD${idev1}${odev2} -p udp -m conntrack --ctstate NEW,ESTABLISHED ${src_client} --sport 1024:65535 ${dst_server} --dport ${sip_port} -j ACCEPT"
+    echo "[0:0] -A FORWARD${idev2}${odev1} -p udp -m conntrack --ctstate ESTABLISHED ${src_server} --sport ${sip_port} ${dst_client} --dport 1024:65535 -j ACCEPT"
+
+    echo "[0:0] -A FORWARD${odev1}${idev2} -p udp -m conntrack --ctstate RELATED,ESTABLISHED ${src_server} --sport 1024:65535 ${dst_client} --dport 1024:65535 -j ACCEPT"
+    echo "[0:0] -A FORWARD${idev1}${odev2} -p udp -m conntrack --ctstate ESTABLISHED ${src_client} --sport 1024:65535 ${dst_server} --dport 1024:65535 -j ACCEPT"
+}
+
+gen-iptables-filter-input-output-file()
+{
+    gen-iptables-filter-input-output-ftp "${@}"
+    gen-iptables-filter-input-output-tftp "${@}"
+    gen-iptables-filter-input-output-sftp "${@}"
+}
+
+gen-iptables-filter-web-web()
+{
+    test -n "${1}" || return 1
+    local dev=${1}
+    local ip_mk=${2}
+
+    local src_option dst_option idev odev ip
+
+    if test ${dev} == ipsec ; then
+	idev=${FW_IPSEC_POLICY_IN}
+	odev=${FW_IPSEC_POLICY_OUT}
+
+    elif test ${dev} == any ; then
+	idev="! -i ${IF_EXTERNAL}"
+	odev="! -o ${IF_EXTERNAL}"
+    else
+	idev="-i ${dev}"
+	odev="-o ${dev}"
+    fi
+
+    if test -n "${ip_mk}" ; then
+	src_option=" -s ${ip_mk}"
+	dst_option=" -d ${ip_mk}"
+    fi
+
+    if test ${SSLMEDIATE_MODE} == True  ; then
+	local sub_drule="-m multiport --dports ${WEB_PORTS}"
+	local sub_srule="-m multiport --sports ${WEB_PORTS}"
+    else
+	local sub_drule="-m tcp --dport ${WWW_PORT}"
+	local sub_srule="-m tcp --sport ${WWW_PORT}"
+    fi
+
+    echo "[0:0] -A INPUT ${idev} -p tcp -m state --state NEW,ESTABLISHED${src_option} -d ${IP_WEB_IP} ${sub_drule} -j ACCEPT"
+    echo "[0:0] -A OUTPUT ${odev} -p tcp -m state --state ESTABLISHED -s ${IP_WEB_IP}${dst_option} ${sub_srule} -j ACCEPT"
+
+    if test ${HA_MODE} == True ; then
+	for ip in ${VRRP_WEB_IP_LIST}
+	do
+	    echo "[0:0] -A INPUT ${idev} -p tcp -m state --state NEW,ESTABLISHED${src_option} -d ${ip} ${sub_drule} -j ACCEPT"
+	    echo "[0:0] -A OUTPUT ${odev} -p tcp -m state --state ESTABLISHED -s ${ip}${dst_option} ${sub_srule} -j ACCEPT"
+	done
+    fi
+
+    test ${VPN_IPSEC_MODE} == True -a ${dev} == any || return 0
+
+    echo "[0:0] -A INPUT ${FW_IPSEC_POLICY_IN} -p tcp -m state --state NEW,ESTABLISHED${src_option} -d ${IP_WEB_IP} ${sub_drule} -j ACCEPT"
+    echo "[0:0] -A OUTPUT ${FW_IPSEC_POLICY_OUT} -p tcp -m state --state ESTABLISHED -s ${IP_WEB_IP}${dst_option} ${sub_srule} -j ACCEPT"
+
+    test ${HA_MODE} == True || return 0
+
+    for ip in ${VRRP_WEB_IP_LIST}
+    do
+	echo "[0:0] -A INPUT ${FW_IPSEC_POLICY_IN} -p tcp -m state --state NEW,ESTABLISHED${src_option} -d ${ip} ${sub_drule} -j ACCEPT"
+	echo "[0:0] -A OUTPUT ${FW_IPSEC_POLICY_OUT} -p tcp -m state --state ESTABLISHED -s ${ip}${dst_option} ${sub_srule} -j ACCEPT"
+    done
+}
+
+gen-iptables-filter-web-web-access()
+{
+    local elt range i=0
+    local interface ip mk dev
+
+    if test ${WEB_MODE} = True ; then
+	for elt in ${ACCESS_IF_IP_MK_WEB_LIST}
+	do
+	    range=$[${i} % 4]
+	    case ${range} in
+		0)
+		    interface=${elt}
+		    ;;
+		1)
+		    ip=${elt}
+		    ;;
+		2)
+		    mk=${elt}
+		    ;;
+		3)
+		    case ${interface} in
+			internal)
+			    dev="${IF_WEB}"
+			    ;;
+			admin)
+			    dev="${IF_ADMIN}"
+			    ;;
+			antivirus)
+			    dev="${IF_AV}"
+			    ;;
+			file)
+			    dev="${IF_FILE}"
+			    ;;
+			mon)
+			    dev="${IF_MON}"
+			    ;;
+			rweb)
+			    dev="${IF_RWEB}"
+			    ;;
+			web)
+			    dev="${IF_WEB}"
+			    ;;
+			auxiliary)
+			    dev="${IF_AUXILIARY}"
+			    ;;
+			vpnipsec)
+			    dev=ipsec
+			    ;;
+			*)
+			    ;;
+		    esac
+
+		    gen-iptables-filter-web-web ${dev} ${ip}/${mk}
+		    ;;
+		*)
+		    return 255
+		    ;;
+	    esac
+	    ((i++))
+	done
+    fi
+
+    i=0
+    if test ${TRANSPARENT_MODE} = True ; then
+	for elt in ${TRANSPARENT_IF_IP_MK_LIST}
+	do
+	    range=$[${i} % 4]
+	    case ${range} in
+		0)
+		    ;;
+		1)
+		    ip=${elt}
+		    ;;
+		2)
+		    mk=${elt}
+		    ;;
+		3)
+		    gen-iptables-filter-web-web any ${ip}/${mk}
+		    ;;
+		*)
+		    return 255
+		    ;;
+	    esac
+	    ((i++))
+	done
+    fi
+
+    i=0
+    for elt in ${PEER_SHARE_LIST} ${PEER_HA_LIST}
+    do
+	range=$[${i} % 2]
+	case ${range} in
+	    0)
+		ip=${elt}
+		;;
+	    1)
+		gen-iptables-filter-web-web ${IF_PEER} ${ip}
+
+		echo "[0:0] -A OUTPUT -o ${IF_PEER} -p tcp -m state --state NEW,ESTABLISHED -m tcp -s ${IP_WEB_IP} -d ${ip} --dport ${WWW_PORT} -j ACCEPT"
+		echo "[0:0] -A INPUT -i ${IF_PEER} -p tcp -m state --state ESTABLISHED -m tcp -s ${ip} --sport ${WWW_PORT} -d ${IP_WEB_IP} -j ACCEPT"
+		;;
+	    *)
+		return 255
+		;;
+	esac
+	((i++))
+    done
+}
+
+gen-iptables-filter-web-proxy1()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    test -n "${3}" || return 3
+    local dev=${1}
+    local dst_ips=${2}
+    local proxy_port=${3}
+    local ip_mk=${4}
+
+    local idev odev dst_ip
+    local src_option dst_option
+
+    if test ${dev} == ipsec ; then
+	idev=${FW_IPSEC_POLICY_IN}
+	odev=${FW_IPSEC_POLICY_OUT}
+
+    elif test ${dev} == any ; then
+	idev="! -i ${IF_EXTERNAL}"
+	odev="! -o ${IF_EXTERNAL}"
+
+    else
+	idev="-i ${dev}"
+	odev="-o ${dev}"
+    fi
+
+    if test -n "${ip_mk}" ; then
+	src_option=" -s ${ip_mk}"
+	dst_option=" -d ${ip_mk}"
+    fi
+
+    for dst_ip in ${dst_ips}
+    do
+	echo "[0:0] -A INPUT ${idev} -p tcp -m state --state NEW,ESTABLISHED${src_option} -d ${dst_ip} --dport ${proxy_port} -j ACCEPT"
+	echo "[0:0] -A OUTPUT ${odev} -p tcp -m state --state ESTABLISHED -s ${dst_ip}${dst_option} --sport ${proxy_port} -j ACCEPT"
+    done
+
+    test ${VPN_IPSEC_MODE} == True -a ${dev} == any || return 0
+
+    for dst_ip in ${dst_ips}
+    do
+	echo "[0:0] -A INPUT ${FW_IPSEC_POLICY_IN} -p tcp -m state --state NEW,ESTABLISHED${src_option} -d ${dst_ip} --dport ${proxy_port} -j ACCEPT"
+	echo "[0:0] -A OUTPUT ${FW_IPSEC_POLICY_OUT} -p tcp -m state --state ESTABLISHED -s ${dst_ip}${dst_option} --sport ${proxy_port} -j ACCEPT"
+    done
+}
+
+gen-iptables-filter-dns()
+{
+    test ${DNS_MODE} == True || return 0
+
+    local idev="! -i ${IF_EXTERNAL}"
+    local odev="! -o ${IF_EXTERNAL}"
+
+    echo "[0:0] -A INPUT ${idev} -p udp -m state --state NEW,ESTABLISHED -d ${IP_WEB_IP} --dport ${DOMAIN_PORT} -j ACCEPT"
+    echo "[0:0] -A OUTPUT ${odev} -p udp -m state --state ESTABLISHED -s ${IP_WEB_IP} --sport ${DOMAIN_PORT} -j ACCEPT"
+    echo "[0:0] -A INPUT ${idev} -p tcp -m state --state NEW,ESTABLISHED -d ${IP_WEB_IP} --dport ${DOMAIN_PORT} -j ACCEPT"
+    echo "[0:0] -A OUTPUT ${odev} -p tcp -m state --state ESTABLISHED -s ${IP_WEB_IP} --sport ${DOMAIN_PORT} -j ACCEPT"
+
+    test ${VPN_IPSEC_MODE} == True || return 0
+
+    echo "[0:0] -A INPUT ${FW_IPSEC_POLICY_IN} -p udp -m state --state NEW,ESTABLISHED -d ${IP_WEB_IP} --dport ${DOMAIN_PORT} -j ACCEPT"
+    echo "[0:0] -A OUTPUT ${FW_IPSEC_POLICY_OUT} -p udp -m state --state ESTABLISHED -s ${IP_WEB_IP} --sport ${DOMAIN_PORT} -j ACCEPT"
+    echo "[0:0] -A INPUT ${FW_IPSEC_POLICY_IN} -p tcp -m state --state NEW,ESTABLISHED -d ${IP_WEB_IP} --dport ${DOMAIN_PORT} -j ACCEPT"
+    echo "[0:0] -A OUTPUT ${FW_IPSEC_POLICY_OUT} -p tcp -m state --state ESTABLISHED -s ${IP_WEB_IP} --sport ${DOMAIN_PORT} -j ACCEPT"
+}
+
+gen-iptables-filter-web-proxy()
+{
+    if test ${TRANSPARENT_MODE} == True ; then
+	if test ${TNAT_MODE} == True ; then
+	    gen-iptables-filter-web-proxy1 any ${IP_WEB_IP} ${THTTP_PORT}
+	    test ${SSLMEDIATE_TRANSPARENT_MODE} == False || gen-iptables-filter-web-proxy1 any ${IP_WEB_IP} ${THTTPS_PORT}
+	else
+	    if test -z "${TRANSPARENT_IF_IP_MK_LIST}" ; then
+		echo "[0:0] -A INPUT ! -i ${IF_EXTERNAL} -p tcp -m state --state NEW,ESTABLISHED --sport 1024:65535 --dport ${WWW_PORT} -j ACCEPT"
+		echo "[0:0] -A OUTPUT ! -o ${IF_EXTERNAL} -p tcp -m state --state ESTABLISHED --dport 1024:65535 --sport ${WWW_PORT} -j ACCEPT"
+
+		if test ${VPN_IPSEC_MODE} == True ; then
+		    echo "[0:0] -A INPUT ${FW_IPSEC_POLICY_IN} -p tcp -m state --state NEW,ESTABLISHED --sport 1024:65535 --dport ${WWW_PORT} -j ACCEPT"
+		    echo "[0:0] -A OUTPUT ${FW_IPSEC_POLICY_OUT} -p tcp -m state --state ESTABLISHED --dport 1024:65535 --sport ${WWW_PORT} -j ACCEPT"
+		fi
+		if test ${SSLMEDIATE_TRANSPARENT_MODE} == True ; then
+		    echo "[0:0] -A INPUT ! -i ${IF_EXTERNAL} -p tcp -m state --state NEW,ESTABLISHED --sport 1024:65535 --dport ${HTTPS_PORT} -j ACCEPT"
+		    echo "[0:0] -A OUTPUT ! -o ${IF_EXTERNAL} -p tcp -m state --state ESTABLISHED --dport 1024:65535 --sport ${HTTPS_PORT} -j ACCEPT"
+		    if test ${VPN_IPSEC_MODE} == True ; then
+			echo "[0:0] -A INPUT ${FW_IPSEC_POLICY_IN} -p tcp -m state --state NEW,ESTABLISHED --sport 1024:65535 --dport ${HTTPS_PORT} -j ACCEPT"
+			echo "[0:0] -A OUTPUT ${FW_IPSEC_POLICY_OUT} -p tcp -m state --state ESTABLISHED --dport 1024:65535 --sport ${HTTPS_PORT} -j ACCEPT"
+		    fi
+		fi
+	    else
+		local elt range i=0
+		local src_ip src_mk
+
+		for elt in ${TRANSPARENT_IF_IP_MK_LIST}
+		do
+		    range=$[${i} % 4]
+		    case ${range} in
+			0)
+			    ;;
+			1)
+			    src_ip=${elt}
+			    ;;
+			2)
+			    src_mk=${elt}
+			    ;;
+			3)
+			    echo "[0:0] -A INPUT ! -i ${IF_EXTERNAL} -p tcp -m state --state NEW,ESTABLISHED -s ${src_ip}/${src_mk} --sport 1024:65535 --dport ${WWW_PORT} -j ACCEPT"
+			    echo "[0:0] -A OUTPUT ! -o ${IF_EXTERNAL} -p tcp -m state --state ESTABLISHED -d ${src_ip}/${src_mk} --dport 1024:65535 --sport ${WWW_PORT} -j ACCEPT"
+
+			    if test ${VPN_IPSEC_MODE} == True ; then
+				echo "[0:0] -A INPUT ${FW_IPSEC_POLICY_IN} -p tcp -m state --state NEW,ESTABLISHED -s ${src_ip}/${src_mk} --sport 1024:65535 --dport ${WWW_PORT} -j ACCEPT"
+				echo "[0:0] -A OUTPUT ${FW_IPSEC_POLICY_OUT} -p tcp -m state --state ESTABLISHED -d ${src_ip}/${src_mk} --dport 1024:65535 --sport ${WWW_PORT} -j ACCEPT"
+			    fi
+			    
+			    if test ${SSLMEDIATE_TRANSPARENT_MODE} == True ; then
+				echo "[0:0] -A INPUT ! -i ${IF_EXTERNAL} -p tcp -m state --state NEW,ESTABLISHED -s ${src_ip}/${src_mk} --sport 1024:65535 --dport ${HTTPS_PORT} -j ACCEPT"
+				echo "[0:0] -A OUTPUT ! -o ${IF_EXTERNAL} -p tcp -m state --state ESTABLISHED -d ${src_ip}/${src_mk} --dport 1024:65535 --sport ${HTTPS_PORT} -j ACCEPT"
+
+				if test ${VPN_IPSEC_MODE} == True ; then
+				    echo "[0:0] -A INPUT ${FW_IPSEC_POLICY_IN} -p tcp -m state --state NEW,ESTABLISHED -s ${src_ip}/${src_mk} --sport 1024:65535 --dport ${HTTPS_PORT} -j ACCEPT"
+				    echo "[0:0] -A OUTPUT ${FW_IPSEC_POLICY_OUT} -p tcp -m state --state ESTABLISHED -d ${src_ip}/${src_mk} --dport 1024:65535 --sport ${HTTPS_PORT} -j ACCEPT"
+				fi
+			    fi
+			    ;;
+			*)
+			    return 255
+			    ;;
+		    esac
+		    ((i++))
+		done
+	    fi
+	fi
+    fi
+
+    local apl_ips
+
+    if test ${HA_MODE} == False ; then
+	apl_ips=${IP_WEB_IP}
+    else
+	apl_ips=${VRRP_WEB_IP_LIST}
+    fi
+
+    test ${WEB_MODE} == False || gen-iptables-filter-web-proxy1 any "${apl_ips}" ${PROXY_PORT}
+}
+
+gen-iptables-filter-web-proxy-access-forward1()
+{
+    test -n "${1}" || return 1
+    local dst_ips=${1}
+
+    local elt range i=0
+    local interface ip mk
+
+    for elt in ${ACCESS_IF_IP_MK_WEB_LIST}
+    do
+	range=$[${i} % 4]
+	case ${range} in
+	    0)
+		interface=${elt}
+		;;
+	    1)
+		ip=${elt}
+		;;
+	    2)
+		mk=${elt}
+		;;
+	    3)
+		case ${interface} in
+		    internal)
+			dev="${IF_WEB}"
+			;;
+		    admin)
+			dev="${IF_ADMIN}"
+			;;
+		    antivirus)
+			dev="${IF_AV}"
+			;;
+		    file)
+			dev="${IF_FILE}"
+			;;
+		    mon)
+			dev="${IF_MON}"
+			;;
+		    rweb)
+			dev="${IF_RWEB}"
+			;;
+		    web)
+			dev="${IF_WEB}"
+			;;
+		    auxiliary)
+			dev="${IF_AUXILIARY}"
+			;;
+		    vpnipsec)
+			dev=ipsec
+			;;
+		    *)
+			;;
+		esac
+
+		gen-iptables-filter-web-proxy1 ${dev} "${dst_ips}" ${PROXY_PORT} ${ip}/${mk}
+		;;
+	    *)
+		return 255
+		;;
+	esac
+	((i++))
+    done
+}
+
+gen-iptables-filter-web-proxy-access-forward()
+{
+    test ${WEB_MODE} == True || return 0
+
+    if test ${HA_MODE} == False ; then
+	gen-iptables-filter-web-proxy-access-forward1 ${IP_WEB_IP}
+    else
+	gen-iptables-filter-web-proxy-access-forward1 "${VRRP_WEB_IP_LIST}"
+    fi
+
+    local elt range i=0
+    local interface ip mk dev
+    
+    for elt in ${ACCESS_IF_IP_MK_WEB_LIST}
+    do
+	range=$[${i} % 4]
+	case ${range} in
+	    0)
+		interface=${elt}
+		;;
+	    1)
+		ip=${elt}
+		;;
+	    2)
+		mk=${elt}
+		;;
+	    3)
+		case ${interface} in
+		    internal)
+			dev="${IF_WEB}"
+			;;
+		    admin)
+			dev="${IF_ADMIN}"
+			;;
+		    antivirus)
+			dev="${IF_AV}"
+			;;
+		    file)
+			dev="${IF_FILE}"
+			;;
+		    mon)
+			dev="${IF_MON}"
+			;;
+		    rweb)
+			dev="${IF_RWEB}"
+			;;
+		    web)
+			dev="${IF_WEB}"
+			;;
+		    auxiliary)
+			dev="${IF_AUXILIARY}"
+			;;
+		    vpnipsec)
+			dev=ipsec
+			;;
+		    *)
+			;;
+		esac
+		;;
+	    *)
+		return 255
+		;;
+	esac
+	((i++))
+    done
+}
+
+gen-iptables-filter-web-proxy-access-previous-peer1()
+{
+    test -n "${1}" || return 1
+    local dst_ips=${1}
+
+    local elt range i=0
+    local ip
+
+    for elt in ${PEER_PREVIOUS_LIST}
+    do
+	range=$[${i} % 2]
+	case ${range} in
+	    0)
+		ip=${elt}
+		;;
+	    1)
+		gen-iptables-filter-web-proxy1 ${IF_WEB} "${dst_ips}" ${PROXY_PORT} ${ip}
+		;;
+	    *)
+		return 255
+		;;
+	esac
+	((i++))
+    done
+}
+
+gen-iptables-filter-web-proxy-access-previous-peer()
+{
+    test ${WEB_MODE} == True || return 0
+
+    if test ${HA_MODE} == False ; then
+	gen-iptables-filter-web-proxy-access-previous-peer1 ${IP_WEB_IP}
+    else
+	gen-iptables-filter-web-proxy-access-previous-peer1 "${VRRP_WEB_IP_LIST}"
+    fi
+}
+
+gen-iptables-filter-web-proxy-access-transparent()
+{
+    test ${TRANSPARENT_MODE} == True || return 0
+
+    local elt range i=0
+    local ip mk src_ip_mk dst_ip_mk
+
+    for elt in ${TRANSPARENT_IF_IP_MK_LIST}
+    do
+	range=$[${i} % 4]
+	case ${range} in
+	    0)
+		;;
+	    1)
+		ip=${elt}
+		;;
+	    2)
+		mk=${elt}
+		;;
+	    3)
+		src_ip_mk=$(echo-firewall-source-ip-mask ${ip} ${mk})
+		dst_ip_mk=$(echo-firewall-destination-ip-mask ${ip} ${mk})
+
+		if test ${TNAT_MODE} == True ; then
+		    gen-iptables-filter-web-proxy1 any ${IP_WEB_IP} ${THTTP_PORT} ${ip}/${mk}
+		    test ${SSLMEDIATE_TRANSPARENT_MODE} == False || gen-iptables-filter-web-proxy1 any ${IP_WEB_IP} ${THTTPS_PORT} ${ip}/${mk}
+		else
+		    echo "[0:0] -A INPUT ! -i ${IF_EXTERNAL} -p tcp -m state --state NEW,ESTABLISHED${src_ip_mk} --dport ${WWW_PORT} -j ACCEPT"
+		    echo "[0:0] -A OUTPUT ! -o ${IF_EXTERNAL} -p tcp -m state --state ESTABLISHED${dst_ip_mk} --sport ${WWW_PORT} -j ACCEPT"
+
+		    if test ${VPN_IPSEC_MODE} == True ; then
+			echo "[0:0] -A INPUT ${FW_IPSEC_POLICY_IN} -p tcp -m state --state NEW,ESTABLISHED${src_ip_mk} --dport ${WWW_PORT} -j ACCEPT"
+			echo "[0:0] -A OUTPUT ${FW_IPSEC_POLICY_OUT} -p tcp -m state --state ESTABLISHED${dst_ip_mk} --sport ${WWW_PORT} -j ACCEPT"
+		    fi
+
+		    if test ${SSLMEDIATE_TRANSPARENT_MODE} == True ; then
+			echo "[0:0] -A INPUT ! -i ${IF_EXTERNAL} -p tcp -m state --state NEW,ESTABLISHED${src_ip_mk} --dport ${HTTPS_PORT} -j ACCEPT"
+			echo "[0:0] -A OUTPUT ! -o ${IF_EXTERNAL} -p tcp -m state --state ESTABLISHED${dst_ip_mk} --sport ${HTTPS_PORT} -j ACCEPT"
+
+			if test ${VPN_IPSEC_MODE} == True ; then
+			    echo "[0:0] -A INPUT ${FW_IPSEC_POLICY_IN} -p tcp -m state --state NEW,ESTABLISHED${src_ip_mk} --dport ${HTTPS_PORT} -j ACCEPT"
+			    echo "[0:0] -A OUTPUT ${FW_IPSEC_POLICY_OUT} -p tcp -m state --state ESTABLISHED${dst_ip_mk} --sport ${HTTPS_PORT} -j ACCEPT"
+			fi
+		    fi
+		fi
+		;;
+	    *)
+		return 255
+		;;
+	esac
+	((i++))
+    done
+}
+
+gen-iptables-filter-web-proxy-access()
+{
+    gen-iptables-filter-web-proxy-access-forward
+    gen-iptables-filter-web-proxy-access-previous-peer
+    gen-iptables-filter-web-proxy-access-transparent
+}
+
+gen-iptables-filter-web-external()
+{
+    if test ${APL_ROLE} == 'manager' ; then
+	echo "[0:0] -A OUTPUT -o ${IF_INTERNAL} -p tcp -m state --state NEW,ESTABLISHED -s ${IP_INTERNAL_IP} --sport 1024:65535 -m multiport --dports ${WEB_PORTS} -j ACCEPT"
+	echo "[0:0] -A INPUT -i ${IF_INTERNAL} -p tcp -m state --state ESTABLISHED -d ${IP_INTERNAL_IP} --dport 1024:65535 -m multiport --sports ${WEB_PORTS} -j ACCEPT"
+	return 0
+    fi
+
+    if test ${RWEB_MODE} == True ; then	
+	local rweb_ip
+
+	for rweb_ip in ${RWEB_HTTP_IP_LIST}
+	do
+	    echo "[0:0] -A INPUT -i ${IF_EXTERNAL} -p tcp -m state --state NEW,ESTABLISHED -d ${rweb_ip} --dport ${WWW_PORT} -j ACCEPT"
+	    echo "[0:0] -A OUTPUT -o ${IF_EXTERNAL} -p tcp -m state --state ESTABLISHED -s ${rweb_ip} --sport ${WWW_PORT} -j ACCEPT"
+	done
+	
+	for rweb_ip in ${RWEB_HTTPS_IP_LIST}
+	do
+	    echo "[0:0] -A INPUT -i ${IF_EXTERNAL} -p tcp -m state --state NEW,ESTABLISHED -d ${rweb_ip} --dport ${HTTPS_PORT} -j ACCEPT"
+	    echo "[0:0] -A OUTPUT -o ${IF_EXTERNAL} -p tcp -m state --state ESTABLISHED -s ${rweb_ip} --sport ${HTTPS_PORT} -j ACCEPT"
+	done
+    fi
+
+    echo "[0:0] -A OUTPUT -o ${IF_EXTERNAL} -p tcp -m state --state NEW,ESTABLISHED -s ${IP_EXTERNAL_IP} --sport 1024:65535 -m multiport --dports ${WEB_PORTS} -j ACCEPT"
+    echo "[0:0] -A INPUT -i ${IF_EXTERNAL} -p tcp -m state --state ESTABLISHED -d ${IP_EXTERNAL_IP} --dport 1024:65535 -m multiport --sports ${WEB_PORTS} -j ACCEPT"
+
+    if test ${WEB_MODE} == True ; then
+
+	gen-iptables-filter-input-output-ftp ${IF_EXTERNAL} ${IP_EXTERNAL_IP}
+	test ${VPN_IPSEC_MODE} == False || gen-iptables-filter-input-output-ftp ipsec ${IP_WEB_IP}
+
+	echo "[0:0] -A OUTPUT -o ${IF_EXTERNAL} -p tcp -m state --state NEW,ESTABLISHED -s ${IP_EXTERNAL_IP} --sport 1024:65535 -m multiport --dports ${SAFE_PORTS} -j ACCEPT"
+	echo "[0:0] -A INPUT -i ${IF_EXTERNAL} -p tcp -m state --state ESTABLISHED -d ${IP_EXTERNAL_IP} --dport 1024:65535 -m multiport --sports ${SAFE_PORTS} -j ACCEPT"
+
+    fi
+
+    test ${TPROXY_MODE} == True || return 0
+
+    if test -z "${TRANSPARENT_IF_IP_MK_LIST}" ; then
+
+	echo "[0:0] -A OUTPUT -o ${IF_EXTERNAL} -p tcp -m state --state NEW,ESTABLISHED --sport 1024:65535 -m multiport --dports ${WEB_PORTS} -j ACCEPT"
+	echo "[0:0] -A INPUT -i ${IF_EXTERNAL} -p tcp -m state --state ESTABLISHED --dport 1024:65535 -m multiport --sports ${WEB_PORTS} -j ACCEPT"
+
+	if test ${VPN_IPSEC_MODE} == True ; then
+	    echo "[0:0] -A OUTPUT ${FW_IPSEC_POLICY_OUT} -p tcp -m state --state NEW,ESTABLISHED --sport 1024:65535 -m multiport --dports ${WEB_PORTS} -j ACCEPT"
+	    echo "[0:0] -A INPUT ${FW_IPSEC_POLICY_IN} -p tcp -m state --state ESTABLISHED --dport 1024:65535 -m multiport --sports ${WEB_PORTS} -j ACCEPT"
+	fi
+
+	return 0
+    fi
+
+    local elt range i=0
+    local src_ip src_mk
+
+    for elt in ${TRANSPARENT_IF_IP_MK_LIST}
+    do
+	range=$[${i} % 4]
+	case ${range} in
+	    0)
+		;;
+	    1)
+		src_ip=${elt}
+		;;
+	    2)
+		src_mk=${elt}
+		;;
+	    3)
+		echo "[0:0] -A OUTPUT -o ${IF_EXTERNAL} -p tcp -m state --state NEW,ESTABLISHED -s ${src_ip}/${src_mk} --sport 1024:65535 -m multiport --dports ${WEB_PORTS} -j ACCEPT"
+		echo "[0:0] -A INPUT -i ${IF_EXTERNAL} -p tcp -m state --state ESTABLISHED -d ${src_ip}/${src_mk} --dport 1024:65535 -m multiport --sports ${WEB_PORTS} -j ACCEPT"
+		
+		if test ${VPN_IPSEC_MODE} == True ; then
+		    echo "[0:0] -A OUTPUT ${FW_IPSEC_POLICY_OUT} -p tcp -m state --state NEW,ESTABLISHED -s ${src_ip}/${src_mk} --sport 1024:65535 -m multiport --dports ${WEB_PORTS} -j ACCEPT"
+		    echo "[0:0] -A INPUT ${FW_IPSEC_POLICY_IN} -p tcp -m state --state ESTABLISHED -d ${src_ip}/${src_mk} --dport 1024:65535 -m multiport --sports ${WEB_PORTS} -j ACCEPT"
+		fi
+		;;
+	    *)
+		return 255
+		;;
+	esac
+	((i++))
+    done
+}
+
+gen-iptables-filter-web-rweb()
+{
+    test ${RWEB_MODE} == True || return 0
+
+    local rweb_ip
+
+    if test -z "${ACCESS_IF_IP_MK_WEB_LIST}" ; then
+	for rweb_ip in ${RWEB_HTTP_IP_LIST}
+	do
+	    echo "[0:0] -A INPUT ! -i ${IF_EXTERNAL} -p tcp -m state --state NEW,ESTABLISHED -d ${rweb_ip} --dport ${WWW_PORT} -j ACCEPT"
+	    echo "[0:0] -A OUTPUT ! -o ${IF_EXTERNAL} -p tcp -m state --state ESTABLISHED -s ${rweb_ip} --sport ${WWW_PORT} -j ACCEPT"
+
+	    if test ${VPN_IPSEC_MODE} == True ; then
+		echo "[0:0] -A INPUT ${FW_IPSEC_POLICY_IN} -p tcp -m state --state NEW,ESTABLISHED -d ${rweb_ip} --dport ${WWW_PORT} -j ACCEPT"
+		echo "[0:0] -A OUTPUT ${FW_IPSEC_POLICY_OUT} -p tcp -m state --state ESTABLISHED -s ${rweb_ip} --sport ${WWW_PORT} -j ACCEPT"
+	    fi
+	done
+	for rweb_ip in ${RWEB_HTTPS_IP_LIST}
+	do
+	    echo "[0:0] -A INPUT ! -i ${IF_EXTERNAL} -p tcp -m state --state NEW,ESTABLISHED -d ${rweb_ip} --dport ${HTTPS_PORT} -j ACCEPT"
+	    echo "[0:0] -A OUTPUT ! -o ${IF_EXTERNAL} -p tcp -m state --state ESTABLISHED -s ${rweb_ip} --sport ${HTTPS_PORT} -j ACCEPT"
+
+	    if test ${VPN_IPSEC_MODE} == True ; then
+	    echo "[0:0] -A INPUT ${FW_IPSEC_POLICY_IN} -p tcp -m state --state NEW,ESTABLISHED -d ${rweb_ip} --dport ${HTTPS_PORT} -j ACCEPT"
+	    echo "[0:0] -A OUTPUT ${FW_IPSEC_POLICY_OUT} -p tcp -m state --state ESTABLISHED -s ${rweb_ip} --sport ${HTTPS_PORT} -j ACCEPT"		
+	    fi
+	done
+    else
+
+	local elt range i=0
+	local interface ip mk src_ip_mk dst_ip_mk
+	local dev idev odev
+
+	for elt in ${ACCESS_IF_IP_MK_WEB_LIST}
+	do
+	    range=$[${i} % 4]
+	    case ${range} in
+		0)
+		    interface=${elt}
+		    ;;
+		1)
+		    ip=${elt}
+		    ;;
+		2)
+		    mk=${elt}
+		    ;;
+		3)
+		    src_ip_mk=$(echo-firewall-source-ip-mask ${ip} ${mk})
+		    dst_ip_mk=$(echo-firewall-destination-ip-mask ${ip} ${mk})
+
+		    case ${interface} in
+			internal)
+			    dev="${IF_WEB}"
+			    ;;
+			admin)
+			    dev="${IF_ADMIN}"
+			    ;;
+			antivirus)
+			    dev="${IF_AV}"
+			    ;;
+			file)
+			    dev="${IF_FILE}"
+			    ;;
+			mon)
+			    dev="${IF_MON}"
+			    ;;
+			rweb)
+			    dev="${IF_RWEB}"
+			    ;;
+			web)
+			    dev="${IF_WEB}"
+			    ;;
+			auxiliary)
+			    dev="${IF_AUXILIARY}"
+			    ;;
+			vpnipsec)
+			    dev=ipsec
+			    ;;
+			*)
+			    ;;
+		    esac
+
+		    if test ${dev} == ipsec ; then
+			idev=${FW_IPSEC_POLICY_IN}
+			odev=${FW_IPSEC_POLICY_OUT}
+		    else
+			idev="-i ${dev}"
+			odev="-o ${dev}"
+		    fi
+
+		    for rweb_ip in ${RWEB_HTTP_IP_LIST}
+		    do
+			echo "[0:0] -A INPUT ${idev} -p tcp -m state --state NEW,ESTABLISHED${src_ip_mk} -d ${rweb_ip} --dport ${WWW_PORT} -j ACCEPT"
+			echo "[0:0] -A OUTPUT ${odev} -p tcp -m state --state ESTABLISHED -s ${rweb_ip} --sport ${WWW_PORT}${dst_ip_mk} -j ACCEPT"
+		    done		    
+
+		    for rweb_ip in ${RWEB_HTTPS_IP_LIST}
+		    do
+			echo "[0:0] -A INPUT ${idev} -p tcp -m state --state NEW,ESTABLISHED${src_ip_mk} -d ${rweb_ip} --dport ${HTTPS_PORT} -j ACCEPT"
+			echo "[0:0] -A OUTPUT ${odev} -p tcp -m state --state ESTABLISHED -s ${rweb_ip} --sport ${HTTPS_PORT}${dst_ip_mk} -j ACCEPT"
+		    done
+		    ;;
+		*)
+		    return 255
+		    ;;
+	    esac
+	    ((i++))
+	done
+    fi
+}
+
+gen-iptables-filter-web()
+{
+    if test ${WEB_MODE} == True ; then
+	if test -z "${ACCESS_IF_IP_MK_WEB_LIST}" ; then
+	    gen-iptables-filter-web-web any
+	    gen-iptables-filter-web-proxy
+	else
+	    gen-iptables-filter-web-web-access
+	    gen-iptables-filter-web-proxy-access
+	fi
+    elif test ${TRANSPARENT_MODE} == True ; then
+	if test -z "${TRANSPARENT_IF_IP_MK_LIST}" ; then
+	    gen-iptables-filter-web-web any
+	    gen-iptables-filter-web-proxy
+	else
+	    gen-iptables-filter-web-web-access
+	    gen-iptables-filter-web-proxy-access
+	fi
+    fi
+
+    gen-iptables-filter-dns
+    gen-iptables-filter-web-rweb
+    gen-iptables-filter-web-external
+}
+
+gen-iptables-filter-rweb()
+{
+    if test ${RWEB_MODE} == False ; then
+	test ${VLAN_MODE} == True -a ${TRANSPARENT_MODE} == True || return 0
+
+	if test -z "${TRANSPARENT_IF_IP_MK_LIST}" ; then
+	    echo "[0:0] -A OUTPUT -o ${IF_RWEB} -p tcp -m state --state NEW,ESTABLISHED -m multiport --dports ${WEB_PORTS} -j ACCEPT"
+	    echo "[0:0] -A INPUT -i ${IF_RWEB} -p tcp -m state --state ESTABLISHED -m multiport --sports ${WEB_PORTS} -j ACCEPT"
+	else
+	    local elt range i=0
+	    local ip mk src_ip_mk dst_ip_mk
+
+	    for elt in ${TRANSPARENT_IF_IP_MK_LIST}
+	    do
+		range=$[${i} % 4]
+		case ${range} in
+		    0)
+		        ;;
+		    1)
+			ip=${elt}
+			;;
+		    2)
+			mk=${elt}
+			;;
+		    3)
+			src_ip_mk=$(echo-firewall-source-ip-mask ${ip} ${mk})
+			dst_ip_mk=$(echo-firewall-destination-ip-mask ${ip} ${mk})
+
+			echo "[0:0] -A OUTPUT -o ${IF_RWEB} -p tcp -m state --state NEW,ESTABLISHED -m multiport${dst_ip_mk} --dports ${WEB_PORTS} -j ACCEPT"
+			echo "[0:0] -A INPUT -i ${IF_RWEB} -p tcp -m state --state ESTABLISHED -m multiport${src_ip_mk} --sports ${WEB_PORTS} -j ACCEPT"
+			;;
+		    *)
+			return 255
+			;;
+		esac
+		((i++))
+	    done
+	fi
+	return 0
+    fi
+
+    local interface ip port vrrp_ip
+    local elt range i=0
+
+    for elt in ${ACCESS_RWEB_LIST}
+    do
+	range=$[${i} % 4]
+	case ${range} in
+	    0)
+		interface=${elt}
+		;;
+	    1)
+		ip=${elt}
+		;;
+	    2)
+		port=${elt}
+		;;
+	    3)
+		case ${interface} in
+		    rweb)
+			echo "[0:0] -A OUTPUT -o ${IF_RWEB} -p tcp -m state --state NEW,ESTABLISHED -s ${IP_RWEB_IP} -d ${ip} --dport ${port} -j ACCEPT"
+			echo "[0:0] -A INPUT -i ${IF_RWEB} -p tcp -m state --state ESTABLISHED -s ${ip} --sport ${port} -d ${IP_RWEB_IP} -j ACCEPT"
+			;;
+		    vpnipsec)
+			if test ${VPN_IPSEC_SITE_IS_ACTIVE} == True ; then
+			    echo "[0:0] -A OUTPUT ${FW_IPSEC_POLICY_OUT} -p tcp -m state --state NEW,ESTABLISHED -s ${IP_RWEB_IP} -d ${ip} --dport ${port} -j ACCEPT"
+			    echo "[0:0] -A INPUT ${FW_IPSEC_POLICY_IN} -p tcp -m state --state ESTABLISHED -s ${ip} --sport ${port} -d ${IP_RWEB_IP} -j ACCEPT"
+			fi
+			;;
+		    external)
+			case ${port} in
+			    ${WWW_PORT}|${HTTPS_PORT})
+				;;
+			    *)
+				echo "[0:0] -A OUTPUT -o ${IF_EXTERNAL} -p tcp -m state --state NEW,ESTABLISHED -s ${IP_EXTERNAL_IP} -d ${ip} --dport ${port} -j ACCEPT"
+				echo "[0:0] -A INPUT -i ${IF_EXTERNAL} -p tcp -m state --state ESTABLISHED -s ${ip} --sport ${port} -d ${IP_EXTERNAL_IP} -j ACCEPT"
+				;;
+			esac
+			;;
+		    *)
+			;;
+		esac
+		;;
+	    *)
+		return 255
+		;;
+	esac
+	((i++))
+    done
+}
+
+gen-iptables-filter-av-1()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    test -n "${3}" || return 3
+    local dev=${1}
+    local av_ip=${2}
+    local ip_mk=${3}
+
+    local src_option dst_option idev odev
+
+    src_option=" -s ${ip_mk}"
+    dst_option=" -d ${ip_mk}"
+
+    if test ${dev} == ipsec ; then
+	idev=${FW_IPSEC_POLICY_IN}
+	odev=${FW_IPSEC_POLICY_OUT}
+    else
+	idev="-i ${dev}"
+	odev="-o ${dev}"
+    fi
+
+    echo "[0:0] -A INPUT ${idev} -p tcp -m state --state NEW,ESTABLISHED${src_option} -d ${av_ip} --dport ${AV_PORT} -j ACCEPT"
+    echo "[0:0] -A OUTPUT ${odev} -p tcp -m state --state ESTABLISHED -s ${av_ip}${dst_option} --sport ${AV_PORT} -j ACCEPT"
+    echo "[0:0] -A INPUT ${idev} -p tcp -m state --state NEW,ESTABLISHED${src_option} -d ${av_ip} --dport ${AV_STREAM_MIN_PORT}:${AV_STREAM_MAX_PORT} -j ACCEPT"
+    echo "[0:0] -A OUTPUT ${odev} -p tcp -m state --state ESTABLISHED -s ${av_ip}${dst_option} --sport ${AV_STREAM_MIN_PORT}:${AV_STREAM_MAX_PORT} -j ACCEPT"
+}
+
+gen-iptables-filter-av()
+{
+    test ${AV_MODE} == True || return 0
+
+    local dev av_ip av_ips
+
+    local elt i=0 range
+    local interface ip mk
+
+    for elt in ${ACCESS_IF_IP_MK_AV_LIST}
+    do
+	range=$[${i} % 4]
+	case ${range} in
+	    0)
+		interface=${elt}
+		;;
+	    1)
+		ip=${elt}
+		;;
+	    2)
+		mk=${elt}
+		;;
+	    3)
+		case ${interface} in
+		    internal)
+			dev=${IF_AV}
+
+			if test ${HA_MODE} == False ; then
+			    av_ips=${IP_AV_IP}
+			else
+			    av_ips=${VRRP_AV_IP_LIST}
+			fi
+			;;
+
+		    external)
+			dev=${IF_EXTERNAL}
+
+			if test ${HA_MODE} == False ; then
+			    av_ips=${IP_EXTERNAL_IP}
+			else
+			    av_ips=${VRRP_EXTERNAL_IP_LIST}
+			fi
+			;;
+
+		    auxiliary)
+			dev=${IF_AUXILIARY}
+
+			if test ${HA_MODE} == False ; then
+			    av_ips=${IP_AUXILIARY_IP}
+			else
+			    av_ips=${VRRP_AUXILIARY_IP_LIST}
+			fi
+			;;
+
+		    vpnipsec)
+			dev=ipsec
+
+			if test ${HA_MODE} == False ; then
+			    av_ips=${IP_AV_IP}
+			else
+			    av_ips=${VRRP_AV_IP_LIST}
+			fi
+			;;
+
+		    *)
+			;;
+		esac
+
+		for av_ip in ${av_ips}
+		do
+		    gen-iptables-filter-av-1 ${dev} ${av_ip} ${ip}/${mk}
+		done
+		;;
+	    *)
+		return 255
+		;;
+	esac
+	((i++))
+    done
+}
+
+gen-iptables-filter-ha-share-peer()
+{
+    local elt i range
+    local ip
+
+    i=0
+    for elt in ${PEER_SHARE_LIST} ${PEER_HA_LIST}
+    do
+	range=$[${i} % 2]
+	case ${range} in
+	    0)
+		ip=${elt}
+		;;
+	    1)
+		echo "[0:0] -A INPUT -i ${IF_PEER} -p tcp -m state --state NEW,ESTABLISHED -m tcp -s ${ip} -d ${IP_PEER_IP} --dport ${PEER_HTTP_PORT} -j ACCEPT"
+		echo "[0:0] -A OUTPUT -o ${IF_PEER} -p tcp -m state --state ESTABLISHED -m tcp -s ${IP_PEER_IP} --sport ${PEER_HTTP_PORT} -d ${ip}  -j ACCEPT"
+		
+		echo "[0:0] -A OUTPUT -o ${IF_PEER} -p tcp -m state --state NEW,ESTABLISHED -m tcp -s ${IP_PEER_IP} -d ${ip} --dport ${PEER_HTTP_PORT} -j ACCEPT"
+		echo "[0:0] -A INPUT -i ${IF_PEER} -p tcp -m state --state ESTABLISHED -m tcp -s ${ip} --sport ${PEER_HTTP_PORT} -d ${IP_PEER_IP} -j ACCEPT"
+
+		echo "[0:0] -A INPUT -i ${IF_PEER} -p udp -m state --state NEW,ESTABLISHED -m udp -s ${ip} --sport ${PEER_HTCP_PORT} -d ${IP_PEER_IP} --dport ${PEER_HTCP_PORT}  -j ACCEPT"
+		echo "[0:0] -A OUTPUT -o ${IF_PEER} -p udp -m state --state NEW,ESTABLISHED -m udp -s ${IP_PEER_IP} --sport ${PEER_HTCP_PORT} -d ${ip} --dport ${PEER_HTCP_PORT} -j ACCEPT"
+
+		if test ${DNS_MODE} == True ; then
+		    echo "[0:0] -A INPUT -i ${IF_PEER} -p udp -m state --state NEW,ESTABLISHED -m udp -s ${ip} -d ${IP_PEER_IP} --dport ${DOMAIN_PORT} -j ACCEPT"
+		    echo "[0:0] -A OUTPUT -o ${IF_PEER} -p udp -m state --state ESTABLISHED -m udp -s ${IP_PEER_IP} --sport ${DOMAIN_PORT} -d ${ip} -j ACCEPT"
+		    echo "[0:0] -A INPUT -i ${IF_PEER} -p tcp -m state --state NEW,ESTABLISHED -m tcp -s ${ip} -d ${IP_PEER_IP} --dport ${DOMAIN_PORT} -j ACCEPT"
+		    echo "[0:0] -A OUTPUT -o ${IF_PEER} -p tcp -m state --state ESTABLISHED -m tcp -s ${IP_PEER_IP} --sport ${DOMAIN_PORT} -d ${ip} -j ACCEPT"
+		fi
+		;;
+	    *)
+		return 255
+		;;
+	esac
+	((i++))
+    done
+}
+
+gen-iptables-filter-dhcp()
+{
+    if test "${DHCP_MODE}" == "True" ; then
+	echo "[0:0] -A INPUT -i ${IF_WEB} -p udp --sport ${BOOTPC_PORT} -d 255.255.255.255 --dport ${BOOTPS_PORT} -j ACCEPT"
+	echo "[0:0] -A INPUT -i ${IF_WEB} -p udp -s ${IP_WEB_NET}/${IP_WEB_MASK} --sport ${BOOTPC_PORT} -d ${IP_WEB_IP} --dport ${BOOTPS_PORT} -j ACCEPT"
+	echo "[0:0] -A OUTPUT -o ${IF_WEB} -p udp -s ${IP_WEB_IP} --sport ${BOOTPS_PORT} -d ${IP_WEB_NET}/${IP_WEB_MASK} --dport ${BOOTPC_PORT} -j ACCEPT"
+	echo "[0:0] -A OUTPUT -o ${IF_WEB} -p udp -s ${IP_WEB_IP} --sport ${BOOTPS_PORT} -d 255.255.255.255 --dport ${BOOTPC_PORT} -j ACCEPT"
+    fi
+
+    if test ${DHCP_IS_ACTIVE} == True -a -n "${DHCP_PEER_LIST}" ; then
+	local ip=$(echo ${DHCP_PEER_LIST} | cut -d ' ' -f2)
+	echo "[0:0] -A INPUT -i ${IF_PEER} -p tcp -m state --state NEW,ESTABLISHED -m tcp -s ${ip} -d ${IP_PEER_IP} --dport ${DHCP_PEER_PORT} -j ACCEPT"
+	echo "[0:0] -A INPUT -i ${IF_PEER} -p tcp -m state --state ESTABLISHED -m tcp -s ${ip} --sport ${DHCP_PEER_PORT} -d ${IP_PEER_IP} -j ACCEPT"
+	echo "[0:0] -A OUTPUT -o ${IF_PEER} -p tcp -m state --state ESTABLISHED -m tcp -s ${IP_PEER_IP} --sport ${DHCP_PEER_PORT} -d ${ip} -j ACCEPT"
+	echo "[0:0] -A OUTPUT -o ${IF_PEER} -p tcp -m state --state NEW,ESTABLISHED -m tcp -s ${IP_PEER_IP} -d ${ip} --dport ${DHCP_PEER_PORT} -j ACCEPT"
+    fi
+}
+
+gen-iptables-filter-admin()
+{
+    local elt i=0 range
+    local interface ip mk src_ip_mk dst_ip_mk
+    local idev odev admin_ip
+
+    for elt in ${ACCESS_IF_IP_MK_ADMIN_LIST}
+    do
+	range=$[${i} % 4]
+	case ${range} in
+	    0)
+		interface=${elt}
+		;;
+	    1)
+		ip=${elt}
+		;;
+	    2)
+		mk=${elt}
+		;;
+	    3)
+		src_ip_mk=$(echo-firewall-source-ip-mask ${ip} ${mk})
+		dst_ip_mk=$(echo-firewall-destination-ip-mask ${ip} ${mk})
+
+		case ${interface} in
+		    internal)
+			idev="-i ${IF_ADMIN}"
+			odev="-o ${IF_ADMIN}"
+			admin_ip=${IP_ADMIN_IP}
+			;;
+
+		    external)
+			idev="-i ${IF_EXTERNAL}"
+			odev="-o ${IF_EXTERNAL}"
+			admin_ip=${IP_EXTERNAL_IP}
+			;;
+
+		    auxiliary)
+			idev="-i ${IF_AUXILIARY}"
+			odev="-o ${IF_AUXILIARY}"
+			admin_ip=${IP_AUXILIARY_IP}
+			;;
+
+		    vpnipsec)
+			idev=${FW_IPSEC_POLICY_IN}
+			odev=${FW_IPSEC_POLICY_OUT}
+			admin_ip=${IP_ADMIN_IP}
+			;;
+
+		    *)
+			;;
+		esac
+
+		if test ${ADMIN_SSH} == True ; then
+		    echo "[0:0] -A INPUT ${idev} -p tcp -m state --state NEW -m tcp${src_ip_mk} -d ${admin_ip} --dport ${SSH_PORT} -j BRUTEFORCE"
+		    echo "[0:0] -A INPUT ${idev} -p tcp -m state --state ESTABLISHED -m tcp${src_ip_mk} -d ${admin_ip} --dport ${SSH_PORT} -j ACCEPT"
+		    echo "[0:0] -A OUTPUT ${odev} -p tcp -m state --state ESTABLISHED -m tcp -s ${admin_ip} --sport ${SSH_PORT}${dst_ip_mk} -j ACCEPT"
+		fi
+
+		if test ${ADMIN_WADMIN} == True ; then
+		    echo "[0:0] -A INPUT ${idev} -p tcp -m state --state NEW,ESTABLISHED -m tcp${src_ip_mk} -d ${admin_ip} --dport ${WADMIN_PORT} -j ACCEPT"
+		    echo "[0:0] -A OUTPUT ${odev} -p tcp -m state --state ESTABLISHED -m tcp -s ${admin_ip} --sport ${WADMIN_PORT}${dst_ip_mk} -j ACCEPT"
+		fi
+
+		if test ${ADMIN_WAUDIT} == True ; then
+		    echo "[0:0] -A INPUT ${idev} -p tcp -m state --state NEW,ESTABLISHED -m tcp${src_ip_mk} -d ${admin_ip} --dport ${WAUDIT_PORT} -j ACCEPT"
+		    echo "[0:0] -A OUTPUT ${odev} -p tcp -m state --state ESTABLISHED -m tcp -s ${admin_ip} --sport ${WAUDIT_PORT}${dst_ip_mk} -j ACCEPT"
+		fi
+		;;
+	    *)
+		return 255
+		;;
+	esac
+	((i++))
+    done
+}
+
+gen-iptables-filter-manager-on-gateway()
+{
+    local elt i=0 range
+    local interface ip
+    local idev odev manager_ip
+
+    for elt in ${ACCESS_MANAGER_LIST}
+    do
+	range=$[${i} % 3]
+	case ${range} in
+	    0)
+		;;
+	    1)
+		interface=${elt}
+		;;
+	    2)
+		ip=${elt}
+
+		case ${interface} in
+		    internal)
+			idev="-i ${IF_ADMIN}"
+			odev="-o ${IF_ADMIN}"
+			admin_ip=${IP_ADMIN_IP}
+			;;
+
+		    external)
+			idev="-i ${IF_EXTERNAL}"
+			odev="-o ${IF_EXTERNAL}"
+			admin_ip=${IP_EXTERNAL_IP}
+			;;
+
+		    auxiliary)
+			if test -z "${IF_AUXILIARY}" -o ${IP_AUXILIARY_IP} == 0.0.0.0 ; then
+			    ((i++))
+			    continue
+			fi
+
+			idev="-i ${IF_AUXILIARY}"
+			odev="-o ${IF_AUXILIARY}"
+			admin_ip=${IP_AUXILIARY_IP}
+			;;
+
+		    *)
+			;;
+		esac
+
+		if test ${ADMIN_SSH} == True ; then
+		    echo "[0:0] -A INPUT ${idev} -p tcp -m state --state NEW,ESTABLISHED -m tcp -s ${ip} -d ${admin_ip} --dport ${SSH_PORT} -j ACCEPT"
+		    echo "[0:0] -A OUTPUT ${odev} -p tcp -m state --state ESTABLISHED -m tcp -s ${admin_ip} --sport ${SSH_PORT} -d ${ip} -j ACCEPT"
+		fi
+
+		;;
+	    *)
+		return 255
+		;;
+	esac
+	((i++))
+    done
+}
+
+gen-iptables-filter-manager-on-manager()
+{
+    local idev="-i ${IF_ADMIN}"
+    local odev="-o ${IF_ADMIN}"
+    local admin_ip=${IP_ADMIN_IP}
+
+    echo "[0:0] -A OUTPUT ${odev} -p tcp -m state --state NEW,ESTABLISHED -m tcp -s ${admin_ip} --dport ${SSH_PORT} -j ACCEPT"
+    echo "[0:0] -A INPUT ${idev} -p tcp -m state --state ESTABLISHED -m tcp -d ${admin_ip} --sport ${SSH_PORT} -j ACCEPT"
+
+    test ${MANAGER_SYNC_ROLE} == slave -a ${MANAGER_SYNC_PEER_IP} != 0.0.0.0 || return 0
+
+    echo "[0:0] -A INPUT ${idev} -p tcp -m state --state NEW,ESTABLISHED -m tcp -s ${MANAGER_SYNC_PEER_IP} -d ${admin_ip} --dport ${SSH_PORT} -j ACCEPT"
+    echo "[0:0] -A OUTPUT ${odev} -p tcp -m state --state ESTABLISHED -m tcp -d ${MANAGER_SYNC_PEER_IP} -s ${admin_ip} --sport ${SSH_PORT} -j ACCEPT"
+}
+
+gen-iptables-filter-manager()
+{
+    case ${APL_ROLE} in
+	gateway)
+	    gen-iptables-filter-manager-on-gateway
+	    ;;
+	manager)
+	    gen-iptables-filter-manager-on-manager
+	    ;;
+	*)
+	    ;;
+    esac
+}
+
+gen-iptables-filter-file()
+{
+    test -n "${1}" || return 0
+    local if_ips=${1}
+
+    local if_ip interface ip apl_ip
+
+    for if_ip in ${if_ips}
+    do
+	interface=${if_ip/:*}
+	ip=${if_ip#*:}
+
+	case ${interface} in
+	    internal)
+		dev="${IF_FILE}"
+		apl_ip=${IP_FILE_IP}
+		;;
+	    
+	    external)
+		dev="${IF_EXTERNAL}"
+		apl_ip=${IP_EXTERNAL_IP}
+		;;
+	    
+	    auxiliary)
+		dev="${IF_AUXILIARY}"
+		apl_ip=${IP_AUXILIARY_IP}
+		;;
+	    vpnipsec)
+		dev=ipsec
+		apl_ip=${IP_FILE_IP}
+		;;
+	    *)
+		continue
+		;;
+	esac
+
+	gen-iptables-filter-input-output-file ${dev} ${apl_ip} ${ip}
+    done
+}
+
+gen-iptables-filter-file-ip()
+{
+    gen-iptables-filter-file "${ACCESS_FILE_IF_IP_LIST}"
+}
+
+gen-iptables-filter-file-nr()
+{
+    gen-iptables-filter-file "${ACCESS_FILE_IF_NR_LIST}"
+}
+
+gen-iptables-filter-mon-agent()
+{
+    test -n "${1}" || return 0
+    local manager_if_ips=${1}
+
+    local if_ip interface ip
+    local idev odev mon_ip
+
+    for if_ip in ${manager_if_ips}
+    do
+	interface=${if_ip/:*}
+	ip=${if_ip#*:}
+
+	case ${interface} in
+	    internal)
+		idev="-i ${IF_MON}"
+		odev="-o ${IF_MON}"
+		mon_ip=${IP_MON_IP}
+		;;
+	    
+	    external)
+		idev="-i ${IF_EXTERNAL}"
+		odev="-o ${IF_EXTERNAL}"
+		mon_ip=${IP_EXTERNAL_IP}
+		;;
+	    
+	    auxiliary)
+		idev="-i ${IF_AUXILIARY}"
+		odev="-o ${IF_AUXILIARY}"
+		mon_ip=${IP_AUXILIARY_IP}
+		;;
+	    vpnipsec)
+		idev=${FW_IPSEC_POLICY_IN}
+		odev=${FW_IPSEC_POLICY_OUT}
+		mon_ip=${IP_MON_IP}
+		;;
+	    *)
+		continue
+		;;
+	esac
+
+	if test ${SNMP_UDP} == True ; then
+	    echo "[0:0] -A INPUT ${idev} -p udp -m state --state NEW,ESTABLISHED -m udp -s ${ip} -d ${mon_ip} --dport ${SNMP_PORT} -j ACCEPT"
+	    echo "[0:0] -A OUTPUT ${odev} -p udp -m state --state ESTABLISHED -m udp -s ${mon_ip} -d ${ip} --sport ${SNMP_PORT} -j ACCEPT"
+	fi
+
+	if test ${SNMP_TCP} == True ; then
+	    echo "[0:0] -A INPUT ${idev} -p tcp -m state --state NEW,ESTABLISHED -m tcp -s ${ip} -d ${mon_ip} --dport ${SNMP_PORT} -j ACCEPT"
+	    echo "[0:0] -A OUTPUT ${odev} -p tcp -m state --state ESTABLISHED -m tcp -s ${mon_ip} -d ${ip} --sport ${SNMP_PORT} -j ACCEPT"
+	fi
+
+	if test ${SNMP_TLS} == True ; then
+	    echo "[0:0] -A INPUT ${idev} -p tcp -m state --state NEW,ESTABLISHED -m tcp -s ${ip} -d ${mon_ip} --dport ${SNMP_TLS_PORT} -j ACCEPT"
+	    echo "[0:0] -A OUTPUT ${odev} -p tcp -m state --state ESTABLISHED -m tcp -s ${mon_ip} -d ${ip} --sport ${SNMP_TLS_PORT} -j ACCEPT"
+	fi
+    done
+}
+
+gen-iptables-filter-mon-trap()
+{
+    test -n "${1}" || return 0
+    local trap_ip_ports=${1}
+
+    local interface interfaces="internal external"
+    test -z "${IF_AUXILIARY}" -o ${IP_AUXILIARY_IP} == 0.0.0.0 || interfaces="${interfaces} auxiliary"
+    test ${VPN_IPSEC_MODE} == False || interfaces="${interfaces} vpnipsec"
+
+    local ip ip_port port
+    local idev odev mon_ip
+
+    for ip_port in ${trap_ip_ports}
+    do
+	ip=${ip_port/:*/}
+	port=${ip_port/*:/}
+
+	for interface in ${interfaces}
+	do
+	    case ${interface} in
+		internal)
+		    idev="-i ${IF_MON}"
+		    odev="-o ${IF_MON}"
+		    mon_ip=${IP_MON_IP}
+		    ;;
+	    
+		external)
+		    idev="-i ${IF_EXTERNAL}"
+		    odev="-o ${IF_EXTERNAL}"
+		    mon_ip=${IP_EXTERNAL_IP}
+		    ;;
+	    
+		auxiliary)
+		    idev="-i ${IF_AUXILIARY}"
+		    odev="-o ${IF_AUXILIARY}"
+		    mon_ip=${IP_AUXILIARY_IP}
+		    ;;
+
+		vpnipsec)
+		    idev=${FW_IPSEC_POLICY_IN}
+		    odev=${FW_IPSEC_POLICY_OUT}
+		    mon_ip=${IP_MON_IP}
+		    ;;
+		*)
+		    return 255
+		    ;;
+	    esac
+
+	    echo "[0:0] -A OUTPUT ${odev} -p tcp -m state --state NEW,ESTABLISHED -m tcp -s ${mon_ip} -d ${ip} --dport ${port} -j ACCEPT"
+	    echo "[0:0] -A INPUT ${idev} -p tcp -m state --state ESTABLISHED -m tcp -s ${ip} --sport ${port} -d ${mon_ip} -j ACCEPT"
+	done
+    done
+}
+
+gen-iptables-filter-mon-ip()
+{
+    test ${ADMIN_SNMP} == True || return 0
+
+    gen-iptables-filter-mon-agent "${ACCESS_MON_IF_IP_LIST}"
+    gen-iptables-filter-mon-trap "${SNMP_TRAP_SERVER_IP_LIST}"
+}
+
+gen-iptables-filter-mon-nr()
+{
+    test ${ADMIN_SNMP} == True || return 0
+
+    gen-iptables-filter-mon-agent "${ACCESS_MON_IF_NR_LIST}"
+    gen-iptables-filter-mon-trap "${SNMP_TRAP_SERVER_NR_LIST}"
+}
+
+gen-iptables-filter-syslog()
+{
+    test ${REMOTE_SYSLOG_MODE} == True || return 0
+
+    test -n "${1}" || return 0
+    local servers=${1}
+
+    local elt range i=0
+    local ip protocol port
+
+    for elt in ${servers}
+    do
+	range=$[${i} % 3]
+	case ${range} in
+	    0)
+		protocol=${elt}
+		;;
+	    1)
+		ip=${elt}
+		;;
+	    2)
+		port=${elt}
+		echo "[0:0] -A OUTPUT -p ${protocol} -m state --state NEW,ESTABLISHED -m ${protocol} -d ${ip} --dport ${port} -j ACCEPT"
+		echo "[0:0] -A INPUT -p ${protocol} -m state --state ESTABLISHED -m ${protocol} -s ${ip} --sport ${port} -j ACCEPT"
+		;;
+	    *)
+		return 255
+		;;
+	esac
+	((i++))
+    done
+}
+
+gen-iptables-filter-syslog-ip()
+{
+    gen-iptables-filter-syslog "${SYSLOG_SERVER_IP_LIST}"
+}
+
+gen-iptables-filter-syslog-nr()
+{
+    gen-iptables-filter-syslog "${SYSLOG_SERVER_NR_LIST}"
+}
+
+gen-iptables-filter-email-server-nr()
+{
+    test -n "${EMAIL_SERVER_NR_LIST}" -a -n "${EMAIL_ACCOUNT_SERVER_PORT}" || return 0
+
+    local ip
+
+    for ip in ${EMAIL_SERVER_NR_LIST}
+    do
+	echo "[0:0] -A OUTPUT -p tcp -m state --state NEW,ESTABLISHED -m tcp -d ${ip} --dport ${EMAIL_ACCOUNT_SERVER_PORT} -j ACCEPT"
+	echo "[0:0] -A INPUT -p tcp -m state --state ESTABLISHED -m tcp -s ${ip} --sport ${EMAIL_ACCOUNT_SERVER_PORT} -j ACCEPT"
+    done
+}
+
+gen-iptables-filter-ns-ip()
+{
+    local ip
+
+    if test "${SELF_NS}" == True -o "${DNS_MODE}" == True ; then
+	echo "[0:0] -A OUTPUT -o ${IF_EXTERNAL} -p udp -m state --state NEW,ESTABLISHED -m udp --dport ${DOMAIN_PORT} -j ACCEPT"
+	echo "[0:0] -A INPUT -i ${IF_EXTERNAL} -p udp -m state --state ESTABLISHED -m udp --sport ${DOMAIN_PORT} -j ACCEPT"
+	echo "[0:0] -A OUTPUT -o ${IF_EXTERNAL} -p tcp -m state --state NEW,ESTABLISHED -m tcp --dport ${DOMAIN_PORT} -j ACCEPT"
+	echo "[0:0] -A INPUT -i ${IF_EXTERNAL} -p tcp -m state --state ESTABLISHED -m tcp --sport ${DOMAIN_PORT} -j ACCEPT"
+    fi
+
+    for ip in ${NAME_SERVER_LIST}
+    do
+	test ${ip} != 127.0.0.1 || continue
+
+	echo "[0:0] -A OUTPUT -p udp -m state --state NEW,ESTABLISHED -m udp -d ${ip} --dport ${DOMAIN_PORT} -j ACCEPT"
+	echo "[0:0] -A INPUT -p udp -m state --state ESTABLISHED -m udp -s ${ip} --sport ${DOMAIN_PORT} -j ACCEPT"
+	echo "[0:0] -A OUTPUT -p tcp -m state --state NEW,ESTABLISHED -m tcp -d ${ip} --dport ${DOMAIN_PORT} -j ACCEPT"
+	echo "[0:0] -A INPUT -p tcp -m state --state ESTABLISHED -m tcp -s ${ip} --sport ${DOMAIN_PORT} -j ACCEPT"
+    done
+}
+
+gen-iptables-filter-ntp()
+{
+    test -n "${NTP_SERVER_LIST}"  || return 0
+
+    echo "[0:0] -A OUTPUT -p udp -m state --state NEW,ESTABLISHED -m udp --sport ntp --dport ntp -j ACCEPT"
+    echo "[0:0] -A INPUT -p udp -m state --state ESTABLISHED -m udp --sport ntp --dport ntp -j ACCEPT"
+}
+
+gen-iptables-filter-ipsec-access()
+{
+    test ${VPN_IPSEC_MODE} == True || return 0
+    test ${VPN_IPSEC_ACCESS_MODE} == True || return 0
+
+    echo "[0:0] -A INPUT -i ${IF_EXTERNAL} -p udp -m multiport --dports ${ISAKMP_PORT},${NATT_PORT} -m conntrack --ctstate NEW,ESTABLISHED -j ACCEPT"
+    echo "[0:0] -A OUTPUT -o ${IF_EXTERNAL} -p udp -m multiport --sports ${ISAKMP_PORT},${NATT_PORT} -m conntrack --ctstate ESTABLISHED -j ACCEPT"
+}
+
+gen-iptables-filter-ipsec-site()
+{
+    test ${VPN_IPSEC_MODE} == True || return 0
+    test ${VPN_IPSEC_ACCESS_MODE} == False || return 0
+
+    test -n "${1}" || return 0
+    local vpn_ipsec_site_ip_list=${1}
+
+    local elt range i=0
+    local ips
+    local src_ip dst_ip
+
+    for elt in ${vpn_ipsec_site_ip_list}
+    do
+	range=$[${i} % 4]
+	case ${range} in
+	    0|2)
+		;;
+	    1)
+		ips=${elt}
+		;;
+	    3)
+		ips=${ips//,/ }
+
+		for ip in ${ips}
+		do
+		    src_ip=$(echo-firewall-source-ip ${ip})
+		    dst_ip=$(echo-firewall-destination-ip ${ip})
+
+		    echo "[0:0] -A INPUT -i ${IF_EXTERNAL} -p udp${src_ip} -m multiport --dports ${ISAKMP_PORT},${NATT_PORT} -m conntrack --ctstate NEW,ESTABLISHED -j ACCEPT"
+		    echo "[0:0] -A OUTPUT -o ${IF_EXTERNAL} -p udp${dst_ip} -m multiport --sports ${ISAKMP_PORT},${NATT_PORT} -m conntrack --ctstate NEW,ESTABLISHED -j ACCEPT"
+		done
+		;;
+	    *)
+		;;
+	esac
+	((i++))
+    done
+}
+
+gen-iptables-filter-ipsec-site-ip()
+{
+    gen-iptables-filter-ipsec-site "${VPN_IPSEC_SITE_IP_LIST}"
+}
+
+gen-iptables-filter-ipsec-site-nr()
+{
+    gen-iptables-filter-ipsec-site "${VPN_IPSEC_SITE_NR_LIST}"
+}
+
+gen-iptables-filter-ocsp()
+{
+    test ${OCSP_MODE} == True || return 0
+
+    echo "[0:0] -A INPUT -p tcp -m state --state NEW,ESTABLISHED -m tcp --dport ${OCSP_PORT} -j ACCEPT"
+    echo "[0:0] -A OUTPUT -p tcp -m state --state ESTABLISHED -m tcp --sport ${OCSP_PORT} -j ACCEPT"
+}
+
+gen-iptables-filter-ldap-ip()
+{
+    test-ldap-auth-state || return 0
+ 
+    local elt i=0 range
+    local ip port
+
+    for elt in ${LDAP_SERVER_LIST}
+    do
+	range=$[${i} % 4]
+	case ${range} in
+	    0|1)
+		;;
+	    2)
+		ip=${elt}
+		;;
+	    3)
+		port=${elt}
+
+		echo "[0:0] -A OUTPUT -p udp -m state --state NEW,ESTABLISHED -m udp -d ${ip} --dport ${port} -j ACCEPT"
+		echo "[0:0] -A OUTPUT -p tcp -m state --state NEW,ESTABLISHED -m tcp -d ${ip} --dport ${port} -j ACCEPT"
+		echo "[0:0] -A INPUT -p udp -m state --state ESTABLISHED -m udp -s ${ip} --sport ${port} -j ACCEPT"
+		echo "[0:0] -A INPUT -p tcp -m state --state ESTABLISHED -m tcp -s ${ip} --sport ${port} -j ACCEPT"
+
+		if test ${VPN_IPSEC_MODE} == True ; then
+		    echo "[0:0] -A OUTPUT ${FW_IPSEC_POLICY_OUT} -p udp -m state --state NEW,ESTABLISHED -m udp -d ${ip} --dport ${port} -j ACCEPT"
+		    echo "[0:0] -A OUTPUT ${FW_IPSEC_POLICY_OUT} -p tcp -m state --state NEW,ESTABLISHED -m tcp -d ${ip} --dport ${port} -j ACCEPT"
+		    echo "[0:0] -A INPUT ${FW_IPSEC_POLICY_IN} -p udp -m state --state ESTABLISHED -m udp -s ${ip} --sport ${port} -j ACCEPT"
+		    echo "[0:0] -A INPUT ${FW_IPSEC_POLICY_IN} -p tcp -m state --state ESTABLISHED -m tcp -s ${ip} --sport ${port} -j ACCEPT"
+		fi
+		;;
+	    *)
+		;;
+	esac
+	((i++))
+    done
+}
+
+gen-iptables-filter-kerberos()
+{
+    test-kerberos-auth-state || return 0
+
+    test -n "${1}" || return 0
+    local ips=${1}
+
+    local ip
+
+    for ip in ${ips}
+    do
+	echo "[0:0] -A OUTPUT -p tcp -m state --state NEW,ESTABLISHED -m tcp -d ${ip} --dport ${KERBEROS_PORT} -j ACCEPT"
+	echo "[0:0] -A OUTPUT -p tcp -m state --state NEW,ESTABLISHED -m tcp -d ${ip} --dport ${LDAP_PORT} -j ACCEPT"
+	echo "[0:0] -A OUTPUT -p udp -m state --state NEW,ESTABLISHED -m udp -d ${ip} --dport ${KPASSWD_PORT} -j ACCEPT"
+	echo "[0:0] -A INPUT -p tcp -m state --state ESTABLISHED -m tcp -s ${ip} --sport ${KERBEROS_PORT} -j ACCEPT"
+	echo "[0:0] -A INPUT -p tcp -m state --state ESTABLISHED -m tcp -s ${ip} --sport ${LDAP_PORT} -j ACCEPT"
+	echo "[0:0] -A INPUT -p udp -m state --state ESTABLISHED -m udp -s ${ip} --sport ${KPASSWD_PORT} -j ACCEPT"
+
+	test ${VPN_IPSEC_MODE} == True || continue
+
+	echo "[0:0] -A OUTPUT ${FW_IPSEC_POLICY_OUT} -p tcp -m state --state NEW,ESTABLISHED -m tcp -d ${ip} --dport ${KERBEROS_PORT} -j ACCEPT"
+	echo "[0:0] -A OUTPUT ${FW_IPSEC_POLICY_OUT} -p tcp -m state --state NEW,ESTABLISHED -m tcp -d ${ip} --dport ${LDAP_PORT} -j ACCEPT"
+	echo "[0:0] -A OUTPUT ${FW_IPSEC_POLICY_OUT} -p udp -m state --state NEW,ESTABLISHED -m udp -d ${ip} --dport ${KPASSWD_PORT} -j ACCEPT"
+	echo "[0:0] -A INPUT ${FW_IPSEC_POLICY_IN} -p tcp -m state --state ESTABLISHED -m tcp -s ${ip} --sport ${KERBEROS_PORT} -j ACCEPT"
+	echo "[0:0] -A INPUT ${FW_IPSEC_POLICY_IN} -p tcp -m state --state ESTABLISHED -m tcp -s ${ip} --sport ${LDAP_PORT} -j ACCEPT"
+	echo "[0:0] -A INPUT ${FW_IPSEC_POLICY_IN} -p udp -m state --state ESTABLISHED -m udp -s ${ip} --sport ${KPASSWD_PORT} -j ACCEPT"
+    done
+}
+
+gen-iptables-filter-kerberos-ip()
+{
+    gen-iptables-filter-kerberos "${KERBEROS_SERVER_IP_LIST}"
+}
+
+gen-iptables-filter-kerberos-nr()
+{
+    gen-iptables-filter-kerberos "${KERBEROS_SERVER_NR_LIST}"
+}
+
+gen-iptables-filter-icmp()
+{
+    echo "[0:0] -A INPUT -p icmp -j ICMPIN"
+    echo "[0:0] -A INPUT -p icmp ${FW_ICMP_LIMIT} -j ACCEPT"
+    echo "[0:0] -A OUTPUT -p icmp -j ICMPOUT"
+}
+
+gen-iptables-filter-input-output-source-code()
+{
+    test "${APL_MODEL}" == 'test' || return 0
+
+    case ${TEST_SRC_PROTOCOL} in
+	nfs)
+	    echo "[0:0] -A OUTPUT -p tcp -m state --state NEW,ESTABLISHED -d ${TEST_SRC_IP} --dport nfs -j ACCEPT"
+	    echo "[0:0] -A INPUT -p tcp -m state --state ESTABLISHED -s ${TEST_SRC_IP} --sport nfs -j ACCEPT"
+	    ;;
+	sshfs)
+	    echo "[0:0] -A OUTPUT -p tcp -m state --state NEW,ESTABLISHED -d ${TEST_SRC_IP} --dport ssh -j ACCEPT"
+	    echo "[0:0] -A INPUT -p tcp -m state --state ESTABLISHED -s ${TEST_SRC_IP} --sport ssh -j ACCEPT"
+	    ;;
+	*)
+	    ;;
+    esac
+}
+
+gen-iptables-filter-input-output-cloud()
+{
+    case ${CLOUD_NAME} in
+	aws|azure)
+	    echo "[0:0] -A OUTPUT -p udp --sport ${BOOTPC_PORT} --dport ${BOOTPS_PORT} -j ACCEPT"
+	    echo "[0:0] -A INPUT -p udp --sport ${BOOTPS_PORT} --dport ${BOOTPC_PORT} -j ACCEPT"
+	    ;;
+	*)
+	    ;;
+    esac
+
+    case ${CLOUD_NAME} in
+	azure)
+	    if test -n "${CLOUD_AZURE_FABRIC_IP}" ; then
+		echo "[0:0] -A OUTPUT -p tcp -d ${CLOUD_AZURE_FABRIC_IP} -m multiport --dports ${CLOUD_AZURE_PORTS} -m conntrack --ctstate NEW,RELATED,ESTABLISHED -j ACCEPT"
+		echo "[0:0] -A INPUT -p tcp -s ${CLOUD_AZURE_FABRIC_IP} -m multiport --sports ${CLOUD_AZURE_PORTS} -m conntrack --ctstate ESTABLISHED -j ACCEPT"
+	    fi
+	    ;;
+	*)
+	    ;;
+    esac
+}
+
+gen-iptables-filter-input-output()
+{
+    gen-iptables-filter-input-output-cloud
+    gen-iptables-filter-input-output-loopback
+    gen-iptables-filter-input-output-multicast
+    gen-iptables-filter-input-output-null
+    gen-iptables-filter-input-output-allstate
+    gen-iptables-filter-input-output-xmas
+    # gen-iptables-filter-input-output-invalid
+    gen-iptables-filter-input-output-illegal
+    gen-iptables-filter-input-output-broadcast
+    gen-iptables-filter-input-output-traceroute
+    gen-iptables-filter-input-flood
+    gen-iptables-filter-ipsec-access
+    gen-iptables-filter-ipsec-site-ip
+
+    gen-iptables-filter-ha-share-peer
+    gen-iptables-filter-web
+    gen-iptables-filter-rweb
+    gen-iptables-filter-av
+    gen-iptables-filter-ntp
+    gen-iptables-filter-ocsp
+
+    gen-iptables-filter-dhcp
+    gen-iptables-filter-manager
+    gen-iptables-filter-admin
+    gen-iptables-filter-file-ip
+    gen-iptables-filter-mon-ip
+    gen-iptables-filter-syslog-ip
+    gen-iptables-filter-ns-ip
+    gen-iptables-filter-ldap-ip
+    gen-iptables-filter-kerberos-ip
+    gen-iptables-filter-icmp
+
+    if test ${EMBEDDED_VPNSUBSCR_IS_ACTIVE} == True ; then
+	echo "[0:0] -A OUTPUT -p tcp --dport ${EMAIL_PORT} -m conntrack --ctstate NEW,ESTABLISHED -j ACCEPT"
+	echo "[0:0] -A INPUT -p tcp --sport ${EMAIL_PORT} -m conntrack --ctstate ESTABLISHED -j ACCEPT"
+    fi
+
+    gen-iptables-filter-input-output-source-code
+}
+
+gen-iptables-filter-forward-default-null()
+{
+    echo "[0:0] -A FORWARD ${FW_NULL} -j ${FW_DROP_NULL}"
+    test ${VPN_IPSEC_MODE} == True || return 0
+    echo "[0:0] -A FORWARD ${FW_IPSEC_POLICY_IN} ${FW_NULL} -j ${FW_DROP_NULL}"
+    echo "[0:0] -A FORWARD ${FW_IPSEC_POLICY_OUT} ${FW_NULL} -j ${FW_DROP_NULL}"
+}
+
+gen-iptables-filter-forward-default-allstate()
+{
+    echo "[0:0] -A FORWARD ${FW_ALLSTATE} -j ${FW_DROP_ALLSTATE}"
+    test ${VPN_IPSEC_MODE} == True || return 0
+    echo "[0:0] -A FORWARD ${FW_IPSEC_POLICY_IN} ${FW_ALLSTATE} -j ${FW_DROP_ALLSTATE}"
+    echo "[0:0] -A FORWARD ${FW_IPSEC_POLICY_OUT} ${FW_ALLSTATE} -j ${FW_DROP_ALLSTATE}"
+}
+
+gen-iptables-filter-forward-default-xmas()
+{
+    echo "[0:0] -A FORWARD ${FW_XMAS} -j ${FW_DROP_XMAS}"
+    test ${VPN_IPSEC_MODE} == True || return 0
+    echo "[0:0] -A FORWARD ${FW_IPSEC_POLICY_IN} ${FW_XMAS} -j ${FW_DROP_XMAS}"
+    echo "[0:0] -A FORWARD ${FW_IPSEC_POLICY_OUT} ${FW_XMAS} -j ${FW_DROP_XMAS}"
+}
+
+gen-iptables-filter-forward-default-invalid()
+{
+    echo "[0:0] -A FORWARD ${FW_INVALID} -j ${FW_DROP_INVALID}"
+    test ${VPN_IPSEC_MODE} == True || return 0
+    echo "[0:0] -A FORWARD ${FW_IPSEC_POLICY_IN} ${FW_INVALID} -j ${FW_DROP_INVALID}"
+    echo "[0:0] -A FORWARD ${FW_IPSEC_POLICY_OUT} ${FW_INVALID} -j ${FW_DROP_INVALID}"
+}
+
+gen-iptables-filter-forward-default-illegal()
+{
+    echo "[0:0] -A FORWARD ${FW_ILLEGAL_NEW} -j ${FW_DROP_ILLEGAL_NEW}"
+    test ${VPN_IPSEC_MODE} == True || return 0
+    echo "[0:0] -A FORWARD ${FW_IPSEC_POLICY_IN} ${FW_ILLEGAL_NEW} -j ${FW_DROP_ILLEGAL_NEW}"
+    echo "[0:0] -A FORWARD ${FW_IPSEC_POLICY_OUT} ${FW_ILLEGAL_NEW} -j ${FW_DROP_ILLEGAL_NEW}"
+}
+
+gen-iptables-filter-forward-default-traceroute()
+{
+    echo "[0:0] -A FORWARD -o ${IF_EXTERNAL} -p icmp --icmp-type time-exceeded -j ${FW_DROP_TRACEROUTE}"
+    test ${VPN_IPSEC_MODE} == True || return 0
+    echo "[0:0] -A FORWARD -o ${IF_EXTERNAL} ${FW_IPSEC_POLICY_OUT} -p icmp --icmp-type time-exceeded -j ${FW_DROP_TRACEROUTE}"
+}
+
+gen-iptables-filter-forward-default-flood()
+{
+    echo "[0:0] -A FORWARD -i ${IF_EXTERNAL} -p tcp --syn -j SYNFLOODOTHER"
+    echo "[0:0] -A FORWARD -o ${IF_EXTERNAL} -p tcp --syn -j SYNFLOODOTHER"
+
+    echo "[0:0] -A FORWARD -i ${IF_EXTERNAL} -p tcp --tcp-flags RST RST -j RSTFLOODOTHER"
+    echo "[0:0] -A FORWARD -o ${IF_EXTERNAL} -p tcp --tcp-flags RST RST -j RSTFLOODOTHER"
+
+    echo "[0:0] -A FORWARD -i ${IF_EXTERNAL} -p udp -m state --state NEW -j UDPFLOODOTHER"
+    echo "[0:0] -A FORWARD -o ${IF_EXTERNAL} -p udp -m state --state NEW -j UDPFLOODOTHER"
+
+    if test ${SINGLE_IP_TCP_CONNLIMIT} -gt 0 ; then
+	echo "[0:0] -A FORWARD ${FW_TCP_CONNLIMIT} -j ${FW_REJECT_LIMIT}"
+    fi
+
+    test ${VPN_IPSEC_MODE} == True || return 0
+
+    echo "[0:0] -A FORWARD ${FW_IPSEC_POLICY_IN} -p tcp --syn -j SYNFLOODOTHER"
+    echo "[0:0] -A FORWARD ${FW_IPSEC_POLICY_OUT} -p tcp --syn -j SYNFLOODOTHER"
+
+    echo "[0:0] -A FORWARD ${FW_IPSEC_POLICY_IN} -p tcp --tcp-flags RST RST -j RSTFLOODOTHER"
+    echo "[0:0] -A FORWARD ${FW_IPSEC_POLICY_OUT} -p tcp --tcp-flags RST RST -j RSTFLOODOTHER"
+
+    if test ${SINGLE_IP_TCP_CONNLIMIT} -gt 0 ; then
+	echo "[0:0] -A FORWARD ${FW_IPSEC_POLICY_IN} ${FW_TCP_CONNLIMIT} -j ${FW_REJECT_LIMIT}"
+	echo "[0:0] -A FORWARD ${FW_IPSEC_POLICY_OUT} ${FW_TCP_CONNLIMIT} -j ${FW_REJECT_LIMIT}"
+    fi
+}
+
+gen-iptables-filter-forward-tcpmss()
+{
+    echo "[0:0] -A FORWARD ${FW_TCP_MSS}"
+}
+
+gen-iptables-filter-forward-default()
+{
+    gen-iptables-filter-forward-default-null
+    gen-iptables-filter-forward-default-xmas
+    gen-iptables-filter-forward-default-invalid
+    gen-iptables-filter-forward-default-illegal
+    gen-iptables-filter-forward-default-traceroute
+    gen-iptables-filter-forward-default-flood
+
+    gen-iptables-filter-forward-tcpmss
+}
+
+gen-iptables-filter-forward()
+{
+    test ${FIREWALL_MODE} == True -a ${ROUTER_MODE} == True || return 0
+    
+    gen-iptables-filter-forward-default
+
+    local i=0 elt range
+    local rset rules
+
+    local id state action protocol src_ip dst_dev dst_ip dst_ports
+    local src_nat_ip dst_nat_ip dst_pat_port
+
+    local output_dev input_dev
+    local input_dev_rule_in input_dev_rule_out
+    local output_dev_rule routput_dev_rule
+    local protocol_rule action_rule
+    local new_state established_state
+    local src_ip_rule dst_ip_rule dst_ports_rule
+    local rsrc_ip_rule rdst_ip_rule rdst_ports_rule
+
+    if test ${VLAN_MODE} == False ; then
+	if test \
+	       -z "${FW_WEB_RULE_LIST}" -a \
+	       -z "${FW_RWEB_RULE_LIST}" -a \
+	       -z "${FW_FILE_RULE_LIST}" -a \
+	       -z "${FW_PEER_RULE_LIST}" -a \
+	       -z "${FW_MON_RULE_LIST}" -a \
+	       -z "${FW_ADMIN_RULE_LIST}" -a \
+	       -z "${FW_AV_RULE_LIST}" ; then
+
+	    echo "[0:0] -A FORWARD -i ${IF_INTERNAL} -m conntrack --ctstate NEW,RELATED,ESTABLISHED -j ACCEPT"
+	    echo "[0:0] -A FORWARD -o ${IF_INTERNAL} -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT"
+
+	    if test ${VPN_IPSEC_MODE} == True ; then
+		echo "[0:0] -A FORWARD -i ${IF_INTERNAL} ${FW_IPSEC_POLICY_IN} -m conntrack --ctstate NEW,RELATED,ESTABLISHED -j ACCEPT"
+		echo "[0:0] -A FORWARD -o ${IF_INTERNAL} ${FW_IPSEC_POLICY_OUT} -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT"
+	    fi
+	fi
+    fi
+
+    local rule_sets="external web rweb antivirus admin mon file peer"
+    test -z "${IF_AUXILIARY}" -o ${IP_AUXILIARY_IP} == 0.0.0.0 || rule_sets="${rule_sets} auxiliary"
+    test ${VPN_IPSEC_MODE} == False || rule_sets="${rule_sets} vpnipsec"
+
+    for rset in ${rule_sets}
+    do
+	case "${rset}" in
+	    external)
+		rules=${FW_EXTERNAL_RULE_LIST}
+		input_dev=${IF_EXTERNAL}
+		;;
+	    auxiliary)
+		rules=${FW_AUXILIARY_RULE_LIST}
+		input_dev=${IF_AUXILIARY}
+		;;
+	    web)
+		rules=${FW_WEB_RULE_LIST}
+		input_dev=${IF_WEB}
+
+		if test -z "${rules}" -a ${VLAN_MODE} == True ; then
+		    echo "[0:0] -A FORWARD -i ${input_dev} -m conntrack --ctstate NEW,RELATED,ESTABLISHED -j ACCEPT"
+		    echo "[0:0] -A FORWARD -o ${input_dev} -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT"
+
+		    if test ${VPN_IPSEC_MODE} == True ; then
+			echo "[0:0] -A FORWARD -i ${input_dev} ${FW_IPSEC_POLICY_IN} -m conntrack --ctstate NEW,RELATED,ESTABLISHED -j ACCEPT"
+			echo "[0:0] -A FORWARD -o ${input_dev} ${FW_IPSEC_POLICY_OUT} -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT"
+		    fi
+		    continue
+		fi
+		;;
+	    rweb)
+		rules=${FW_RWEB_RULE_LIST}
+		input_dev=${IF_RWEB}
+		;;
+	    antivirus)
+		rules=${FW_AV_RULE_LIST}
+		input_dev=${IF_AV}
+		;;
+	    admin)
+		rules=${FW_ADMIN_RULE_LIST}
+		input_dev=${IF_ADMIN}
+		;;
+	    mon)
+		rules=${FW_MON_RULE_LIST}
+		input_dev=${IF_MON}
+		;;
+	    file)
+		rules=${FW_FILE_RULE_LIST}
+		input_dev=${IF_FILE}
+		;;
+	    peer)
+		rules=${FW_PEER_RULE_LIST}
+		input_dev=${IF_PEER}
+		;;
+	    vpnipsec)
+		rules=${FW_VPN_IPSEC_RULE_LIST}
+		input_dev=ipsec
+
+		if test -z "${rules}" -a ${VPN_IPSEC_MODE} == True ; then
+
+		    echo "[0:0] -A FORWARD ${FW_IPSEC_POLICY_IN} -o ${IF_WEB} -m state --state NEW,RELATED,ESTABLISHED -j ACCEPT"
+		    echo "[0:0] -A FORWARD -i ${IF_WEB} ${FW_IPSEC_POLICY_OUT} -m state --state RELATED,ESTABLISHED -j ACCEPT"
+
+		    continue
+		fi
+		;;
+	    *)
+		return 255
+		;;
+	esac
+
+	if test ${input_dev} == ipsec ; then
+	    input_dev_rule_in=${FW_IPSEC_POLICY_IN}
+	    input_dev_rule_out=${FW_IPSEC_POLICY_OUT}
+	else
+	    input_dev_rule_in="-i ${input_dev}"
+	    input_dev_rule_out="-o ${input_dev}"
+	fi
+
+	i=0
+	for elt in ${rules}
+	do
+	    range=$[${i} % 11]
+	    case ${range} in
+		0)
+		    id=${elt}
+		    ;;
+		1)
+		    state=${elt}
+		    ;;
+		2)
+		    action=${elt}
+		    ;;
+		3)
+		    protocol=${elt}
+		    ;;
+		4)
+		    src_ip=${elt}
+		    ;;
+		5)
+		    dst_dev=${elt}
+		    output_dev=$(get-net-dev ${dst_dev})
+		    ;;
+		6)
+		    dst_ip=${elt}
+		    ;;
+		7)
+		    dst_ports=${elt}
+		    ;;
+		8)
+		    src_nat_ip=${elt}
+		    ;;
+		9)
+		    dst_nat_ip=${elt}
+		    ;;
+		10)
+		    dst_pat_port=${elt}
+
+		    if test ${state} == off -o -z "${output_dev}" ; then
+			((i++))
+			continue
+		    fi
+
+		    if test ${output_dev} == ipsec ; then
+			if test ${VPN_IPSEC_MODE} == False ; then
+			    ((i++))
+			    continue
+			fi
+		    fi
+
+		    if test ${input_dev} == ${output_dev} ; then
+			((i++))
+			continue
+		    fi
+
+		    if test ${dst_nat_ip} != nil ; then
+			dst_ip=${dst_nat_ip}
+			test ${dst_pat_port} == nil || dst_ports=${dst_pat_port}
+		    fi
+
+		    case ${protocol} in
+
+			ftp_active)
+			    gen-iptables-filter-forward-ftp 'active'  ${action} ${input_dev} ${output_dev} ${src_ip} ${dst_ip} ${dst_ports}
+			    ;;
+
+			ftp_passive)
+			    gen-iptables-filter-forward-ftp 'passive' ${action} ${input_dev} ${output_dev} ${src_ip} ${dst_ip} ${dst_ports}
+			    ;;
+
+			ftp_trivial)
+			    gen-iptables-filter-forward-tftp          ${action} ${input_dev} ${output_dev} ${src_ip} ${dst_ip} ${dst_ports}
+			    ;;
+			sip)
+			    gen-iptables-filter-forward-sip           ${action} ${input_dev} ${output_dev} ${src_ip} ${dst_ip} ${dst_ports}
+			    ;;
+			*)
+			    case ${action} in
+				allow)
+				    action_rule="-j ACCEPT"
+				    ;;
+				deny)
+				    action_rule="-j ${FW_DROP_DENY}"
+				    ;;
+				*)
+				    return 255
+				    ;;
+			    esac
+
+			    case ${protocol} in
+				udp|tcp)
+				    new_state=" -m state --state NEW,ESTABLISHED"
+				    established_state=" -m state --state ESTABLISHED"
+				    ;;
+				*)
+				    unset new_state
+				    unset established_state
+				    ;;
+			    esac
+
+			    if test ${output_dev} == any ; then
+				unset output_dev_rule
+				unset routput_dev_rule
+			    elif test ${output_dev} == ipsec ; then
+				output_dev_rule=" ${FW_IPSEC_POLICY_OUT}"
+				routput_dev_rule=" ${FW_IPSEC_POLICY_IN}"
+			    else
+				output_dev_rule=" -o ${output_dev}"
+				routput_dev_rule=" -i ${output_dev}"
+			    fi
+
+			    if test ${protocol} == any ; then
+				unset protocol_rule
+			    else
+				protocol_rule=" -p ${protocol}"
+			    fi
+
+			    if test ${src_ip} == any ; then
+				unset src_ip_rule
+				unset rsrc_ip_rule
+			    else
+				src_ip_rule=" -s ${src_ip}"
+				rsrc_ip_rule=" -d ${src_ip}"
+			    fi
+
+			    if test ${dst_ip} == any ; then
+				unset dst_ip_rule
+				unset rdst_ip_rule
+			    else
+				dst_ip_rule=" -d ${dst_ip}"
+				rdst_ip_rule=" -s ${dst_ip}"
+			    fi
+
+			    if test ${dst_ports} == any ; then
+				unset dst_ports_rule
+				unset rdst_ports_rule
+			    else
+				dst_ports_rule=" --dport ${dst_ports}"
+				rdst_ports_rule=" --sport ${dst_ports}"
+			    fi
+
+			    echo "[0:0] -A FORWARD ${input_dev_rule_in}${output_dev_rule}${protocol_rule}${src_ip_rule}${dst_ip_rule}${dst_ports_rule}${new_state} ${action_rule}"
+			    echo "[0:0] -A FORWARD ${input_dev_rule_out}${routput_dev_rule}${protocol_rule}${rdst_ip_rule}${rsrc_ip_rule}${rdst_ports_rule}${established_state} ${action_rule}"
+			    ;;
+		    esac
+		    ;;
+		*)
+		    return 255
+		    ;;
+	    esac
+	    ((i++))
+	done
+    done
+}
+
+gen-iptables-filter-log()
+{
+    test ${LOG_MODE} == True -a ${LOG_TYPE_FIREWALL/:*} == True || return 0
+
+    echo "[0:0] -A INPUT -m state --state NEW,RELATED,ESTABLISHED -j LOGGING_DENY"
+    echo "[0:0] -A OUTPUT -m state --state NEW,RELATED,ESTABLISHED -j LOGGING_DENY"
+    test ${ROUTER_MODE} == False -o ${FIREWALL_MODE} == False || \
+	echo "[0:0] -A FORWARD -m state --state NEW,RELATED,ESTABLISHED -j LOGGING_DENY"
+
+    gen-iptables-log-accept ALLOW "Track"
+    gen-iptables-log-reject LIMIT "ConLimit"
+
+    gen-iptables-log-drop MULTICAST "MulticastIP"
+    gen-iptables-log-drop DENY "Policy"
+    gen-iptables-log-drop NULL "NullState"
+    gen-iptables-log-drop ALLSTATE "AllState"
+    gen-iptables-log-drop XMAS "XMasTCP"
+    gen-iptables-log-drop INVALID "InvalidState"
+    gen-iptables-log-drop ILLEGALNEW "IllegalSyn"
+    gen-iptables-log-drop BROADCAST "BroadcastIP"
+    gen-iptables-log-drop SYNFLOOD "SynFlood"
+    gen-iptables-log-drop UDPFLOOD "UDPFlood"
+    gen-iptables-log-drop RSTFLOOD "ResetFlood"
+    gen-iptables-log-drop SMURF "SmurfPing"
+    gen-iptables-log-drop TRACEROUTE "TraceRoute"
+    gen-iptables-log-drop UPTIME "UpTime"
+    gen-iptables-log-drop BRUTEFORCE "BruteForce"
+}
+
+gen-iptables-filter()
+{
+    echo "*filter"
+    echo ":INPUT DROP [0:0]"
+    if test ${ROUTER_MODE} == True ; then
+	if test ${FIREWALL_MODE} == True ; then
+	    echo ":FORWARD DROP [0:0]"
+	else
+	    echo ":FORWARD ACCEPT [0:0]"
+	fi
+    else
+	echo ":FORWARD DROP [0:0]"
+    fi
+    echo ":OUTPUT DROP [0:0]"
+
+    echo ":SYNFLOODWEB - [0:0]"
+    echo ":SYNFLOODRWEB - [0:0]"
+    echo ":UDPFLOOD - [0:0]"
+
+    echo ":SYNFLOODOTHER - [0:0]"
+    echo ":UDPFLOODOTHER - [0:0]"
+    echo ":SYNFLOODMGT - [0:0]"
+
+    echo ":RSTFLOODWEB - [0:0]"
+    echo ":RSTFLOODRWEB - [0:0]"
+    echo ":RSTFLOODOTHER - [0:0]"
+    echo ":RSTFLOODMGT - [0:0]"
+
+    echo ":ICMPIN - [0:0]"
+    echo ":ICMPOUT - [0:0]"
+    echo ":CONNLIMITWEB - [0:0]"
+    echo ":BRUTEFORCE - [0:0]"
+    echo ":LOGGING_MULTICAST - [0:0]"
+    echo ":LOGGING_ALLOW - [0:0]"
+    echo ":LOGGING_LIMIT - [0:0]"
+    echo ":LOGGING_DENY - [0:0]"
+    echo ":LOGGING_NULL - [0:0]"
+    echo ":LOGGING_ALLSTATE - [0:0]"
+    echo ":LOGGING_XMAS - [0:0]"
+    echo ":LOGGING_INVALID - [0:0]"
+    echo ":LOGGING_ILLEGALNEW - [0:0]"
+    echo ":LOGGING_BROADCAST - [0:0]"
+    echo ":LOGGING_SYNFLOOD - [0:0]"
+    echo ":LOGGING_UDPFLOOD - [0:0]"
+    echo ":LOGGING_RSTFLOOD - [0:0]"
+    echo ":LOGGING_SMURF - [0:0]"
+    echo ":LOGGING_TRACEROUTE - [0:0]"
+    echo ":LOGGING_UPTIME - [0:0]"
+    echo ":LOGGING_BRUTEFORCE - [0:0]"
+
+    gen-iptables-filter-input-output
+    gen-iptables-filter-forward
+    is-dn-present || gen-iptables-filter-log
+}
+
+gen-icmp-tables()
+{
+    echo "[0:0] -A ICMPIN -p icmp --icmp-type address-mask-request -j ${FW_DROP_SMURF}"
+    echo "[0:0] -A ICMPIN -p icmp --icmp-type timestamp-request -j ${FW_DROP_SMURF}"
+    echo "[0:0] -A ICMPIN -p icmp -m state --state RELATED,ESTABLISHED -j ACCEPT"
+    echo "[0:0] -A ICMPIN -j RETURN"
+    echo "[0:0] -A ICMPOUT -p icmp --icmp-type time-exceeded -j ${FW_DROP_TRACEROUTE}"
+    echo "[0:0] -A ICMPOUT -p icmp --icmp-type timestamp-reply -j ${FW_DROP_UPTIME}"
+    echo "[0:0] -A ICMPOUT -j ACCEPT"
+}
+
+gen-flood()
+{
+    local mgt_limit=20
+    local mgt_burst=$[${mgt_limit} * 3]
+
+    local tcp_limit tcp_burst
+    local udp_limit udp_burst
+    local web_limit web_burst
+    local rweb_limit rweb_burst
+
+    if test -z "${FW_DOS_TCP_FLOOD}" ; then
+	tcp_limit=$(get-default-tcp-flood-limit)
+	tcp_burst=$(get-default-tcp-flood-burst)
+    else
+	tcp_limit=${FW_DOS_TCP_FLOOD/ *}
+	tcp_burst=${FW_DOS_TCP_FLOOD/* }
+    fi
+
+    if test -z "${FW_DOS_UDP_FLOOD}" ; then
+	udp_limit=$(get-default-udp-flood-limit)
+	udp_burst=$(get-default-udp-flood-burst)
+    else
+	udp_limit=${FW_DOS_UDP_FLOOD/ *}
+	udp_burst=${FW_DOS_UDP_FLOOD/* }
+    fi
+
+    if test -z "${FW_DOS_WEB_FLOOD}" ; then
+	web_limit=$(get-default-web-flood-limit)
+	web_burst=$(get-default-web-flood-burst)
+    else
+	web_limit=${FW_DOS_WEB_FLOOD/ *}
+	web_burst=${FW_DOS_WEB_FLOOD/* }
+    fi
+
+    if test -z "${FW_DOS_RWEB_FLOOD}" ; then
+	rweb_limit=$(get-default-rweb-flood-limit)
+	rweb_burst=$(get-default-rweb-flood-burst)
+    else
+	rweb_limit=${FW_DOS_RWEB_FLOOD/ *}
+	rweb_burst=${FW_DOS_RWEB_FLOOD/* }
+    fi
+    
+    echo "[0:0] -A SYNFLOODMGT -m limit --limit ${mgt_limit}/second --limit-burst ${mgt_burst} -j RETURN"
+    echo "[0:0] -A SYNFLOODMGT -j ${FW_DROP_SYNFLOOD}"
+
+    echo "[0:0] -A RSTFLOODMGT -m limit --limit ${mgt_limit}/second --limit-burst ${mgt_burst} -j RETURN"
+    echo "[0:0] -A RSTFLOODMGT -j ${FW_DROP_RSTFLOOD}"
+
+    echo "[0:0] -A SYNFLOODWEB -m limit --limit ${web_limit}/second --limit-burst ${web_burst} -j RETURN"
+    echo "[0:0] -A SYNFLOODWEB -j ${FW_DROP_SYNFLOOD}"
+
+    echo "[0:0] -A RSTFLOODWEB -m limit --limit ${web_limit}/second --limit-burst ${web_burst} -j RETURN"
+    echo "[0:0] -A RSTFLOODWEB -j ${FW_DROP_RSTFLOOD}"
+
+    echo "[0:0] -A SYNFLOODRWEB -m limit --limit ${rweb_limit}/second --limit-burst ${rweb_burst} -j RETURN"
+    echo "[0:0] -A SYNFLOODRWEB -j ${FW_DROP_SYNFLOOD}"
+
+    echo "[0:0] -A RSTFLOODRWEB -m limit --limit ${rweb_limit}/second --limit-burst ${rweb_burst} -j RETURN"
+    echo "[0:0] -A RSTFLOODRWEB -j ${FW_DROP_RSTFLOOD}"
+
+    echo "[0:0] -A UDPFLOOD -m limit --limit ${web_limit}/second --limit-burst ${web_burst} -j RETURN"
+    echo "[0:0] -A UDPFLOOD -j ${FW_DROP_UDPFLOOD}"
+
+    echo "[0:0] -A SYNFLOODOTHER -m limit --limit ${tcp_limit}/second --limit-burst ${tcp_burst} -j RETURN"
+    echo "[0:0] -A SYNFLOODOTHER -j ${FW_DROP_SYNFLOOD}"
+
+    echo "[0:0] -A RSTFLOODOTHER -m limit --limit ${tcp_limit}/second --limit-burst ${tcp_burst} -j RETURN"
+    echo "[0:0] -A RSTFLOODOTHER -j ${FW_DROP_RSTFLOOD}"
+
+    echo "[0:0] -A UDPFLOODOTHER -m limit --limit ${udp_limit}/second --limit-burst ${udp_burst} -j RETURN"
+    echo "[0:0] -A UDPFLOODOTHER -j ${FW_DROP_UDPFLOOD}"
+}
+
+gen-conn-limit-web()
+{
+    test ${SINGLE_IP_WEB_CONNLIMIT} -gt 0 || return 0
+
+    local elt i=0 range
+    local ip
+
+    for elt in ${PEER_PREVIOUS_LIST}
+    do
+	range=$[${i} % 2]
+	case ${range} in
+	    0)
+		ip=${elt}
+		;;
+	    1)
+		echo "[0:0] -A CONNLIMITWEB -s ${ip} -j RETURN"
+		test ${VPN_IPSEC_MODE} == False || echo "[0:0] -A CONNLIMITWEB ${FW_IPSEC_POLICY_IN} -s ${ip} -j RETURN"
+		;;
+	    *)
+		return 255
+		;;
+	esac
+	((i++))
+    done
+
+    echo "[0:0] -A CONNLIMITWEB ${FW_WEB_CONNLIMIT} -j ${FW_REJECT_LIMIT}"
+}
+
+gen-brute-force()
+{
+    echo "[0:0] -A BRUTEFORCE -m recent --set --name SSH"
+    echo "[0:0] -A BRUTEFORCE -m recent --update --name SSH --seconds 60 --hitcount 6 -j ${FW_DROP_BRUTEFORCE}"
+    echo "[0:0] -A BRUTEFORCE -j ACCEPT"
+}
+
+gen-iptables-raw-nr()
+{
+    gen-iptables-raw-conntrack-file-nr
+}
+
+gen-iptables-mangle-nr()
+{
+    gen-iptables-mangle-qos-mon-nr
+    gen-iptables-mangle-qos-syslog-nr
+    gen-iptables-mangle-qos-file-nr
+    gen-iptables-mangle-external-route-nr
+}
+
+gen-iptables-filter-nr()
+{
+    gen-iptables-filter-ipsec-site-nr
+    gen-iptables-filter-kerberos-nr
+    gen-iptables-filter-file-nr
+    gen-iptables-filter-mon-nr
+    gen-iptables-filter-syslog-nr
+    gen-iptables-filter-email-server-nr
+    gen-iptables-filter-log
+}
+
+gen-iptables-apl()
+{
+    gen-icmp-tables
+    gen-flood
+    gen-conn-limit-web
+    gen-brute-force
+}
+
+gen-iptables()
+{
+    cat sysconfig.iptables.raw.new
+    echo "COMMIT"
+    cat sysconfig.iptables.nat.new
+    echo "COMMIT"
+    cat sysconfig.iptables.mangle.new
+    echo "COMMIT"
+    cat sysconfig.iptables.filter.new \
+	sysconfig.iptables.apl.new
+    echo "COMMIT"
+}
+
+gen-iptables-resolved()
+{
+    cat sysconfig.iptables.raw
+    gen-iptables-raw-nr
+    echo "COMMIT"
+    cat sysconfig.iptables.nat
+    echo "COMMIT"
+    cat sysconfig.iptables.mangle
+    gen-iptables-mangle-nr
+    echo "COMMIT"
+    cat sysconfig.iptables.filter
+    gen-iptables-filter-nr
+    cat sysconfig.iptables.apl
+    echo "COMMIT"
+}
+
+fw-allow-ns-only()
+{
+    local counter rule
+    local fw=iptables chain
+
+    service-nolog iptables stop
+
+    gen-iptables-snat | while read counter rule
+    do
+	${fw} -t nat ${rule} 2> /dev/null || return 1
+    done
+
+    for chain in INPUT OUTPUT FORWARD
+    do
+	${fw} -P ${chain} DROP 2> /dev/null || return 2
+    done
+
+    gen-iptables-filter-ns-ip | while read counter rule
+    do
+	${fw} -t filter ${rule} 2> /dev/null || return 3
+    done
+
+    return 0
+}
+
+LIB_APL_FW=Yes

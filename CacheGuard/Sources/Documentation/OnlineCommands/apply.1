@@ -1,0 +1,388 @@
+Apply new settings
+.SH SYNOPSIS
+
+[1] \fBapply\fR [\fBcheck\fR | \fBforce\fR [\fBwait\fR] | \fBreport\fR | \fBcancel\fR [\fBforce\fR [\fBwait\fR]]]
+
+.SH DESCRIPTION
+When you use different commands to configure the system (or submit settings using the GUI) new settings are not immediately applied to the the running system but only program the system for a future new configuration considered as a whole. Most commands display both the running (current) and the new (net yet applied) configuration and the whole configuration can be displayed using the \fBconf\fR command.
+
+To take effect, a new configuration should be applied to the system using the \fBapply\fR command. In the other hand the \fBapply\fR command replace the running configuration with the new configuration. The apply operation runs in background unless the \fBforce wait\fR keywords are used. If you modify the new configuration during the apply operation, there are chances that your new configuration would be taken into account. You can use the \fBconf diff\fR command after the termination of the apply operation to display differences between the running and the new configuration.
+
+Before being applied to the system, the \fBapply\fR command verifies the integrity of the new configuration as a whole to make sure that all new parameters are both consistent. After this step and if all goes well, the user is invited to confirm the apply operation. The optional argument \fBforce\fR allows you to bypass this confirmation step. If the optional \fBcheck\fR keyword is used, the operation finishes after the integrity checks and possibly integrity errors are displayed. The optional \fBreport\fR keyword allows you to display a system report on the last \fBapply\fR command.
+
+Finally it is possible to cancel (or abort) a running \fBapply\fP operation and get the previous configuration before launching the \fBapply\fR command. To cancel the current running apply operation, use the \fBcancel\fR keyword. However, please note that the apply of the following settings can't be cancelled: settings that depend on the content of external files (for instance custom WAF rules), generated SSL certificates and administrators passwords. Note that some sub-operations attached to the \fBapply\fR program cannot be cancelled immediately. \fBCAUTION\fR: aborting some operations such as downloading the antivirus signatures may let the system in an inconsistent state. That's why the cancellation of an apply operation should always be followed by a new apply operation.
+
+Please note that:
+
+\(bu You have to wait for the termination of other asynchronous commands before running the \fBapply\fR command.
+
+\(bu If you load a backup file (see the \fBsystem\fR command) to restore a system and at the same time you manually modify the new configuration using the CLI (or the GUI), the new configuration included in the backup file erases the manually modified new configuration.
+
+The apply report (mentioned above) may produce some additional runtime errors in different contexts. Meaningful runtime errors are as follows:
+
+\fB[ Antivirus signature base update context ]\fR:
+
+  \(bu Error 58: can't read databases from remote servers.
+
+  \(bu Error 59: mirrors are not fully synchronized (try again later).
+
+  \(bu Error 101-109: can't resolve remote servers names.
+
+\fB[ Antivirus extended signature index update context ]\fR:
+
+  \(bu Error 6: couldn't resolve host. The given remote host was not resolved.
+
+  \(bu Error 7: failed to connect to host.
+
+  \(bu Error 28: operation timeout. The specified timeout period was reached according to the conditions.
+
+  \(bu Error 67: the user name, password, or similar was not  accepted  and the client failed to log in.
+
+  \(bu Error 68: file not found on file server.
+
+  \(bu Error 78: the resource referenced in the URL does not exist.
+
+  \(bu Error 101: the index file signature verification failed.
+
+\fB[ Antivirus white list integration context ]\fR:
+
+  \(bu Error 11: can't compile the antivirus white list.
+
+  \(bu Error 13: can't integrate the antivirus white list.
+
+  \(bu Error 15: can't reload the antivirus DB files.
+
+\fB[ Appliance and license registration context ]\fR:
+
+  \(bu Error 2: failed to initialize.
+
+  \(bu Error 6: couldn't resolve host. The given remote host was not resolved.
+
+  \(bu Error 7: failed to connect to host.
+
+  \(bu Error 22: HTTP page not retrieved. The requested URL was not found or returned another error with the HTTP error code being 400 or above.
+
+  \(bu Error 26: read error. Various reading problems.
+
+  \(bu Error 27: out of memory. A memory allocation request failed.
+
+  \(bu Error 28: operation timeout. The specified timeout period was reached according to the conditions.
+
+  \(bu Error 33: HTTP range error. The range "command" didn't work.
+
+  \(bu Error 34: HTTP post error. Internal post-request generation error.
+
+  \(bu Error 35: SSL connect error. The SSL handshaking failed.
+
+  \(bu Error 42: aborted by callback. An application told to abort the operation.
+
+  \(bu Error 47: too many redirects. Hit the maximum amount when following redirects.
+
+  \(bu Error 51: the peer's SSL certificate or SSH MD5 fingerprint was not ok.
+
+  \(bu Error 52: the service service didn't reply anything, which here is considered an error.
+
+  \(bu Error 53: SSL cryptographic engine not found.
+
+  \(bu Error 54: cannot set SSL cryptographic engine as default.
+
+  \(bu Error 55: failed sending network data.
+
+  \(bu Error 56: failure in receiving network data.
+
+  \(bu Error 58: problem with the local certificate.
+
+  \(bu Error 59: couldn't use specified SSL cipher.
+
+  \(bu Error 60: peer certificate cannot be authenticated with known CA certificates.
+
+  \(bu Error 61: unrecognised transfer encoding.
+
+  \(bu Error 65: sending the data requires a rewind that failed.
+
+  \(bu Error 66: failed to initialise SSL Engine.
+
+  \(bu Error 75: character conversion failed.
+
+  \(bu Error 76: character conversion functions required.
+
+  \(bu Error 78: the resource referenced in the URL does not exist.
+
+  \(bu Error 80: failed to shut down the SSL connection.
+
+  \(bu Error 83: issuer check failed.
+
+  \(bu Error 100: the registration service returned a non digit value code.
+
+  \(bu Error 111-140: the appliance has sent an illegal appliance registration request.
+
+  \(bu Error 141-143: an invalid email address has been used to register the appliance.
+
+  \(bu Error 171-175: the appliance registration service is unavailable at this moment.
+
+  \(bu Error 181: the appliance registration service returned an unknown state.
+
+  \(bu Error 183: the transmitted OTP is not valid.
+
+  \(bu Error 185: the OTP is transmitted by an IP address which is not allowed to register this appliance.
+
+  \(bu Error 187: the appliance has never been registered.
+
+  \(bu Error 189: an invalid password has been transmitted by an already registered appliance.
+
+  \(bu Error 191: the appliance has been already registered.
+
+  \(bu Error 193: the email address required to register the appliance on a public cloud is missing.
+
+  \(bu Error 195: the appliance has already been registered with a different role (Gateway or Manager). If possible, use a distinct MAC address to register the appliance as a new appliance, or contact your provider for further instructions.
+
+  \(bu Error 199: the appliance registration service returned an unknown code.
+
+  \(bu Error 201-205: the registration service returned non conform values.
+
+  \(bu Error 209: can't add the S/N account.
+
+  \(bu Error 211-227: the appliance has sent an unauthorized license registration request.
+
+  \(bu Error 241-245: the license registration service is unavailable.
+
+  \(bu Error 251: can't register a license key for a non registered appliance.
+
+  \(bu Error 253: the appliance can't be authenticated.
+
+  \(bu Error 255: the license key is not intended to be install on this appliance for capacity incompatibility reasons.
+
+  \(bu Error 257: the license key is revoked.
+
+  \(bu Error 259: the license key has been already registered for another appliance.
+
+  \(bu Error 261: can't register the license key because no subscription exists for it.
+
+  \(bu Error 265: the subscription associated to the license key has been canceled.
+
+  \(bu Error 267: the subscription associated to the license key has been disabled.
+
+  \(bu Error 268: the subscription associated to the license is pending.
+
+  \(bu Error 269-289: errors due to registration service unavailability.
+
+  \(bu Error 300: the registration service returned an unknown state value.
+
+\fB[ Checking the RAM capacity ]\fR:
+
+  \(bu Error 1: the RAM capacity of the appliance is not enough to simultaneously activate all configured features. This error is encountered because either some warnings have been ignored during the OS installation or the RAM capacity of the appliance has been reduced after the installation. To avoid this error you can either deactivate some RAM consuming features (like the caching, antivirus or  compression) or upgrade the RAM capacity of your appliance. Also if you encounter this error because you activated the caching mode, you have the possibility to reinstall the OS and reduce the HDD capacity usage during the installation.
+
+\fB[ Custom WAF rules compilation context ]\fR:
+
+  \(bu Error 10: the maximum number of WAF rules per reverse website has been reached during a WAF rule compilation. In case the maximum number is reached, the compilation stops and rules limited to that maximum number are applied. Please note that this error should not occur in normal situation as the maximum number of WAF rules is verified during the WAF rules loading (see the command \fBwaf\fR).
+
+\fB[ License key checking context ]\fR:
+
+  \(bu Error 11: the appliance is not yet registered and therefore does not have a S/N.
+
+  \(bu Error 13: the specified license key is not valid.
+
+\fB[ SSL Mediation exceptions list compiling context]\fR:
+
+  \(bu Error 11: can't convert the domain name list to dump format.
+
+  \(bu Error 13: can't convert the domain name list to db format.
+
+  \(bu Error 15: can't dump a URL list in db format.
+
+  \(bu Error 17: can't convert a URL list from dump format to db format.
+
+  \(bu Error 19: can't convert an exceptions list form db format to a flat format.
+
+  \(bu Error 21: can't remove subdomains from the exceptions list.
+
+\fB[ System restore operation context ]\fR:
+
+  \(bu Error 11-21: backup file corrupted.
+
+  \(bu Error 23-25: can't restore the loaded backup file on the present system because the OS version of the backup differs from the OS version of the present system.
+
+  \(bu Error 27: can't restore the loaded backup file because the backup has been been made on a machine that its hardware configurations and/or OS installation parameters differ from the present system.
+
+\fB[ System patch version matching context ]\fR:
+
+  \(bu Error 11-13: internal error during version matching verification.
+  
+  \(bu Error 15: the patch is not adequate.
+
+\fB[ System patch unpacking context ]\fR:
+
+  \(bu Error 11: the patch is not in a compressed format.
+
+  \(bu Error 21: the patch is not in an archive format.
+
+  \(bu Error 27: patch signature verification failed.
+
+  \(bu Error 41: CPU architecture mismatch.
+
+\fB[ System patch applying context ]\fR:
+
+  \(bu Error 11: internal error in pre installation program.
+
+  \(bu Error 13: internal error during patched component installation.
+
+  \(bu Error 15: internal error in post installation program.
+
+\fB[ System patch machine retuning context ]\fR:
+
+  \(bu Error 1-4, 7-255: unexpected errors that may leave the appliance in an inconsistent state. It is recommended to re-install the OS from scratch using the installation media.
+
+\(bu Error 5-6: these errors are due to little free space on disk(s) and may leave the appliance in an inconsistent state. It is recommended to re-install the OS from scratch using the installation media.
+
+\fB[ TLS components loading context ]\fR:
+
+  \(bu Error 11: can't add the signed certificate to the certificates index file.
+
+  \(bu Error 13: can't extract the certificate information from the loaded certificate.
+
+  \(bu Error 15: can't generate the certificate configuration file for the loaded TLS component file(s).
+
+  \(bu Error 17: can't remove the certificate from the certificates index to update the certificate.
+
+  \(bu Error 61: can't install the certificate information file.
+
+  \(bu Error 63: can't install the certificate configuration file.
+
+  \(bu Error 65: can't install the private key file.
+
+  \(bu Error 67: can't install the certificate file.
+
+  \(bu Error 101: can't generate the configuration file for the loaded CSR file.
+
+  \(bu Error 103: can't remove the certificate from the certificates index to sign the generated certificate.
+
+  \(bu Error 105: can't update the certificates index to generate the signed certificate with the system's CA certificate.
+
+  \(bu Error 107: can't generate the signed certificate with the system's CA certificate.
+
+  \(bu Error 109: can't install the generated signed certificate.
+
+  \(bu Error 111: can't install the CSR file.
+
+\fB[ System's CA components loading context ]\fR:
+
+  \(bu Error 21: can't generate the CA certificate information file.
+
+  \(bu Error 31: can't convert a root CA certificate from PEM format to DER format.
+
+  \(bu Error 61: can't install the CA certificate information file.
+
+  \(bu Error 65: can't install the private key file.
+
+  \(bu Error 67: can't install the CA certificate file in PEM format.
+
+  \(bu Error 69: can't link the CA certificate file for hashing.
+
+  \(bu Error 71: can't install the CA certificate file in DER format.
+
+\fB[ TLS server component generation context ]\fR:
+
+  \(bu Error 11: can't generate the certificate configuration file.
+
+  \(bu Error 13: can't generate the private key.
+
+  \(bu Error 15: can't generate the CSR for the certificate configuration.
+
+  \(bu Error 17: can't remove the certificate from the certificates index.
+
+  \(bu Error 19: can't update the certificates index to sign the server certificate with the system's CA certificate.
+
+  \(bu Error 21: can't generate and/or sign a certificate with the system's CA certificate.
+
+  \(bu Error 23: can't update the certificate reference.
+
+  \(bu Error 61: can't install the server certificate information file.
+
+  \(bu Error 63: can't install the server certificate configuration file.
+
+  \(bu Error 65: can't install the private key file.
+
+  \(bu Error 67: can't install the server certificate file.
+
+  \(bu Error 69: can't install the server CSR file.
+
+\fB[ System's CA components generation context ]\fR:
+
+  \(bu Error 11: can't generate the CA configuration file.
+
+  \(bu Error 13: can't generate the private key for the system's CA certificate.
+
+  \(bu Error 15: can't generate CA certificate.
+
+  \(bu Error 17: can't convert the CA public certificate from PEM format to DER format.
+
+  \(bu Error 19: can't link the CA certificate file for hashing.
+
+  \(bu Error 21: can't initialise the certificates index.
+
+  \(bu Error 61: can't install the CA certificate information file.
+
+  \(bu Error 63: can't install the CA certificate configuration file.
+
+  \(bu Error 65: can't install the private key file.
+
+  \(bu Error 67: can't install the CA certificate file in PEM format.
+
+  \(bu Error 69: can't install the CA certificate file in DER format.
+
+\fB[ Third party CA certificate loading context ]\fR:
+
+  \(bu Error 13: can't install the third party CA certificate file.
+
+\fB[ Client certificates generation context ]\fR:
+
+  \(bu Error 11: can't generate the client certificate configuration file.
+
+  \(bu Error 13: can't generate the client private key.
+
+  \(bu Error 15: can't generate the client certificate.
+
+  \(bu Error 17: can't remove the client certificate from the certificates index.
+
+  \(bu Error 19: can't update the certificates index to sign the client certificate with the system's CA certificate.
+
+  \(bu Error 21: can't sign the client certificate with the system's CA certificate.
+
+  \(bu Error 23: can't generate the PKCS12 client certificate bundle.
+
+  \(bu Error 25: can't base64 encode the PKCS12 client certificate bundle.
+
+  \(bu Error 27: can't install generated TLS components (private key, certificate...).
+
+\fB[ URL list building/updating context ]\fR:
+
+  \(bu Error 7: URL list signature verification failed.
+
+  \(bu Error 9: the URL list is not in a gzip compressed format.
+
+  \(bu Error 13: not enough space left in the URL list directory.
+
+  \(bu Error 15: can't uncompress the URL list.
+
+  \(bu Error 17: the uncompressed URL list is not an ASCII file.
+
+  \(bu Error 19: can't create the new URL list.
+
+  \(bu Error 21: URL list update failed because it has never been created before.
+
+  \(bu Error 23: can't apply the URL list update.
+
+\fB[ Configuration committing context ]\fR:
+
+  \(bu Error 27: can't update the Dynamic DNS.
+
+.SH GENERAL NOTES
+In case where the new configuration to apply requires a DNS server restart, some name resolutions may fail during the apply operation. In this case you should wait for the apply operation end and run the apply command again.
+
+.SH SEE ALSO
+.B cancel
+(1)
+.B conf
+(1)
+.B system
+(1)

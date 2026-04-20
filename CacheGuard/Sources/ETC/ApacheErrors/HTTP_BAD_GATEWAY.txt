@@ -1,0 +1,3 @@
+502
+Bad Gateway
+The Web Gateway received an invalid response from an upstream server

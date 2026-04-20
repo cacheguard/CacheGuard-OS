@@ -1,0 +1,100 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       InitScript
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+source /lib/lsb/init-functions
+
+CACHEGUARD_DIR=/etc/sysconfig/cacheguard
+source ${CACHEGUARD_DIR}/constant
+source ${HARD_DIR}/cloud.conf
+source ${ABASE_DIR}/${ENV_RDIR}/${ENV_CURRENT_NAME}
+source ${LOCAL_DIR}/lib/apl_common
+source ${LOCAL_DIR}/lib/apl_ea_vpnsubscr_functions
+
+embedded-vpnsubscr-conf()
+{
+    local new_public_ip old_public_ip
+    local error error_file=/tmp/vpnsubscr-rweb-error.${$}
+    local retval
+
+    [ ! -f /etc/sysconfig/vpnsubscr ] || source /etc/sysconfig/vpnsubscr
+
+    if is-embedded-in-cloud vpnsubscr ; then
+
+	log_info_msg "Manage ${EMBEDDED_VPNSUBSCR_COMMERCIAL_NAME} App..."
+	apl_ea_vpnsubscr_manage
+	evaluate_retval
+
+	if test -n "${EMBEDDED_VPNSUBSCR_SITE_NAME}" ; then
+	    [ "${EMBEDDED_VPNSUBSCR}" == yes ] || return 0
+	    check-expr-ip ${EMBEDDED_VPNSUBSCR_SITE_NAME} || return 0
+	    new_public_ip='cloud'
+	else
+	    new_public_ip='cloud'
+	fi
+    else
+	[ "${EMBEDDED_VPNSUBSCR}" == yes ] || return 0
+	check-expr-ip ${EMBEDDED_VPNSUBSCR_SITE_NAME} || return 0
+    fi
+
+    log_info_msg "${EMBEDDED_VPNSUBSCR_COMMERCIAL_NAME} App IP adaptation..."
+
+    case ${new_public_ip} in
+	cloud)
+	    new_public_ip=$(get-cloud-my-first-public-ip)
+	    ;;
+	*)
+	    new_public_ip=$(get-my-public-ip)
+	    ;;
+    esac
+
+    test -n "${new_public_ip}" || new_public_ip=${CURRENT_IP_EXTERNAL_IP}
+
+    old_public_ip=$(get-setup-ip 2> ${error_file})
+    error=$(get-error-text ${error_file})
+
+    if test -n "${error}" ; then
+	retval=11
+	[ ${retval} -eq 0 ]
+	evaluate_retval
+	return ${retval}
+    fi
+
+    if test "${old_public_ip}" == "${new_public_ip}" ; then
+	evaluate_retval
+	return 0
+    fi
+
+    apl_ea_vpnsubscr_rweb ${new_public_ip} 2> /dev/null
+    evaluate_retval
+}
+
+case "${1}" in
+    start)
+	embedded-vpnsubscr-conf
+	;;
+    *)
+	echo "Usage: ${0} start"
+	exit 1
+	;;
+esac

@@ -1,0 +1,11 @@
+[ ca ]
+default_ca = CA_default
+  
+[ CA_default ]
+default_days = 5555
+default_md = sha256
+preserve = no
+email_in_dn = no
+nameopt = default_ca
+certopt = default_ca
+policy = policy_match

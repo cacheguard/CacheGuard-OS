@@ -1,0 +1,260 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       Configurator
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+set-dhcp-parameters()
+{
+    if test ${DHCP_MODE} == True -a ${WEB_MODE} == True -a ${IP_WEB_IP} != "0.0.0.0" ; then
+	if test -z "${DHCP_FIXED_LIST}" -a -z "${DHCP_RANGE_LIST}" ; then
+	    export DHCP_IS_ACTIVE=False
+	else
+	    export DHCP_IS_ACTIVE=True
+	fi
+    else
+	export DHCP_IS_ACTIVE=False
+    fi
+
+    if test ${CURRENT_DHCP_MODE} == True -a ${CURRENT_WEB_MODE} == True -a ${CURRENT_IP_WEB_IP} != "0.0.0.0" ; then
+	if test -z "${CURRENT_DHCP_FIXED_LIST}" -a -z "${CURRENT_DHCP_RANGE_LIST}" ; then
+	    export CURRENT_DHCP_IS_ACTIVE=False
+	else
+	    export CURRENT_DHCP_IS_ACTIVE=True
+	fi
+    else
+	export CURRENT_DHCP_IS_ACTIVE=False
+    fi
+}
+
+gen-dhcpd-range-conf()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 1
+    test -n "${3}" || return 1
+    test -n "${4}" || return 1
+    test -n "${5}" || return 1
+
+    local real_ip=${1}
+    local mask=${2}
+    local net=${3}
+    local brd=${4}
+    local vrrp_ip=${5}
+
+    local i=0 elt range
+    local hostname mac ip
+    local ip1 ip2
+
+    echo "subnet ${net} netmask ${mask} {"
+    echo -e "\toption subnet-mask ${mask};"
+    echo -e "\toption broadcast-address ${brd};"
+
+    if test ${HA_MODE} == True ; then
+	if test ${vrrp_ip} != 0.0.0.0 ; then
+	    echo -e "\toption routers ${vrrp_ip};"
+	    echo -e "\toption local-pac-server \"http://${vrrp_ip}/ha.pac\";"
+	fi
+    else
+	if test ${real_ip} != 0.0.0.0 ; then
+	    echo -e "\toption routers ${real_ip};"
+	    echo -e "\toption local-pac-server \"http://${real_ip}/ha.pac\";"
+	fi
+    fi
+
+    if test -n "${NAME_SERVER_LIST}" ; then
+	local ns null=1
+	for ns in ${NAME_SERVER_LIST}
+	do
+	    if test ${ns} == 127.0.0.1 ; then
+		if test ${DNS_MODE} == True ; then
+		    if test ${HA_MODE} == True ; then
+			if test ${vrrp_ip} != 0.0.0.0 ; then
+			    if test ${null} -eq 1 ; then
+				echo -ne "\toption domain-name-servers "
+			    else
+				echo -n ", "
+			    fi
+			    echo -n "${vrrp_ip}"
+			    null=0
+			fi
+		    else
+			if test ${real_ip} != 0.0.0.0 ; then
+			    if test ${null} -eq 1 ; then
+				echo -ne "\toption domain-name-servers "
+			    else
+				echo -n ", "
+			    fi
+			    echo -n "${real_ip}"
+			    null=0
+			fi
+		    fi
+		fi
+	    else
+		if test ${null} -eq 1 ; then
+		    echo -ne "\toption domain-name-servers "
+		else
+		    echo -n ", "
+		fi
+		echo -n "${ns}"
+		null=0
+	    fi
+	done
+	
+	test ${null} -eq 1 || echo ";"
+    fi
+
+    echo
+
+    for elt in ${DHCP_FIXED_LIST}
+    do
+	range=$[${i} % 3]
+	case ${range} in
+	    0)
+		hostname=${elt}
+		;;
+	    1)
+		mac=${elt}
+		;;
+	    2)
+		ip=${elt}
+		echo -e "\thost ${hostname} {hardware ethernet ${mac}; fixed-address ${ip};}"
+		;;
+	    *)
+		return 1
+		;;
+	esac
+	((i++))
+    done
+
+    test -z "${DHCP_FIXED_LIST}" || echo
+
+    i=0
+    echo -e "\tpool {"
+    test -z "${DHCP_PEER_LIST}" || echo -e "\t\tfailover peer \"${SHOSTNAME}\";"
+    echo -e "\t\tdeny dynamic bootp clients;"
+
+    for elt in ${DHCP_RANGE_LIST}
+    do
+	range=$[${i} % 2]
+	case ${range} in
+	    0)
+		ip1=${elt}
+		;;
+	    1)
+		ip2=${elt}
+		echo -e "\t\trange ${ip1} ${ip2};"
+		;;
+	    *)
+		return 1
+		;;
+	esac
+	((i++))
+    done
+    echo -e "\t}"
+
+    echo -e "}"
+}
+
+gen-dhcpd-conf()
+{
+    cat dhcpd.conf-constant
+    cat dhcpd.conf-tuned
+    echo
+    echo "option domain-name \"${DOMAIN_NAME}\";"
+
+    test ${IP_WEB_IP} == 0.0.0.0 || echo "local-address ${IP_WEB_IP};"
+    echo "server-identifier ${IP_WEB_IP};"
+    echo "option dhcp-server-identifier ${IP_WEB_IP};"
+
+    echo "server-name ${SHOSTNAME};"
+    if test ${HA_MODE} == True ; then
+	echo "option arp-cache-timeout 30;"
+	echo "option www-server ${VRRP_WEB_MASTER_IP};"
+    else
+	echo "option arp-cache-timeout 60;"
+	echo "option www-server ${IP_WEB_IP};"
+    fi
+
+    if test -n "${NTP_SERVER_LIST}" ; then
+	local ntp_servers=${NTP_SERVER_LIST//\ /,}
+	echo "option ntp-servers ${ntp_servers};"
+    fi
+
+    echo
+
+    if test -n "${DHCP_PEER_LIST}" ; then
+	local role
+	role=${DHCP_PEER_LIST/ *}
+	ip=${DHCP_PEER_LIST#* }
+	ip=${ip/ *}
+	echo -e "failover peer \"${SHOSTNAME}\" {"
+	case ${role} in
+	    master)
+		echo -e "\tsecondary;"
+		;;
+	    slave)
+		echo -e "\tprimary;"
+		echo -e "\tsplit 128;"
+		echo -e "\tmclt 3600;"
+		;;
+	    *)
+		return 255
+		;;
+	esac
+
+	echo -e "\taddress ${IP_WEB_IP};"
+	echo -e "\tport ${DHCP_PEER_PORT};"
+	echo -e "\tpeer address ${ip};"
+	echo -e "\tpeer port ${DHCP_PEER_PORT};"
+	echo -e "\tmax-response-delay 60;"
+	echo -e "\tmax-unacked-updates 10;"
+	echo -e "\tload balance max seconds 3;"
+	echo -e "}"
+	echo
+    fi
+
+    gen-dhcpd-range-conf ${IP_WEB_IP} ${IP_WEB_MASK} ${IP_WEB_NET} ${IP_WEB_BRD} ${VRRP_WEB_MASTER_IP}
+}
+
+gen-sysconfig-dhcpd()
+{
+    echo "DHCPD_IF=\"${IF_WEB}\""
+
+    if test ${WEB_MODE} == True -a "${IP_WEB_IP}" != "0.0.0.0" ; then
+	test -z "${DHCP_FIXED_LIST}" -a -z "${DHCP_RANGE_LIST}" || echo "DHCPD_STATE=1"
+    fi
+}
+
+commit-dhcp-leases()
+{
+    test ${FLAG_DHCP} -eq 1 || return 0
+
+    rm -f \
+       ${DB_DIR}/dhcpd.leases~ \
+       ${DB_DIR}/dhcpd.leases
+}
+
+restore-dhcp-leases()
+{
+    :
+}
+
+LIB_APL_DHCP=Yes

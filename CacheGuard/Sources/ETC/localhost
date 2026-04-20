@@ -1,0 +1,13 @@
+; zone loclhost
+
+$TTL 172800
+ 
+localhost.	IN	SOA     loclhost. postmaster.loclhost. (
+		2002062901	; Serial
+		21600		; Refresh every 6 hours
+		3600		; Retry after 1 hour
+		3600000		; Expire after 41 days
+		172800 ) 	; Minimum TTL of 2 days
+
+		IN	NS	localhost.
+		IN	A	127.0.0.1

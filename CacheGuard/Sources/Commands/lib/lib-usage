@@ -1,0 +1,320 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       Commands
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+get-system-id()
+{
+    local hard_dir
+
+    case ${APL_ROLE} in
+	gateway)
+	    hard_dir=${HARD_DIR}
+	    ;;
+	manager)
+	    local level=${1}
+	    if test -n "${level}" ; then
+		hard_dir=/${HARD_DIR_NAME}
+	    else
+		hard_dir=${HARD_DIR}
+	    fi
+	    ;;
+	*)
+	    hard_dir=${HARD_DIR}
+	    ;;
+    esac
+
+    local id=$(cat ${hard_dir}/${SN_ID})
+
+    echo -n "${id:1}"
+}
+
+get-system-sn()
+{
+    local id=$(get-system-id)
+    local sn=${id/${SN_PREFIX}-L*_/}
+
+    echo -n "${sn}"
+}
+
+is-registered-appliance()
+{
+    local sn=$(get-system-sn)
+    local first_part=${sn/-*}
+    local len=${#first_part} ; ((len--))
+    local last_char=${first_part:${len}:1}
+
+    test "${last_char}" != 'T'
+}
+
+is-usage-conform()
+{
+    case ${CLOUD_NAME} in
+	aws|azure)
+	    case ${CLOUD_USAGE} in
+		free)
+		    return 0
+		    ;;
+		payg)
+		    if test "${CLOUD_VALID_IP}" == yes ; then
+			return 0
+		    else
+			return 11
+		    fi
+		    ;;
+		byol)
+		    ;;
+		*)
+		    ;;
+	    esac
+	    ;;
+	*)
+	    ;;
+    esac
+
+    test -s ${ROOT_DIR}${HARD_DIR}/${SN_ALIVE} || return 0
+
+    local ret msg=$(cat ${ROOT_DIR}${HARD_DIR}/${SN_ALIVE})
+
+    local msg_state=${msg:0:3}
+    local code_value=${msg#*:}
+    local code=${code_value/:*}
+
+    case "${msg_state}" in
+	"OK:")
+	    ret=0
+	    ;;
+	"KO:")
+	    ret=21
+	    ;;
+	*)
+	    ret=0
+	    ;;
+    esac
+
+    return ${ret}
+}
+
+is-first-startup-login()
+{
+    test -f ${HARD_DIR}/${FIRST_STARTUP} || return 11
+    local action
+    read action < ${HARD_DIR}/${FIRST_STARTUP}
+    test -n "${action}"
+}
+
+echo-usage-message()
+{
+    test -n "${1}" || return 0
+    local message=${1}
+
+    ! is-first-startup-login || return 0
+
+    echo ${message}
+}
+
+get-usage-message()
+{
+    local trial=${1}	; test -n "${trial}"	|| trial=${TRIAL_PERIOD}
+    local trialm=${2}	; test -n "${trialm}"	|| trialm=${TRIAL_PERIOD_MARGIN}
+    local ifile=${3}	; test -n "${ifile}"	|| ifile=${INSTALL_DATE}
+    local vfile=${4}	; test -n "${vfile}"	|| vfile=${VARIATION_DATE}
+    local sfile=${5}	; test -n "${sfile}"	|| sfile=${SERIAL_DATE}
+    local rfile=${6}	; test -n "${rfile}"	|| rfile=${RENEW_DAYS}
+    local lperiod=${7}	; test -n "${lperiod}"	|| lperiod=${LICENSE_PERIOD}
+    local lperiodm=${8}	; test -n "${lperiodm}"	|| lperiodm=${LICENSE_PERIOD_MARGIN_1}
+
+    local lic_message sn_message end period
+
+    local msg0=$(cat ${ROOT_DIR}${APPLIANCE_DIR}/etc/.file0)
+    local msg1=$(cat ${ROOT_DIR}${APPLIANCE_DIR}/etc/.file1)
+    local msg2=$(cat ${ROOT_DIR}${APPLIANCE_DIR}/etc/.file2)
+    local msg3=$(cat ${ROOT_DIR}${APPLIANCE_DIR}/etc/.file3)
+    local msg4=$(cat ${ROOT_DIR}${APPLIANCE_DIR}/etc/.file4)
+    local msg5=$(cat ${ROOT_DIR}${APPLIANCE_DIR}/etc/.file5)
+    local msg6=$(cat ${ROOT_DIR}${APPLIANCE_DIR}/etc/.file6)
+    local msg8=$(cat ${ROOT_DIR}${APPLIANCE_DIR}/etc/.file8)
+    local msg9=$(cat ${ROOT_DIR}${APPLIANCE_DIR}/etc/.file9)
+
+    msg0=$(echo -en "${msg0}")
+    msg1=$(echo -en "${msg1}")
+    msg2=$(echo -en "${msg2}")
+    msg3=$(echo -en "${msg3}")
+    msg4=$(echo -en "${msg4}")
+    msg5=$(echo -en "${msg5}")
+    msg6=$(echo -en "${msg6}")
+    msg8=$(echo -en "${msg8}")
+    msg9=$(echo -en "${msg9}")
+
+    if ! is-usage-conform ; then
+	lic_message="${msg8}"
+	echo-usage-message "${lic_message}"
+	return 11
+    fi
+
+    is-registered-appliance || sn_message=${msg5}
+
+    local id_file=${ROOT_DIR}${HARD_DIR}/${SN_ID}
+
+    if test ! -f ${id_file} ; then
+	lic_message="${msg0}"
+	echo-usage-message "${lic_message}"
+	return 13
+    fi
+
+    case ${CLOUD_NAME} in
+	aws|azure)
+	    case ${CLOUD_USAGE} in
+		free)
+		    return 0
+		    ;;
+		payg)
+		    return 0
+		    ;;
+		byol)
+		    ;;
+		*)
+		    ;;
+	    esac
+	    ;;
+	*)
+	    ;;
+    esac
+
+    if test ${OS_FREE_USAGE} == True ; then
+	echo-usage-message "${sn_message}"
+	return 0
+    else
+	local id level
+
+	id=$(cat ${id_file} 2> /dev/null)
+	id=${id:4}
+	level=${id/_*}
+	level=${level:1}
+
+	if test ${level} -eq 0 ; then
+	    echo-usage-message "${sn_message}"
+	    return 0
+	fi
+    fi
+
+    if test ! -f ${ROOT_DIR}${HARD_DIR}/${ifile} ; then
+	lic_message="${msg0}"
+	echo-usage-message "${lic_message}"
+	return 15
+    fi
+
+    if test ! -f ${ROOT_DIR}${HARD_DIR}/${vfile} ; then
+	lic_message="${msg0}"
+	echo-usage-message "${lic_message}"
+	return 17
+    fi
+
+    local vdate=$(cat ${ROOT_DIR}${HARD_DIR}/${vfile})
+    local date=$(date +"%s" 2> /dev/null)
+
+    if test -f ${ROOT_DIR}${HARD_DIR}/${sfile} -a -f ${ROOT_DIR}${HARD_DIR}/${rfile} ; then
+
+	local sdate=$(cat ${ROOT_DIR}${HARD_DIR}/${sfile})
+	local renew_days=$(cat ${ROOT_DIR}${HARD_DIR}/${rfile})
+
+	end=$[${sdate} + ${vdate} + (${lperiod} * ${renew_days})]
+
+	if test ${date} -le ${end} ; then
+	    period=$[${end} - ${date}]
+	    if test ${period} -lt ${lperiodm} ; then
+		local hours=$[${period} / 3600]
+		lic_message="${msg3/\%h/${hours}}"
+		echo-usage-message "${sn_message}"
+		echo-usage-message "${lic_message}"
+		return 0
+	    fi
+	else
+	    period=$[${date} - ${end}]
+	    if test ${period} -lt ${lperiodm} ; then
+		lic_message="${msg6}"
+		echo-usage-message "${sn_message}"
+		echo-usage-message "${lic_message}"
+		return 1
+	    else
+		lic_message="${msg4}"
+		echo-usage-message "${sn_message}"
+		echo-usage-message "${lic_message}"
+		return 1
+	    fi
+	fi
+    else
+	local idate=$(cat ${ROOT_DIR}${HARD_DIR}/${ifile})
+	idate=$[${idate} + ${vdate}]
+	local end=$[${idate} + ${trial}]
+
+	if test ${date} -lt ${idate} ; then
+	    lic_message="${msg0}"
+	    echo-usage-message "${lic_message}"
+	    return 19
+	else
+	    if test ${date} -le ${end} ; then
+                local period=$[${end} - ${date}]
+                local days=$[${period} / 86400]
+		local seconds=$[${period} % 86400]
+		test ${seconds} -lt 43200 || ((days++))
+
+		if test ${days} -eq 0 ; then
+                    lic_message="${msg9}"
+		else
+		    lic_message="${msg1/\%time/about ${days} days}"
+		fi
+                echo-usage-message "${lic_message}"
+                return 0
+	    else
+		lic_message="${msg2}"
+		echo-usage-message "${lic_message}"
+		return 3
+	    fi
+	fi
+    fi
+
+    echo-usage-message "${sn_message}"
+    return 0
+}
+
+is-usage-allowed()
+{
+    local message ret
+
+    message=$(get-usage-message)
+    ret=${?}
+
+    test ${ret} -le 10 || return 11
+    test ${ret} -ne 0 || return 0
+
+    case ${ret} in
+	1|3)
+	    test ! -f ${TMP_DIR}/${UNREGISTER_SN} || return 0
+	    test ! -f ${TMP_DIR}/${REGISTER_OTP} || return 0
+	    test ! -f ${TMP_DIR}/${REGISTER_KEY} || return 0
+	    return 13
+	    ;;
+	*)
+	    ;;
+    esac
+}

@@ -1,0 +1,912 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       Commands
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+source functions
+
+vlan-exist()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    local vlans=${1}
+    local vlan=${2}
+
+    local elt i=0 range
+
+    for elt in ${vlans}
+    do
+	range=$[${i} % 2]
+	test ${range} -eq 0 && test "${elt}" == "${vlan}" && return 0
+	((i++))
+    done
+    return 1
+}
+
+show-ip-internal()
+{
+    echo-command-form "ip internal"
+    echo-mark-cur
+    echo-value "${CURRENT_IP_INTERNAL_IP} ${CURRENT_IP_INTERNAL_MASK}"
+
+    if test "${CURRENT_IP_INTERNAL_IP}" != "${IP_INTERNAL_IP}" -o \
+	"${CURRENT_IP_INTERNAL_MASK}" != "${IP_INTERNAL_MASK}" ; then
+	echo-command-form "ip internal"
+	echo-mark-new
+	echo-value "${IP_INTERNAL_IP} ${IP_INTERNAL_MASK}"
+    fi
+}
+
+show-ip-external()
+{
+    echo-command-form "ip external"
+    echo-mark-cur
+    echo-value "${CURRENT_IP_EXTERNAL_IP} ${CURRENT_IP_EXTERNAL_MASK}"
+
+    if test "${CURRENT_IP_EXTERNAL_IP}" != "${IP_EXTERNAL_IP}" -o \
+	"${CURRENT_IP_EXTERNAL_MASK}" != "${IP_EXTERNAL_MASK}" ; then
+	echo-command-form "ip external"
+	echo-mark-new
+	echo-value "${IP_EXTERNAL_IP} ${IP_EXTERNAL_MASK}"
+    fi
+}
+
+show-ip-auxiliary()
+{
+    echo-command-form "ip auxiliary"
+    echo-mark-cur
+    echo-value "${CURRENT_IP_AUXILIARY_IP} ${CURRENT_IP_AUXILIARY_MASK}"
+
+    if test "${CURRENT_IP_AUXILIARY_IP}" != "${IP_AUXILIARY_IP}" -o \
+	"${CURRENT_IP_AUXILIARY_MASK}" != "${IP_AUXILIARY_MASK}" ; then
+	echo-command-form "ip auxiliary"
+	echo-mark-new
+	echo-value "${IP_AUXILIARY_IP} ${IP_AUXILIARY_MASK}"
+    fi
+}
+
+show-ip-vlan-all()
+{
+    local i=0 elt range
+    local vlan ip netmask ip_netmask1 ip_netmask2
+
+    for elt in ${CURRENT_IP_VLAN_LIST}
+    do
+	range=$[${i} % 3]
+	case ${range} in
+	    0)
+		vlan=${elt}
+		;;
+	    1)
+		ip=${elt}
+		;;
+	    2)
+		netmask=${elt}
+		echo-command-form "ip internal.${vlan}"
+		echo-mark-cur
+		echo-value "${ip} ${netmask}"
+		ip_netmask1=$(get-vlan-ip-netmask ${vlan} new)
+		test -n "${ip_netmask1}" || warning 2
+		;;
+	    *)
+		return 1
+		;;
+	esac
+	((i++))
+    done
+    
+    i=0
+    for elt in ${IP_VLAN_LIST}
+    do
+	range=$[${i} % 3]
+	case ${range} in
+	    0)
+		vlan=${elt}
+		;;
+	    1)
+		ip=${elt}
+		;;
+	    2)
+		netmask=${elt}
+		ip_netmask1=$(get-vlan-ip-netmask ${vlan} cur)
+		if test "${ip_netmask1}" != "${ip} ${netmask}" ; then
+		    echo-command-form "ip internal.${vlan}"
+		    echo-mark-new
+		    echo-value "${ip} ${netmask}"
+		fi
+		;;
+	    *)
+		return 1
+		;;
+	esac
+	((i++))
+    done
+}
+
+show-ip-vlan()
+{
+    if test -z "${1}" ; then
+	show-ip-vlan-all
+	return ${?}
+    fi
+
+    local vlan ip_netmask1 ip_netmask2
+    vlan=${1}
+
+    ip_netmask1=$(get-vlan-ip-netmask ${vlan} cur)
+    ip_netmask2=$(get-vlan-ip-netmask ${vlan} new)
+
+    test -n "${ip_netmask1}" -o -n "${ip_netmask2}" || return 42
+
+    echo
+
+    if test -n "${ip_netmask1}" ; then
+	echo-command-form "ip internal.${vlan}"
+	echo-mark-cur
+	echo-value "${ip_netmask1}"
+    else
+	warning 1
+    fi
+
+    if test "${ip_netmask1}" != "${ip_netmask2}" ; then
+	if test -n "${ip_netmask2}" ; then
+	    echo-command-form "ip internal.${vlan}"
+	    echo-mark-new
+	    echo-value "${ip_netmask2}"
+	else
+	    warning 2
+	fi
+    fi
+
+    echo
+}
+
+show-ip()
+{
+    local ret=0
+
+    echo-begin-show
+    if test -z "${1}" ; then
+
+	! contextual-command-is-allowed || show-ip-external
+	show-ip-internal
+
+	if contextual-command-is-allowed ; then
+	    show-ip-auxiliary
+	    show-ip-vlan
+	    ret=${?}
+	fi
+    else
+	case ${1} in
+	    internal)
+		show-ip-${1}
+		ret=${?}
+		;;
+
+	    external|auxiliary)
+		! contextual-command-is-allowed || show-ip-${1}
+		ret=${?}
+		;;
+	    vlan)
+		! contextual-command-is-allowed || show-ip-vlan-all
+		;;
+	    *)
+		if contextual-command-is-allowed ; then
+		    if test "${1:0:9}" == "internal." ; then
+			if check-vlan "${1:9}" ; then
+			    show-ip-vlan "${1:9}"
+			    ret=${?}
+			else
+			    ret=41
+			fi
+		    else
+			ret=1
+		    fi
+		fi
+		    ;;
+	esac
+    fi
+    echo-end-show
+    return ${ret}
+}
+
+show-name1()
+{
+    local names=${2}
+
+    echo-command-form "ip name"
+    if test "${1}" == "new" ; then
+	echo-mark-new
+    else
+	echo-mark-cur
+    fi
+
+    if test -z "${names}" ; then
+	echo-value-null
+	return 0
+    fi
+
+    local elt range i=0 n=0
+    local name ip
+
+    for elt in ${names}
+    do
+	range=$[${i} %2]
+	case ${range} in
+	    0)
+		name=${elt}
+		;;
+	    1)
+		ip=${elt}
+		test ${n} -eq 0 || echo-blank-command
+		echo-value "${name} ${ip}"
+		((n++))
+		;;
+	    *)
+		return 255
+		;;
+	esac
+	((i++))
+    done
+}
+
+show-name()
+{
+    echo-begin-show
+    show-name1 'current' "${CURRENT_IP_NAME_IP_LIST}"
+    test "${CURRENT_IP_NAME_IP_LIST}" == "${IP_NAME_IP_LIST}" || show-name1 'new' "${IP_NAME_IP_LIST}"
+    echo-end-show
+}
+
+manage-name()
+{
+    if test -z "${1}" ; then show-name ; return 0 ; fi
+
+    local action=${1}
+
+    case ${action} in
+	raz)
+	    unset IP_NAME_IP_LIST
+	    ;;
+	add|del)
+
+	    if test "${action}" == "add" ; then
+		local len=$(record2-length-list "${IP_NAME_IP_LIST}")
+		test ${len} -lt ${MAX_NAME_IP_NB} || return 90
+	    fi
+
+	    test -n "${2}" || return 1
+	    local name=${2}
+	    test ${name} != 'localhost' || return 32
+	    test ${name} != 'localhost.localdomain' || return 32
+	    
+	    check-domainname ${name} || return 16
+
+	    if check-expr-ip ${name} ; then
+		INDIRECT_ERROR_CODE=520
+		return 254
+	    fi
+
+	    if test ${action} == add ; then
+		test -n "${3}" || return 1
+		local ip=${3}
+		test ${ip:0:4} != '127.' || return 204
+		check-ip ${ip} || return 12
+	    fi
+
+	    IP_NAME_IP_LIST=$(remove-record-from-list 2 1 ${name} "${IP_NAME_IP_LIST}")
+	    test ${action} != add || IP_NAME_IP_LIST=$(insert-record-in-slist 2 1 "${name} ${ip}" "${IP_NAME_IP_LIST}")
+	    ;;
+	
+	*)
+	    return 1
+	    ;;
+    esac
+
+    SAVENV=1
+}
+
+show-route1()
+{
+    local routes=${2}
+
+    echo-command-form "ip route"
+    if test "${1}" == "new" ; then
+	echo-mark-new
+    else
+	echo-mark-cur
+    fi
+
+    if test -z "${routes}" ; then
+	echo-value-null
+	return 0
+    fi
+
+    local elt range i=0 n=0
+    local ip netmask gateway weight pinged
+
+    for elt in ${routes}
+    do
+	range=$[${i} % 5]
+	case ${range} in
+	    0)
+		ip=${elt}
+		;;
+	    1)
+		netmask=${elt}
+		;;
+	    2)
+		gateway=${elt}
+		;;
+	    3)
+		weight=${elt}
+		;;
+	    4)
+		pinged=${elt}
+
+		if test ${pinged} == ${gateway} ; then
+		    unset pinged
+		else
+		    pinged=" ${pinged}"
+		fi
+
+		test ${n} -eq 0 || echo-blank-command
+		if test ${ip} == '0.0.0.0' -a ${netmask} == '0.0.0.0' ; then
+		    echo-value "default ${gateway} ${weight}${pinged}"
+		else
+		    echo-value "${ip} ${netmask} ${gateway} ${weight}${pinged}"
+		fi
+		((n++))
+		;;
+	    *)
+		return 1
+		;;
+	esac
+	((i++))
+    done
+}
+
+show-route()
+{
+    echo-begin-show
+    show-route1 'current' "${CURRENT_IP_ROUTE_LIST}"
+    test "${CURRENT_IP_ROUTE_LIST}" == "${IP_ROUTE_LIST}" || show-route1 'new' "${IP_ROUTE_LIST}"
+    echo-end-show
+}
+
+route-remove()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    local in_list=${1}
+    local record=${2}
+
+    local out_list
+    local f1 f2 f3 f4 f5
+    local elt i=0 range
+
+    for elt in ${in_list}
+    do
+	range=$[${i} % 5]
+	case ${range} in
+	    0)
+		f1=${elt}
+		;;
+	    1)
+		f2=${elt}
+		;;
+	    2)
+		f3=${elt}
+		;;
+	    3)
+		f4=${elt}
+		;;
+	    4)
+		f5=${elt}
+		test "${f1} ${f2} ${f3}" == "${record}" || out_list="${out_list} ${f1} ${f2} ${f3} ${f4} ${f5}"
+		;;
+	    *)
+		return 1
+		;;
+	esac
+	i=$[${i} + 1]
+    done
+    out_list="${out_list:1}"
+    echo "${out_list}"
+    return 0
+}
+
+get-default-gateways()
+{
+    local i=0 elt range
+    local ip netmask gateway
+    local default_gateways
+
+    for elt in ${IP_ROUTE_LIST}
+    do
+	range=$[${i} % 5]
+	case ${range} in
+	    0)
+		ip=${elt}
+		;;
+	    1)
+		netmask=${elt}
+		;;
+	    2)
+		gateway=${elt}
+		;;
+	    3)
+		;;
+	    4)
+		test ${ip} != '0.0.0.0' -o ${netmask} != '0.0.0.0' || default_gateways="${default_gateways} ${gateway}"
+		;;
+	    *)
+		return 255
+		;;
+	esac
+	((i++))
+    done
+
+    echo ${default_gateways:1}
+}
+
+manage-route()
+{
+    if test -z "${1}" ; then show-route ; return 0 ; fi
+    local operation=${1}
+
+    local len
+    local ip mk px gw wt pg route
+    local position_ip_mk_gw position_ip_mk position_nb position
+    local position_ip position_mk position_gw position_route
+
+    case "${operation}" in
+	add|del|raz)
+	    ;;
+	*)
+	    if test "${operation:0:7}" == "insert:" ; then
+		position_ip_mk_gw=${operation:7}
+		operation=insert
+		position=before
+	    elif test "${operation:0:4}" == "add:" ; then
+		position_ip_mk_gw=${operation:4}
+		operation=insert
+		position=after
+	    elif test "${operation:0:5}" == "move:" ; then
+		if check-digit ${operation:5} ; then
+		    position_nb=${operation:5}
+		else
+		    position_ip_mk_gw=${operation:6}
+		    case "${operation:5:1}" in
+			+)
+			    position=after
+			    ;;
+			-)
+			    position=before
+			    ;;
+			*)
+			    return 1
+			    ;;
+		    esac
+		fi
+		operation=move
+	    else
+		return 1
+	    fi
+
+	    if test -n "${position_ip_mk_gw}" ; then
+		position_gw=${position_ip_mk_gw/*:}
+		position_ip_mk=${position_ip_mk_gw/:*}
+		
+		test "${position_gw}" != "${position_ip_mk}" || return 180
+		check-ip ${position_gw} || return 12
+		
+		if test "${position_ip_mk}" == default ; then
+		    position_ip='0.0.0.0'
+		    position_mk='0.0.0.0'
+		else
+		    position_ip=${position_ip_mk/\/*}
+		    position_mk=${position_ip_mk/*\/}
+		    if test "${position_ip}" != '0.0.0.0' -o "${position_mk}" != '0.0.0.0' ; then
+			test "${position_ip}" != "${position_mk}" || return 180
+			
+			check-ip ${position_ip} || return 12
+
+			if test ${#position_mk} -le 2 ; then
+			    check-prefix ${position_mk} || return 158
+			    if test ${position_mk} == 32 ; then
+				position_mk='255.255.255.255'
+			    elif test ${position_mk} == 0 ; then
+				position_mk='0.0.0.0'
+			    else
+				position_mk=$(ipcalc -s ${position_ip}/${position_mk} -m)
+				position_mk=${position_mk/NETMASK=/}
+			    fi
+			else
+			    check-mask ${position_mk} || return 13
+			fi
+			check-net-ip-address ${position_ip} ${position_mk} || return 70
+		    fi
+		fi
+		position_route="${position_ip} ${position_mk} ${position_gw}"
+	    fi
+	    ;;
+    esac
+
+    case "${operation}" in
+	add|insert|move|del)
+	    if test "${operation}" == "add" -o "${operation}" == "insert" ; then
+		local len=$(record5-length-list "${IP_ROUTE_LIST}")
+		test ${len} -lt ${MAX_IP_ROUTES_NB} || return 90
+	    fi
+	    test -n "${2}" || return 1
+	    if test "${2}" == default ; then
+		ip='0.0.0.0'
+		mk='0.0.0.0'
+	    else
+		ip=${2}
+		px=${ip/*\/}
+		if test ${ip} != ${px} ; then
+		    check-prefix ${px} || return 158
+		    ip=${ip/\/*}
+		    check-ip ${ip} || return 12
+		    if test ${px} == 32 ; then
+			local mk='255.255.255.255'
+		    elif test ${px} == 0 ; then
+			mk='0.0.0.0'
+		    else
+			local mk=$(ipcalc -s ${ip}/${px} -m)
+			mk=${mk/NETMASK=/}
+		    fi
+		else
+		    test -n "${3}" || return 1
+		    check-ip ${ip} || return 12
+		    mk=${3}
+		    check-mask ${mk} || return 13
+		    shift
+		fi
+	    fi
+
+	    gw=${3}
+
+	    check-ip ${gw} || return 12
+	    check-net-ip-address ${ip} ${mk} || return 70
+
+	    case "${operation}" in
+		move)
+		    export IP_ROUTE_LIST
+		    route="${ip} ${mk} ${gw}"
+		    if test -n "${position_nb}" ; then
+			IP_ROUTE_LIST=$(move-record-at-position-in-list 5 3 "${route}" "${IP_ROUTE_LIST}" ${position_nb})
+		    else
+			IP_ROUTE_LIST=$(move-record-in-list 5 3 "${route}" "${IP_ROUTE_LIST}" "${position_route}" ${position})
+		    fi
+		    test ${?} -eq 0 || return 152
+
+		    ;;
+		del)
+		    export IP_ROUTE_LIST=$(route-remove "${IP_ROUTE_LIST}" "${ip} ${mk} ${gw}")
+		    ;;
+
+		add|insert)
+		    if test ${ip} == '0.0.0.0' -a ${mk} == '0.0.0.0' ; then
+			local default_gws=$(get-default-gateways)
+			len=$(length-list "${default_gws}")
+			test ${len} -lt ${MAX_IP_DEFAUKT_ROUTES_NB} || return 90
+		    fi
+		    if test -n "${4}" ; then
+			wt=${4}
+			check-weight ${wt} || return 137
+			if test -n "${5}" ; then
+			    pg=${5}
+			    check-ip ${pg} || return 12
+			else
+			    pg=${gw}
+			fi
+		    else
+			wt=50
+			pg=${gw}
+		    fi
+
+		    if test -z "${position_ip_mk_gw}" ; then
+			export IP_ROUTE_LIST=$(insert-record-in-list 5 3 "${ip} ${mk} ${gw} ${wt} ${pg}" "${IP_ROUTE_LIST}")
+		    else
+			export IP_ROUTE_LIST
+			IP_ROUTE_LIST=$(insert-record-in-list 5 3 "${ip} ${mk} ${gw} ${wt} ${pg}" "${IP_ROUTE_LIST}" "${position_route}" ${position})
+			test ${?} -eq 0 || return 152
+		    fi
+		    ;;
+		*)
+		    return 255
+		    ;;
+	    esac
+	    ;;
+	
+	raz)
+	    export IP_ROUTE_LIST=""
+	    ;;
+	*)
+	    return 255
+	;;
+    esac
+
+    SAVENV=1
+}
+
+show-via1()
+{
+    local vias=${2}
+
+    echo-command-form "ip via"
+    if test "${1}" == "new" ; then
+	echo-mark-new
+    else
+	echo-mark-cur
+    fi
+
+    if test -z "${vias}" ; then
+	echo-value-null
+	return 0
+    fi
+
+    local elt range i=0 n=0
+    local gateway role prio
+
+    for elt in ${vias}
+    do
+	range=$[${i} % 3]
+	case ${range} in
+	    0)
+		gateway=${elt}
+		;;
+	    1)
+		role=${elt}
+		;;
+	    2)
+		prio=${elt}
+		echo-value "${gateway} ${role} ${prio}"
+		;;
+	    *)
+		return 255
+		;;
+	esac
+	((i++))
+    done
+}
+
+show-via()
+{
+    echo-begin-show
+    show-via1 'current' "${CURRENT_IP_VIA_LIST}"
+    test "${CURRENT_IP_VIA_LIST}" == "${IP_VIA_LIST}" || show-via1 'new' "${IP_VIA_LIST}"
+    echo-end-show
+}
+
+manage-via()
+{
+    if test -z "${1}" ; then show-via ; return 0 ; fi
+
+    local action=${1}
+
+    case ${action} in
+	raz)
+	    unset IP_VIA_LIST
+	    ;;
+	add|del)
+	    test -n "${2}" || return 1
+	    local gateway=${2}
+	    check-ip ${gateway} || return 12
+
+	    IP_VIA_LIST=$(remove-record-from-list 3 1 ${gateway} "${IP_VIA_LIST}")
+
+	    if test ${action} == add ; then
+		test -n "${3}" || return 1
+		local role=${3}
+		check-ha-role ${role} || return 48
+		if test -z "${4}" ; then
+		    case ${role} in
+			master)
+			    local prio=110
+			    ;;
+			backup)
+			    local prio=100
+			    ;;
+			*)
+			    return 255
+			    ;;
+		    esac
+		else
+		    local prio=${4}
+		    check-priority ${prio} || return 47
+		fi
+		IP_VIA_LIST=$(insert-record-in-slist 3 1 "${gateway} ${role} ${prio}" "${IP_VIA_LIST}")
+	    fi
+	    ;;
+	*)
+	    return 1
+	    ;;
+    esac
+
+    SAVENV=1
+}
+
+show-ip-neighbour()
+{
+    test -f /var/run/${IP_NEIGHBOUR_FILENAME} || return 0
+    local ip dev mac
+
+    echo-begin-show
+
+    while read ip dev mac
+    do
+	echo-command-form ip
+	echo-value "${ip} ${dev}" ${PRINT_COL} -n
+	echo-value "${mac}" 50
+    done < /var/run/${IP_NEIGHBOUR_FILENAME}
+
+    echo-end-show
+}
+
+run()
+{
+    local interface=${ARGS[1]}
+
+    case "${interface}" in
+	"")
+	    show-ip
+	    return ${?}
+	    ;;
+	name)
+	    shift-args
+	    manage-name ${ALLARGS}
+	    return ${?}
+	    ;;
+	neighbour)
+	    update-report ip-neighbour 15 || return 104
+	    show-ip-neighbour
+	    return 0
+	    ;;
+	route)
+	    shift-args
+	    manage-route ${ALLARGS}
+	    return ${?}
+	    ;;
+	via)
+	    shift-args
+	    manage-via ${ALLARGS}
+	    return ${?}
+	    ;;
+	*)
+	    ;;
+    esac
+
+    if test -z "${ARGS[2]}" ; then
+	case ${interface} in
+	    internal)
+		show-ip ${interface}
+		return 0
+		;;
+
+	    external|auxiliary|vlan)
+		contextual-command-is-allowed || return 209
+		show-ip ${interface}
+		return 0
+		;;
+
+	    *)
+		
+		if test "${ARGS[1]:0:9}" == "internal." ; then
+		    contextual-command-is-allowed || return 209
+		    if check-vlan "${ARGS[1]:9}"; then
+			show-ip-vlan "${ARGS[1]:9}"
+			return 0
+		    else
+			return 41
+		    fi
+		else
+		    return 1
+		fi
+		;;
+	esac
+    fi
+
+    case ${interface} in
+	internal)
+	;;
+
+	external|auxiliary|vlan)
+	    contextual-command-is-allowed || return 209
+	    ;;
+
+	*)		
+	    test "${ARGS[1]:0:9}" != "internal." || contextual-command-is-allowed || return 209
+	    ;;
+    esac
+
+    local ip=${ARGS[2]}
+    local px=${ip/*\/}
+    local mk
+
+    if test ${ip} != ${px} ; then
+	check-prefix ${px} || return 158
+	ip=${ip/\/*}
+    else
+	unset px
+    fi
+
+    check-ip ${ip} || return 12
+
+    test ${ip} != '127.0.0.1' || return 38
+    test ${ip} != '127.0.0.2' || return 38
+
+    if test -z "${px}" ; then
+	if test -n "${ARGS[3]}" ; then
+	    local mk=${ARGS[3]}
+	    check-mask ${mk} || return 13
+	else
+	    local mk=255.255.255.0
+	fi
+    else
+	if test ${px} == 32 ; then
+	    mk='255.255.255.255'
+	elif test ${px} == 0 ; then
+	    mk='0.0.0.0'
+	else
+	    local mk=$(ipcalc -s ${ip}/${px} -m)
+	    mk=${mk/NETMASK=/}
+	fi
+    fi
+
+    host-ip-address ${ip} ${mk} || return 62
+
+    case ${interface} in
+	internal)
+	    export IP_INTERNAL_IP=${ip}
+	    export IP_INTERNAL_MASK=${mk}
+	    ;;
+	external)
+	    export IP_EXTERNAL_IP=${ip}
+	    export IP_EXTERNAL_MASK=${mk}
+	    ;;
+	auxiliary)
+	    export IP_AUXILIARY_IP=${ip}
+	    export IP_AUXILIARY_MASK=${mk}
+	    ;;
+	*)
+	    if test "${ARGS[1]:0:9}" == "internal." ; then
+		if check-vlan "${ARGS[1]:9}"; then
+		    local vlan=${ARGS[1]:9}
+		    vlan-exist "${VLAN_FLOW_LIST}" "${vlan}"  || return 42
+		    export IP_VLAN_LIST=$(remove-ip_vlan_list_vlan "${IP_VLAN_LIST}" "${vlan}")
+		    export IP_VLAN_LIST="${IP_VLAN_LIST} ${vlan} ${ip} ${mk}"
+		else
+		    return 41
+		fi
+	    else
+		return 43
+	    fi
+	    ;;
+    esac
+    SAVENV=1
+}
+
+main "${@}"

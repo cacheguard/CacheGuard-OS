@@ -1,0 +1,323 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       Commands
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+get-2fa-state-file()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    local user=${1}
+    local ver=${2}
+
+    test -d ${BASE_DIR}/${user} || return 11
+    local mfa_file=${BASE_DIR}/${user}/${TWO_FACTOR_AUTHENTICATION}
+
+    case ${ver} in
+	cur)
+	    mfa_file=${mfa_file}.current
+	    ;;
+	new)
+	    ;;
+	*)
+	    return 13
+	    ;;
+    esac
+
+    echo ${mfa_file}
+}
+
+get-admin-2fa()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    local user=${1}
+    local ver=${2}
+
+    local mfa_file
+
+    mfa_file=$(get-2fa-state-file ${user} ${ver})
+
+    if test ${?} -ne 0 ; then
+	echo False
+	return 11
+    fi
+
+    if test ! -f ${mfa_file} ; then
+	echo False
+	return 13
+    fi
+
+    local mfa
+    read mfa < ${mfa_file}
+
+    case ${mfa} in
+	True|False)
+	    echo ${mfa}
+	    ;;
+	*)
+	    echo False
+	    return 21
+	    ;;
+    esac
+}
+
+set-admin-2fa()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    test -n "${3}" || return 3
+    local user=${1}
+    local ver=${2}
+    local val=${3}
+
+    local mfa_file
+
+    mfa_file=$(get-2fa-state-file ${user} ${ver})
+    test ${?} -eq 0 || return 11
+
+    case ${val} in
+	True|False)
+	    echo -n ${val} > ${mfa_file}
+	    ;;
+	*)
+	    return 13
+	    ;;
+    esac
+}
+
+reset-admin-2fa-1()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    local user=${1}
+    local ver=${2}
+
+    local mfa_file
+
+    mfa_file=$(get-2fa-state-file ${user} ${ver})
+    test ${?} -eq 0 || return 11
+    rm -f ${mfa_file}
+}
+
+reset-admin-2fa()
+{
+    test -n "${1}" || return 1
+    local user=${1}
+
+    reset-admin-2fa-1 ${user} new
+    reset-admin-2fa-1 ${user} cur
+}
+
+is-admin-2fa-mode()
+{
+    test -n "${1}" || return 1
+    local user=${1}
+
+    local mfa=$(get-admin-2fa ${user} cur)
+
+    case ${mfa} in
+	True)
+	    return 0
+	    ;;
+	False)
+	    return 11
+	    ;;
+	*)
+	    return 21
+	    ;;
+    esac
+}
+
+is-admin-2fa-activated()
+{
+    test -n "${1}" || return 1
+    local user=${1}
+
+    local mfa
+
+    mfa=$(get-admin-2fa ${user} cur)
+}
+
+is-admin-2fa-initialised()
+{
+    test -n "${1}" || return 1
+    local user=${1}
+
+    test -f ${BASE_DIR}/${user}/${TWO_FACTOR_GOOGLE_AUTHENTICATOR}
+}
+
+is-admin-2fa-is-running()
+{
+    test -n "${1}" || return 1
+    local user=${1}
+
+    is-admin-2fa-activated ${user} && \
+	is-admin-2fa-initialised ${user}
+}
+
+is-admin-2fa-enabled()
+{
+    local mfa=$(get-admin-2fa ${ADMIN_NAME} cur)
+
+    case ${mfa} in
+	True)
+	    return 0
+	    ;;
+	False)
+	    return 11
+	    ;;
+	*)
+	    return 21
+	    ;;
+    esac
+}
+
+admin-2fa-modified()
+{
+    test -n "${1}" || return 1
+    local user=${1}
+
+    local new_mfa=$(get-admin-2fa ${USER} new)
+    local cur_mfa=$(get-admin-2fa ${USER} cur)
+
+    test ${new_mfa} != ${cur_mfa}
+}
+
+get-2fa-first-code()
+{
+    test -n "${1}" || return 1
+    local google_authenticator=${1}
+
+    test -f ${google_authenticator} || return 11
+
+    local line code i=0
+
+    while read line
+    do
+	test -n "${line}" || continue
+
+	case ${i} in
+	    1)
+		code=${line/* }
+		break
+		;;
+	    *)
+		;;
+	esac
+	((i++))
+    done < ${google_authenticator}
+
+    echo ${code}
+}
+
+get-2fa-secrets()
+{
+    test -n "${1}" || return 1
+    local google_authenticator=${1}
+
+    test -f ${google_authenticator} || return 11
+
+    local line secret ecodes i=0
+
+    while read line
+    do
+	test -n "${line}" || continue
+	test "${line:0:1}" != '"' || continue
+
+	case ${i} in
+	    0)
+		secret=${line}
+		;;
+	    *)
+		ecodes="${ecodes} ${line}"
+		;;
+	esac
+	((i++))
+    done < ${google_authenticator}
+    ecodes=${ecodes:1}
+
+    echo "${secret} ${ecodes}"
+}
+
+get-2fa-disallow-reuse()
+{
+    test -n "${1}" || return 1
+    local google_authenticator=${1}
+    test -f ${google_authenticator} || return 11
+
+    local key='" DISALLOW_REUSE '
+    local len=${#key}
+    local line reuses
+
+    while read line
+    do
+	test -n "${line}" || continue
+	if test "${line:0:${len}}" == "${key}" ; then
+	    reuses=${line:${len}}
+	    break
+	fi
+    done < ${google_authenticator}
+
+    echo ${reuses}
+}
+
+update-2fa-timestamp()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    local user=${1}
+    local status=${2}
+
+    local google_authenticator
+
+    if test ${user} == ${ADMIN_NAME} ; then
+	google_authenticator=/${TWO_FACTOR_GOOGLE_AUTHENTICATOR}
+    else
+	google_authenticator=${HOME_DIR}/${user}/${TWO_FACTOR_GOOGLE_AUTHENTICATOR}
+    fi
+
+    test -f ${google_authenticator} || return 11
+
+    case ${status} in
+	ko)
+	    touch ${google_authenticator}
+	    ;;
+	ok)
+	    local now=$(($(date +%s) / TWO_FACTOR_AUTHENTICATION_STEP_SIZE))
+	    local dates=$(get-2fa-disallow-reuse ${google_authenticator})
+
+	    dates="${dates} ${now}"
+	    test "${dates:0:1}" != ' ' || dates=${dates:1}
+
+	    local min=$((now - TWO_FACTOR_AUTHENTICATION_WINDOW_SIZE))
+	    dates=$(keep-ge-in-slist ${min} "${dates}")
+	    sed -i -e "s/DISALLOW_REUSE.*/DISALLOW_REUSE ${dates}/" ${google_authenticator} > /dev/null 2>&1
+	    ;;
+	*)
+	    return 13
+	    ;;
+    esac
+
+    test ${user} == ${ADMIN_NAME} || \
+	cp -a ${google_authenticator} ${BASE_DIR}/${user}/${TWO_FACTOR_GOOGLE_AUTHENTICATOR}
+}

@@ -1,0 +1,65 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       GUI
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+set-admin-snmp()
+{
+    local transaction=/tmp/${TRANSACTION_FILE}.wadmin.${REMOTE_USER}.${$}
+
+    test -z "${VALUES[0]}" || echo "admin snmp user '${VALUES[0]}'" > ${transaction}
+
+    if test -n "${VALUES[1]}" -a -n "${VALUES[2]}" ; then
+	if test "${VALUES[1]}" == "${VALUES[2]}" ; then
+	    echo "admin snmp community '${VALUES[1]}'" >> ${transaction}
+	else
+	    gen-gui-error 4
+	fi
+    fi
+
+    if test -n "${VALUES[3]}" -a -n "${VALUES[4]}" ; then
+	if test "${VALUES[3]}" == "${VALUES[4]}" ; then
+	    echo "admin snmp privacy '${VALUES[3]}'" >> ${transaction}
+	else
+	    gen-gui-error 4
+	fi
+    fi
+
+    local i mode var
+    local tls=off
+    local udp=off
+    local tcp=off
+
+    for ((i=5 ; i<${ATTRIBUTE_NB} ; i++))
+    do
+	mode=${ATTRIBUTES[${i}]}
+	local ${mode}=on
+    done
+
+    echo "admin snmp tls '${tls}'"		>> ${transaction}
+    echo "admin snmp udp '${udp}'"		>> ${transaction}
+    echo "admin snmp tcp '${tcp}'"		>> ${transaction}
+
+    execute-transaction ${transaction}
+}
+
+set-admin-snmp

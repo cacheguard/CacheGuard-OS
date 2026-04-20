@@ -1,0 +1,4510 @@
+#!/bin/bash
+
+############################################################################
+#
+# MODULE:       Install
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+debug()
+{
+    local variable
+    echo -n "Press any key to continue..." ; read variable
+}
+
+reset-install-log()
+{
+    rm -f /tmp/${LOG_FILE}
+}
+
+dialog-debug()
+{
+    local message=${1}
+    ${DIALOG} --backtitle "${INSTALL_BACKTITLE} Installation" --title "Debugging" --colors --msgbox "\n\Z5${message}\Zn" 0 0
+}
+
+log-install()
+{
+    test -n "${1}" || return 1
+    local message=${1}
+
+    local date=$(date)
+    echo "+++ ${date}: ${message}" >> /tmp/${LOG_FILE} 2>&1
+}
+
+print-error()
+{
+    test -n "${1}" || return 1
+    local code=${1}
+
+    local text=${Errors[${code}]}
+    echo ${text}
+}
+
+dialog-error()
+{
+    test -n "${1}" || return 1
+    local code=${1}
+
+    local text=${Errors[${code}]}
+
+    ${DIALOG} --backtitle "${INSTALL_BACKTITLE} Installation" --title "Error $[${code} + 1000]" --colors --msgbox "\n\Z1${text}\Zn" 0 0
+}
+
+error()
+{
+    if test -z "${1}" ; then local code=255 ; else local code=${1} ; fi
+    test ${code} -ne 0 || return 0
+
+    dialog-error ${code}
+
+    return ${code}
+}
+
+dialog-warning()
+{
+    test -n "${1}" || return 1
+    local code=${1}
+
+    local text=${Warnings[${code}]}
+
+    ${DIALOG} --backtitle "${INSTALL_BACKTITLE} Installation" --title "Warning $[${code} + 1000]" --colors --msgbox "\n\Z5${text}\Zn" 0 0
+}
+
+dialog-report()
+{
+    test -n "${1}" || return 1
+    local file=${1}
+    test -f ${file} || return 11
+
+    local line
+
+    echo
+
+    while read line
+    do
+	echo "${line}" | fmt --width=65
+    done < ${file} 2>> /tmp/${LOG_FILE}
+}
+
+dialog-progress()
+{
+    test -n "${1}" || return 1
+    local progress=${1}
+    local message=${2}
+    local tempo=${3}
+
+    test -n "${tempo}" || tempo=300000
+    test ${tempo} -eq 0 || usleep ${tempo}
+    echo ${progress}
+
+    if test -n "${message}" ; then
+	cat << EOF
+XXX
+${message}...
+XXX
+EOF
+	log-install "${message}"
+    fi
+}
+
+dialog-end-progress()
+{
+    usleep 300000
+    echo 100
+    usleep 300000
+}
+
+warning()
+{
+    if test -z "$1" ; then local code=255 ; else local code=${1} ; fi
+    test ${code} -ne 0 || return 0
+
+    dialog-warning ${code}
+
+    return ${code}
+}
+
+load-clock()
+{
+    source /etc/sysconfig/clock
+
+    case "${UTC}" in
+	yes|true|1)
+	    export CLOCK_OPTIONS="${CLOCKPARAMS} --utc"
+	    ;;
+	
+	no|false|0)
+	    export CLOCK_OPTIONS="${CLOCKPARAMS} --localtime"
+	    ;;
+	
+    esac
+
+    hwclock --hctosys ${CLOCK_OPTIONS}
+    echo ${CLOCK_OPTIONS} > /tmp/VARIABLE_CLOCK_OPTIONS
+}
+
+save-clock()
+{
+    hwclock --systohc ${CLOCK_OPTIONS}
+}
+
+check-nb()
+{
+    test -n "${1}" || return 1
+    local nb=${1}
+
+    local len=${#nb}
+    test ${len} -le 18 || return 1
+    [[ "${nb}" =~ ^[0-9]+$ ]] || return 2
+
+    return 0
+}
+
+setenv-variable-from-file()
+{
+    local file variable value
+    local files=$(ls /tmp/VARIABLE_* 2> /dev/null)
+    
+    for file in ${files}
+    do
+	variable=${file/\/tmp\/VARIABLE_}
+	value="$(cat ${file})"
+	export ${variable}="${value}"
+	rm -f ${file}
+    done
+}
+
+triple-beep()
+{
+    local i
+    for ((i=0 ; i<2 ; i++))
+    do
+	printf "\007"; usleep 700000 ;
+    done
+    printf "\007"
+}
+
+get-system-architecture()
+{
+    uname -r 2>> /tmp/${LOG_FILE}
+}
+
+get-memory-type()
+{
+    local memory_type
+
+    if test ${SYSTEM} == ${SYS_VERSION}-${SYS_64_NAME} ; then
+	memory_type=64mem
+    elif test ${SYSTEM} == ${SYS_VERSION}-${SYS_HM_NAME} ; then
+	memory_type=highmem
+    elif test ${system} == ${SYS_VERSION}-${SYS_UML_64_NAME} ; then
+	memory_type=highmem
+    elif test ${system} == ${SYS_VERSION}-${SYS_UML_NAME} ; then
+	memory_type=lowmem
+    else
+	memory_type=unknown
+    fi
+    echo "${memory_type}"
+}
+
+get-architecture()
+{
+    uname -m 2>> /tmp/${LOG_FILE}
+}
+
+get-model()
+{
+    get-cmdline-attribute model
+}
+
+get-install()
+{
+    get-cmdline-attribute install
+}
+
+get-partition-uuid()
+{
+    test -n "${1}" || return 1
+    local dev=${1}
+
+    local uuid=$(blkid ${dev} 2> /dev/null)
+
+    uuid=${uuid/* UUID=\"}
+    uuid=${uuid/\" *}
+
+    echo ${uuid}
+}
+
+read-license()
+{
+    test -z "${APL_MODEL}" || return 0
+
+    local response
+
+    clear
+    man -r 'Press <SPACE> to continue or <Q> to Quit' ${LICENSE}
+    echo
+    echo -n "Do you accept the terms of the ${COMMERCIAL_NAME}-OS License (Y|N) [Y]? "
+    read response
+    test -z "${response}" -o "${response}" == y -o "${response}" == Y || return 1
+    clear
+}
+
+display-memory-sz()
+{
+    echo "\Z4${BULLET}Useful RAM size:\Zn $[${MEMORY_SZ} / 1024] MB"
+}
+
+find-memory-sz()
+{
+    local memory_sz=$(get-memory-sz)
+
+    export MEMORY_SZ=${memory_sz} ; echo ${memory_sz} > /tmp/VARIABLE_MEMORY_SZ
+}
+
+display-product-name()
+{
+    local manufacturer_name=$(dmidecode -q --string system-manufacturer 2>> /tmp/${LOG_FILE})
+    local product_name=$(dmidecode -q --string system-product-name 2>> /tmp/${LOG_FILE})
+
+    test "${manufacturer_name}" != "Default string" || manufacturer_name="${COMMERCIAL_NAME}"
+    test "${product_name}" != "Default string" || product_name="Appliance"
+
+    echo "\Z4${BULLET}Target machine:\Zn ${manufacturer_name} ${product_name}"
+}
+
+display-cpu-infos()
+{
+    check-nb ${CPU_NB} || return 1
+
+    if test ${CPU_NB} -eq 1 ; then
+	echo -n "\Z4${BULLET}Single CPU system:\Zn "
+    else
+	echo -n "\Z4${BULLET}${CPU_NB} x Cores CPU system:\Zn "
+    fi
+
+    local cpu=$(cat /tmp/${CPU_FILE})
+    echo "${cpu}"
+}
+
+display-network-infos()
+{
+    local dev mac info
+
+    while read dev mac info
+    do
+	dev=${dev/eth/NIC}
+	echo "${TAB_BULLET}${dev}: ${info}"
+    done < /tmp/${NETWORK_FILE}
+}
+
+display-storage-info()
+{
+    local line
+
+    while read line ; do
+	echo "${TAB_BULLET}${line}"
+    done < /tmp/${STORAGE_FILE}
+}
+
+gen-system-info()
+{
+    echo
+
+    display-product-name
+    display-memory-sz
+    display-cpu-infos
+
+    case ${NETWORK_NB} in
+	0)
+	    echo "\Z1${BULLET}${Errors[18]}\Zn"
+	    ;;
+	1)
+	    echo "\Z4${BULLET}Network Interface Card:\Zn"
+	    ;;
+	*)
+	    echo "\Z4${BULLET}Network Interface Cards:\Zn"
+	    ;;
+    esac
+    display-network-infos
+    case ${STORAGE_NB} in
+	0)
+	    echo "\Z1${BULLET}${Warnings[2]}\Zn"
+	    ;;
+	1)
+	    echo "\Z4${BULLET}Single Storage Controller:\Zn"
+	    ;;
+	*)
+	    echo "\Z4${BULLET}Multi Storage Controllers:\Zn"
+	    ;;
+    esac
+
+    display-storage-info
+    display-disks-info
+}
+
+gen-system-info-file()
+{
+    gen-system-info > /tmp/${HARDWARE_FILE}
+}
+
+find-cpus()
+{
+    local info_file=/proc/cpuinfo
+
+    local cpu_nb=$(grep '^processor' ${info_file} | wc -l)
+    local model_name=$(grep '^model name' ${info_file} | head -1) ; model_name=${model_name/model name*: /}
+    local cache_size=$(grep '^cache size' ${info_file} | head -1) ; cache_size=${cache_size/cache size*: /}
+
+    echo "${model_name}, ${cache_size} Cache" > /tmp/${CPU_FILE}
+
+    export CPU_NB=${cpu_nb} ; echo ${cpu_nb} > /tmp/VARIABLE_CPU_NB
+}
+
+do-ordered-disk-info()
+{
+    if test ${RAID_STATE} -eq 1 ; then
+	export DISK_INFOS_ORDERED="raid${RAID_LEVEL} x:1 ${RAID_SZ}"
+	return 0
+    elif test ${OS_DISK_ID} == x:1 -o ${OS_DISK_ID} == 0:1 ; then
+	export DISK_INFOS_ORDERED=${DISK_INFOS}
+	return 0
+    fi
+
+    local disk_infos_ordered os_info disk
+    local elt i=0 range
+    local type disk_id disk_size
+
+    for elt in ${DISK_INFOS}
+    do
+	range=$[${i} % 3]
+	case ${range} in
+	    0)
+		type=${elt}
+		;;
+	    1)
+		disk_id=${elt}
+		;;
+	    2)
+		disk_size=${elt}
+		disk=$[${i} / 3 + 1]
+
+		if test "x:${disk}" == "${OS_DISK_ID}" -o "0:${disk}" == "${OS_DISK_ID}" ; then
+		    os_info="${type} ${disk_id} ${disk_size}"
+		else
+		    disk_infos_ordered="${disk_infos_ordered} ${type} ${disk_id} ${disk_size}"
+		fi
+		;;
+	    *)
+		return 255
+		;;
+	esac
+	((i++))
+    done
+    disk_infos_ordered="${os_info}${disk_infos_ordered}"
+
+    export DISK_INFOS_ORDERED=${disk_infos_ordered}
+}
+
+display-disks()
+{
+    local elt
+    local i=0 range
+    local type size disk
+
+    for elt in ${DISK_INFOS}
+    do
+	range=$[${i} % 3]
+	case ${range} in
+	    0)
+		type=${elt}
+		;;
+	    1)
+		;;
+	    2)
+		size=${elt}
+		disk=$[${i}/3 + 1]
+		echo -n "DK [${disk}]: ($[${size} / 1024 / 1024 ] GB) "
+		;;
+	    *)
+		return 255
+		;;
+	esac
+	((i++))
+    done
+}
+
+display-disks-info()
+{
+    if test ${DISK_NB} == 0 ; then
+	echo "\Z1${TAB_BULLET}${Errors[3]}\Zn"
+	return 0
+    else
+	echo "\Z4${BULLET}Disk(s):\Zn"
+	echo -n "${TAB_BULLET}"
+	display-disks
+    fi
+}
+
+gen-hw-drive-file()
+{
+    display-disks
+}
+
+find-disks()
+{
+    local usb_disk
+
+    if test "${INSTALL}" == iso -a "${MEDIA_TYPE}" == usb ; then
+	usb_disk=${MEDIA_DEVICE/[0-9]*}
+    else
+	usb_disk=null
+    fi
+
+    sfdisk -s 2> /dev/null | grep --invert-match \
+  				  --regexp="/dev/${usb_disk}" \
+				  --regexp='/dev/ram' \
+				  --regexp='/dev/mapper' \
+				  --regexp='/dev/md' | head -n -1 > /tmp/${DISK_FILE}
+    
+    local dev size info
+    local ide=1 scsi=1 nvme=1 virt=1 i=0
+    local disk_infos disk_devices
+    local name
+    local nvme_ctrl_dk_ref nvme_ctrl_ref nvme_dk_ref
+    local disk_id os_disk_id
+
+    while read dev size
+    do
+	dev=${dev/:}
+	name=${dev:5}
+
+	test ${size} -gt $((FIRST_PARTITION_BEGINING_SECTOR + EFI_SZ + LVM_MD_SZ)) || return 5
+	
+	case ${name:0:2} in
+	    hd)
+		disk_id=x:${ide}
+		info="ide ${disk_id} ${size}"
+		((ide++))
+		;;
+	    sd)
+		disk_id=x:${scsi}
+		info="scsi ${disk_id} ${size}"
+		((scsi++))
+		;;
+	    nv)
+		nvme_ctrl_dk_ref=${name/nvme}
+		nvme_ctrl_ref=${nvme_ctrl_dk_ref/n*}
+		nvme_dk_ref=${nvme_ctrl_dk_ref/*n}
+		disk_id=${nvme_ctrl_ref}:${nvme_dk_ref}
+		info="nvme ${disk_id} ${size}"
+		((nvme++))
+		;;
+	    vd)
+		disk_id=x:${virt}
+		info="virt ${disk_id} ${size}"
+		((virt++))
+		;;
+	    *)
+		unset info
+		unset dev
+		;;
+	esac
+
+	test ${i} -ne 0 || os_disk_id=${disk_id}
+	test -z "${info}" || disk_infos="${disk_infos} ${info}"
+	test -z "${dev}" || disk_devices="${disk_devices} ${dev}"
+	((i++))
+    done < /tmp/${DISK_FILE}
+
+    disk_devices=${disk_devices:1}
+    disk_infos=${disk_infos:1}
+
+    ((ide--))
+    ((scsi--))
+    ((nvme--))
+    ((virt--))
+
+    if test ${ide} -gt 20 -o ${scsi} -gt 104 -o ${nvme} -gt 1024 -o ${virt} -gt 104 ; then
+	return 6
+    fi
+
+    export DISK_DEVICES=${disk_devices} ; echo ${disk_devices} > /tmp/VARIABLE_DISK_DEVICES
+    export DISK_INFOS=${disk_infos} ; echo ${disk_infos} > /tmp/VARIABLE_DISK_INFOS
+    export DISK_NB=${i} ; echo ${i} > /tmp/VARIABLE_DISK_NB
+    export OS_DISK_ID=${os_disk_id} ; echo ${os_disk_id} > /tmp/VARIABLE_OS_DISK_ID
+
+    gen-hw-drive-file 2>> /tmp/${LOG_FILE} > ${GENERATED_DIR}/hw-drive
+}
+
+calculate-raid-size()
+{
+    test ${RAID_STATE} -eq 1 || return 0
+
+    local elt i=0 range
+    local size nb
+    local raid_sz raid_disk_sz total_sz=0
+
+    for elt in ${DISK_INFOS}
+    do
+	range=$[${i} % 3]
+	case ${range} in
+	    0|1)
+		;;
+	    2)
+		size=$[${elt} - ${FIRST_PARTITION_BEGINING_SECTOR} - ${EFI_SZ}]
+		size=$[${size} * ${RAID_SECURITY_PCT} / 100]
+		total_sz=$[${total_sz} + ${size}]
+		if test -z "${raid_disk_sz}" ; then
+		    raid_disk_sz=${size}
+		elif test ${size} -lt ${raid_disk_sz} ; then
+		    raid_disk_sz=${size}
+		fi
+		;;
+	    *)
+		return 255
+		;;
+	esac
+	((i++))
+    done
+
+    test -n "${raid_disk_sz}" || raid_disk_sz=0
+
+    case ${RAID_LEVEL} in
+	0)
+	    if test ${DISK_NB} -lt 2 ; then
+		return 30
+	    fi
+
+	    if test ${RAID_SPARE_NB} -ne 0 ; then
+		return 31
+	    fi
+	    raid_sz=${total_sz}
+	    ;;
+	1)
+	    nb=$[${DISK_NB} - ${RAID_SPARE_NB}]
+	    if test ${nb} -lt 2 ; then
+		return 32
+	    fi
+	    raid_sz=${raid_disk_sz}
+	    ;;
+	5)
+	    nb=$[${DISK_NB}-${RAID_SPARE_NB}-1]
+	    if test ${nb} -lt 2 ; then
+		return 33
+	    fi
+	    raid_sz=$[${nb}*${raid_disk_sz}]
+	    ;;
+	6)
+	    nb=$[${DISK_NB}-${RAID_SPARE_NB}-2]
+	    if test ${nb} -lt 2 ; then
+		return 34
+	    fi
+	    raid_sz=$[${nb}*${raid_disk_sz}]
+	    ;;
+	10)
+	    nb=$[${DISK_NB}-${RAID_SPARE_NB}]
+	    if test ${nb} -lt 4 ; then
+		return 35
+	    fi
+	    raid_sz=$[(${nb}*${raid_disk_sz}) / 2]
+	    ;;
+	*)
+	    ;;
+    esac
+
+    raid_disk_sz=$[${raid_disk_sz} / ${RAID_CHUNK_SZ}]
+    raid_disk_sz=$[${raid_disk_sz} * ${RAID_CHUNK_SZ}]
+
+    raid_sz=$[${raid_sz} / ${RAID_CHUNK_SZ}]
+    raid_sz=$[${raid_sz} * ${RAID_CHUNK_SZ}]
+
+    export RAID_SZ=${raid_sz}
+    export RAID_DISK_SZ=${raid_disk_sz}
+
+    echo "/dev/md${RAID_MD_NB}: ${RAID_SZ}" > /tmp/${MD_FILE}
+}
+
+set-default-raid()
+{
+    if test "${APL_MODEL}" == 'test' ; then
+	export RAID_STATE=0
+	unset RAID_LEVEL
+	unset RAID_SPARE_NB
+    else
+	case ${DISK_NB} in
+	    0|1)
+		export RAID_STATE=0
+		unset RAID_LEVEL
+		unset RAID_SPARE_NB
+		;;
+	    2)
+		export RAID_STATE=1
+		export RAID_LEVEL=1
+		export RAID_SPARE_NB=0
+		;;
+	    3)
+		export RAID_STATE=1
+		export RAID_LEVEL=1
+		export RAID_SPARE_NB=1
+		;;
+	    *)
+		export RAID_STATE=1
+		export RAID_LEVEL=5
+		export RAID_SPARE_NB=1
+		;;
+	esac
+    fi
+
+    echo ${RAID_STATE} > /tmp/VARIABLE_RAID_STATE
+    echo ${RAID_LEVEL} > /tmp/VARIABLE_RAID_LEVEL
+    echo ${RAID_SPARE_NB} > /tmp/VARIABLE_RAID_SPARE_NB
+
+    calculate-raid-size
+}
+
+get-disk-type()
+{
+    test -n "${1}" || return 1
+    local in_disk_id=${1}
+
+    if test ${RAID_STATE} -eq 1 ; then
+	echo raid
+	return 0
+    fi
+
+    local elt
+    local i=0 range
+    local disk_type disk_id
+
+    for elt in ${DISK_INFOS}
+    do
+	range=$[${i} % 3]
+	case ${range} in
+	    0)
+		disk_type=${elt}
+		;;
+	    1)
+		disk_id=${elt}
+		;;
+	    2)
+		if test ${disk_id} == ${in_disk_id} ; then
+		    echo ${disk_type}
+		    return 0
+		fi
+		;;
+	    *)
+		return 255
+		;;
+	esac
+	((i++))
+    done
+
+    echo xxx
+    return 1
+}
+
+get-os-disk-id()
+{
+    local os_disk
+
+    if test ${RAID_STATE} -eq 1 ; then
+	os_disk=x:1
+    else
+	os_disk=${OS_DISK_ID}
+    fi
+
+    echo ${os_disk}
+}
+
+get-os-disk-name()
+{
+    local disk_id=$(get-os-disk-id)
+    local disk_type=$(get-disk-type ${disk_id})
+    local disk_name=$(disk-name ${disk_type} ${disk_id})
+
+    echo ${disk_name}
+}
+
+partition-exist()
+{
+    test -n "${1}" || return 1
+    local part=${1}
+
+    local elt
+    local i=0 range
+
+    for elt in ${PARTITIONS}
+    do
+	range=$[${i} % 2]
+	case ${range} in
+	    0)
+		test ${elt} != ${part} || return 0
+		;;
+	    1)
+		;;
+	    *)
+		return 255
+		;;
+	esac
+	((i++))
+    done
+    
+    return 1
+}
+
+find-load-modules()
+{
+    local i n=3
+
+    for ((i=0 ; i<n ; i++))
+    do
+	find-modules ${SYSTEM} ${INSTALL_PX}
+	load-modules ${INSTALL_PX}
+    done
+}
+
+gen-persistent-rules()
+{
+    update-udev-network-rules ${INSTALL_PX}
+}
+
+set-mac-address-dependent-env()
+{
+    local dev mac info
+
+    read dev mac info < /tmp/${NETWORK_FILE}
+
+    if test "${mac:0:15}" == "aa:bb:cc:dd:ee:" ; then
+	export MACHINE='VE'
+	case ${mac:15:1} in
+	    0)
+		HYPERVISOR_NAME=vmware
+		;;
+	    1)
+		HYPERVISOR_NAME=virtualbox
+		;;
+	    2)
+		HYPERVISOR_NAME=parallels
+		;;
+	    3)
+		HYPERVISOR_NAME=hyperv
+		case ${mac:16:1} in
+		    0|1|2|3|4|5)
+			CLOUD_NAME=azure
+			CLOUD_CONSOLE=ttyS0
+			;;
+		    6|7|8|9)
+			CLOUD_NAME=azure
+			CLOUD_CONSOLE=ttyS0
+			CLOUD_EMBEDDED_APPLICATIONS="${EMBEDDED_VPNSUBSCR_NAME}"
+			;;
+		    *)
+			;;
+		esac
+		;;
+	    4)
+		HYPERVISOR_NAME='kvm|xen'
+		case ${mac:16:1} in
+		    0|1|2|3|4|5)
+			CLOUD_NAME=aws
+			CLOUD_CONSOLE=ttyS0
+			;;
+		    6|7|8|9)
+			CLOUD_NAME=aws
+			CLOUD_CONSOLE=ttyS0
+			CLOUD_EMBEDDED_APPLICATIONS="${EMBEDDED_VPNSUBSCR_NAME}"
+			;;
+		    *)
+			;;
+		esac
+		;;
+	    5)
+		HYPERVISOR_NAME='kvm'
+		case ${mac:16:1} in
+		    1)
+			CLOUD_NAME=gce
+			CLOUD_CONSOLE=ttyS0
+			;;
+		    *)
+			;;
+		esac
+		;;
+
+	    *)
+		;;
+	esac
+    fi
+
+    echo "${MACHINE}" > /tmp/VARIABLE_MACHINE
+    echo "${HYPERVISOR_NAME}" > /tmp/VARIABLE_HYPERVISOR_NAME
+    echo "${CLOUD_NAME}" > /tmp/VARIABLE_CLOUD_NAME
+    echo "${CLOUD_CONSOLE}" > /tmp/VARIABLE_CLOUD_CONSOLE
+    echo "${CLOUD_EMBEDDED_APPLICATIONS}" > /tmp/VARIABLE_CLOUD_EMBEDDED_APPLICATIONS
+}
+
+find-install-devices()
+{
+    find-devices /tmp/${LOG_FILE} ${INSTALL_PX} yes
+    cp -f /tmp/${NETWORK_FILE} ${GENERATED_DIR}/hw-links
+}
+
+raid-stop()
+{
+    test -b /dev/md${RAID_MD_NB} || return 0
+    mdadm --quiet --stop /dev/md${RAID_MD_NB} >> /tmp/${LOG_FILE} 2>&1
+}
+
+raid-start()
+{
+    mdadm --quiet --assemble --freeze-reshape /dev/md${RAID_MD_NB}
+    mdadm --quiet --run /dev/md${RAID_MD_NB}
+    blockdev --rereadpt /dev/md${RAID_MD_NB}
+}
+
+raid-auto-stop()
+{
+    test -f /proc/mdstat || return 0
+
+    local md rest
+
+    while read md rest
+    do
+	test ${md:0:2} == "md" || continue
+	mdadm --quiet --stop /dev/${md} >> /tmp/${LOG_FILE} 2>&1
+    done < /proc/mdstat
+}
+
+make-raid-partitions()
+{
+    local ret
+    local disk disk_name pp
+    local commands
+    local sector_sz count sectors_per_kb sectors
+    local begin_sector end_sector
+
+    for disk in ${DISK_DEVICES}
+    do
+	echo "Formatting ${disk} for RAID usage..."
+
+	commands=$(get-common-parted-commands)
+
+	disk_name=${disk:5}
+	pp=$(get-partition-prefix ${disk_name})
+	sector_sz=$(get-disk-sector-sz ${disk_name})
+	sectors_per_kb=$((1024 / sector_sz))
+
+	((begin_sector = FIRST_PARTITION_BEGINING_SECTOR * sectors_per_kb))
+	((end_sector = begin_sector + (FIRST_PARTITION_BEGINING_SECTOR * sectors_per_kb) - 1))
+	commands="${commands} mkpart primary ext2 ${begin_sector} ${end_sector}"
+	commands="${commands} name ${GRUB_PARTITION_NB} GRUB"
+
+	((begin_sector = end_sector + 1))
+	((end_sector = begin_sector + (EFI_SZ * sectors_per_kb) - 1))
+	commands="${commands} mkpart primary fat32 ${begin_sector} ${end_sector}"
+	commands="${commands} name ${EFI_PARTITION_NB} EFI"
+
+	((begin_sector = end_sector + 1))
+
+	case ${RAID_LEVEL} in
+	    0|5|6|10)
+		end_sector="100%"
+		;;
+	    1)
+		((end_sector = begin_sector + (RAID_SZ * sectors_per_kb) - 1))
+		;;
+	    *)
+		return 255
+		;;
+	esac
+
+	commands="${commands} mkpart primary ext2 ${begin_sector} ${end_sector}"
+	commands="${commands} name ${RAID_PARTITION_NB} RAID"
+	commands="${commands} quit"
+
+	((sectors = (EFI_SZ + FIRST_PARTITION_BEGINING_SECTOR) * sectors_per_kb))
+	((blank_count = sectors / sector_sz))
+	dd if=/dev/zero of=${disk} bs=${sector_sz} count=${blank_count} conv=notrunc
+
+	partprobe ${disk}
+	blockdev -q --rereadpt ${disk}
+	rm -f ${disk}${RAID_PARTITION_NB}
+
+	parted ${disk} --align cylinder --script -- ${commands}
+	ret=${?}
+
+	if test ${ret} -eq 0 ; then
+	    partprobe ${disk}
+	    blockdev -q --rereadpt ${disk}
+	    commands="set ${GRUB_PARTITION_NB} bios_grub on set ${EFI_PARTITION_NB} esp on set ${RAID_PARTITION_NB} raid on quit"
+	    parted ${disk} --align cylinder --script -- ${commands}
+	    ret=$[${ret}*10 + ${?}]
+	fi
+
+	mdadm --zero-superblock --metadata=1.2 ${disk}${pp}${RAID_PARTITION_NB}
+	test ${ret} -eq 0 || break
+    done
+
+    return ${ret}
+}
+
+raid-create()
+{
+    if test ${RAID_STATE} -eq 0 ; then
+	unset RAID_MODULES
+	unset RAID_DEVICES
+	return 0
+    fi
+
+    make-raid-partitions  > /dev/null 2>&1 || return 1
+
+    local layout chunk raid_devices
+    local num_devices device disk_name pp
+    local raid_modules base_modules module
+    local i=0
+
+    case ${RAID_LEVEL} in
+	0)
+	    chunk="--chunk=${RAID_CHUNK_SZ}"
+	    num_devices=${DISK_NB}
+	    raid_modules="raid0"
+	    ;;
+	1)
+	    num_devices=2
+	    raid_modules="raid1"
+	    ;;
+	5|6)
+	    layout="--layout=left-symmetric"
+	    chunk="--chunk=${RAID_CHUNK_SZ}"
+	    num_devices=$[${DISK_NB} - ${RAID_SPARE_NB}]
+	    raid_modules="raid456"
+	    ;;
+	10)
+	    layout="--layout=o2"
+	    chunk="--chunk=${RAID_CHUNK_SZ}"
+	    num_devices=$[${DISK_NB} - ${RAID_SPARE_NB}]
+	    raid_modules="raid10"
+	    ;;
+	*)
+	    ;;
+    esac
+
+    for device in ${DISK_DEVICES}
+    do
+	disk_name=${device:5}
+	pp=$(get-partition-prefix ${disk_name})
+	raid_devices="${raid_devices} ${device}${pp}${RAID_PARTITION_NB}"
+	((i++))
+    done
+    raid_devices=${raid_devices:1}
+
+    raid_modules=$(find-raid-modules ${SYSTEM} ${RAID_LEVEL})
+    base_modules=$(get-base-module-names "${raid_modules}")
+
+    modprobe --quiet md-mod
+    modprobe --quiet ${base_modules}
+
+    gen-mdadm-conf ${num_devices} "${raid_devices}" > /etc/mdadm.conf
+
+    mdadm --create /dev/md${RAID_MD_NB} --quiet --run --config=/etc/mdadm.conf --metadata=1.2 --spare-devices=${RAID_SPARE_NB} --raid-devices=${num_devices} ${chunk} --level=${RAID_LEVEL} ${layout} --name=${TECHNICAL_NAME} ${raid_devices} || return 3
+
+    RAID_MODULES=${raid_modules} ; echo ${raid_modules} > /tmp/VARIABLE_RAID_MODULES
+    RAID_DEVICES=${raid_devices} ; echo ${raid_devices} > /tmp/VARIABLE_RAID_DEVICES
+
+    raid_modules=$(get-base-module-names "${raid_modules}")
+    for module in ${raid_modules}
+    do
+	echo ${module}
+    done > /tmp/${RAID_MODULES_FILE}
+}
+
+lvm-stop()
+{
+    vgchange --quiet --quiet --activate n > /dev/null 2>&1
+}
+
+lvm-start()
+{
+    vgchange --quiet --quiet --activate y > /dev/null 2>&1
+}
+
+lvm-reset()
+{
+    local vg_info vg_uuid
+
+    vgdisplay --colon 2> /dev/null > /tmp/${VGS_FILE}
+    while read vg_info
+    do
+	vg_uuid=${vg_info/*:}
+	vgremove --force --yes --quiet --quiet --select vg_uuid=${vg_uuid} > /dev/null 2>&1
+    done < /tmp/${VGS_FILE}
+}
+
+lvm-create()
+{
+    test -n "${1}" || return 1
+    local devs=${@}
+
+    vgcreate --force --yes --quiet --quiet --physicalextentsize ${LVM_PE_SZ}KB ${LVM_VG_NAME} ${devs}  > /dev/null 2>&1
+}
+
+make-lvm()
+{
+    local s1=${1}
+    local s2=${2}
+    test -n "${s1}" || s1=5
+    test -n "${s2}" || s2=95
+
+    local devs disk_nb
+    local fs_name fs_dir fs_type fs_size
+
+    local step=$(get-fs-step ${s1} ${s2})
+    local progress=${s1}
+    (( step /= 2))
+
+    dialog-progress ${progress} "Partitioning Disk(s)" 20000
+
+    lvm-stop
+    lvm-reset
+
+    if test ${RAID_STATE} -eq 1 ; then
+	dev="/dev/md${RAID_MD_NB}p${RAID_LVM_PARTITION_NB}"
+	pvcreate --force --force --yes --quiet --quiet ${dev} > /dev/null 2>&1
+	devs=${dev}
+	disk_nb=1
+    else
+	local dev part
+	local root_dev=/dev/$(get-os-disk-name)
+
+	for dev in ${DISK_DEVICES}
+	do
+	    if test ${dev} == ${root_dev} ; then
+		part=${OS_DISK_LVM_PARTITION_NB}
+	    else
+		part=${NOS_DISK_LVM_PARTITION_NB}
+	    fi
+
+	    test "${dev:5:4}" != nvme || part=p${part}
+	    pvcreate --force --yes --quiet --quiet ${dev}${part} > /dev/null 2>&1
+	    devs="${devs} ${dev}${part}"
+	done
+	devs=${devs:1}
+	disk_nb=${DISK_NB}
+    fi
+
+    lvm-create ${devs}
+
+    while read fs_name fs_dir fs_type fs_size
+    do
+	progress=$[${progress} + ${step} / 100]
+	dialog-progress ${progress} "Partitioning Disk(s)" 30000
+
+	test -n "${fs_name}" || continue
+	test ${fs_name:0:1} != '#' || continue
+	test ${fs_name} != Root || continue
+
+	lvremove --force --yes --quiet --quiet /dev/${LVM_VG_NAME}/${fs_name} 2> /dev/null
+    done < ${GENERATED_DIR}/fs-info
+
+    while read fs_name fs_dir fs_type fs_size
+    do
+	test -n "${fs_name}" || continue
+	test ${fs_name:0:1} != '#' || continue
+	test ${fs_name} != Root || continue
+
+	progress=$[${progress} + ${step} / 100]
+	dialog-progress ${progress} "Partitioning Disk(s)" 20000
+
+	lvcreate --yes --quiet --quiet --type striped --stripes ${disk_nb} --stripesize ${LVM_PE_SZ}KB --alloc normal --name ${fs_name} --size ${fs_size}KB ${LVM_VG_NAME} 2> /dev/null
+	test ${?} -eq 0 || lvcreate --yes --quiet --quiet --type striped --stripes ${disk_nb} --stripesize ${LVM_PE_SZ}KB --alloc anywhere --name ${fs_name} --size ${fs_size}KB ${LVM_VG_NAME} 2> /dev/null
+    done < ${GENERATED_DIR}/fs-info
+
+    lvm-start
+}
+
+get-common-parted-commands()
+{
+    echo "mklabel ${PARTITION_LABEL_TYPE} unit s"
+}
+
+make-system-partitions()
+{
+    local dev disk_sz dev_name
+    local commands
+    local beginning_sz sector_sz sectors_per_kb
+    local sectors blank_count count
+    local disks_file ret
+
+    local root_dev_name=$(get-os-disk-name)
+
+    if test ${RAID_STATE} -eq 0 ; then
+	disks_file="/tmp/${DISK_FILE}"
+    else
+	disks_file="/tmp/${MD_FILE}"
+    fi
+
+    local root_fs_name root_fs_mp root_fs_type root_fs_sz
+    read root_fs_name root_fs_mp root_fs_type root_fs_sz < ${GENERATED_DIR}/fs-info
+
+    while read dev disk_sz
+    do
+	dev=${dev/:}
+	dev_name=${dev:5}
+
+	test ${disk_sz} -gt 0 || return 11
+
+	if test "${INSTALL}" == iso -a "${MEDIA_TYPE}" == usb ; then
+	    test "${MEDIA_DEVICE}" != ${dev_name} || continue
+	fi
+
+	sector_sz=$(get-disk-sector-sz ${dev_name})
+	sectors_per_kb=$((1024 / sector_sz))
+
+	commands=$(get-common-parted-commands)
+
+	if test ${RAID_STATE} -eq 1 ; then
+
+	    beginning_sz=${FIRST_PARTITION_BEGINING_SECTOR}
+
+	    ((end_sector = (root_fs_sz * sectors_per_kb) - 1))
+	    commands="${commands} mkpart primary ${root_fs_type} ${FIRST_PARTITION_BEGINING_SECTOR} ${end_sector}"
+	    commands="${commands} name ${RAID_ROOT_PARTITION_NB} ${root_fs_name}"
+
+	    ((begin_sector = end_sector + 1))
+	    commands="${commands} mkpart primary ext2 ${begin_sector} 100%"
+	    commands="${commands} set ${RAID_LVM_PARTITION_NB} lvm on"
+	    commands="${commands} name ${RAID_LVM_PARTITION_NB} Data"
+	    commands="${commands} quit"
+
+	else
+
+	    if test ${dev_name} == ${root_dev_name} ; then
+
+		beginning_sz=$((FIRST_PARTITION_BEGINING_SECTOR + EFI_SZ))
+
+		((begin_sector = FIRST_PARTITION_BEGINING_SECTOR * sectors_per_kb))
+		((end_sector = begin_sector + (FIRST_PARTITION_BEGINING_SECTOR * sectors_per_kb) - 1))
+		commands="${commands} mkpart primary ext2 ${begin_sector} ${end_sector}"
+		commands="${commands} name ${GRUB_PARTITION_NB} GRUB"
+		commands="${commands} set ${GRUB_PARTITION_NB} bios_grub on"
+
+		((begin_sector = end_sector + 1))
+		((end_sector = begin_sector + (EFI_SZ * sectors_per_kb) - 1))
+		commands="${commands} mkpart primary fat32 ${begin_sector} ${end_sector}"
+		commands="${commands} name ${EFI_PARTITION_NB} EFI"
+		commands="${commands} set ${EFI_PARTITION_NB} esp on"
+
+		((begin_sector = end_sector + 1))
+		((end_sector = begin_sector + (root_fs_sz * sectors_per_kb) - 1))
+		commands="${commands} mkpart primary ${root_fs_type} ${begin_sector} ${end_sector}"
+		commands="${commands} name ${ROOT_PARTITION_NB} ${root_fs_name}"
+
+		((begin_sector = end_sector + 1))
+		commands="${commands} mkpart primary ext2 ${begin_sector} 100%"
+		commands="${commands} name ${OS_DISK_LVM_PARTITION_NB} Data"
+		commands="${commands} set ${OS_DISK_LVM_PARTITION_NB} lvm on"
+
+		commands="${commands} quit"
+
+	    else
+
+		beginning_sz=${FIRST_PARTITION_BEGINING_SECTOR}
+
+		commands="${commands} mkpart primary ext2 2048 100%"
+		commands="${commands} name ${NOS_DISK_LVM_PARTITION_NB} Data"
+		commands="${commands} set ${NOS_DISK_LVM_PARTITION_NB} lvm on"
+
+		commands="${commands} quit"
+	    fi
+	fi
+
+	((sectors = beginning_sz * sectors_per_kb))
+	((blank_count = sectors / sector_sz))
+	dd if=/dev/zero of=${dev} bs=${sector_sz} count=${blank_count} conv=notrunc
+
+	partprobe /dev/${dev_name}
+	blockdev -q --rereadpt /dev/${dev_name}
+
+	parted /dev/${dev_name} --align cylinder --script -- ${commands}
+	ret=${?}
+
+	partprobe /dev/${dev_name}
+	blockdev -q --rereadpt /dev/${dev_name}
+	test ${ret} -eq 0 || break
+    done < ${disks_file}
+
+    return ${ret}
+}
+
+get-fs-step()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    local s1=${1}
+    local s2=${2}
+
+    local steps=$(egrep "ext2|ext3|ext4|reiserfs|swap" ${GENERATED_DIR}/etc.fstab | wc -l 2>> /tmp/${LOG_FILE})
+    local step=$[(${s2}-${s1}) * 100 / ${steps}] # (* 100) because the precision
+
+    echo ${step}
+}
+
+dialog-do-make-fs()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    local s1=${1}
+    local s2=${2}
+
+    local step=$(get-fs-step ${s1} ${s2})
+    local progress=${s1}
+
+    local dev mp fs_type rest
+    local label
+    local n=0
+
+    dialog-progress ${progress} "Making File Systems" 50000
+
+    while read dev mp fs_type rest
+    do
+	test -n "${dev}" || continue
+	test "${dev:0:1}" != "#" || continue
+	
+	case ${fs_type} in
+	    
+	    proc|sysfs|devpts|tmpfs)
+		;;
+
+	    swap)
+		mkswap -L swap ${dev} >> /tmp/${LOG_FILE} 2>&1
+
+		progress=$[${progress} + ${step} / 100]
+		dialog-progress ${progress} "Making File Systems" 50000
+		;;
+
+	    vfat)
+		label=EFI
+		umount ${APL}${mp} >> /tmp/${LOG_FILE} 2>&1
+		mkfs -t vfat -n ${label} -F 32 ${dev} >> /tmp/${LOG_FILE} 2>&1
+		;;
+
+	    ext2|ext3|ext4)
+		label=${dev/\/dev\/${LVM_VG_NAME}\/}
+		umount ${APL}${mp} >> /tmp/${LOG_FILE} 2>&1
+		mkfs -t ${fs_type} -q -L ${label} ${dev} >> /tmp/${LOG_FILE} 2>&1
+		tune2fs -i0 -C ${n} -c ${MAX_MOUNT} ${dev} >> /tmp/${LOG_FILE} 2>&1
+		((n++))
+		n=$[${n} % ${MAX_MOUNT}]
+
+		progress=$[(${progress} + ${step} / 100)]
+		dialog-progress ${progress} "Making File Systems" 50000
+		;;
+	    
+	    reiserfs)
+		label=${dev/\/dev\/${LVM_VG_NAME}\/}
+		umount ${APL}${mp} >> /tmp/${LOG_FILE} 2>&1
+		mkfs -t ${fs_type} -q -l ${label} ${dev} >> /tmp/${LOG_FILE} 2>&1
+		reiserfstune -M ${n} -m ${MAX_MOUNT} ${dev} >> /tmp/${LOG_FILE} 2>&1
+		((n++))
+		n=$[${n} % ${MAX_MOUNT}]
+
+		progress=$[(${progress} + ${step} / 100)]
+		dialog-progress ${progress} "Making File Systems" 50000
+		;;
+	    *)
+		;;
+	esac
+
+    done < ${GENERATED_DIR}/etc.fstab
+}
+
+get-swap-fs()
+{
+    local swap_info=$(cat /proc/swaps | tail -n +2)
+    local swap_fs=${swap_info/ *}
+
+    echo ${swap_fs}
+}
+
+do-mount-fs()
+{
+    test -n "${1}" || return 1
+    local action=${1}
+    
+    local umount_list
+    local fs mp fs_type rest
+
+    local swap_fs=$(get-swap-fs)
+
+    cd ${INSTALL_DIR}
+    
+    while read fs mp fs_type rest
+    do
+	test -n "${fs}" || continue
+	test "${fs:0:1}" != "#" || continue
+
+	case ${mp} in
+	    /proc|/sys|/dev/pts|/run|/dev|${ADMIN_DIR}/proc|${ADMIN_DIR}/dev/pts|${PROXY_DIR}/dev/shm)
+		;;
+	    swap)
+		case ${action} in
+		    on)
+			test -n "${swap_fs}" || swapon ${fs}
+			;;
+		    *)
+			;;
+		esac
+		;;
+
+	    /boot/efi)
+		;;
+	    *)
+		test -b ${fs} || continue
+
+		case ${action} in
+		    on)
+			mkdir -p ${APL}${mp}
+			mount -t ${fs_type} ${fs} ${APL}${mp}
+			;;
+		    off)
+			umount_list="${mp} ${umount_list}"
+			;;
+		    *)
+			;;
+		esac
+		;;
+	esac
+    done < ${GENERATED_DIR}/etc.fstab
+
+    if test ${action} == on ; then
+
+	install -d -m 555 -o root -g root ${APL}/proc
+	install -d -m 555 -o root -g root ${APL}/sys
+
+	mount -t proc proc ${APL}/proc
+	mount -t sysfs sysfs ${APL}/sys
+
+	! is-efi-system || mount -t efivarfs efivarfs ${APL}/sys/firmware/efi/efivars
+
+	return 0
+    fi
+
+    ! is-efi-system || umount ${APL}/sys/firmware/efi/efivars
+    umount ${APL}/proc
+    umount ${APL}/sys
+
+    for mp in ${umount_list}
+    do
+	umount ${APL}${mp}
+    done
+
+    test -z "${swap_fs}" || swapoff ${swap_fs}
+}
+
+mount-fs()
+{
+    do-mount-fs on
+}
+
+umount-fs()
+{
+    cd ${INSTALL_DIR}
+    do-mount-fs off
+}
+
+set-admin-tls-certificate()
+{
+    local tls=default
+
+    test -f ${APL}${SSL_SERVER_DIR}/${tls}.conf || return 0
+    cp -f ${APL}${SSL_SERVER_DIR}/${tls}.conf ${APL}${TMP_DIR}/${TLS_SERVER}.${tls}.conf
+}
+
+set-ca-tls-certificate()
+{
+    test -f ${APL}${SSL_CA_DIR}/${SYSTEM_CA}.conf || return 0
+    cp -f ${APL}${SSL_CA_DIR}/${SYSTEM_CA}.conf ${APL}${TMP_DIR}/${SYSTEM_CA}.conf
+}
+
+set-admin-environment()
+{
+    local userenv_file userenv_name
+    local max_upload_file_sz
+    local admin_ssh_passwd name_server_list
+
+    if test ${MAX_UPLOAD_FILE_SZ} -gt ${DEFAULT_MAX_UPLOAD_FILE_SZ} ; then
+	max_upload_file_sz=$[${DEFAULT_MAX_UPLOAD_FILE_SZ} * 1024]
+    else
+	max_upload_file_sz=$[${MAX_UPLOAD_FILE_SZ} * 1024]
+    fi
+
+    case ${CLOUD_NAME} in
+	aws)
+	    admin_ssh_passwd=False
+	    ;;
+	azure)
+	    admin_ssh_passwd=True
+	    ;;
+	*)
+	    admin_ssh_passwd=True
+	    ;;
+    esac
+
+    # The first time the machine starts, to the init process named is disabled even if the apl_configure program can activated it in the appliance service. That's why for a gateway in a public cloud we must activate it here to allow the registration program to resolve the public registration service name to an IP address.
+
+    case ${CLOUD_NAME} in
+	aws|azure)
+	    case ${APL_ROLE} in
+		gateway)
+		    name_server_list='127.0.0.1'
+		    ;;
+		manager)
+		    ;;
+		*)
+		    ;;
+	    esac
+	    ;;
+	*)
+	    ;;
+    esac
+
+    for userenv_file in ${ABASE_DIR}/${ENV_RDIR}/${ENV_NAME} \
+			${ABASE_DIR}/${ENV_RDIR}/${ENV_CURRENT_NAME} \
+			${ABASE_DIR}/${ENV_RDIR}/${ENV_CANCEL_NAME}
+    do
+	sed -i \
+	    -e "s@NAME_SERVER_LIST='.*'@NAME_SERVER_LIST='${name_server_list}'@" \
+	    -e "s@ADMIN_SSH_PASSWORD='.*'@ADMIN_SSH_PASSWORD='${admin_ssh_passwd}'@" \
+	    -e "s@TIMEZONE='.*'@TIMEZONE='${TIMEZONE}'@" \
+	    -e "s@WAF_FILES_SIZE='.*'@WAF_FILES_SIZE='${max_upload_file_sz}'@" \
+	    ${APL}${userenv_file}
+    done
+
+    case ${APL_ROLE} in
+	manager)
+	    cp -af ${APL}${SAVE_DIR}/${ENV_FACTORY_NAME}.gateway ${APL}${SAVE_DIR}/${ENV_FACTORY_NAME}.manager
+	    cp -af ${APL}${SAVE_DIR}/${ENV_CURRENT_FACTORY_NAME}.gateway ${APL}${SAVE_DIR}/${ENV_CURRENT_FACTORY_NAME}.manager
+
+	    cp -af ${APL}${SAVE_DIR}/${CONFIGURATION_FACTORY_DB_NAME}.gateway ${APL}${SAVE_DIR}/${CONFIGURATION_FACTORY_DB_NAME}.manager
+	    cp -af ${APL}${SAVE_DIR}/${CONFIGURATION_CURRENT_FACTORY_DB_NAME}.gateway ${APL}${SAVE_DIR}/${CONFIGURATION_CURRENT_FACTORY_DB_NAME}.manager
+
+	    for userenv_file in ${ABASE_DIR}/${ENV_RDIR}/${ENV_NAME} \
+				${ABASE_DIR}/${ENV_RDIR}/${ENV_CURRENT_NAME} \
+				${ABASE_DIR}/${ENV_RDIR}/${ENV_CANCEL_NAME}
+	    do
+		sed -i \
+		    -e "s@BOND_INTERNALS='.*'@BOND_INTERNALS='${DEFAULT_MANAGER_BOND_INTERNALS}'@" \
+		    -e "s@BOND_EXTERNALS='.*'@BOND_EXTERNALS='${DEFAULT_MANAGER_BOND_EXTERNALS}'@" \
+		    -e "s@ROUTER_MODE='.*'@ROUTER_MODE='False'@" \
+		    -e "s@SNAT_MODE='.*'@SNAT_MODE='False'@" \
+		    -e "s@DNS_MODE='.*'@DNS_MODE='False'@" \
+		    -e "s@FIREWALL_MODE='.*'@FIREWALL_MODE='False'@" \
+		    -e "s@WEB_MODE='.*'@WEB_MODE='False'@" \
+		    -e "s@TRANSPARENT_MODE='.*'@TRANSPARENT_MODE='False'@" \
+		    -e "s@ACCESS_ADMIN_LIST='.*'@ACCESS_ADMIN_LIST='internal 0.0.0.0 0.0.0.0 100'@" \
+		    ${APL}${userenv_file}
+	    done
+	    ;;
+	gateway)
+	    for userenv_file in ${ABASE_DIR}/${ENV_RDIR}/${ENV_NAME} \
+				${ABASE_DIR}/${ENV_RDIR}/${ENV_CURRENT_NAME} \
+				${ABASE_DIR}/${ENV_RDIR}/${ENV_CANCEL_NAME}
+	    do
+		sed -i \
+		    -e "s@ACCESS_ADMIN_LIST='.*'@ACCESS_ADMIN_LIST='internal 0.0.0.0 0.0.0.0 100 external 0.0.0.0 0.0.0.0 100'@" \
+		    ${APL}${userenv_file}
+	    done
+	    ;;
+	*)
+	    ;;
+    esac
+
+    test "${APL_MODEL}" == 'test' || return 0
+
+    for userenv_name in ${ENV_NAME} ${ENV_CURRENT_NAME} ${ENV_CANCEL_NAME}
+    do
+	sed -i \
+	    -e "s@TIMEZONE='.*'@TIMEZONE='${DEFAULT_TIMEZONE}'@" \
+	    \
+	    -e "s@ACCESS_FILE_LIST='.*'@ACCESS_FILE_LIST='${DEFAULT_ACCESS_FILE_LIST}'@" \
+	    -e "s@ACCESS_MON_LIST='.*'@ACCESS_MON_LIST='${DEFAULT_ACCESS_MON_LIST}'@" \
+	    ${APL}${ABASE_DIR}/${ENV_RDIR}/${userenv_name}
+    done
+
+    case ${APL_ROLE} in
+	gateway)
+	    for userenv_name in ${ENV_NAME} ${ENV_CURRENT_NAME} ${ENV_CANCEL_NAME}
+	    do
+		sed -i \
+		    -e "s@IP_INTERNAL_IP='.*'@IP_INTERNAL_IP='${DEFAULT_GATEWAY_IP_INTERNAL_IP}'@" \
+		    -e "s@IP_INTERNAL_MASK='.*'@IP_INTERNAL_MASK='${DEFAULT_GATEWAY_IP_INTERNAL_MASK}'@" \
+		    -e "s@IP_EXTERNAL_IP='.*'@IP_EXTERNAL_IP='${DEFAULT_IP_EXTERNAL_IP}'@" \
+		    -e "s@IP_EXTERNAL_MASK='.*'@IP_EXTERNAL_MASK='${DEFAULT_IP_EXTERNAL_MASK}'@" \
+		    -e "s@IP_ROUTE_LIST='.*'@IP_ROUTE_LIST='${DEFAULT_GATEWAY_IP_ROUTE_LIST}'@" \
+		    -e "s@NAME_SERVER_LIST='.*'@NAME_SERVER_LIST='${DEFAULT_NAME_SERVER_LIST}'@" \
+		    -e "s@DNS_MODE='.*'@DNS_MODE='${DEFAULT_DNS_MODE}'@" \
+		    ${APL}${ABASE_DIR}/${ENV_RDIR}/${userenv_name}
+	    done
+	    ;;
+	manager)
+	    for userenv_name in ${ENV_NAME} ${ENV_CURRENT_NAME} ${ENV_CANCEL_NAME}
+	    do
+		sed -i \
+		    -e "s@IP_INTERNAL_IP='.*'@IP_INTERNAL_IP='${DEFAULT_MANAGER_IP_INTERNAL_IP}'@" \
+		    -e "s@IP_INTERNAL_MASK='.*'@IP_INTERNAL_MASK='${DEFAULT_MANAGER_IP_INTERNAL_MASK}'@" \
+		    -e "s@IP_ROUTE_LIST='.*'@IP_ROUTE_LIST='${DEFAULT_MANAGER_IP_ROUTE_LIST}'@" \
+		    -e "s@NAME_SERVER_LIST='.*'@NAME_SERVER_LIST='${DEFAULT_MANAGER_DNS_IP}'@" \
+		    ${APL}${ABASE_DIR}/${ENV_RDIR}/${userenv_name}
+	    done
+	    ;;
+	*)
+	    ;;
+    esac
+}
+
+reset-apply-log()
+{
+    echo -n > ${APL}${APPLY_LOG}
+}
+
+set-test-configuration()
+{
+    test "${APL_MODEL}" == 'test' || return 0
+
+    sed -i -e '/CONSOLE/d' ${APL}/etc/login.defs
+    cp -af ${APL}/etc/login.defs ${APL}${ETC_DIR}/login.defs
+
+    sed -i -e '1 i\+:root:/dev/ttyS0 /dev/tty1 /dev/tty2 /dev/tty3' ${APL}/${CONF_DIR}/login.access-constant
+    sed -i -e 's/SQUID_ACTION_RETRY=.*/SQUID_ACTION_RETRY=1/' ${APL}/${CONF_DIR}/sysconfig.squid-tuned
+
+    mkdir -p ${APL}/usr/src
+
+    case ${TEST_SRC_PROTOCOL} in
+	nfs)
+	    sed -i -e "/.*swap.*swap.*/a ${TEST_SRC_IP}:${TEST_SRC_DIR} /usr/src nfs4 soft,timeo=10,retry=0,defaults,user,exec 0 2" ${APL}/etc/fstab
+	    ;;
+	sshfs)
+	    sed -i -e "/.*swap.*swap.*/a sshfs#${TEST_SRC_ACCOUNT}@${TEST_SRC_IP}:${TEST_SRC_DIR} /usr/src fuse3 sshfs_sync,no_readahead,sync_readdir,reconnect,delay_connect,allow_other 0 2" ${APL}/etc/fstab
+
+	    install -d -m 700 -o root -g root  ${APL}/root/.ssh
+	    install -v -m 600 -o root -g root ${INSTALL_DIR}/id_rsa ${APL}/root/.ssh
+	    ;;
+	*)
+	    ;;
+    esac
+}
+
+do-embedded-applications-configuration()
+{
+    chroot ${APL} apl_ea_vpnsubscr_change_password ${ADMIN_NAME} "${APASSWORD}"
+}
+
+do-configuration()
+{
+    set-admin-tls-certificate
+    set-ca-tls-certificate
+    set-admin-environment
+    set-test-configuration
+
+    chroot ${APL} /usr/local/sbin/apl_configure
+    reset-apply-log
+
+    do-embedded-applications-configuration
+}
+
+do-model-install()
+{
+    gen-uuid-fstab
+
+    cd ${CACHEGUARD_DIR}
+
+    GENERATED_DIR=${INSTALL_DIR}/${GENERATED_DIR} ${INSTALL_DIR}/apl_model_install install ${APL_ROLE}
+
+    cd ${INSTALL_DIR}
+
+    install -m 644 -o root -g root ${GENERATED_DIR}/hw-links ${APL}${HARD_DIR}/hw-links
+    install -m 644 -o root -g root ${GENERATED_DIR}/hw-drive ${APL}${HARD_DIR}/hw-drive
+    test ${RAID_STATE} -eq 0 || install -m 644 -o root -g root /etc/mdadm.conf ${APL}/etc/mdadm.conf
+}
+
+gen-machine-type()
+{
+    echo "${MACHINE}"
+}
+
+gen-cloud-conf()
+{
+    local usage valid_ip
+
+    if test "${APL_MODEL}" == 'test' ; then
+	usage=free
+	valid_ip=yes
+    fi
+
+    echo "CLOUD_NAME=${CLOUD_NAME}"
+
+    test -z "${CLOUD_EMBEDDED_APPLICATIONS}" || \
+	echo "CLOUD_EMBEDDED_APPLICATIONS=\"${CLOUD_EMBEDDED_APPLICATIONS}\""
+
+    echo "CLOUD_USAGE=${usage}"
+    echo "CLOUD_VALID_IP=${valid_ip}"
+    echo "CLOUD_PROVISION_STATE="
+
+    echo "CLOUD_CONSOLE=${CLOUD_CONSOLE}"
+
+    echo "CLOUD_NETWORK_MAIN_DEV=${CLOUD_NETWORK_MAIN_DEV}"
+    echo "CLOUD_NETWORK_MAIN_IP="
+    echo "CLOUD_NETWORK_MAIN_MASK="
+    echo "CLOUD_NETWORK_MAIN_GATEWAY="
+
+    echo "CLOUD_NETWORK_SECOND_DEV=${CLOUD_NETWORK_SECOND_DEV}"
+    echo "CLOUD_NETWORK_SECOND_IP="
+    echo "CLOUD_NETWORK_SECOND_MASK="
+}
+
+set-nic-names-table()
+{
+    unset INSTALL_NIC_NAMES
+    INSTALL_NIC_NAMES_NB=0
+
+    local nb name rest
+    local links_file=/tmp/links.file.${$}
+    local range i=0 j=0
+
+    ip link > ${links_file}
+
+    while read nb name rest
+    do
+	test -n "${rest}" || continue
+
+	range=$[${i} % 2]
+	case ${range} in
+	    0)
+		if test ${name} != lo: ; then
+		    INSTALL_NIC_NAMES[${j}]=${name%:}
+		    ((j++))
+		fi
+		;;
+	    1)
+		;;
+	    *)
+		return 255
+		;;
+	esac
+	((i++))
+    done < ${links_file}
+
+    INSTALL_NIC_NAMES_NB=${j}
+    rm -f ${links_file}
+}
+
+get-nic-name()
+{
+    test -n "${1}" || return 1
+    local nic=${1}
+
+    set-nic-names-table
+    echo ${INSTALL_NIC_NAMES[${nic}]}
+}
+
+set-install-ip()
+{
+    local nic=${1}
+
+    local nic_name used_nic_name
+    local f1 f2 f3 ret
+
+    touch /tmp/{VARIABLE_DHCP_SERVER_IP,VARIABLE_APL_IP,VARIABLE_TFTP_SERVER_IP}
+
+    cat << EOF > ${INSTALL_DIR}/dhclient.conf
+timeout 10;
+retry 2;
+select-timeout 0;
+reboot 5;
+backoff-cutoff 10;
+initial-interval 5;
+initial-delay 0;
+script "/sbin/dhclient-script";
+EOF
+    echo "script \"/sbin/dhclient-script\";" >> ${INSTALL_DIR}/dhclient.conf
+
+    if test -n "${nic}" ; then
+	nic_name=$(get-nic-name ${nic})
+	dhclient -1 -4 -v -lf ${INSTALL_DIR}/dhclient.leases -cf ${INSTALL_DIR}/dhclient.conf --no-pid ${nic_name} 2> /tmp/dhcp.info
+	ret=${?}
+	test ${ret} -ne 0 || used_nic_name=${nic_name}
+    else
+	set-nic-names-table
+	local i
+
+	for ((i=0 ; i<INSTALL_NIC_NAMES_NB ; i++))
+	do
+	    nic_name=${INSTALL_NIC_NAMES[${i}]}
+	    dhclient -1 -4 -v -lf ${INSTALL_DIR}/dhclient.leases -cf ${INSTALL_DIR}/dhclient.conf --no-pid ${nic_name} 2> /tmp/dhcp.inf
+	    ret=${?}
+	    if test ${ret} -eq 0 ; then
+		used_nic_name=${nic_name}
+		break
+	    fi
+	done
+    fi
+
+    echo ${used_nic_name} > /tmp/VARIABLE_USED_NIC_NAME
+
+    if test -n "${used_nic_name}" -a -f ${INSTALL_DIR}/dhclient.leases ; then
+	while read f1 f2 f3
+	do
+	    test "${f1}" != option -o "${f2}" != dhcp-server-identifier || echo ${f3/;} > /tmp/VARIABLE_DHCP_SERVER_IP
+	    test "${f1}" != fixed-address || echo ${f2/;} > /tmp/VARIABLE_APL_IP
+	done < ${INSTALL_DIR}/dhclient.leases 2>> /tmp/${LOG_FILE}
+    fi
+
+    cp -f /tmp/VARIABLE_DHCP_SERVER_IP /tmp/VARIABLE_TFTP_SERVER_IP
+
+    dhcp_server_ip=$(cat /tmp/VARIABLE_DHCP_SERVER_IP)
+    apl_ip=$(cat /tmp/VARIABLE_APL_IP)
+    tftp_server_ip=$(cat /tmp/VARIABLE_TFTP_SERVER_IP)
+
+    echo
+
+    if test -n "${dhcp_server_ip}" ; then
+
+	echo "Used NIC: ${used_nic_name}"
+	echo "DHCP server IP: ${dhcp_server_ip}"
+
+	if test -n "${apl_ip}" ; then
+	    echo "Assigned IP address: ${apl_ip}"
+	else
+	    echo "No IP address has been assigned"
+	fi
+
+	if test -n "${tftp_server_ip}" ; then
+	    echo "Used TFTP server: ${tftp_server_ip}"
+	else
+	    echo "No TFTP server has been detected"
+	fi
+    else
+	echo "No DHCP server has been detected"
+    fi
+
+    echo
+
+    usleep 3000000
+    return ${ret}
+}
+
+dialog-select-nic()
+{
+    test -n "${1}" || return 1
+    local description=${1}
+
+    test -f /tmp/${NETWORK_FILE} || return 0
+
+    local dev mac info
+
+    echo "\"auto\" \"Probe all available NICs\"" > /tmp/${NIC_MENU}.auto
+
+    while read dev mac info ; do
+	echo "\"${dev}\" \"${info:0:32}...\""
+    done < /tmp/${NETWORK_FILE} > /tmp/${NIC_MENU}.nic
+
+    if test ! -s /tmp/${NIC_MENU}.nic ; then
+	${DIALOG} --backtitle "${INSTALL_BACKTITLE} Installation" --title "NIC Selection" --msgbox "\nNo NIC is present on this machine." 0 0
+	return 11
+    fi
+
+    cat /tmp/${NIC_MENU}.auto /tmp/${NIC_MENU}.nic > /tmp/${NIC_MENU}
+
+    ${DIALOG} --backtitle "${INSTALL_BACKTITLE} Installation" --title "NIC Selection" --menu "${description}" 0 0 4 --file /tmp/${NIC_MENU} 2> /tmp/VARIABLE_SELECTED_NIC
+
+    local ret=${?}
+
+    local nic=$(cat /tmp/VARIABLE_SELECTED_NIC)
+    rm -f /tmp/VARIABLE_SELECTED_NIC
+
+    test -n "${nic}" || return ${DIALOG_CANCEL}
+
+    nic=${nic/eth}
+    export SELECTED_NIC=${nic}
+
+    return ${ret}
+}
+
+dialog-request-ip()
+{
+    test "${INSTALL}" == pxe || return 0
+
+    local nic ret
+
+    if test "${REMOTE_DEBUG_MODE}" == yes ; then
+	SELECTED_NIC=${DEBUG_NETWORK_DEV}
+	nic=${SELECTED_NIC}
+    else
+	if test -z "${APL_MODEL}" ; then
+	    if test -f /tmp/${NETWORK_FILE} ; then
+		local nb=$(wc -l /tmp/${NETWORK_FILE} 2> /dev/null)
+		nb=${nb/ *}
+		if test ${nb} -le 1 ; then
+		    nic=${INSTALL_MODEL_NETWORK_DEV}
+		else
+		    dialog-select-nic "\nPlease select the NIC from which you want to download the OS:"
+		    test ${?} -eq ${DIALOG_OK} || return 0
+		    test "${SELECTED_NIC}" == auto || nic=${SELECTED_NIC}
+		fi
+	    else
+		nic=${INSTALL_MODEL_NETWORK_DEV}
+	    fi
+	else
+	    nic=${INSTALL_MODEL_NETWORK_DEV}
+	fi
+    fi
+
+    set-install-ip ${nic} | ${DIALOG} --backtitle "${INSTALL_BACKTITLE} Installation" --title "Network Installation" --progressbox "\nNetwork configuration in progress..." 10 50
+    ret=${PIPESTATUS[0]}
+
+    setenv-variable-from-file
+    return ${ret}
+}
+
+unset-install-ip()
+{
+    test -n "${USED_NIC_NAME}" || return 1
+    dhclient -1 -4 -v -lf ${INSTALL_DIR}/dhclient.leases -cf ${INSTALL_DIR}/dhclient.conf --no-pid -r ${USED_NIC_NAME} 2>> /tmp/${LOG_FILE}
+    unset TFTP_SERVER_IP ; echo > /tmp/VARIABLE_TFTP_SERVER_IP
+}
+
+dialog-download-os()
+{
+    cd ${WORKING_DIR}
+
+    local curl_global_options="-qsf --globoff"
+    local curl_options="${curl_global_options} --connect-timeout 5 --max-time 240 --tftp-blksize 20480"
+
+    mv -f /tmp/os.xx os.xx || return 10
+    curl -qsf --globoff --connect-timeout 5 --max-time 10 --url tftp://${TFTP_SERVER_IP}/${TECHNICAL_NAME}/os.sg -o os.sg || return 17
+
+    curl -qsf --globoff --connect-timeout 5 --max-time 10 --url tftp://${TFTP_SERVER_IP}/${TECHNICAL_NAME}/os.dv -o os.dv
+
+    dialog-progress 1 "" 500000
+
+    local nb=$(cat os.xx)
+    check-nb ${nb} || return 10
+
+    local progress_pieces=85
+
+    local step=$[${nb} * 100 / ${progress_pieces}]
+
+    local i index
+
+    for ((i=0 ; i<nb ; i++))
+    do
+	if test ${#i} -eq 1 ; then
+	    index="0${i}"
+	else
+	    index="${i}"
+	fi
+	curl ${curl_options} --url tftp://${TFTP_SERVER_IP}/${TECHNICAL_NAME}/os.${index} -o os.${index} || return 10
+	dialog-progress $[(${i} * 100 / ${step}) +2] "Downloading OS piece $[${i}+1]/${nb} from tftp://${TFTP_SERVER_IP}" 0
+    done
+
+    dialog-progress ${progress_pieces} "Checking the integrity of downloaded OS pieces." 0
+
+    local src_sig dst_sig os
+    while read src_sig os
+    do
+	test -n "${os}" || return 13
+
+	dst_sig=$(openssl dgst -sha1 ${os} 2> /dev/null)
+	dst_sig=${dst_sig/*= }
+
+	test "${dst_sig}" == ${src_sig} || return 13
+    done < os.sg
+
+    mkdir -p ${APL}/boot
+
+    case ${ARCHITECTURE} in
+	x86_64)
+	    dialog-progress $((progress_pieces + 5)) "Downloading the 64 bits Linux kernel from ${TFTP_SERVER_IP}" 0
+	    curl ${curl_options} --url tftp://${TFTP_SERVER_IP}/${TECHNICAL_NAME}-boot/${CG_KERNEL_64} -o ${APL}/boot/kernel-${SYS_VERSION}-${SYS_64_NAME} || return 14
+	    ;;
+	*)
+	    dialog-progress $((progress_pieces + 5)) "Downloading the 32 bits Linux kernel from ${TFTP_SERVER_IP}" 0
+	    curl ${curl_options} --url tftp://${TFTP_SERVER_IP}/${TECHNICAL_NAME}-boot/${CG_KERNEL_HM} -o ${APL}/boot/kernel-${SYS_VERSION}-${SYS_HM_NAME} || return 14
+	    ;;
+    esac
+
+    cd ${INSTALL_DIR}
+    dialog-end-progress
+}
+
+is-media-detected()
+{
+    test -n "${MEDIA_TYPE}"
+}
+
+check-completeness()
+{
+    test -f ${MEDIA_DIR}/${TECHNICAL_NAME}/os.xx || return 2
+
+    local nb1=$(cat ${MEDIA_DIR}/${TECHNICAL_NAME}/os.xx)
+    check-nb ${nb1} || return 3
+    
+    local nb2=$(ls -1 ${MEDIA_DIR}/${TECHNICAL_NAME}/os.[0-9]* | wc -l)
+    test ${nb1} -eq ${nb2} || return 4
+}
+
+dialog-copy-os()
+{
+    dialog-progress 10 "Checking the media device"
+    is-media-detected || return 11
+    dialog-progress 20 "Checking OS completeness"
+    check-completeness || return 12
+    dialog-progress 30 "Copying the OS Kernel from the media"
+
+    mkdir -p ${APL}/boot
+    
+    case ${ARCHITECTURE} in
+	x86_64)
+	    dialog-progress 40
+	    dialog-progress 50
+	    cp --archive ${MEDIA_DIR}/${TECHNICAL_NAME}-boot/${CG_KERNEL_64} ${APL}/boot/kernel-${SYS_VERSION}-${SYS_64_NAME} && \
+		chmod 644 ${APL}/boot/kernel-${SYS_VERSION}-${SYS_64_NAME} || return 16
+	    ;;
+	*)
+	    dialog-progress 40
+	    cp --archive ${MEDIA_DIR}/${TECHNICAL_NAME}-boot/${CG_KERNEL_HM} ${APL}/boot/kernel-${SYS_VERSION}-${SYS_HM_NAME} && \
+		chmod 644 ${APL}/boot/kernel-${SYS_VERSION}-${SYS_HM_NAME} || return 16
+	    dialog-progress 50
+	    ;;
+    esac
+
+    dialog-end-progress
+    return 0
+}
+
+dialog-merge-os-pieces()
+{
+    test -f os.xx || return 11
+    local nb=$(cat os.xx) i piece
+
+    check-nb ${nb} || return 13
+
+    rm -f ${WORKING_DIR}/${TECHNICAL_NAME}-os.tar.xz
+
+    for ((i=0 ; i<nb ; i++)) 
+    do
+	if test ${#i} -eq 1 ; then
+	    piece=os.0${i}
+	else
+	    piece=os.${i}
+	fi
+
+	cat ${piece} >> ${WORKING_DIR}/${TECHNICAL_NAME}-os.tar.xz 2>> /tmp/${LOG_FILE} || return 15
+	dialog-progress $[${i} * 100 / ${nb}] "" 0
+    done
+
+    test ! -f os.dv || mv -f ${WORKING_DIR}/${TECHNICAL_NAME}-os.tar.xz ${WORKING_DIR}/${TECHNICAL_NAME}-os.tar.gz
+    test "${INSTALL}" == "iso" || rm -f os.*
+
+    dialog-end-progress
+}
+
+set-runtime-inittab()
+{
+    rm -f etc/rc.d/rc7.d/S00install
+    rm -f etc/rc.d/init.d/install
+    mv -f etc/inittab.save etc/inittab
+    rmdir etc/rc.d/rc7.d
+
+    if test -s /sys/class/tty/ttyS0/device/resources -o "${CLOUD_CONSOLE:0:4}" == ttyS ; then
+	test "${CLOUD_CONSOLE:0:4}" != ttyS || sed -i -e "s/vt100/linux/g" etc/inittab
+    else
+	sed -i -e "s/s1:/# s1:/g" etc/inittab
+    fi
+}
+
+dialog-install-os-components()
+{
+    reset-install-log
+
+    dialog-progress 10 "Uncompressing the OS"
+    cd ${WORKING_DIR}
+    rm -f ${TECHNICAL_NAME}-os.tar
+
+    if test -f ${TECHNICAL_NAME}-os.tar.xz ; then
+	unxz --quiet ${TECHNICAL_NAME}-os.tar.xz >> /tmp/${LOG_FILE} 2>&1 || return 3
+    elif test -f ${TECHNICAL_NAME}-os.tar.gz ; then
+	gunzip --quiet ${TECHNICAL_NAME}-os.tar.gz >> /tmp/${LOG_FILE} 2>&1 || return 3
+    else
+	return 3
+    fi
+
+    dialog-progress 40 "Unpacking the OS"
+    cd ${APL}
+    tar xpf ${WORKING_DIR}/${TECHNICAL_NAME}-os.tar >> /tmp/${LOG_FILE} 2>&1 || return 5
+    rm -f   ${WORKING_DIR}/${TECHNICAL_NAME}-os.tar
+
+    dialog-progress 70 "Installing Binaries & Libraries"
+    cd /
+    tar \
+	--numeric-owner \
+	--same-owner \
+	--exclude="run/udev" \
+	--exclude="usr/lib/modules" \
+	--exclude="usr/lib/firmware" \
+	${excludes} \
+	--create --file ${WORKING_DIR}/${TECHNICAL_NAME}-os.tar \
+	dev/console dev/null \
+	${INITRD_OS_FILES} \
+	>> /tmp/${LOG_FILE} 2>&1 || return 7
+
+    dialog-progress 75 "Installing Binaries & Libraries"
+    cd ${APL}
+    tar xpf ${WORKING_DIR}/${TECHNICAL_NAME}-os.tar >> /tmp/${LOG_FILE} 2>&1 || return 9
+
+    dialog-progress 80 "Installing OS components"
+    set-runtime-inittab
+    rm -f ${WORKING_DIR}/${TECHNICAL_NAME}-os.tar
+
+    dialog-progress 90 "Installing Drivers & Firmware"
+    cd /
+    tar \
+	--numeric-owner \
+	--same-owner \
+	--create --file ${WORKING_DIR}/${TECHNICAL_NAME}-os.tar \
+	usr/lib/modules \
+	usr/lib/firmware \
+	>> /tmp/${LOG_FILE} 2>&1 || return 11
+
+    dialog-progress 95 "Installing Drivers & Firmware"
+    cd ${APL}
+    tar xpf ${WORKING_DIR}/${TECHNICAL_NAME}-os.tar >> /tmp/${LOG_FILE} 2>&1 || return 11
+    rm -f ${WORKING_DIR}/${TECHNICAL_NAME}-os.tar
+
+    cd ${INSTALL_DIR}
+    dialog-end-progress
+}
+
+gen-mdadm-conf()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    local num_devices=${1}
+    local raid_devices=${2}
+
+    echo "DEVICE ${raid_devices}"
+    echo "ARRAY /dev/md${RAID_MD_NB} name=${TECHNICAL_NAME} devices=${raid_devices// /,} level=${RAID_LEVEL} num-devices=${num_devices} spares=${RAID_SPARE_NB} spare-group=${TECHNICAL_NAME} metadata=1.2"
+    echo "PROGRAM ${LOCAL_DIR}/bin/apl_raid_monitor"
+    echo "CREATE owner=root group=disk metadata=1.2 symlinks=no names=yes"
+    echo "HOMEHOST ignore ${TECHNICAL_NAME}"
+    echo "AUTO homehost +1.2 -all"
+    echo "POLICY domain=${TECHNICAL_NAME} metadata=1.2 path=pci-* type=disk action=spare"
+}
+
+gen-smartd-conf()
+{
+    local common_options="-d auto -T permissive -o off -S on -l selftest -n standby -F none -P use"
+    local monitor_options="-H -s S/../.././04 -U 198 -C 197 -f -p -u -W 3,40,45"
+    local exec_option="-m <nomailer> -M once -M exec ${LOCAL_DIR}/bin/apl_smart_monitor"
+
+    local disk type_option i=0
+
+    smartctl --scan-open > /tmp/${SMART_FILE}
+
+    while read disk type_option
+    do
+	type_option=${type_option/\#*/}
+	smartctl -i ${disk} > /tmp/${SMARTCTL_FILE}.${i} 2>> /tmp/${LOG_FILE}
+	grep "SMART support is: Available" /tmp/${SMARTCTL_FILE}.${i} >> /tmp/${LOG_FILE} 2>&1
+	test ${?} -eq 0 || continue
+
+	echo -e "${disk} \\"
+	echo -e "\t${common_options} \\"
+	echo -e "\t${monitor_options} \\"
+	echo -e "\t${exec_option}"
+
+	((i++))
+    done < /tmp/${SMART_FILE}
+}
+
+gen-console()
+{
+    grep --invert-match KEYMAP /etc/sysconfig/console
+    echo "KEYMAP=\"${KEYBOARD}\""
+}
+
+gen-keymap()
+{
+    echo "${KEYBOARD}"
+}
+
+gen-modules()
+{
+    cat ${APL}/etc/sysconfig/modules-constant
+    cat ${APL}/etc/sysconfig/modules-network
+
+    echo
+
+    if test "${APL_MODEL}" == 'test' ; then
+	echo fuse
+	echo
+    fi
+    echo "# End /etc/sysconfig/modules"
+}
+
+load-usb-modules()
+{
+    # Caution: The order is important
+    modprobe --quiet xhci_pci >> /tmp/${LOG_FILE} 2>&1
+    modprobe --quiet ehci_pci >> /tmp/${LOG_FILE} 2>&1
+    modprobe --quiet uhci_hcd >> /tmp/${LOG_FILE} 2>&1
+    modprobe --quiet ohci_hcd >> /tmp/${LOG_FILE} 2>&1
+}
+
+load-hid-modules()
+{
+    ! is-serial-terminal || return 0
+    load-usb-modules
+    modprobe --quiet hid_generic >> /tmp/${LOG_FILE} 2>&1
+    modprobe --quiet usbhid >> /tmp/${LOG_FILE} 2>&1
+}
+
+mount-cdrom()
+{
+    test -b /dev/cdrom || return 11
+    local cdrom1=$(readlink -e /dev/cdrom 2> /dev/null)
+    test -n "${cdrom1}" || return 13
+
+    local cdrom2=$(cat /proc/sys/dev/cdrom/info 2> /dev/null | grep "drive name:" 2> /dev/null | cut -f3)
+    test -n "${cdrom2}" || return 15
+
+    test ${cdrom1} == /dev/${cdrom2} || return 17
+
+    mount /dev/cdrom ${MEDIA_DIR} >> /tmp/${LOG_FILE} 2>&1 || return 13
+
+    export MEDIA_DEVICE=${cdrom2}
+    echo ${MEDIA_DEVICE} > /tmp/VARIABLE_MEDIA_DEVICE
+}
+
+mount-usb()
+{
+    load-usb-modules
+    modprobe --quiet usb_storage >> /tmp/${LOG_FILE} 2>&1
+
+    local retries=10 i usb_disks
+
+    for ((i=0 ; i<retries ; i++))
+    do
+	usb_disks=$(ls -d1 /dev/disk/by-id/usb-* 2> /dev/null)
+	test -z "${usb_disks}" || break
+	usleep 250000
+    done
+    test ${i} -lt ${retries} || return 11
+
+    local first_usb_disk=${usb_disks/ *}
+
+    local usb=$(readlink -e ${first_usb_disk} 2> /dev/null)
+
+    wait4-file ${usb} b 10 250000 || return 13
+    mount ${usb} ${MEDIA_DIR} 2>> /tmp/${LOG_FILE} || return 15
+
+    export MEDIA_DEVICE=${usb:5}
+    echo ${MEDIA_DEVICE} > /tmp/VARIABLE_MEDIA_DEVICE
+}
+
+mount-media()
+{
+    test "${INSTALL}" == iso || return 0
+
+    mkdir -p ${MEDIA_DIR}
+    umount ${MEDIA_DIR} 2>> /tmp/${LOG_FILE}
+
+    if mount-cdrom ; then
+	export MEDIA_TYPE=cdrom
+    elif mount-usb ; then
+	export MEDIA_TYPE=usb
+    else
+	unset MEDIA_TYPE
+	return 1
+    fi
+
+    echo ${MEDIA_TYPE} > /tmp/VARIABLE_MEDIA_TYPE
+    return 0
+}
+
+dialog-mount-media()
+{
+    test "${INSTALL}" == iso || return 0
+
+    if test -z "${MEDIA_TYPE}" ; then
+	dialog-error 11
+	return 11
+    fi
+
+    local name=$(cat /sys/block/${MEDIA_DEVICE}/device/{vendor,model} 2>> /tmp/${LOG_FILE})
+
+    case ${MEDIA_TYPE} in
+	cdrom)
+	    test -n "${APL_MODEL}" || ${DIALOG} --backtitle "${INSTALL_BACKTITLE} Installation" --title "CDROM Installation" --msgbox "\nCDROM installation media found at ${name} (/dev/${MEDIA_DEVICE})." 0 0
+	    ;;
+	usb)
+	    test -n "${APL_MODEL}" || ${DIALOG} --backtitle "${INSTALL_BACKTITLE} Installation" --title "USB Stick Installation" --msgbox "\nUSB stick installation media found at ${name} (/dev/${MEDIA_DEVICE})." 0 0
+	    ;;
+	*)
+	    dialog-error 11
+	    return 11
+	    ;;
+    esac
+}
+
+dialog-manage-fs()
+{
+    cd ${INSTALL_DIR}
+    dialog-do-make-fs 0 90
+    dialog-progress 95 "Mounting File systems"
+    mount-fs
+    dialog-end-progress
+}
+
+gen-uuid-fstab()
+{
+    test -f ${GENERATED_DIR}/etc.fstab || return 11
+
+    if test ${RAID_STATE} -eq 1 ; then
+	cp -f ${GENERATED_DIR}/etc.fstab ${GENERATED_DIR}/etc.fstab.uuid
+	return 0
+    fi
+
+    local dev mp fs_type rest
+    local line uuid
+
+    while read dev mp fs_type rest
+    do
+	line="${dev} ${mp} ${fs_type} ${rest}"
+	if test -z "${dev}" -o "${dev:0:1}" == "#" ; then
+	    echo ${line}
+	    continue
+	fi
+
+	if test ${dev:0:10} == /dev/${LVM_VG_NAME}/ ; then
+	    echo ${line}
+	    continue
+	fi	    
+	    
+	case ${fs_type} in
+
+	    ext4|vfat)
+		uuid=$(get-partition-uuid ${dev})
+		echo UUID=${uuid} ${mp} ${fs_type} ${rest}
+		;;
+	    *)
+		echo ${line}
+		;;
+	esac
+
+    done < ${GENERATED_DIR}/etc.fstab > ${GENERATED_DIR}/etc.fstab.uuid
+}
+
+dialog-install-model()
+{
+    cd ${INSTALL_DIR}
+    dialog-progress 10 "Installing Tuned files"
+    do-model-install
+    dialog-progress 30 "Generating other files"
+    gen-machine-type > ${APL}${HARD_DIR}/hw-apl
+    gen-cloud-conf > ${APL}${HARD_DIR}/cloud.conf
+    gen-console > ${APL}/etc/sysconfig/console
+    gen-keymap > ${APL}${ETC_DIR}/keymap
+    gen-network-modules > ${APL}/etc/sysconfig/modules-network
+    gen-modules > ${APL}/etc/sysconfig/modules
+    gen-smartd-conf > ${APL}/usr/etc/smartd.conf
+    dialog-progress 50 "OS configuration"
+    do-configuration
+    dialog-progress 70 "Password file generation"
+    gen-testing-sn-user > ${APL}${HARD_DIR}/${SN_ID}
+    gen-passwords
+    dialog-progress 80 "Setting the machine Clock"
+    save-clock
+    dialog-progress 90 "Finishing"
+    dialog-end-progress
+}
+
+dialog-install-os-3()
+{
+    dialog-manage-fs | ${DIALOG} --backtitle "${INSTALL_BACKTITLE} ${APL_ROLE^} Installation [Progression: ${PROGRESSION}%]" --title "File system management" --gauge "Initialization..." 8 40 0
+
+    export PROGRESSION=30
+    
+    local ret
+
+    case "${INSTALL}" in
+	pxe)
+	    dialog-download-os | ${DIALOG} --backtitle "${INSTALL_BACKTITLE} ${APL_ROLE^} Installation [Progression: ${PROGRESSION}%]" --title "Downloading the OS" --gauge "Beginning the OS download from tftp://${TFTP_SERVER_IP}..." 8 40 0
+	    ret=${PIPESTATUS[0]}
+	    if test ${ret} -ne 0 ; then
+		case ${ret} in
+		    10|13|14|17)
+			error ${ret}
+			;;
+		    *)
+			error 10
+			;;
+		esac
+		return ${ret}
+	    fi
+	    cd ${WORKING_DIR}
+	    ;;
+	iso)
+	    dialog-copy-os | ${DIALOG} --backtitle "${INSTALL_BACKTITLE} ${APL_ROLE^} Installation [Progression: ${PROGRESSION}%]" --title "Copying the OS Kernel" --gauge "Initialization..." 8 40 0
+	    ret=${PIPESTATUS[0]}
+	    if test ${ret} -ne 0 ; then
+		error ${ret}
+		return ${ret}
+	    fi
+	    cd ${MEDIA_DIR}/${TECHNICAL_NAME}
+	    ;;
+	*)
+	    ;;
+    esac
+    setenv-variable-from-file
+    export PROGRESSION=50
+
+    dialog-merge-os-pieces | ${DIALOG} --backtitle "${INSTALL_BACKTITLE} ${APL_ROLE^} Installation [Progression: ${PROGRESSION}%]" --title "Merging the OS" --gauge "Merging OS pieces..." 8 40 0
+    ret=${PIPESTATUS[0]}
+    if test ${ret} -ne 0 ; then
+	error 20
+	return 20
+    fi
+
+    export PROGRESSION=65
+
+    cd ${INSTALL_DIR}
+
+    dialog-install-os-components | ${DIALOG} --backtitle "${INSTALL_BACKTITLE} ${APL_ROLE^} Installation [Progression: ${PROGRESSION}%]" --title "Installing OS Components" --gauge "Installation in progress..." 8 40 0
+    ret=${PIPESTATUS[0]}
+    if test ${ret} -ne 0 ; then
+	error 21
+	return 21
+    fi
+
+    export PROGRESSION=80
+
+    dialog-install-model | ${DIALOG} --backtitle "${INSTALL_BACKTITLE} ${APL_ROLE^} Installation [Progression: ${PROGRESSION}%]" --title "Model Installation" --gauge "Initialization..." 8 40 0
+
+    export PROGRESSION=85
+
+    return 0
+}
+
+dialog-install-os-2()
+{
+    dialog-install-os-3
+    if test ${?} -ne 0 ; then umount-fs ; return 1 ; fi
+    return 0
+}
+
+purge-role-files()
+{
+    case ${APL_ROLE} in
+	gateway)
+	    rm -f \
+	       ${APL}/usr/bin/{ssh} \
+	       ${APL}/usr/share/man/man1/{ssh}.1
+	    ;;
+	manager)
+	    ;;
+	*)
+	    ;;
+    esac
+}
+
+dialog-finish-install()
+{
+    chattr -iR ${APL}/boot # as protection on /boot may exist from a previous installation!
+
+    local grub_options="--recheck --root-directory=${APL} --boot-directory=${APL}/boot --efi-directory=${APL}/boot/efi --modules=part_gpt"
+
+    local efi pp
+
+    is-efi-system
+    efi=${?}
+
+    if test ${RAID_STATE} -eq 0 ; then
+
+	dialog-progress 10 "Installing GRUB"
+	local disk_name=$(get-os-disk-name)
+	pp=$(get-partition-prefix ${disk_name})
+
+	# Remove grub from the MBR
+	dd if=/dev/zero of=/dev/${disk_name} bs=446 count=1 >> /tmp/${LOG_FILE} 2>&1
+
+	test ${efi} -ne 0 || mount -t vfat /dev/${disk_name}${pp}${EFI_PARTITION_NB} ${APL}/boot/efi
+	grub-install ${grub_options} /dev/${disk_name} >> /tmp/${LOG_FILE} 2>&1
+	test ${efi} -ne 0 || umount ${APL}/boot/efi
+    else
+	local min=0 max=40 steps=${DISK_NB}
+	local step=$[(${max}-${min}) * 100 / ${steps}] # (* 100) because the precision
+	local progress=${min}
+	
+	local disk disks dev i=1
+
+	if test ${RAID_LEVEL} -eq 0 ; then
+	    disks=${DISK_DEVICES/ *}
+	else
+	    disks=${DISK_DEVICES}
+	fi
+
+	for disk in ${disks}
+	do
+	    progress=$[${progress} + ${step} / 100]
+	    dialog-progress ${progress} "Installing GRUB ${i}/${DISK_NB}" 10000
+	    dd if=/dev/zero of=${disk} bs=446 count=1 >> /tmp/${LOG_FILE} 2>&1
+
+	    pp=$(get-partition-prefix ${disk})
+
+	    if test ${efi} -eq 0 ; then
+		dev=${disk}${pp}${EFI_PARTITION_NB}
+		mkfs -t vfat -n EFI -F 32 ${dev} >> /tmp/${LOG_FILE} 2>&1
+		mount -t vfat ${dev} ${APL}/boot/efi
+	    fi
+
+	    grub-install ${grub_options} ${disk} >> /tmp/${LOG_FILE} 2>&1
+
+	    test ${efi} -ne 0 || umount ${APL}/boot/efi
+
+	    ((i++))
+	done
+    fi
+
+    purge-role-files
+
+    dialog-progress 50 "Locking OS components"
+    lock-os ${ARCHITECTURE} ${APL}
+    dialog-progress 60 "Unmounting File systems"
+    sync
+    umount-fs
+    dialog-progress 65 "Stopping Logical Volume Manager"
+    lvm-stop
+    if test ${RAID_STATE} -eq 1 ; then
+	dialog-progress 70 "Stopping the RAID"
+	raid-stop
+	dialog-progress 90
+    else
+	dialog-progress 90
+    fi
+    dialog-end-progress
+}
+
+dialog-congratulations()
+{
+    test -z "${APL_MODEL}" || return 0
+
+    local message="\nCongratulations! You have transformed your machine into a ${COMMERCIAL_NAME} appliance."
+
+    case "${INSTALL}" in
+	iso)
+	    message="${message} Remove the media and Reboot."
+	    ;;
+	pxe)
+	    message="${message} Disconnect from the PXE server and Reboot."
+	    ;;
+	*)
+	    ;;
+    esac
+
+    message="${message} Login as admin after reboot."
+    
+    ${DIALOG} --backtitle "${INSTALL_BACKTITLE} ${APL_ROLE^} Installation [Progression: ${PROGRESSION}%]" --title "Congratulations" --msgbox "${message}" 0 0
+}
+
+dialog-make-initrd-1()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    test -n "${3}" || return 3
+    test -n "${4}" || return 4
+    local sys_version=${1}
+    local root_device=${2}
+    local min=${3}
+    local max=${4}
+
+    local progress=${min} steps=5
+    local step=$[(${max}-${min}) / ${steps}]
+
+    local loopdev=/dev/loop5
+    local initrd_dir=/mnt/initrd
+    local image_file=${WORKING_DIR}/initrd
+    local applet basename keymap
+
+    local azure_modules=$(get-azure-storage-modules ${ARCHITECTURE} ${SYSTEM} /tmp/${LOG_FILE})
+    local aws_modules=$(get-aws-storage-modules ${ARCHITECTURE} ${SYSTEM} /tmp/${LOG_FILE})
+    local modules="${STORAGE_MODULES} ${RAID_MODULES} ${HID_MODULES}"
+    test -z "${azure_modules}" || modules="${modules} ${azure_modules}"
+    test -z "${aws_modules}" || modules="${modules} ${aws_modules}"
+
+    modules=$(uniq-elt ${modules})
+
+    local binkeymap_files=$(find /usr/share/${BINKEYMAP_DIR_NAME} -type f 2>/dev/null)
+    local all_files="/usr/bin/busybox ${modules} ${binkeymap_files}"
+
+    test ${RAID_STATE} -eq 0 || all_files="${all_files} /usr/sbin/mdadm.static"
+    local ramdisk_sz=$(get-files-size ${all_files})
+    ((ramdisk_sz += 1024))
+
+    log-install "Initial RAM Disk size = ${ramdisk_sz}"
+
+    cd ${INSTALL_DIR}
+
+    rm -f ${image_file}
+    mkdir -p ${initrd_dir}
+
+    dd if=/dev/zero of=${image_file} bs=1k count=${ramdisk_sz} 2>> /tmp/${LOG_FILE}
+    dialog-progress ${progress} ; progress=$[${progress} + ${step}]
+
+    losetup ${loopdev} ${image_file}
+    mke2fs -b 1024 -q ${loopdev} ${ramdisk_sz} >> /tmp/${LOG_FILE} 2>&1
+    tune2fs -i0 -c0 ${loopdev} >> /tmp/${LOG_FILE} 2>&1
+    mount -t ext2 ${loopdev} ${initrd_dir}
+    rm -rf ${initrd_dir}/lost+found
+    dialog-progress ${progress} ; progress=$[${progress} + ${step}]
+
+    mkdir -p ${initrd_dir}/proc
+    mkdir -p ${initrd_dir}/sys
+    mkdir -p ${initrd_dir}/dev
+    mkdir -p ${initrd_dir}/etc
+    mkdir -p ${initrd_dir}/lib/modules
+    mkdir -p ${initrd_dir}/bin
+    mkdir -p ${initrd_dir}/newroot
+
+    mknod ${initrd_dir}/dev/console -m 600 c 5 1
+    mknod ${initrd_dir}/dev/null -m 666 c 1 3
+
+    install -d -m 755 -o root -g root ${initrd_dir}/etc/${BINKEYMAP_DIR_NAME}
+    for keymap in /usr/share/${BINKEYMAP_DIR_NAME}/*
+    do
+	install -m 644 -o root -g root ${keymap} ${initrd_dir}/etc/${BINKEYMAP_DIR_NAME}
+    done
+
+    for applet in ash blkid blockdev cat chattr chmod chown chroot cp ed eject fdisk find fsck grep gunzip gzip insmod ip ln loadkmap ls lsmod mdev mkdir mknod mount mv ping pivot_root ps pwd raidautorun rm rmdir rmmod sed setsid tftp umount uname unxz vi xz
+    do
+	ln -sf busybox ${initrd_dir}/bin/${applet}
+    done
+
+    cp -a /usr/bin/busybox ${initrd_dir}/bin
+    dialog-progress ${progress} ; progress=$[${progress} + ${step}]
+
+    gen-initrd-load-modules-script ${APL}/ ${initrd_dir} "${modules}" > /tmp/loadmodules
+    gen-initrd-unload-modules-script ${APL}/ ${initrd_dir} "${modules}" > /tmp/unloadmodules
+
+    install -m 744 -o root -g root /tmp/loadmodules ${initrd_dir}/bin/loadmodules
+    install -m 744 -o root -g root /tmp/unloadmodules ${initrd_dir}/bin/unloadmodules
+
+    rm -f \
+       /tmp/loadmodules \
+       /tmp/unloadmodules
+
+    install -m 744 -o root -g root ${INSTALL_DIR}/raidfail ${initrd_dir}/bin/raidfail
+
+    gen-linuxrc ${root_device} > ${initrd_dir}/linuxrc
+    chmod u+x ${initrd_dir}/linuxrc
+    dialog-progress ${progress} ; progress=$[${progress} + ${step}]
+
+    if test ${RAID_STATE} -eq 1 ; then
+	cp -a /usr/sbin/mdadm.static ${initrd_dir}/bin/mdadm
+	cp -a /etc/mdadm.conf ${initrd_dir}/etc/mdadm.conf
+	echo "root:x:0:0:root:/root:/bin/ash" > ${initrd_dir}/etc/passwd
+	echo "root::12000:0:1000000:30:::" > ${initrd_dir}/etc/shadow
+	cp -a /etc/group ${initrd_dir}/etc/group
+	cp -a /etc/nsswitch.conf ${initrd_dir}/etc/nsswitch.conf
+	mkdir ${initrd_dir}/root
+    fi
+    dialog-progress ${progress} ; progress=$[${progress} + ${step}]
+
+    # Saving the initrd image on the local disk
+    local cpu_nb=$(get-max-working-cpu)
+    umount ${initrd_dir}
+    losetup -d ${loopdev} &&
+    rm -f ${image_file}.xz &&
+    xz --threads=${cpu_nb} --quiet --check=crc32 ${image_file} &&
+    install -m 644 -o root -g root ${image_file}.xz ${APL}/boot/initrd-${sys_version}.img &&
+    rm -f ${image_file}.xz
+}
+
+# Take a disk type and disk id (controller:disk) and output the disk name: (scsi x:1 -> sda), (ide x:2 -> hdb)...
+disk-name()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    local disk_type=${1}
+    local disk_id=${2}
+
+    if test ${RAID_STATE} -eq 1 ; then
+	echo md${RAID_MD_NB}${disk_num}
+	return 0
+    fi
+
+    local disk_num=${disk_id/*:}
+
+    local octal disk_name
+
+    case ${disk_type} in
+	ide)
+	    # [a-t]: 20 max
+	    test ${disk_num} -ge 1 -a ${disk_num} -le 20 || return 11
+	    disk_num=$[${disk_num}+96]
+	    octal=$(octal ${disk_num})
+	    disk_name="hd\0${octal}"
+	    ;;
+	scsi|virt)
+	    # [a-z], [a-c][a-z]: 104 max
+	    test ${disk_num} -ge 1 -a ${disk_num} -le 104 || return 12
+	    if test ${disk_num} -le 26 ; then
+		disk_num=$[${disk_num}+96]
+		octal=$(octal ${disk_num})
+		disk_name="\0${octal}"
+	    elif test ${disk_num} -le 52 ; then
+		disk_num=$[${disk_num}-26+96]
+		octal=$(octal ${disk_num})
+		disk_name="a\0${octal}"
+	    elif test ${disk_num} -le 78 ; then
+		disk_num=$[${disk_num}-52+96]
+		octal=$(octal ${disk_num})
+		disk_name="b\0${octal}"
+	    else
+		disk_num=$[${disk_num}-78+96]
+		octal=$(octal ${disk_num})
+		disk_name="c\0${octal}"
+	    fi
+
+	    case ${disk_type} in
+		scsi)
+		    disk_name="sd${disk_name}"
+		    ;;
+		virt)
+		    disk_name="vd${disk_name}"
+		    ;;
+		*)
+		    ;;
+	    esac
+	    ;;
+	nvme)
+	    # n1, n2... nn
+	    local ctrl_num=${disk_id/:*}
+	    disk_name=nvme${ctrl_num}n${disk_num}
+	    ;;
+
+	raid)
+	    disk_name=md${RAID_MD_NB}${disk_num}
+	    ;;
+	*)
+	    return 13
+	    ;;
+    esac
+
+    echo -e ${disk_name}
+    return 0
+}
+
+dialog-make-initrd()
+{
+    local os_disk=$(get-os-disk-id)
+    local disk_type=$(get-disk-type ${os_disk})
+    local root_partition_nb pp
+
+    local disk_name=$(disk-name ${disk_type} ${os_disk})
+
+    case ${disk_type} in
+	ide|scsi|virt)
+	    root_partition_nb=${ROOT_PARTITION_NB}
+	    ;;
+	nvme)
+	    root_partition_nb=${ROOT_PARTITION_NB}
+	    pp=p
+	    ;;
+	raid)
+	    root_partition_nb=${RAID_ROOT_PARTITION_NB}
+	    pp=p
+	    ;;
+	*)
+	    return 255
+	    ;;
+    esac
+
+    dialog-progress 10
+
+    case ${ARCHITECTURE} in
+	x86_64)
+	    dialog-make-initrd-1 ${SYS_VERSION}-${SYS_64_NAME} ${disk_name}${pp}${root_partition_nb} 20 100
+	    ;;
+	*)
+	    dialog-make-initrd-1 ${SYS_VERSION}-${SYS_HM_NAME} ${disk_name}${pp}${root_partition_nb} 60 100
+	    ;;
+    esac
+
+    dialog-end-progress
+}
+
+dialog-format-disk-1()
+{
+    cd ${INSTALL_DIR}
+
+    dialog-progress 5
+    lvm-stop
+    raid-stop
+    dialog-progress 10
+    test ${RAID_STATE} -eq 0 || dialog-progress 30 "Creating the RAID meta device"
+    raid-create >> /tmp/${LOG_FILE} 2>&1 || return 1
+    dialog-progress 20 "Partitioning Disk(s)" 0
+    make-system-partitions >> /tmp/${LOG_FILE} 2>&1 || return 3
+    make-lvm 30 90 || return 5
+    dialog-progress 95 "Waiting for device files creation"
+    usleep 500000
+    dialog-end-progress
+}
+
+dialog-format-disk()
+{
+    dialog-format-disk-1 | ${DIALOG} --backtitle "${INSTALL_BACKTITLE} ${APL_ROLE^} Installation [Progression: ${PROGRESSION}%]" --title "Formatting Disks" --gauge "Initialization..." 8 40 0
+
+    local ret=${PIPESTATUS[0]}
+    setenv-variable-from-file
+    export PROGRESSION=20
+
+    return ${ret}
+}
+
+dialog-install-os-1()
+{
+    dialog-format-disk || return 9
+    dialog-install-os-2 || return 19
+
+    dialog-make-initrd | ${DIALOG} --backtitle "${INSTALL_BACKTITLE} ${APL_ROLE^} Installation [Progression: ${PROGRESSION}%]" --title "Making InitRD" --gauge "Generating the Initial RAM Disk..." 8 40 0
+    export PROGRESSION=90
+
+    dialog-finish-install | ${DIALOG} --backtitle "${INSTALL_BACKTITLE} ${APL_ROLE^} Installation [Progression: ${PROGRESSION}%]" --title "Finilizing the Installation" --gauge "Initialization..." 8 40 0
+    export PROGRESSION=100
+    dialog-congratulations
+}
+
+set-persistency-cache()
+{
+    local state=${1}
+
+    if test -n "${state}" ; then
+	PERSISTENT_CACHE=on
+    else
+	PERSISTENT_CACHE=off
+    fi
+}
+
+set-persistency-web-log()
+{
+    local state=${1}
+
+    if test -n "${state}" ; then
+	PERSISTENT_WEB_LOG=on
+    else
+	PERSISTENT_WEB_LOG=off
+    fi
+}
+
+set-persistency-rweb-log()
+{
+    local state=${1}
+
+    if test -n "${state}" ; then
+	PERSISTENT_RWEB_LOG=on
+    else
+	PERSISTENT_RWEB_LOG=off
+    fi
+}
+
+set-gateway-nb()
+{
+    test -n "${1}" || return 1
+    local gateways=${1}
+
+    check-nb ${gateways} || return 2
+    MANAGER_GATEWAY_NB=${gateways}
+
+    return 0
+}
+
+
+set-template-nb()
+{
+    test -n "${1}" || return 1
+    local templates=${1}
+
+    check-nb ${templates} || return 2
+    MANAGER_TEMPLATE_NB=${templates}
+
+    return 0
+}
+
+set-users()
+{
+    test -n "${1}" || return 1
+    local users=${1}
+
+    check-nb ${users} || return 2
+    USERS_NB=${users}
+
+    return 0
+}
+
+set-manager-total-users()
+{
+    test -n "${1}" || return 1
+    local users=${1}
+
+    check-nb ${users} || return 2
+    MANAGER_TOTAL_USERS_NB=${users}
+
+    return 0
+}
+
+set-guards()
+{
+    test -n "${1}" || return 1
+    local records=${1}
+
+    check-nb ${records} || return 2
+    URLLIST_RECORDS_NB=${records}
+    return 0
+}
+
+set-rusers()
+{
+    test -n "${1}" || return 1
+    local users=${1}
+
+    check-nb ${users} || return 2
+    RUSERS_NB=${users}
+
+    return 0
+}
+
+set-rwebs()
+{
+    test -n "${1}" || return 1
+    local rwebs=${1}
+
+    check-nb ${rwebs} || return 2
+    export RWEB_NB=${rwebs}
+    return 0
+}
+
+set-manager-total-rwebs()
+{
+    test -n "${1}" || return 1
+    local rwebs=${1}
+
+    check-nb ${rwebs} || return 2
+    export MANAGER_TOTAL_RWEB_NB=${rwebs}
+    return 0
+}
+
+set-rcache()
+{
+    test -n "${1}" || return 1
+    local rcache=${1}
+
+    check-nb ${rcache} || return 2
+    export RWEB_CACHE_SZ=${rcache}
+    return 0
+}
+
+set-logrotates()
+{
+    test -n "${1}" || return 1
+    local log_rotates=${1}
+
+    check-nb ${log_rotates} || return 2
+    export LOGROTATE_NB=${log_rotates}
+    return 0
+}
+
+set-uploaded-files()
+{
+    test -n "${1}" || return 1
+    local max_upload_file_sz=${1}
+
+    check-nb ${max_upload_file_sz} || return 2
+    export MAX_UPLOAD_FILE_SZ=${max_upload_file_sz}
+    return 0
+
+}
+
+set-tftp-server()
+{
+    test -n "${1}" || return 1
+    local tftp=${1}
+
+    check-ip "${tftp}" || return 2
+    TFTP_SERVER_IP=${tftp}
+    return 0
+}
+
+get-size-unit()
+{
+    test -n "${1}" || return 1
+    local size=${1}
+
+    local size_unit
+
+    if test $[${size} / 1024 / 1024] -ge 10 ; then
+	size=$[${size} / 1024 / 1024]
+	size_unit=GB
+    elif test $[${size} / 1024 ] -ge 10 ; then
+	size=$[${size} / 1024]
+	size_unit=MB
+    else
+	size_unit=KB
+    fi
+
+    echo "${size} ${size_unit}"
+}
+
+print-install-report()
+{
+    test -n "${1}" || return 0
+    local code=${1}
+
+    if test ${code} -ne 0 ; then
+	dialog-report /tmp/${CONFIGURE_FILE}
+	return 1
+    fi
+
+    if test -s /tmp/${CONFIGURE_FILE} ; then
+	echo -e "\n${Informations[2]}"
+	dialog-report /tmp/${CONFIGURE_FILE}
+    else
+	echo -e "\n${Informations[1]}"
+    fi
+
+    test -f ${GENERATED_DIR}/fs-info || return 2
+
+    local fs_name fs_dir fs_type fs_size
+
+    echo
+
+    case ${APL_ROLE} in
+	gateway)
+	    local cache_sz=0 rcache_sz=0 log_sz=0
+	    local len=${#PROXY_CACHE_DIR}
+
+	    while read fs_name fs_dir fs_type fs_size
+	    do
+		if test ${fs_dir} == ${WEB_LOG_DIR} ; then
+		    log_sz=$[${log_sz} + ${fs_size}]
+		elif test ${fs_dir:0:${len}} == ${PROXY_CACHE_DIR} ; then
+		    cache_sz=$[${cache_sz} + ${fs_size}]
+		elif test ${fs_dir} == ${WEB_CACHE_DIR} ; then
+		    rcache_sz=${fs_size}
+		fi
+	    done < ${GENERATED_DIR}/fs-info
+
+	    local cache_sz_unit=$(get-size-unit ${cache_sz})
+	    local rcache_sz_unit=$(get-size-unit ${rcache_sz})
+	    local log_sz_unit=$(get-size-unit ${log_sz})
+
+	    echo "Your Web cache file system size: ${cache_sz_unit}"
+	    echo "Your rWeb cache file system size: ${rcache_sz_unit}"
+	    echo "Your log reports file system size: ${log_sz_unit}"
+	    ;;
+
+	manager)
+	    local base_sz
+
+	    while read fs_name fs_dir fs_type fs_size
+	    do
+		if test ${fs_dir} == ${BASE_DIR} ; then
+		    base_sz=${fs_size}
+		    break
+		fi
+	    done < ${GENERATED_DIR}/fs-info
+
+	    local base_sz_unit=$(get-size-unit ${base_sz})
+
+	    echo "Your configuration file system size: ${base_sz_unit}"
+	    ;;
+	*)
+	    ;;
+    esac
+}
+
+dialog-check-installation-1()
+{
+    local ret
+
+    cd ${INSTALL_DIR}
+    do-ordered-disk-info
+
+    cd ${CACHEGUARD_DIR}
+
+    if test -z "${APL_MODEL}" ; then
+
+	local memory_type=$(get-memory-type)
+
+	case ${APL_ROLE} in
+	    gateway)
+		local total_rweb_cache_sz=$[${RWEB_NB} * ${RWEB_CACHE_SZ} * 1024]
+		local max_upload_file_sz=$[${MAX_UPLOAD_FILE_SZ} * 1024]
+	
+		GENERATED_DIR=${INSTALL_DIR}/${GENERATED_DIR} \
+		CLOUD_CONSOLE=${CLOUD_CONSOLE} \
+		\
+		${INSTALL_DIR}/apl_model_configure \
+		"${memory_type}" \
+		"${CPU_NB}" \
+		"${MEMORY_SZ}" \
+		"${DISK_INFOS_ORDERED}" \
+		"${NETWORKS}" \
+		"${KEYBOARD}" \
+		"${APL_ROLE}:${USERS_NB},${URLLIST_RECORDS_NB},${RUSERS_NB},${RWEB_NB},${LOGROTATE_NB},${total_rweb_cache_sz},${max_upload_file_sz},${PERSISTENT_CACHE},${PERSISTENT_WEB_LOG},${PERSISTENT_RWEB_LOG}" \
+		> /tmp/${CONFIGURE_FILE} 2>&1
+		;;
+	    manager)
+		GENERATED_DIR=${INSTALL_DIR}/${GENERATED_DIR} \
+		CLOUD_CONSOLE=${CLOUD_CONSOLE} \
+		\
+		${INSTALL_DIR}/apl_model_configure \
+		"${memory_type}" \
+		"${CPU_NB}" \
+		"${MEMORY_SZ}" \
+		"${DISK_INFOS_ORDERED}" \
+		"${NETWORKS}" \
+		"${KEYBOARD}" \
+		"${APL_ROLE}:${MANAGER_GATEWAY_NB},${MANAGER_TEMPLATE_NB},${MANAGER_TOTAL_USERS_NB},${MANAGER_TOTAL_RWEB_NB},${URLLIST_RECORDS_NB}" \
+		> /tmp/${CONFIGURE_FILE} 2>&1
+		;;
+	    *)
+		;;
+	esac
+    else
+	GENERATED_DIR=${INSTALL_DIR}/${GENERATED_DIR} \
+	CLOUD_CONSOLE=${CLOUD_CONSOLE} \
+	\
+	${INSTALL_DIR}/apl_model_configure \
+	--model ${APL_ROLE}:${APL_MODEL} \
+	> /tmp/${CONFIGURE_FILE} 2>&1
+    fi
+    ret=${?}
+
+    cd ${INSTALL_DIR}
+    test -n "${APL_MODEL}" || print-install-report ${ret}
+    return ${ret}
+}
+
+dialog-check-installation()
+{
+    if test -z "${APL_MODEL}" ; then
+	dialog-check-installation-1 | ${DIALOG} --backtitle "${INSTALL_BACKTITLE} Installation" --title "Installation Checking Report" --scrollbar --programbox "\nCustomised configuring result" 20 70
+	return ${PIPESTATUS[0]}
+    else
+	dialog-check-installation-1
+	local ret=${?}
+	test ${ret} -eq 0 || print-install-report ${ret} | ${DIALOG} --backtitle "${INSTALL_BACKTITLE} Installation" --title "Installation Error" --scrollbar --programbox "\nModel ${APL_ROLE}:${APL_MODEL} configuring" 20 70
+	return ${ret}
+    fi
+}
+
+init-crontab()
+{
+    gen-crontab > ${GENERATED_DIR}/crontab
+    gen-av-extended-cron > ${GENERATED_DIR}/${AV_EXTENDED_CRON_FILENAME}.cron
+}
+
+dialog-install-os()
+{
+    if ! check-hardware ; then	error 8 ; return 1 ; fi
+    dialog-check-installation || return 3
+    init-crontab || return 3
+
+    if test -z "${APL_MODEL}" ; then
+	title="OS Installation"
+	description="\nCaution: The OS installation erases all existing data on all disks."
+
+	description="${description}\n\nDo you want to proceed with the installation"
+	test ${RAID_STATE} -eq 0 || description="${description} (With RAID ${RAID_LEVEL} Capabilities)"
+	description="${description}?"
+
+	${DIALOG} --backtitle "${INSTALL_BACKTITLE} Installation" --title "${title}" --defaultno --yesno "${description}" 0 0
+	test ${?} -eq ${DIALOG_OK} || return 0
+    fi
+
+    if test "${INSTALL}" == pxe ; then
+	if test -z "${APL_IP}" ; then
+	    error 23
+	    return 23
+	elif test -z "${TFTP_SERVER_IP}" ; then
+	    error 24
+	    return 24
+	else
+	    curl -qsf --globoff --connect-timeout 5 --max-time 10 --url tftp://${TFTP_SERVER_IP}/${TECHNICAL_NAME}/os.xx -o /tmp/os.xx
+	    if test ${?} -ne 0 ; then
+		error 10
+		return 10
+	    fi
+	fi
+    fi
+
+    local ret
+    export PROGRESSION=10
+    dialog-install-os-1
+    ret=${?}
+
+    case ${ret} in
+	9)
+	    error 9
+	    ;;
+	19)
+	    error 19
+	    ;;
+	*)
+	    test ${ret} -eq 0 || error 255
+	    ;;
+    esac
+}
+
+check-hardware()
+{
+    if test ${DISK_NB} -eq 0 ; then
+	error 3
+	return 3
+    fi
+
+    case ${APL_ROLE} in
+	gateway)
+	    if test ${NETWORK_NB} -lt 2 ; then
+		error 4
+		return 4
+	    fi
+	    ;;
+	manager)
+	    if test ${NETWORK_NB} -eq 0 ; then
+		error 25
+		return 25
+	    fi
+	    ;;
+	*)
+	    ;;
+    esac
+}
+
+dialog-check-hardware()
+{
+    test ${CPU_NB} -le 32 || warning 1
+    test ${STORAGE_NB} -ne 0 || warning 2
+
+    if test ${DISK_NB} -eq 0 ; then
+	error 3
+	return 3
+    fi
+}
+
+# Take a decimal number and output it's octal
+octal()
+{
+    test -n "${1}" || return 1
+    local quotient=${1}
+
+    local remainder octal
+
+    while [ ${quotient} -ne 0 ]
+      do
+      remainder=$[$quotient % 8]
+      octal=${remainder}${octal}
+      quotient=$[${quotient} / 8]
+    done
+    echo ${octal}
+}
+
+gen-linuxrc()
+{
+    test -n "${1}" || return 1
+    local root_name=${1}
+
+    root_device=/dev/${root_name}
+
+    cat << EOF
+#!/bin/ash
+
+############################################################################
+#
+# MODULE:       Install
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) ${YEARS} by CacheGuard Technologies Ltd
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+set_environment()
+{
+    local option
+
+    for option in \$(cat /proc/cmdline)
+    do
+	if test "\${option}" == 'single' ; then
+	    export RUNLEVEL='S'
+	elif test "\${option:0:9}" == 'keyboard=' ; then
+	    export KEYBOARD=\${option:9}
+	fi
+    done
+    test -n "\${KEYBOARD}" || export KEYBOARD='us'
+}
+
+mount -t tmpfs tmpfs /dev
+mount -t proc proc /proc
+mount -t sysfs sysfs /sys
+
+set_environment || setsid -c ash
+
+EOF
+    if test "${CLOUD_CONSOLE:0:4}" != ttyS ; then
+	is-serial-terminal || echo "test ! -s etc/${BINKEYMAP_DIR_NAME}/\${KEYBOARD} || loadkmap < etc/${BINKEYMAP_DIR_NAME}/\${KEYBOARD} || setsid -c ash"
+    fi
+    cat << EOF
+loadmodules || setsid -c ash
+mdev -s || setsid -c ash
+EOF
+
+    if test ${RAID_STATE} -eq 1 ; then
+	echo "mdadm --quiet --assemble --freeze-reshape /dev/md${RAID_MD_NB} > /dev/null 2>&1 || setsid -c ash"
+	echo "mdadm --quiet --run /dev/md${RAID_MD_NB} > /dev/null 2>&1 || setsid -c ash"
+	echo "blockdev --rereadpt /dev/md${RAID_MD_NB} || setsid -c ash"
+	echo "mdev -s || setsid -c ash"
+    else
+	local uuid=$(get-partition-uuid ${root_device})
+	root_device="UUID=${uuid}"
+    fi
+
+    echo 'test "${RUNLEVEL}" != "S" || setsid -c ash'
+    echo "mount -o rw -t ext4 ${root_device} /newroot || setsid -c ash"
+
+    cat << EOF
+cd /newroot || setsid -c ash
+pivot_root . mnt/initrd || setsid -c ash
+exec chroot . bash -c "exec /usr/sbin/init \${RUNLEVEL}" < dev/console > dev/console 2>&1 || setsid -c ash
+EOF
+}
+
+start-device-manager()
+{
+    echo > /proc/sys/kernel/hotplug
+
+    udevd --daemon
+
+    udevadm trigger --action=add    --type=subsystems
+    udevadm trigger --action=add    --type=devices
+    udevadm trigger --action=change --type=devices
+    udevadm trigger --action=remove --type=devices
+
+    udevadm settle
+}
+
+stop-device-manager()
+{
+    killall --quiet udevd
+}
+
+gen-password-file()
+{
+    case ${CLOUD_NAME} in
+	aws)
+	    return 0
+	    ;;
+	azure)
+	    ;;
+	*)
+	    ;;
+    esac
+
+    gen-sn-password
+
+    test -z "${CLOUD_NAME}" || return 0
+
+    local level=$(get-usage-level)
+    local sapassword=${APASSWORD}
+    local rpassword=${sapassword}${level}
+
+    if test "${APL_MODEL}" != 'test' ; then
+	echo ${ADMIN_NAME}:${APASSWORD}
+	echo ${SUPERADMIN_NAME}:${sapassword}
+	echo root:${rpassword}
+    fi
+}
+
+gen-admin-password-sha1()
+{
+    echo ${APASSWORD} | openssl dgst -sha1 2> /dev/null
+}
+
+gen-passwords()
+{
+    ROOT_DIR=${APL} update-sn-passwd-shadow
+
+    gen-password-file > /tmp/${PASSWORD_FILE}
+    chroot ${APL} chpasswd 2> /dev/null < /tmp/${PASSWORD_FILE}
+
+    gen-admin-password-sha1 > /tmp/${ADMIN_PASSWORD_SHA1_FILE}
+    install -m 600 -o ${ADMIN_NAME} -g ${GROUP_NAME} /tmp/${ADMIN_PASSWORD_SHA1_FILE} ${APL}${ABASE_DIR}/.passwd.sha1
+    install -m 600 -o ${ADMIN_NAME} -g ${GROUP_NAME} /tmp/${ADMIN_PASSWORD_SHA1_FILE} ${APL}${ABASE_DIR}/.htpasswd.sha1
+
+    chroot ${APL}${ADMIN_DIR} /bin/htpasswd -Bb /${HARD_DIR_NAME}/.htpasswd ${ADMIN_NAME} "${APASSWORD}" >> /tmp/${LOG_FILE} 2>>/tmp/${LOG_FILE}
+
+    # Set modification date - The order is important - See /usr/local/lib/apl_functions/<function 'set-users'>
+    touch ${APL}${ETC_DIR}/shadow ${APL}/etc/shadow
+
+    rm -f ${APL}${ETC_DIR}/shadow-
+    rm -f ${APL}/etc/shadow-
+
+    rm -f /tmp/etc.shadow
+    rm -f /tmp/etc.passwd
+
+    test "${MACHINE}" != OS || return 0
+
+    case ${CLOUD_NAME} in
+	aws|azure)
+	    return 0
+	    ;;
+	*)
+	    ;;
+    esac
+
+    local first_login=${APL}${ABASE_DIR}/${FIRST_LOGIN}
+
+    touch ${first_login}
+    chown ${ADMIN_NAME}:${GROUP_NAME} ${first_login}
+    chmod 600 ${first_login}
+}
+
+dialog-hardware-config-1()
+{
+    local ret
+
+    dialog-progress 10
+    start-device-manager
+    sync
+    dialog-progress 30
+    raid-auto-stop
+    usleep 500000
+    sync
+    dialog-progress 40
+    find-memory-sz
+    find-cpus
+    find-install-devices
+    dialog-progress 50
+    gen-persistent-rules
+    set-mac-address-dependent-env
+    usleep 300000
+    dialog-progress 60
+    mount-media
+    dialog-progress 70
+    find-disks ; ret=${?}
+    set-default-raid
+    dialog-progress 80
+    load-clock
+    dialog-progress 90
+    stop-device-manager
+    dialog-end-progress
+
+    return ${ret}
+}
+
+dialog-hardware-config()
+{
+    local ret
+
+    dialog-hardware-config-1 | ${DIALOG} --backtitle "${INSTALL_BACKTITLE} Installation" --title "Machine Resources Detection" --gauge "\nDetection in progress..." 8 40 0
+
+    ret=${PIPESTATUS[0]}
+    setenv-variable-from-file
+    test ${ret} -eq 0 || error ${ret}
+
+    dialog-check-hardware ; ret=${?}
+
+    gen-system-info-file
+    dialog-display-hardware
+
+    test ${ret} -eq 0 || return ${ret}
+
+    dialog-mount-media
+    dialog-request-ip
+
+    return 0
+}
+
+dialog-setenv()
+{
+    case "${TERMINAL:0:4}" in
+	ttyS)
+	    export TERM=vt102
+	    DIALOG_OPTIONS="--no-shadow --ascii-lines"
+	    ;;
+	*)
+	    ;;
+    esac
+
+    DIALOG="${DIALOG-dialog ${DIALOG_OPTIONS}}"
+
+    DIALOG_OK=0
+    DIALOG_CANCEL=1
+    DIALOG_HELP=2
+    DIALOG_EXTRA=3
+    DIALOG_ITEM_HELP=4
+    DIALOG_ESC=255
+
+    SIG_NONE=0
+    SIG_HUP=1
+    SIG_INT=2
+    SIG_QUIT=3
+    SIG_KILL=9
+    SIG_TERM=15
+}
+
+dialog-welcome()
+{
+    test -z "${APL_MODEL}" || return 0
+    ${DIALOG} --backtitle "${INSTALL_BACKTITLE} Installation" --title "Welcome" --msgbox "\nWelcome to the ${COMMERCIAL_NAME}-OS installation program. ${COMMERCIAL_NAME}-OS transforms your machine into a powerful network appliance.\n\nOnce the installation is complete, you can remotely manage your appliance using a Web browser or an SSH client." 13 50
+    return ${?}
+}
+
+dialog-set-appliance-role()
+{
+    local role
+
+    if test -z "${APL_MODEL}" ; then
+	role=$(${DIALOG} --backtitle "${INSTALL_BACKTITLE} Installation" --title "Appliance Role Selection" --stdout --no-cancel --default-item "${APL_ROLE^}" --menu "\nYou can either install your machine as a Gateway or as a Manager. A Manager allows you to centrally manage multiple Gateways. Please select the installed appliance Role:\n\n" 0 0 2 Gateway "To get network Security and Optimisation" Manager "To manage multiple Gateways")
+
+	export APL_ROLE=${role,,}
+    fi
+}
+
+dialog-debug()
+{
+    ${DIALOG} --backtitle "${INSTALL_BACKTITLE} Installation" --title "Welcome" --msgbox "\nPress Enter to conitnue." 7 40
+    return ${?}
+}
+
+dialog-test-keyboard()
+{
+    ${DIALOG} --backtitle "${INSTALL_BACKTITLE} Installation" --title "Keyboard Test" --no-cancel --max-input 32 --inputbox "\nType some characters to test your keyboard selection:" 10 40 2>> /tmp/${LOG_FILE}
+}
+
+dialog-set-keyboard()
+{
+    if test -n "${APL_MODEL}" ; then
+	cd ${INSTALL_DIR}
+	return 0
+    fi
+
+    cd /usr/share/keymaps/i386
+    local files=$(find . -type f 2>> /tmp/${LOG_FILE} | sort)
+    local keyboard keyboards
+    cd ${INSTALL_DIR}
+
+    for keyboard in ${files}
+    do
+	keyboard=${keyboard:2}
+	! [[ "${keyboard}" =~ ^.*include/.* ]] || continue
+	keyboard=${keyboard/\.map\.gz}
+	keyboards="${keyboards} ${keyboard/*\/} ${keyboard}"
+    done
+    keyboards=${keyboards:1}
+
+    local ret
+
+    while true
+    do
+	${DIALOG} --backtitle "${INSTALL_BACKTITLE} Installation" --title "Keyboard selection" --no-cancel --extra-button --extra-label "Test" --default-item "${KEYBOARD}" --menu "Please select your keyboard type:\n\n" 20 0 16 ${keyboards} 2> /tmp/VARIABLE_KEYBOARD
+
+	ret=${?}
+
+	local keymap=$(cat /tmp/VARIABLE_KEYBOARD)
+	rm -f /tmp/VARIABLE_KEYBOARD
+
+	loadkeys --quiet ${keymap} >> /tmp/${LOG_FILE} 2>&1
+	export KEYBOARD=${keymap}
+
+	test ${ret} -eq ${DIALOG_EXTRA} || break
+	dialog-test-keyboard
+    done
+}
+
+dialog-set-timezone()
+{
+    local timezone continent
+    local ret=0
+
+    if test -z "${APL_MODEL}" ; then
+	continent=$(${DIALOG} --backtitle "${INSTALL_BACKTITLE} Installation" --title "Date & Time settings 1/4" --stdout --default-item "${TIMEZONE/\/*}" --menu "\nPlease select your Continent:\n\n" 0 0 8 Africa "The Africa Continent" America "The America Continent" Antarctica "The Antarctica Continent" Asia "The Asia Continent" Atlantic "The Atlantic Continent" Australia "The Australia Continent" Europe "The Europe Continent" Pacific "The Pacific Continent")
+
+	ret=${?}
+
+	if test ${ret} -eq ${DIALOG_OK} ; then
+	    cd /usr/share/zoneinfo
+	    local files=$(find ${continent} -type f 2>> /tmp/${LOG_FILE} | sort)
+
+	    local timezones
+	    for timezone in ${files}
+	    do
+		timezones="${timezones} ${timezone/*\/} ${timezone}"
+	    done
+	    timezones=${timezones:1}
+
+	    timezone=$(${DIALOG} --backtitle "${INSTALL_BACKTITLE} Installation" --title "Date & Time settings 2/4" --stdout --default-item ${TIMEZONE#*\/} --menu "\nPlease select your timezone:\n\n" 20 0 16 ${timezones})
+
+	    ret=${?}
+
+	    test ${ret} -eq ${DIALOG_CANCEL} || export TIMEZONE=${continent}/${timezone}
+	    cd ${INSTALL_DIR}
+	fi
+    fi
+
+    rm -f /etc/localtime
+    ln -s /usr/share/zoneinfo/${TIMEZONE} /etc/localtime
+
+    return ${ret}
+}
+
+dialog-set-date-time()
+{
+    test -z "${APL_MODEL}" || return 0
+    local date time ret
+
+    date=$(${DIALOG} --backtitle "${INSTALL_BACKTITLE} Installation" --stdout --title "Date & Time settings 3/4" --calendar "\nPlease choose a date (use arrow and TAB keys):" 0 0)
+    ret=${?}
+
+    test ${ret} -eq ${DIALOG_OK} || return 11
+    
+    time=$(${DIALOG} --backtitle "${INSTALL_BACKTITLE} Installation" --stdout --title "Date & Time settings 4/4" --timebox "\nPlease set the time (use arrow keys):" 0 0)
+    ret=${?}
+
+    test ${ret} -eq ${DIALOG_OK} || return 13
+
+    local DD=${date/\/*}
+    date=${date#*\/}
+    local MM=${date/\/*}
+    date=${date#*\/}
+    local YY=${date/\/*}
+    YY=${YY:2}
+
+    local hh=${time/:*}
+    time=${time#*:}
+    local mm=${time/:*}
+    time=${time#*:}
+    local ss=${time/:*}
+
+    local date=${MM}${DD}${hh}${mm}${YY}.${ss}
+    date ${date} >> /tmp/${LOG_FILE} 2>&1
+
+    return ${ret}
+}
+
+dialog-set-timezone-date-time()
+{
+    dialog-set-timezone
+    test ${?} -eq ${DIALOG_OK} || return 11
+    dialog-set-date-time || return 13
+}
+
+dialog-display-hardware()
+{
+    test -z "${APL_MODEL}" || return 0
+    ${DIALOG} --backtitle "${INSTALL_BACKTITLE} Installation" --title "Machine Resources" --colors --msgbox "$(cat /tmp/${HARDWARE_FILE})" 22 0
+}
+
+dialog-select-disk()
+{
+    test -n "${1}" || return 11
+
+    local description=${1}
+    local selected=${2}
+    local widget=${3}
+
+    test -n "${widget}" || widget=radiolist
+
+    local elt i=0 range
+    local disk_type disk_id disk_size
+    local disk disk_name
+    local ctrl_num disk_num
+    local state display
+
+    rm -f /tmp/${DISK_MENU}
+
+    for elt in ${DISK_INFOS}
+    do
+	range=$[${i} % 3]
+	case ${range} in
+	    0)
+		disk_type=${elt}
+		;;
+	    1)
+		disk_id=${elt}
+		;;
+	    2)
+		disk_size=${elt}
+
+		if test ${widget} == radiolist ; then
+		    if test -n "${selected}" -a ${disk_id} -eq ${selected} ; then
+			state=on
+		    else
+			state=off
+		    fi
+		fi
+
+		#################################################################################################
+		# Release note: only disks attached to the fist NVMe controller can be selected as the OS disk. #
+		# Otherwise the gen-grub-menuentry() function in apl_model_configure should be reviewed.        #
+		#################################################################################################
+
+		disk_num=${disk_id/*:}
+		unset display
+
+		case ${disk_type} in
+		    nvme)
+			ctrl_num=${disk_id/:*}
+			test ${ctrl_num} != 0 || display=yes
+			;;
+		    *)
+			display=yes
+			;;
+		esac
+
+		test -z "${display}" || echo "\"Disk ${disk_num}/${disk_type}\" \"${disk_type} Disk ($[${disk_size}/1024] MB)\" ${state}" >> /tmp/${DISK_MENU}
+		;;
+	    *)
+		return 255
+		;;
+	esac
+	((i++))
+    done
+
+    if test ! -s /tmp/${DISK_MENU} ; then
+	${DIALOG} --backtitle "${INSTALL_BACKTITLE} Installation" --title "Disk Selection" --msgbox "\nNo disk is present on this machine." 0 0
+	return 12
+    fi
+
+    ${DIALOG} --backtitle "${INSTALL_BACKTITLE} Installation" --title "Disk Selection" --${widget} "${description}" 0 0 4 --file /tmp/${DISK_MENU} 2> /tmp/VARIABLE_SELECTED_DISK
+
+    local ret=${?}
+
+    disk=$(cat /tmp/VARIABLE_SELECTED_DISK)
+    rm -f /tmp/VARIABLE_SELECTED_DISK
+
+    test -n "${disk}" || return ${DIALOG_CANCEL}
+
+    disk=${disk/* }
+    disk_num=${disk/\/*}
+    disk_type=${disk/*\/}
+
+    case ${disk_type} in
+	nvme)
+	    ctrl_num=0
+	    disk_id=${ctrl_num}:${disk_num}
+	    ;;
+	*)
+	    disk_id=x:${disk_num}
+	    ;;
+    esac
+
+
+    disk_name=$(disk-name ${disk_type} ${disk_id})
+
+    export SELECTED_DISK_ID=${disk_id}
+    export SELECTED_DISK_NAME=${disk_name}
+
+    return ${ret}
+}
+
+dialog-tftp-ip()
+{
+    local ip
+
+    while true
+    do
+	${DIALOG} --backtitle "${INSTALL_BACKTITLE} Installation" --title "TFTP server IP" --inputbox "\nIf more than one DHCP server is connected to your LAN, the proposed IP address for the installation TFTP server may not be the right one. In this case you can modify this IP address.\n\nPlease enter the IP address of the TFTP server from which you want to download the OS:" 0 0 ${TFTP_SERVER_IP} 2> /tmp/VARIABLE_TFTP_SERVER_IP
+
+	if test ${?} -ne ${DIALOG_OK} ; then
+	    rm -f /tmp/VARIABLE_TFTP_SERVER_IP
+	    break
+	fi
+	
+	ip=$(cat /tmp/VARIABLE_TFTP_SERVER_IP)
+	rm -f /tmp/VARIABLE_TFTP_SERVER_IP
+
+	! set-tftp-server ${ip} || break
+
+	${DIALOG} --backtitle "${INSTALL_BACKTITLE} Installation" --title "TFTP IP address" --msgbox "\nPlease enter an IP address." 0 0
+    done
+}
+
+dialog-os-disk()
+{
+    dialog-select-disk "\nMain OS components are installed on a disk called OS Disk. The OS Disk should be configured as a bootable disk by your BIOS and be placed at the first position in the boot sequence. Additional disks may be used for the persistent cache only. If the OS Disk is not large enough, the OS can't be installed.\n\nIt is preferable to choose your most performant disk and/or with the highest volume capacity as your OS Disk.\n\nPlease select the OS Disk (press the Space Bar to select):" ${OS_DISK_ID}
+    local ret=${?}
+
+    test ${ret} -ne ${DIALOG_OK} || export OS_DISK_ID=${SELECTED_DISK_ID}
+    return ${ret}
+}
+
+dialog-startup()
+{
+    local ret
+
+    while true
+    do
+	${DIALOG} --backtitle "${INSTALL_BACKTITLE} Installation" --title "Startup selection" --no-cancel --extra-label "Startup" --default-item "${MACHINE}" --menu "Please select the startup mode:\n\n" 0 0 2 OS "Operation System" HW "Hardware Appliance" 2> /tmp/VARIABLE_MACHINE
+
+	ret=${?}
+
+	local machine=$(cat /tmp/VARIABLE_MACHINE)
+	export MACHINE=${machine}
+
+	test ${ret} -eq ${DIALOG_EXTRA} || break
+    done
+}
+
+dialog-raid-available()
+{
+    ${DIALOG} --backtitle "${INSTALL_BACKTITLE} Installation" --title "RAID Availability" --msgbox "\nThe RAID will be available immediately but its performance will not be optimized until its final construction." 0 0
+}
+
+dialog-raid-config()
+{
+    test ${DISK_NB} -ge 2 || return 0
+    test "${APL_MODEL}" != 'test' || return 0
+
+    ${DIALOG} --backtitle "${INSTALL_BACKTITLE} Installation" --title "RAID Configuration" --yesno "\nMore than one disk has been detected. We highly recommend that you configure them as a RAID (Redundant Array of Independent Disks). Note that to install the OS in Test mode you should say \"No\" here.\n\nDo you want to install your disks as a RAID?" 0 0
+
+    if test ${?} -ne ${DIALOG_OK} ; then
+	export RAID_STATE=0
+	export RAID_SPARE_NB=0
+	export RAID_SZ=0
+	export RAID_DISK_SZ=0
+	return 0
+    fi
+
+    export RAID_STATE=1
+
+    local level spare levels="0 1"
+    local state label hint i=0
+
+    if test ${DISK_NB} -gt 2 ; then
+	levels="${levels} 5"	
+	if test ${DISK_NB} -gt 3 ; then
+	    levels="${levels} 6 10"
+	fi
+    fi
+
+    rm -f /tmp/${RAID_MENU_FILE}
+
+    for level in ${levels}
+    do
+	if test ${level} == ${RAID_LEVEL} ; then
+	    state=on
+	else
+	    state=off
+	fi
+	
+	case ${level} in
+	    0)
+		label="Striping across ${DISK_NB} disks"
+		hint="Immproves performances but is not fault tolerant - Size = sum of all disk sizes"
+		;;
+	    1)
+		if test ${DISK_NB} -eq 2 ; then
+		    label="Mirroring 2 disks"
+		else
+		    spare=$[${DISK_NB} - 2]
+		    if test ${spare} -eq 1 ; then
+			label="Mirroring 2 disks (1 Hot Spare disk)"
+		    else
+			label="Mirroring 2 disks (${spare} Hot Spare disks)"
+		    fi
+		fi
+		hint="Improves availability and performances - Size = 50% of a single disk size"
+		;;
+	    5)
+		if test ${DISK_NB} -eq 3 ; then
+		    label="Striping and Checksum"
+		else
+		    label="Striping and Checksum (1 mandatory Hot Spare disk)"
+		fi
+		hint="Improves availability and performances - Size = size of a single disk x (number of disks - 1)"
+		;;
+	    6)
+		if test ${DISK_NB} -eq 4 ; then
+		    label="Striping and 2 x Checksum"
+		else
+		    label="Striping and 2 x Checksum (1 optional Hot Spare disk)"
+		fi
+		hint="Improves availability and performances - Size = size of a single disk x (number of disks - 2)"
+		;;
+	    10)
+		if test ${DISK_NB} -eq 4 ; then
+		    label="Mirroring and Striping"
+		else
+		    label="Mirroring and Striping (1 mandatory Hot Spare disk)"
+		fi
+		hint="Improves availability and performances - Size = (sum of all disk sizes) / 2"
+		;;
+	esac
+	echo "\"RAID ${level}\" \"${label}\" ${state} \"${hint}\"" >> /tmp/${RAID_MENU_FILE}
+    done
+
+    ${DIALOG} --backtitle "${INSTALL_BACKTITLE} Installation" --title "RAID Level" --item-help --radiolist "\nThe software RAID manager integrated into this system uses around  3% of the CPU resources with no additional cost of a hardware RAID. This RAID system could be fully monitored using SNMP. ${DISK_NB} disks have been detected on this machine. The current RAID size is $[${RAID_SZ} / 1024] MB. \n\nPlease select the required RAID level (press the Space Bar to select):" 0 0 5 --file /tmp/${RAID_MENU_FILE} 2> /tmp/${RAID_LEVEL_FILE}
+
+    level=$(cat /tmp/${RAID_LEVEL_FILE})
+
+    if test "${level}" == "RAID 0" ; then
+	export RAID_LEVEL=0
+	export RAID_SPARE_NB=0
+	calculate-raid-size
+	return 0
+    elif test "${level}" == "RAID 1" ; then
+	export RAID_LEVEL=1
+	export RAID_SPARE_NB=$[${DISK_NB} - 2]
+	calculate-raid-size
+	dialog-raid-available
+	return 0
+    elif test "${level}" == "RAID 5" ; then
+	export RAID_LEVEL=5
+	if test ${DISK_NB} -eq 3 ; then
+	    export RAID_SPARE_NB=0
+	else
+	    export RAID_SPARE_NB=1
+	fi
+	calculate-raid-size
+	dialog-raid-available
+	return 0
+    elif test "${level}" == "RAID 6" ; then
+	export RAID_LEVEL=6
+	if test ${DISK_NB} -eq 4 ; then
+	    export RAID_SPARE_NB=0
+	    calculate-raid-size
+	    dialog-raid-available
+	    return 0
+	fi
+    elif test "${level}" == "RAID 10" ; then
+	export RAID_LEVEL=10
+	if test ${DISK_NB} -eq 4 ; then
+	    export RAID_SPARE_NB=0
+	else
+	    export RAID_SPARE_NB=1
+	fi
+	calculate-raid-size
+	dialog-raid-available
+	return 0
+    else
+	return 255
+    fi
+
+    ${DIALOG} --backtitle "${INSTALL_BACKTITLE} Installation" --title "RAID Hot Spare Disk" --yesno "\nThe RAID level (RAID ${RAID_LEVEL}) you've selected and the number of disks (${DISK_NB}) on this machine allow you to use a disk as a Hot Spare.\n\nDo you want to use a disk as a Hot Spare for your RAID configuration?" 11 50
+
+    if test ${?} -eq ${DIALOG_OK} ; then
+	export RAID_SPARE_NB=1
+    else
+	export RAID_SPARE_NB=0
+    fi
+    
+    calculate-raid-size
+}
+
+dialog-read-gateway-persistency()
+{
+    local statuses status ret
+    local check_cache check_log check_rlog
+
+    while true
+    do
+	${DIALOG} --backtitle "${INSTALL_BACKTITLE} ${APL_ROLE^} Installation" --title "Persistency Features" --no-cancel --help-button --checklist "\nPlease select persistent data to activate:\n(press the Space Bar to tick/untick)" 12 50 3 \
+	    cache "Web Caching" ${PERSISTENT_CACHE} \
+	    log "Web access Logging" ${PERSISTENT_WEB_LOG} \
+	    rlog "Reverse Web access Logging" ${PERSISTENT_RWEB_LOG} \
+	    2> /tmp/${PERSISTENCY_FILE}
+
+	ret=${?}
+	if test ${ret} -eq ${DIALOG_HELP} ; then
+	    ${DIALOG} --backtitle "${INSTALL_BACKTITLE} Installation" --title "Persistency Features" --colors --msgbox "\nIf your disk(s) is (are) not large enough you can deactivate some features that require substantial storage space on your disk(s). The deactivation of those features allows you to install the OS on machines with low disk storage capacity. Please note that if you deactivate those features during the installation, you won't be able to activate them afterwards on a running OS. Below is a brief description of persistent data that you can deactivate:\n\n\Z4Web Caching:\Zn Web Caching allows you to persistently store Web contents on disk in order to reduce bandwidth usage and Web servers load (in reverse mode).\n\n\Z4Web access Logging:\Zn this mechanism allows you to persistently store on disk Web browsing activities.\n\n\Z4Reverse Web access Logging:\Zn this mechanism is similar to the previous one with the difference being that it stores traffic on cloaked (protected) Web servers managed by the reverse Web proxy." 0 0
+	    continue
+	fi
+
+	unset check_cache
+	unset check_log
+	unset check_rlog
+
+	read statuses < /tmp/${PERSISTENCY_FILE}
+
+	for status in ${statuses}
+	do
+	    case ${status} in
+		cache)
+		    check_cache=on
+		    ;;
+		log)
+		    check_log=on
+		    ;;
+		rlog)
+		    check_rlog=on
+		    ;;
+		*)
+		    ;;
+	    esac
+	done
+	break
+    done
+
+    set-persistency-cache ${check_cache}
+    set-persistency-web-log ${check_log}
+    set-persistency-rweb-log ${check_rlog}
+}
+
+dialog-read-gateway-capacities()
+{
+    local line i=0 ret level
+    local check_users check_urllists
+    local check_rusers check_rweb
+    local check_logrotate
+    local check_uploaded
+    local check_limit_disk
+
+    while true
+    do
+	${DIALOG} --backtitle "${INSTALL_BACKTITLE} ${APL_ROLE^} Installation" --title "Capacity Settings" --no-cancel --help-button --form "\nPlease enter required capacity to support:\n(use arrow keys)" 0 0 7 \
+	    "Number of users in forwarding mode:" 1 1 "${USERS_NB}" 1 ${DIALOG_CAPACITY_TITLE_LEN} 6 0 \
+	    "Number of URLs in blacklists:" 2 1 "${URLLIST_RECORDS_NB}" 2 ${DIALOG_CAPACITY_TITLE_LEN} 10 0 \
+	    "Number of simultaneous users in reverse mode:" 3 1 "${RUSERS_NB}" 3 ${DIALOG_CAPACITY_TITLE_LEN} 6 0 \
+	    "Number of websites in reverse mode:" 4 1 "${RWEB_NB}" 4 ${DIALOG_CAPACITY_TITLE_LEN} 4 0 \
+	    "Cache size per reverse website (MB):"  5 1  "${RWEB_CACHE_SZ}" 5 ${DIALOG_CAPACITY_TITLE_LEN} 7 0 \
+	    "Logs retention period:" 6 1 "${LOGROTATE_NB}" 6 ${DIALOG_CAPACITY_TITLE_LEN} 4 0 \
+	    "Uploaded file maximum size (MB):" 7 1 "${MAX_UPLOAD_FILE_SZ}" 7 ${DIALOG_CAPACITY_TITLE_LEN} 5 0 \
+	    2> /tmp/${CAPACITY_FILE}
+
+	ret=${?}
+	if test ${ret} -eq ${DIALOG_HELP} ; then
+	    ${DIALOG} --backtitle "${INSTALL_BACKTITLE} ${APL_ROLE^} Installation" --title "Input values" --colors --msgbox "\nInput values here allow you to tune the installed appliance for a given capacity to support. Theses values should be compatible with your machine resource capacity so all entered values are verified during the installation for acceptance. Please note that entered values may be subject to usage allowance according to the licensing in force for this version during the installation. Below is a brief description of input values:\n\n\Z4Number of users in forwarding mode:\Zn the total number of end-users (not simultaneous) in forwarding or transparent mode to access the internet via this appliance. The simultaneous number of managed end-users in forwarding mode will be 20% of the total number of end-users given here. \Z1Caution: if you run CacheGuard beyond its installed users capacity, your network traffic can be slowed down or be blocked.\Zn\n\n\Z4Number of URLs in blacklists:\Zn the total number of domain names and URLs in blacklists.\n\n\Z4Number of simultaneous users in reverse mode:\Zn simultaneous number of users accessing your Web servers cloaked by the appliance in reverse mode. Please note that the simultaneous number of end-users are distinguished from concurrent end-users. We call simultaneous end-users, users that have an active connection with the appliance while concurrent users may be connected without producing any significant traffic. \Z1Caution: if you run CacheGuard beyond its installed users capacity, your network traffic can be slowed down or be blocked.\Zn\n\n\Z4Number of websites in reverse mode:\Zn the total number of protected/cloaked websites identified by their names.\n\n\Z4Cache size per reverse website (MB):\Zn reserved cache size (on disk) in Mega Bytes for each reverse website (rWeb). The rWeb cache is only used in particular configurations (WAF mode, sticky load balancing...). Otherwise reverse websites share the same cache as for end-users in forwarding mode. If your machine contains more the one disk, the rWeb cache is created on the largest one.\n\n\Z4Logs retention period:\Zn number of days for log reports retention in the system. This value should be greater than or equal to 1 and less than or equal to 31.\n\n\Z4Uploaded file maximum size (MB):\Zn because uploaded files to protected Web servers (in reverse mode) are streamed to disk, the maximum allowed size for uploaded files (Content-Type: multipart/form-data) should be specified here to reserve the required temporary space on disk. The reserved space is calculated according to the value given here and the simultaneous users capacity for reverse websites. This value should be greater than or equal to 1 MB and less than or equal to 1024 MB." 0 0
+	    continue
+	fi
+
+	i=0
+	unset check_users
+	unset check_urllists
+	unset check_rusers
+	unset check_rweb
+	unset check_rcache
+	unset check_logrotate
+	unset check_uploaded
+	unset check_limit_disk
+
+	while read line
+	do
+	    case ${i} in
+		0)
+		    set-users "${line}" || check_users=false
+		    ;;
+		1)
+		    set-guards "${line}" || check_urllists=false
+		    ;;
+		2)
+		    set-rusers "${line}" || check_rusers=false
+		    ;;
+		3)
+		    set-rwebs "${line}" || check_rweb=false
+		    ;;
+		4)
+		    set-rcache "${line}" || check_rcache=false
+		    ;;
+		5)
+		    set-logrotates "${line}" || check_logrotate=false
+		    ;;
+		6)
+		    set-uploaded-files "${line}" || check_uploaded=false
+		    ;;
+		*)
+		    ;;
+	    esac
+	    ((i++))
+	done < /tmp/${CAPACITY_FILE}
+
+	if test \
+	       -z "${check_users}" -a \
+	       -z "${check_urllists}" -a \
+	       -z "${check_rusers}" -a \
+	       -z "${check_rweb}" -a \
+	       -z "${check_logrotate}" -a \
+	       -z "${check_rcache}" -a \
+	       -z "${check_uploaded}" -a \
+	       -z "${check_limit_disk}" ; then
+	    level=$(get-usage-level)
+
+	    break
+
+	    test ${level} -ne 0 || break
+
+	    ${DIALOG} --backtitle "${INSTALL_BACKTITLE} ${APL_ROLE^} Installation" --title "Commercial Configuration" --colors --yesno "\n\Z5Warning:\Zn the configuration you are about to install is not free (forward users > \Z4${LIC_USERS_NB_0}\Zn and/or reverse simultaneous users > \Z4${LIC_RUSERS_NB_0}\Zn).\n\nIf you choose to install this configuration, you will have the opportunity to evaluate the installed system for a trial period. Once this trial period has been exceeded, you should purchase a subscription in order to continue to use the installed system. \Z5Please note that underestimating the number of users would slowdown your network traffic\Zn.\n\nDo you want to install this configuration?" 18 60
+
+	    test ${?} -ne ${DIALOG_OK} || break
+	else
+	    ${DIALOG} --backtitle "${INSTALL_BACKTITLE} ${APL_ROLE^} Installation" --title "${COMMERCIAL_NAME}-OS Installation" --msgbox "\nThese data fields accept numeric values only. All values are mandatory." 0 0
+	fi
+    done
+}
+
+dialog-read-manager-capacities()
+{
+    local line i=0 ret level
+    local check_gateway_nb check_template_nb check_urllists check_users check_rweb
+
+    while true
+    do
+	${DIALOG} --backtitle "${INSTALL_BACKTITLE} ${APL_ROLE^} Installation" --title "Capacity Settings" --no-cancel --help-button --form "\nPlease enter required capacity to support:\n(use arrow keys)" 0 0 5 \
+		  "Number of managed gateways:"  1 1  "${MANAGER_GATEWAY_NB}" 1 ${DIALOG_CAPACITY_TITLE_LEN} 6 0 \
+		  "Number of templates:"  2 1  "${MANAGER_TEMPLATE_NB}" 2 ${DIALOG_CAPACITY_TITLE_LEN} 4 0 \
+		  "Total number of users in forwarding mode:" 3 1 "${MANAGER_TOTAL_USERS_NB}" 3 ${DIALOG_CAPACITY_TITLE_LEN} 7 0 \
+		  "Total number of websites in reverse mode:" 4 1 "${MANAGER_TOTAL_RWEB_NB}" 4 ${DIALOG_CAPACITY_TITLE_LEN} 5 0 \
+		  "URL blacklists per gateway:" 5 1 "${URLLIST_RECORDS_NB}" 5 ${DIALOG_CAPACITY_TITLE_LEN} 10 0 \
+	    2> /tmp/${CAPACITY_FILE}
+
+	ret=${?}
+	if test ${ret} -eq ${DIALOG_HELP} ; then
+	    ${DIALOG} --backtitle "${INSTALL_BACKTITLE} ${APL_ROLE^} Installation" --title "Capacity Settings" --colors --msgbox "\nInput values here allow you to tune the installed appliance for a given capacity to support. Theses values should be compatible with your machine capacity so all entered values are verified during the installation for acceptance. Please note that entered values may be subject to usage allowance according to the licensing in force for this version during the installation. Below is a brief description of input values:\n\n\Z4Number of managed gateways:\Zn the number of Gateways to manage by the installed Manager appliance.\n\n\Z4Number of templates:\Zn the maximum number of Templates that can be created. A template is a set of configuration commands that can be specialized for each gateway. Templates are object oriented and are organized hierarchically as classes and sub classes.\n\n\Z4Total number of users in forwarding mode:\Zn the total number of end-users supported by all managed gateways.\n\n\Z4Total number of websites in reverse mode:\Zn the total number of websites in reverse mode supported by all managed gateways.\n\n\Z4URL blacklists per gateway:\Zn the maximum number of domain names and URLs in installed blacklists on a managed gateway." 0 0
+	    continue
+	fi
+
+	i=0
+	unset check_gateway_nb
+	unset check_template_nb
+	unset check_urllists
+	unset check_users
+	unset check_rweb
+
+	while read line
+	do
+	    case ${i} in
+		0)
+		    set-gateway-nb "${line}" || check_gateway_nb=false
+		    ;;
+		1)
+		    set-template-nb "${line}" || check_template_nb=false
+		    ;;
+		2)
+		    set-manager-total-users "${line}" || check_users=false
+		    ;;
+		3)
+		    set-manager-total-rwebs "${line}" || check_rweb=false
+		    ;;
+		4)
+		    set-guards "${line}" || check_urllists=false
+		    ;;
+		*)
+		    ;;
+	    esac
+	    ((i++))
+	done < /tmp/${CAPACITY_FILE}
+
+	if test \
+	       -z "${check_gateway_nb}" -a \
+	       -z "${check_template_nb}" -a \
+	       -z "${check_urllists}" -a \
+	       -z "${check_users}" -a \
+	       -z "${check_rweb}" ; then
+	    level=$(get-usage-level)
+	    break
+
+	    test ${level} -ne 0 || break
+
+	    ${DIALOG} --backtitle "${INSTALL_BACKTITLE} ${APL_ROLE^} Installation" --title "Commercial Configuration" --colors --yesno "\n\Z5Warning:\Zn the configuration you are about to install is not free (managed gateways > \Z4${LIC_GATEWAY_NB_0}\Zn).\n\nIf you choose to install this configuration, you will have the opportunity to evaluate the installed system for a trial period. Once this trial period has been exceeded, you should purchase a subscription in order to continue to use the installed system.\n\nDo you want to install this configuration?" 18 60
+
+	    test ${?} -ne ${DIALOG_OK} || break
+	else
+	    ${DIALOG} --backtitle "${INSTALL_BACKTITLE} ${APL_ROLE^} Installation" --title "${COMMERCIAL_NAME}-OS Installation" --msgbox "\nThese data fields accept numeric values only. All values are mandatory." 0 0
+	fi
+    done
+}
+
+dialog-read-settings()
+{
+    test -z "${APL_MODEL}" || return 0
+
+    ${DIALOG} --backtitle "${INSTALL_BACKTITLE} Installation" --title "${COMMERCIAL_NAME}-OS Installation" --msgbox "\nThe following windows allow you to tune your machine according to the required capacity and available machine resources." 0 0
+
+    case ${APL_ROLE} in
+	gateway)
+	    dialog-read-gateway-persistency
+	    dialog-read-gateway-capacities
+	    ;;
+	manager)
+	    dialog-read-manager-capacities
+	    ;;
+	*)
+	    ;;
+    esac
+}
+
+dialog-read-passwords()
+{
+    if test -n "${APL_MODEL}" ; then
+	if test ${APL_MODEL} == 'test' ; then
+	    export APASSWORD=""
+	else
+	    export APASSWORD='admin'
+	fi
+	return 0
+    elif test -n "${CLOUD_NAME}" ; then
+	export APASSWORD=""
+	return 0
+    fi
+
+    local line i ret
+    local password1 password2
+
+    while true
+    do
+	${DIALOG} --backtitle "${INSTALL_BACKTITLE} ${APL_ROLE^} Installation" --title "Administrator password" --help-button ${@} --insecure --passwordform "\nPlease enter the administrator (user admin) password \n(use Up/Down arrow keys):" 0 0 2 \
+	    "Password:"  1 1  "" 1 24 32 0 \
+	    "Retype password:"  2 1  "" 2 24 32 0 2> /tmp/${ADMIN_PASSWORD_FILE}
+	ret=${?}
+	if test ${ret} -eq ${DIALOG_HELP} ; then
+	    ${DIALOG} --backtitle "${INSTALL_BACKTITLE} Installation" --title "Administrator Password" --msgbox "\nThere are 3 levels of administration with the present OS. The first level is the appliance administration level. This level is bound to the user \"${ADMIN_NAME}\" and is the only recommended level to use to administrate your appliance. The two other levels are Linux administration levels bound to the users \"${SUPERADMIN_NAME}\" and \"root\". These levels are there for maintenance purpose and should never be used unless you know exactly what you do.\n\n The \"${SUPERADMIN_NAME}\" default password is the same as the one configured for the user \"${ADMIN_NAME}\". The \"root\" default password is the same as for the user \"${ADMIN_NAME}\" followed by the configured Users Capacity (${USERS_NB} here). It is highly recommended to change these default passwords once the OS is installed on your machine." 0 0
+	elif test ${ret} -eq ${DIALOG_CANCEL} ; then
+	    if test -n "${APASSWORD}" ; then
+		break
+	    else
+		${DIALOG} --backtitle "${INSTALL_BACKTITLE} Installation" --title "Administrator password" --msgbox "\nEmpty password is not allowed! Please input a valid password." 0 0
+	    fi
+	else
+	    i=0
+	    while read line
+	    do
+		case ${i} in
+		    0)
+			password1="${line}"
+			;;
+		    1)
+			password2="${line}"
+			;;
+		    *)
+			;;
+		esac
+		((i++))
+	    done < /tmp/${ADMIN_PASSWORD_FILE}
+	    
+	    if test -z "${password1}" -o -z "${password2}" ; then
+		${DIALOG} --backtitle "${INSTALL_BACKTITLE} Installation" --title "Administrator password" --msgbox "\nEmpty password is not allowed! Please input a valid password." 0 0
+	    elif test "${password1}" != "${password2}" ; then
+		${DIALOG} --backtitle "${INSTALL_BACKTITLE} Installation" --title "Administrator password" --msgbox "\nEntered passwords do not match! Please retype again." 0 0
+	    else
+		export APASSWORD=${password1}
+		break
+	    fi
+	fi
+    done
+}
+
+dialog-reboot()
+{
+    ${DIALOG} --backtitle "${INSTALL_BACKTITLE} Installation" --title "Reboot" --defaultno --yesno "\nReboot the system?" 0 0
+    if test ${?} -eq ${DIALOG_OK} ; then
+	return 1
+    else
+	return 0
+    fi
+}
+
+run-shell()
+{
+    clear
+    sulogin --timeout 15
+    raid-auto-stop
+    stop-device-manager
+}
+
+dialog-main-menu()
+{
+    if test -n "${APL_MODEL}" ; then
+	dialog-install-os
+	return 0
+    fi
+
+    local item title description message
+
+    while true
+    do
+	cat << EOF > /tmp/${MAIN_MENU_FILE}
+"Install" "Proceed with the Installation" "Install the OS and transform your machine into a Network appliance"
+"Reboot" "Reboot the System" ""
+"Machine" "View your machine resources" ""
+"Role" "Select the installed appliance Role" ""
+"Capacity" "Modify the required capacity" "Modify the required capacity according to your machine resources"
+"Password" "Modify the admin user password" ""
+"Keyboard" "Modify the selected keyboard" ""
+"Date" "Modify the date & time" "Modify the timezone, date and time"
+"Shell" "Run a Linux shell" "Inspect the OS (experts only)"
+EOF
+	test "${DISK_NB}" -le 1 || cat << EOF >> /tmp/${MAIN_MENU_FILE}
+"RAID" "Modify the RAID configuration ($[${RAID_SZ} / 1024] MB)" "Modify or delete the RAID configuration"
+EOF
+	test "${INSTALL}" != pxe || cat << EOF >> /tmp/${MAIN_MENU_FILE}
+"IP" "Request an IP address" "Request an IP address from a DHCP server"
+"TFTP" "Modify the TFTP server IP adderss (${TFTP_SERVER_IP})" "Modify the IP address of the TFTP server to download the OS"
+EOF
+	test ${RAID_STATE} -eq 1 -o ${DISK_NB} -eq 1 || cat << EOF >> /tmp/${MAIN_MENU_FILE}
+"OS Disk" "Select the main OS Disk" "Specify the bootable disk on which you want to install OS components"
+EOF
+	test "${MACHINE}" == 'VE' || cat << EOF >> /tmp/${MAIN_MENU_FILE}
+"Startup" "Configure the first Startup (${MACHINE})" "Use this if you need to modify some settings during the first startup"
+EOF
+
+	unset message
+	test ${RAID_STATE} -eq 0 || message=" [With RAID]"
+
+	${DIALOG} --backtitle "${INSTALL_BACKTITLE} Installation${message}" --title "Main Menu" --no-cancel --default-item "Check Installation" --item-help --menu "\nPlease select an operation:" 0 0 8 --file /tmp/${MAIN_MENU_FILE} 2> /tmp/${MENU_ITEM_FILE}
+	item=$(cat /tmp/${MENU_ITEM_FILE})
+
+	if test "${item}" == "Install" ; then
+	    dialog-install-os
+	elif test "${item}" == "Reboot" ; then
+	    dialog-reboot || break
+	elif test "${item}" == "Machine" ; then
+	    dialog-display-hardware
+	elif test "${item}" == "Role" ; then
+	    dialog-set-appliance-role
+	elif test "${item}" == "Capacity" ; then
+	    dialog-read-settings
+	elif test "${item}" == "Password" ; then
+	    dialog-read-passwords
+	elif test "${item}" == "Keyboard" ; then
+	    dialog-set-keyboard
+	elif test "${item}" == "Date" ; then
+	    dialog-set-timezone-date-time
+	elif test "${item}" == "Shell" ; then
+	    run-shell
+	elif test "${item}" == "IP" ; then
+	    dialog-request-ip
+	elif test "${item}" == "TFTP" ; then
+	    dialog-tftp-ip
+	elif test "${item}" == "RAID" ; then
+	    dialog-raid-config
+	elif test "${item}" == "OS Disk" ; then
+	    dialog-os-disk
+	elif test "${item}" == "Startup" ; then
+	    dialog-startup
+	else
+	    :
+	fi
+    done
+}
+
+switch-install-log()
+{
+    test ! -f /tmp/${LOG_FILE} || diff -q /tmp/${LOG_FILE} /tmp/${LOG_FILE_1} || cp -f /tmp/${LOG_FILE} /tmp/${LOG_FILE_1}
+    LOG_FILE=${LOG_FILE_2}
+    reset-install-log
+}
+
+set-device-drivers()
+{
+    local module
+
+    set-network-drivers ${INSTALL_PX} /tmp/${LOG_FILE}
+    set-storage-drivers ${INSTALL_PX} /tmp/${LOG_FILE}
+    set-hid-drivers
+
+    echo ${NETWORK_MODULES} > /tmp/VARIABLE_NETWORK_MODULES
+    echo ${STORAGE_MODULES} > /tmp/VARIABLE_STORAGE_MODULES
+    echo ${HID_MODULES} > /tmp/VARIABLE_HID_MODULES
+
+    local network_modules=$(get-base-module-names "${NETWORK_MODULES}")
+    for module in ${network_modules}
+    do
+	echo ${module}
+    done > /tmp/${NETWORK_MODULES_FILE}
+
+    local storage_modules=$(get-base-module-names "${STORAGE_MODULES}")
+    for module in ${storage_modules}
+    do
+	echo ${module}
+    done > /tmp/${STORAGE_MODULES_FILE}
+
+    local hid_modules=$(get-base-module-names "${HID_MODULES}")
+    for module in ${hid_modules}
+    do
+	echo ${module}
+    done > /tmp/${HID_MODULES_FILE}
+}
+
+dialog-appliance-install()
+{
+    find-load-modules
+    load-hid-modules
+    set-device-drivers
+
+    dialog-setenv
+    dialog-welcome
+    dialog-set-keyboard
+    read-license || quit-install
+
+    if dialog-hardware-config ; then
+	dialog-set-timezone-date-time
+	dialog-raid-config
+	dialog-set-appliance-role
+	dialog-read-settings
+	dialog-read-passwords
+	switch-install-log
+    fi
+
+    dialog-main-menu
+}
+
+install-keyboard()
+{
+    test -n "${1}" || return 1
+    keyboard=${1}
+
+    loadkeys --quiet ${keyboard} > /tmp/${LOG_FILE} 2>&1
+}
+
+appliance-install()
+{
+    test -z "${APL_MODEL}" -o "${APL_MODEL}" == 'test' || export MACHINE=HW
+    install-keyboard ${KEYBOARD}
+    dialog-appliance-install
+}
+
+quit-install()
+{
+    clear
+
+    case "${INSTALL}" in
+	iso)
+	    umount ${MEDIA_DIR} 2>> /tmp/${LOG_FILE}
+	    ;;
+	pxe)
+	    unset-install-ip
+	    ;;
+	*)
+	    ;;
+    esac
+
+    if test -z "${APL_MODEL}" ; then
+	shutdown -nfr now > /dev/null 2>&1
+    else
+	shutdown -nfhP now > /dev/null 2>&1
+    fi
+}
+
+mount-install-sysfs()
+{
+    mount /proc
+    mount /sys
+
+    ! is-efi-system || mount -t efivarfs efivarfs /sys/firmware/efi/efivars
+
+    klogd -c 1
+}
+
+set-environment()
+{
+    cd /install && mkdir -p ${GENERATED_DIR}
+
+    export WORKING_DIR=${APL}${TMP_DIR}
+    export ARCHITECTURE=$(get-architecture)
+    export INSTALL=$(get-install)
+    export TERMINAL=$(get-console)
+    export SYSTEM=$(get-system-architecture)
+    export CONSOLE=$(tty)
+
+    if test -z "${APL_MODEL}" ; then
+	export APL_MODEL=$(get-model)
+    elif test "${APL_MODEL}" == 'test' ; then
+	KEYBOARD=${DEV_KEYBOARD}
+    fi
+}
+
+if-debug-mode()
+{
+    test "${REMOTE_DEBUG_MODE}" == yes || return 0
+    echo "Entering the development mode..."
+
+    echo "Setting the appropriate keyboard..."
+    install-keyboard ${DEV_KEYBOARD}
+
+    echo "Loading required modules..."
+    find-load-modules
+    load-hid-modules
+
+    echo "Starting the device manager..."
+    start-device-manager
+    local date1=$(date +"%s")
+
+    echo "Generating the SSH daemon configuration..."
+    rm -f \
+       ${INSTALL_DIR}/install.ssh_host_rsa_key \
+       ${INSTALL_DIR}/install.ssh_host_dsa_key
+    ssh-keygen -q -t rsa -f ${INSTALL_DIR}/install.ssh_host_rsa_key -C '' -N ''
+    ssh-keygen -q -t dsa -f ${INSTALL_DIR}/install.ssh_host_dsa_key -C '' -N ''
+    chmod 400 ${INSTALL_DIR}/install.ssh_host_rsa_key ${INSTALL_DIR}/install.ssh_host_dsa_key
+    chmod 444 ${INSTALL_DIR}/install.ssh_host_rsa_key.pub ${INSTALL_DIR}/install.ssh_host_dsa_key.pub
+
+    local sshd_config_file="${INSTALL_DIR}/install.sshd_config"
+    echo "PermitRootLogin yes" > ${sshd_config_file}
+    echo "PermitEmptyPasswords yes" >> ${sshd_config_file}
+    echo "HostKey ${INSTALL_DIR}/install.ssh_host_rsa_key" >> ${sshd_config_file}
+    echo "HostKey ${INSTALL_DIR}/install.ssh_host_dsa_key" >> ${sshd_config_file}
+
+    mkdir -p /dev/pts
+    mount devpts /dev/pts -t devpts
+
+    echo "Starting the SSH daemon..."
+    /sbin/sshd -f ${sshd_config_file} -u0
+
+    echo "Stopping the device manager..."
+    stop-device-manager
+    local date2=$(date +"%s")
+    test $[${date2} - ${date1}] -gt 1 || usleep 1000000
+
+    echo "Getting an IP address..."
+    set-install-ip ${DEBUG_NETWORK_DEV}
+    setenv-variable-from-file
+
+    sulogin
+    return 11
+
+    # from the remote machine: ssh root@<appliance-ip>
+    cd /install
+    source functions
+    set-environment
+    # debug from dialog-appliance-install() and then dialog-install-os()
+}

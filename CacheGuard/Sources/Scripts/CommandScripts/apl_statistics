@@ -1,0 +1,106 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       Scripts
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+test ! -f /var/lock/apl_statistics || exit 1
+touch /var/lock/apl_statistics
+
+CACHEGUARD_DIR=/etc/sysconfig/cacheguard
+source ${CACHEGUARD_DIR}/constant
+source ${APPLIANCE_DIR}/etc/role
+source ${LOCAL_DIR}/lib/apl_common
+
+clean-exit()
+{
+    trap "" USR1 INT QUIT TERM
+
+    local code=${1}
+
+    wait
+
+    rm -f /var/lock/apl_statistics
+    exit ${code}
+}
+
+gen-cpu-statistics()
+{
+    test -s ${RUN_DIR}/${CPU_STATISTICS_FILENAME} || return 1
+
+    local cpu_prv=($(cat ${RUN_DIR}/${CPU_STATISTICS_FILENAME}))
+    local cpu_now=($(head --lines=1 /proc/stat))
+
+    local cpu_prv_sum=${cpu_prv[@]:1}
+    local cpu_now_sum=${cpu_now[@]:1}
+
+    cpu_prv_sum=$((${cpu_prv_sum// /+}))
+    cpu_now_sum=$((${cpu_now_sum// /+}))
+    
+    local cpu_prv_idle=${cpu_prv[4]}
+    local cpu_now_idle=${cpu_now[4]}
+
+    local cpu_sum_delta=$((cpu_now_sum - cpu_prv_sum))
+    local cpu_idle_delta=$((cpu_now_idle - cpu_prv_idle))
+
+    local cpu_used=$((cpu_sum_delta - cpu_idle_delta))
+    local cpu_usage_pct=$((100 * cpu_used / cpu_sum_delta))
+
+    echo "${cpu_now[@]}" > ${RUN_DIR}/${CPU_STATISTICS_FILENAME}
+    echo "${cpu_usage_pct}" > ${RUN_DIR}/${CPU_USAGE_FILENAME}
+}
+
+gen-network-statistics()
+{
+    local nic
+    local stat_file
+    local rx_bytes tx_bytes
+
+    local date=$(date +"%s" 2> /dev/null)
+
+    test -f ${RUN_DIR}/${NETWORK_INTERFACES_FILENAME} || return 11
+    local nics=$(cat ${RUN_DIR}/${NETWORK_INTERFACES_FILENAME} 2> /dev/null)
+
+    for nic in ${nics}
+    do
+	stat_file=${RUN_DIR}/${NETWORK_STATISTICS_FILENAME}.${nic}
+
+	rx_bytes=$(cat /sys/class/net/${nic}/statistics/rx_bytes 2> /dev/null)
+	tx_bytes=$(cat /sys/class/net/${nic}/statistics/tx_bytes 2> /dev/null)
+
+	test -n "${rx_bytes}" || rx_bytes=0
+	test -n "${tx_bytes}" || tx_bytes=0
+
+	echo ${date} ${rx_bytes} ${tx_bytes} >> ${stat_file}
+    done
+}
+
+main()
+{
+    trap "clean-exit" USR1 INT QUIT TERM
+    gen-network-statistics
+    gen-cpu-statistics
+    clean-exit 0
+}
+
+# Main()
+
+main "${@}"

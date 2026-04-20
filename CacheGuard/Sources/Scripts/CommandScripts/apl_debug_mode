@@ -1,0 +1,63 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       Scripts
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+CACHEGUARD_DIR=/etc/sysconfig/cacheguard
+source ${CACHEGUARD_DIR}/constant
+source ${APPLIANCE_DIR}/etc/role
+source ${LOCAL_DIR}/lib/apl_common
+
+set-debug-mode()
+{
+    is-console-user || return 11
+
+    local level=${1}
+
+    case "${level}" in
+	""|on)
+	    level=1
+	    ;;
+	off)
+	    level=0
+	    ;;
+	*)
+	    ;;
+    esac
+
+    check-digit ${level} || return 13
+    test ${level} -lt 6 || return 15
+
+    apl_services stop daemon-only
+    apl_health_check < /dev/console
+    APPLIANCE_DEBUG_LEVEL=${level} apl_configure
+
+    if test ${level} -eq 0 ; then
+	rm -rf ${LOG_DIR}/audit/[0-9]*
+	echo -n > ${LOG_DIR}/audit/audit.log
+	rm -f ${LOG_DIR}/${WAF_DEBUG_LOG}
+    fi
+
+    apl_services start daemon-only
+}
+
+set-debug-mode "${@}"

@@ -1,0 +1,14 @@
+<a name='main' class='doc-title'></a>
+<h1>Administrator Users</h1>
+
+Only authenticated users are permitted to administer and configure a CacheGuard appliance. The primary administrator user is named "<i>admin</i>". This user exists by default in the system and possesses the highest level of privilege.
+<p>
+Secondary administrator users with reduced privileges can be added to the system. Secondary administrators are authorised to read the configurations but cannot modify them (only the "<i>admin</i>" user has this privilege). Certain secondary administrative operations, such as <a href="/doc/command/cache.html">cache loadurl</a>, can be executed by secondary administrators. The <a href="/doc/command/admin.html">admin user</a> command allows you to manage secondary administrator users.
+<p>
+To create a new administrator user called "<i>john</i>", log in as the "<i>admin</i>" user first and then use the following commands:
+<ul>
+  <li><i>admin user add john</i></li>
+  <li><i>apply</i></li>
+</ul>
+
+When invoking the "<i>admin user add john</i>" command, the "<i>admin</i>" user is prompted to choose a temporary password for "<i>john</i>". Once the <a href="/doc/command/apply.html">apply</a> operation is completed, the administrator user named "<i>john</i>" can log in. The first time a secondary administrator logs in to a CacheGuard appliance, they are required to change their password by entering a compliant one (refer to the <a href="/doc/command/password.html">password</a> command to learn more about permitted password formats).

@@ -1,0 +1,67 @@
+Manage IP addresses and routing configurations
+.SH SYNOPSIS
+
+[1] \fBip\fR [(\fBinternal\fR [\fB.\fR\fI<vlan-id\fR] | \fBexternal\fR | \fBauxiliary\fR) [\fI<ip>\fR [\fI<network-mask>\fR]]]
+
+[2] \fBip route\fR [(\fBadd\fR | \fBadd:\fR\fI<network-ip>\fR/\fI<network-mask>\fR:\fI<gateway-ip>\fR | \fBinsert:\fR\fI<network-ip>\fR/\fI<network-mask>\fR:\fI<gateway-ip>\fR) \fI<network-ip> <network-mask> <gateway-ip>\fR [\fI<balance-weight>\fR [\fI<pinged-gateway>\fR]]]
+
+[3] \fBip route\fR [\fBmove:(\fB-\fR|\fB+\fR)\fI<ip>\fR/\fI<network-mask>\fR:\fI<gateway-ip>\fR \fI<network-ip> <network-mask> <gateway-ip>\fR | \fBmove:\fI<position>\fR]
+
+[4] \fBip route\fR [\fBraz\fR | \fBdel\fR \fI<network-ip> <network-mask> <gateway-ip>\fR]
+
+[5] \fBip via\fR [\fBraz\fR | (\fBadd\fR | \fBdel\fR) \fI<gateway-ip>\fR (\fBmaster\fR \fBbackup\fR) [\fI<priority>\fR]]
+
+[6] \fBip name\fR [\fBraz\fR | (\fBadd\fR | \fBdel\fR) \fI<name>\fR \fI<ip>\fR]
+
+[7] \fBip vlan\fR
+
+[8] \fBip neighbour\fR
+
+.SH DESCRIPTION
+The first [1] usage form is used to get or set the \fBinternal\fR, \fBexternal\fR and \fBauxiliary\fR interface IP addresses. The internal interface is mainly used to connect clients or backend Web servers to the appliance and can be considered as a trusted and secure interface. The external interface is used to connect the system to the internet thus considered as an untrusted or non-secure interface. You can use the auxiliary interface for your specific needs (for instance to implement a DMZ or a Back Office zone). If a VLAN identifier is given for the internal interface, the command is applied to the 802.1q pseudo interface in the given VLAN. If no \fI<network-mask>\fR is specified the default network mask \fI255.255.255.0\fR is used.
+
+The second [2] usage form allows you to add static IP routes. A static IP route is defined by the couple \fI<network-ip> <network-mask>\fR and followed by a gateway IP address. To set the default route use the keyword \fBdefault\fR instead of the couple \fI<network-ip> <network-mask>\fR . It is also possible to define the default route by giving the couple \fI0.0.0.0 0.0.0.0\fR as the network address.
+
+To add a route at the end all existing routes, use the keyword \fBadd\fR. To add a route after a given route, use the keyword \fBadd:\fR followed by the route after which the new route should be inserted. To insert a route before a given route, use the keyword \fBinsert:\fR followed by the route before which the new rule should be inserted. When adding after or inserting before a give route, the given route should be specified as a network IP address and a network mask separated by the character "/" followed by the character ":" and a gateway IP address.
+
+The third [3] usage form allows you to move an existing  route from one position to another in the routing table. To move a route before or after a given route use the keyword \fBmove:\fR followed by the sign \fB-\fR (for before) or \fB+\fR (for after), the given route (\fI<network-ip>\fR/\fI<network-mask>\fR:\fI<gateway-ip>\fR) and the route to move (\fI<network-ip> <network-mask> <gateway-ip>\fR). Please note that white spaces are not allowed between the keyword \fBmove:\fR, the signs \fB-\fR or \fB+\fR and the given route. To move a route to an absolute position use the \fBmove:\fR followed by the position number and the route to move (the first position is the position number 1). Again white spaces are not allowed between the keyword \fBmove:\fR and the position number.
+
+The fourth [4] usage form allows you to delete a static route or completely erase the static route list.
+
+If more than one gateway is specified for the same network to route, the traffic is balanced over those gateways. In this case the optional balance weight allows you to privilege a gateway over the others. The balance weight is an integer between 0 and 100. The higher the weigh is, the higher the probability is that the traffic takes a path via a gateway. Specifying the value 0 means that the gateway is in standby and is only activated if all other gateways are unavailable. For the same network to route, only one gateway with the weigh value of 0 allowed. If no weigh is specified, the weigh is set to 50. In order to avoid IP spoofing, multiple gateways for the same network to route should belong to the same connected network. In case of the unavailability of a gateway, the related route is automatically removed from the routing table. If a failed route is reinstated, it is automatically added to the routing table and the overall traffic is balanced over it again.
+
+All routing changes are notified if the monitoring mode (SNMP or other) is activated (see the \fBadmin\fR command for further information). A gateway is marked unavailable if it can't reply to pings (ICMP protocol). In case where the optional \fI<pinged-gateway>\fR is specified, the gateway is marked unavailable if it can't route pings to that gateway. A pinged gateway (or server) should be a valid IP address (and can't be a name as ping results may be erroneous due to the non accessibility of DNS servers). It's a good compromise to specify as pinged gateway, the default gateway configured on the specified gateway (concerned by the route definition). In this case the unavailability of the WAN can be quickly detected while the connectivity test goes beyond the local gateway outage.
+
+When the appliance is configured to use multiple external gateways (connected to the external interface), each potentially having a distinct public IP address (with each gateway performing source NAT on all outgoing traffic to the Internet using its own public IP), you should explicitly specify the gateways through which external users can access services exposed via the external interface. For services provided by the appliance itself, such as the reverse proxy (\fBrweb\fR mode) and the IPsec VPN (\fBvpnipsec\fR mode), you must configure specific "via gateways" using the commands associated with those services. For other services (routed via the appliance) the fifth [5] usage form allows you to globally specify via gateways to use. Via gateways can have two roles: the \fBmaster\fR role and the \fBbackup\fR role. Please note that specifying backup via gateways is meaningful only if the external gateways share the same public IP address.
+
+When all gateways are available, a master gateway with the highest priority is elected to route the traffic for technical services. The elected gateway is then activated for those services. Please note that at a given point, one and only one gateway is considered as active for technical services. In case of a failure on the active gateway, a backup gateway (with the highest priority) is then elected to be activated. In case where a faulty gateway becomes operational again, the process of electing and activating via gateways is performed again.
+
+To add a master via gateway, use the keywords \fBvia add\fR followed by the gateway IP address to use, the keyword \fBmaster\fR and optionally the priority associated to the specified gateway. To add a backup gateway, use the keyword \fBbackup\fR instead of the \fBmaster\fR keyword. To delete a gateway, use the keyword \fBdel\fR instead of \fBadd\fR. To erase the list of all \fBvia\fR gateways, use the keywords \fBraz\fR. The priority is a numeric value between 0 and 255. If no priority is specified, the priority is set to 110 for a master gateway and to 100 for a backup gateway.
+
+In certain situations, it may help that the system overrides the name to IP resolutions provided by DNS servers.  The sixth [6] usage form allows you to manage such overrides with a list of specific name to IP associations. To add an entry to that list, use the keywords \fBname add\fR followed by the name (\fI<name>\fR) to resolve and the specific IP address (\fI<ip>\fR) to associate to it. To delete an entry, use the keywords \fBname del\fR followed by the name (\fI<name>\fR) to remove from that list. To erase the list of specific name to IP associations use the keywords \fBname raz\fR. Please note that some internal names (like localhost) can't be override as well some IPs (like 127.0.0.1) can't be associated to a name.
+
+The seventh [7] usage forms prints all IPs associated to 802.1q pseudo network interfaces.
+
+The eighth [8] usage form (\fBip neighbour\fR) allows you to display the ARP cache entries.
+
+.SH GATEWAY SELECTION AND ROUTE PERSISTENCE
+
+In a multi gateway configuration, default routes are persistent while other routes are not. This means that when for a given connection a default gateway is selected (according to its weight), all traffic related to that connection will pass via the same initial selected gateway. Traffic passing via non default routes can sometimes pass via a gateway and sometimes via another gateway according to their associated weights.
+
+.SH SEE ALSO
+.B admin
+(1)
+.B apply
+(1)
+.B domainname
+(1)
+.B hostname
+(1)
+.B link
+(1)
+.B rweb
+(1)
+.B vlan
+(1)
+.B vpnipsec
+(1)

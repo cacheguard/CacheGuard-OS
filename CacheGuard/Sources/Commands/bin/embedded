@@ -1,0 +1,171 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       Commands
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+source functions
+
+show-embedded-vpnsubscr1()
+{
+    test -n "${1}" || return 1
+    local state=${1}
+    local name=${2}
+    local tls=${3}
+
+    local state=$(external-form ${state})
+
+    if test -n "${name}" ; then
+	if test -n "${tls}" ; then
+	    echo-value "${state} ${name} ${tls}"
+	else
+	    echo-value "${state} ${name}"
+	fi
+    else
+	echo-value "${state}"
+    fi
+}
+
+show-embedded-vpnsubscr()
+{
+    echo-command-form "embedded ${EMBEDDED_VPNSUBSCR_CLI_NAME}"
+    echo-mark-cur
+
+    show-embedded-vpnsubscr1 ${CURRENT_EMBEDDED_VPNSUBSCR_MODE} "${CURRENT_EMBEDDED_VPNSUBSCR_RWEB_SITE_NAME}" "${CURRENT_EMBEDDED_VPNSUBSCR_RWEB_TLS_ID}"
+
+    if test ${CURRENT_EMBEDDED_VPNSUBSCR_MODE} != ${EMBEDDED_VPNSUBSCR_MODE} -o \
+	    "${CURRENT_EMBEDDED_VPNSUBSCR_RWEB_SITE_NAME}" != "${EMBEDDED_VPNSUBSCR_RWEB_SITE_NAME}" -o \
+	    "${CURRENT_EMBEDDED_VPNSUBSCR_RWEB_TLS_ID}" != "${EMBEDDED_VPNSUBSCR_RWEB_TLS_ID}" ; then
+	echo-command-form "embedded ${EMBEDDED_VPNSUBSCR_CLI_NAME}"
+	echo-mark-new
+	show-embedded-vpnsubscr1 ${EMBEDDED_VPNSUBSCR_MODE} "${EMBEDDED_VPNSUBSCR_RWEB_SITE_NAME}" "${EMBEDDED_VPNSUBSCR_RWEB_TLS_ID}"
+    fi
+}
+
+show-embedded()
+{
+    echo-begin-show
+    case ${1} in
+	${EMBEDDED_VPNSUBSCR_CLI_NAME})
+	    show-embedded-vpnsubscr
+	    ;;
+	'')
+	    show-embedded-vpnsubscr
+	    ;;
+	
+	*)
+	    error 255
+	    ;;
+    esac
+    echo-end-show
+}
+
+run()
+{
+    contextual-command-is-allowed || return 207
+
+    if test -z "${ARGS[1]}" ; then show-embedded ; return 0 ; fi
+
+    local embedded=${ARGS[1]}
+    local state=${ARGS[2]}
+
+    if test -z "${state}" ; then
+	case ${embedded} in
+	    ${EMBEDDED_VPNSUBSCR_CLI_NAME})
+		show-embedded ${embedded}
+		return 0
+		;;
+	    *)
+		return 1
+		;;
+	esac
+    fi
+
+    check-boolean ${state} || return 18
+
+    case ${embedded} in
+	${EMBEDDED_VPNSUBSCR_CLI_NAME})
+	    local name=${ARGS[3]}
+	    local tls=${ARGS[4]}
+
+	    local check_name check_tls
+
+	    case ${state} in
+		off)
+		    if test -n "${name}" ; then
+			check_name=yes
+			if test -n "${tls}" ; then
+			    check_tls=yes
+			fi
+		    fi
+		    ;;
+		on)
+		    check_name=yes
+		    check_tls=yes
+		    ;;
+		*)
+		    return 255
+		    ;;
+	    esac
+
+ 	    if test -n "${check_name}" ; then
+		test -n "${name}" || return 1
+		check-sitename ${name} || return 78
+	    fi
+
+	    if test -n "${check_tls}" ; then
+		test -n "${tls}" || return 1
+		local level=$(tls-get-ca-chain-level "${tls}")
+		test ${level} -le 2 || return 28
+
+		local id
+
+		for id in ${tls//:/ }
+		do
+		    check-tls-id ${id} || return 213
+		done
+	    fi
+
+	    case ${state} in
+		off)
+		    EMBEDDED_VPNSUBSCR_MODE=False
+		    ;;
+		on)
+		    embedded=$(get-embedded-internal-name ${embedded})
+		    is-embedded-activable ${embedded} || return 186
+		    EMBEDDED_VPNSUBSCR_MODE=True
+		    ;;
+		*)
+		    return 255
+		    ;;
+	    esac
+
+	    EMBEDDED_VPNSUBSCR_RWEB_SITE_NAME=${name}
+	    EMBEDDED_VPNSUBSCR_RWEB_TLS_ID=${tls}
+	    SAVENV=1
+	    ;;
+	*)
+	    return 255
+	    ;;
+    esac
+}
+
+main "${@}"

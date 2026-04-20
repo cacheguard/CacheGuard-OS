@@ -1,0 +1,897 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       Commands
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+clean-loaded-files()
+{
+    local file
+
+    for file in ${TRAP_LOADED_FILES}
+    do
+	rm -f ${file}
+    done
+
+    test -z "${TRAP_PROGRESS_FILE}" || rm -f ${TRAP_PROGRESS_FILE}
+}
+
+echo-curl-result()
+{
+    test -n "${1}" || return 0
+
+    local code=${1}
+    
+    test ${code} -ne 0 || return 0
+
+    case ${code} in
+	1)
+	    echo "Transfer error ${code} - Unsupported protocol. This build of the program has no support for this protocol." >&2
+	    ;;
+	2)
+	    echo "Transfer error ${code} - Failed to initialize." >&2
+	    ;;
+	3)
+	    echo "Transfer error ${code} - URL malformed. The syntax was not correct." >&2
+	    ;;
+	5)
+	    echo "Transfer error ${code} - Couldn't resolve proxy. The given proxy host could not be resolved." >&2
+	    ;;
+	6)
+	    echo "Transfer error ${code} - Couldn't resolve host. The given remote host was not resolved." >&2
+	    ;;
+	7)
+	    echo "Transfer error ${code} - Failed to connect to host." >&2
+	    ;;
+	8)
+	    echo "Transfer error ${code} - FTP weird server reply. The server sent data the program couldn't parse." >&2
+	    ;;
+	9)
+	    echo "Transfer error ${code} - FTP/SFTP access denied. The server denied login or denied access to the particular resource or directory you wanted to reach. Most often you tried to change to a directory that doesn't exist on the server. To save on an SFTP server always specify the full target path." >&2
+	    ;;
+	11)
+	    echo "Transfer error ${code} - FTP weird PASS reply. The Program couldn't parse the reply sent to the PASS request." >&2
+	    ;;
+	13)
+	    echo "Transfer error ${code} - FTP weird PASV reply, The Program couldn't parse the reply sent to the PASV request." >&2
+	    ;;
+	14)
+	    echo "Transfer error ${code} - FTP weird 227 format. The Program couldn't parse the 227-line the server sent." >&2
+	    ;;
+	15)
+	    echo "Transfer error ${code} - FTP can't get host. Couldn't resolve the host IP we got in the 227-line." >&2
+	    ;;
+	17)
+	    echo "Transfer error ${code} - FTP couldn't set binary. Couldn't change transfer method to binary." >&2
+	    ;;
+	18)
+	    echo "Transfer error ${code} - Partial file. Only a part of the file was transferred." >&2
+	    ;;
+	19)
+	    echo "Transfer error ${code} - FTP couldn't download/access the given file, the RETR (or similar) command failed." >&2
+	    ;;
+	21)
+	    echo "Transfer error ${code} - FTP quote error. A quote command returned error from the server." >&2
+	    ;;
+	22)
+	    echo "Transfer error ${code} - HTTP page not retrieved. The requested url was not found or returned another error with the HTTP error code being 400 or above. This return code only appears if -f/--fail is used." >&2
+	    ;;
+	23)
+	    echo "Transfer error ${code} - Write error. The Program couldn't write data to a local filesystem or similar." >&2
+	    ;;
+	25)
+	    echo "Transfer error ${code} - FTP couldn't STOR file. The server denied the STOR operation, used for FTP uploading." >&2
+	    ;;
+	26)
+	    echo "Transfer error ${code} - Read error. Various reading problems." >&2
+	    ;;
+	27)
+	    echo "Transfer error ${code} - Out of memory. A memory allocation request failed." >&2
+	    ;;
+	28)
+	    echo "Transfer error ${code} - Operation timeout. The specified timeout period was reached according to the conditions." >&2
+	    ;;
+	30)
+	    echo "Transfer error ${code} - FTP PORT failed. The PORT command failed. Not all FTP servers support the PORT command, try doing a transfer using PASV instead!" >&2
+	    ;;
+	31)
+	    echo "Transfer error ${code} - FTP couldn't use REST. The REST command failed. This command is used for resumed FTP transfers." >&2
+	    ;;
+	33)
+	    echo "Transfer error ${code} - HTTP range error. The range "command" didn't work." >&2
+	    ;;
+	34)
+	    echo "Transfer error ${code} - HTTP post error. Internal post-request generation error." >&2
+	    ;;
+	35)
+	    echo "Transfer error ${code} - SSL connect error. The SSL handshaking failed." >&2
+	    ;;
+	36)
+	    echo "Transfer error ${code} - FTP bad download resume. Couldn't continue an earlier aborted download." >&2
+	    ;;
+	37)
+	    echo "Transfer error ${code} - FILE couldn't read file. Failed to open the file. Permissions?" >&2
+	    ;;
+	38)
+	    echo "Transfer error ${code} - LDAP cannot bind. LDAP bind operation failed." >&2
+	    ;;
+	39)
+	    echo "Transfer error ${code} - LDAP search failed." >&2
+	    ;;
+	41)
+	    echo "Transfer error ${code} - Function not found. A required LDAP function was not found." >&2
+	    ;;
+	42)
+	    echo "Transfer error ${code} - Aborted by callback. An application told the program to abort the operation." >&2
+	    ;;
+	43)
+	    echo "Transfer error ${code} - Internal error. A function was called with a bad parameter." >&2
+	    ;;
+	45)
+	    echo "Transfer error ${code} - Interface error. A specified outgoing interface could not be used." >&2
+	    ;;
+	47)
+	    echo "Transfer error ${code} - Too many redirects. When following redirects, the program hit the maximum amount." >&2
+	    ;;
+	48)
+	    echo "Transfer error ${code} - Unknown TELNET option specified." >&2
+	    ;;
+	49)
+	    echo "Transfer error ${code} - Malformed telnet option." >&2
+	    ;;
+	51)
+	    echo "Transfer error ${code} - The peer's SSL certificate or SSH MD5 fingerprint was not ok." >&2
+	    ;;
+	52)
+	    echo "Transfer error ${code} - The server didn't reply anything, which here is considered an error." >&2
+	    ;;
+	53)
+	    echo "Transfer error ${code} - SSL cryptographic engine not found." >&2
+	    ;;
+	54)
+	    echo "Transfer error ${code} - Cannot set SSL cryptographic engine as default." >&2
+	    ;;
+	55)
+	    echo "Transfer error ${code} - Failed sending network data." >&2
+	    ;;
+	56)
+	    echo "Transfer error ${code} - Failure in receiving network data." >&2
+	    ;;
+	58)
+	    echo "Transfer error ${code} - Problem with the local certificate." >&2
+	    ;;
+	59)
+	    echo "Transfer error ${code} - Couldn't use specified SSL cipher." >&2
+	    ;;
+	60)
+	    echo "Transfer error ${code} - Peer certificate cannot be authenticated with known CA certificates." >&2
+	    ;;
+	61)
+	    echo "Transfer error ${code} - Unrecognised transfer encoding." >&2
+	    ;;
+	62)
+	    echo "Transfer error ${code} - Invalid LDAP URL." >&2
+	    ;;
+	63)
+	    echo "Transfer error ${code} - Maximum file size exceeded." >&2
+	    ;;
+	64)
+	    echo "Transfer error ${code} - Requested FTP SSL level failed." >&2
+	    ;;
+	65)
+	    echo "Transfer error ${code} - Sending the data requires a rewind that failed." >&2
+	    ;;
+	66)
+	    echo "Transfer error ${code} - Failed to initialise SSL Engine." >&2
+	    ;;
+	67)
+	    echo "Transfer error ${code} - The user name, password, or similar was not accepted and the program failed to log in." >&2
+	    ;;
+	68)
+	    echo "Transfer error ${code} - File not found on TFTP server." >&2
+	    ;;
+	69)
+	    echo "Transfer error ${code} - Permission problem on TFTP server." >&2
+	    ;;
+	70)
+	    echo "Transfer error ${code} - Out of disk space on TFTP server." >&2
+	    ;;
+	71)
+	    echo "Transfer error ${code} - Illegal TFTP operation." >&2
+	    ;;
+	72)
+	    echo "Transfer error ${code} - Unknown TFTP transfer ID." >&2
+	    ;;
+	73)
+	    echo "Transfer error ${code} - File already exists (TFTP)." >&2
+	    ;;
+	74)
+	    echo "Transfer error ${code} - No such user (TFTP)." >&2
+	    ;;
+	75)
+	    echo "Transfer error ${code} - Character conversion failed." >&2
+	    ;;
+	76)
+	    echo "Transfer error ${code} - Character conversion functions required." >&2
+	    ;;
+	77)
+	    echo "Transfer error ${code} - Problem with reading the SSL CA certificate (path? access rights?)." >&2
+	    ;;
+	78)
+	    echo "Transfer error ${code} - The resource referenced in the URL does not exist." >&2
+	    ;;
+	79)
+	    echo "Transfer error ${code} - An unspecified error occurred during the SSH session." >&2
+	    ;;
+	80)
+	    echo "Transfer error ${code} - Failed to shut down the SSL connection." >&2
+	    ;;
+	82)
+	    echo "Transfer error ${code} - Could not load CRL file, missing or wrong format." >&2
+	    ;;
+	83)
+	    echo "Transfer error ${code} - Issuer check failed." >&2
+	    ;;
+	*)
+	    echo "Transfer error ${code} - Unkown!" >&2
+	    ;;
+    esac
+
+    if test -n "${NON_INTERACTIVE}" ; then
+	return ${code}
+    else
+	return 96
+    fi
+}
+
+clean-netrc()
+{
+    local mode=${1}
+
+    case ${mode} in
+	soft)
+	    echo -n > ${HOME}/.netrc
+	    ;;
+	hard)
+	    rm -f ${HOME}/.netrc
+	    ;;
+	*)
+	    rm -f ${HOME}/.netrc
+	    ;;
+    esac
+}
+
+delete-file()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    test -n "${3}" || return 3
+    local protocol=${1}
+    local ip=${2}
+    local file_name=${3}
+
+    local ret file_command
+    local connect_timeout max_time=5
+    local curl_command=$(get-curl-command ${protocol} ${CURRENT_FTP_PASSIVE_MODE})
+
+    case ${protocol} in
+	ftp)
+	    file_command='DELE'
+	    gen-netrc ${ip} ${protocol} > ${HOME}/.netrc
+	    connect_timeout=7
+	    ;;
+	sftp)
+	    file_command='rm'
+	    gen-netrc ${ip} ${protocol} > ${HOME}/.netrc
+	    connect_timeout=5
+	    ;;
+	*)
+	    return 11
+	    ;;
+    esac
+
+    file_command="${file_command} '${file_name}'"
+
+    unset TRAP_LOADED_FILES
+    unset TRAP_PROGRESS_FILE
+
+    ${curl_command} \
+	--no-show-error --silent \
+	--connect-timeout ${connect_timeout} --max-time ${max_time} \
+	--cacert ${SSL_VAR_DIR}/ca-bundle.crt --capath ${RUNTIME_ENV_DIR}/${SSL_LOCAL_CA_RDIR} \
+	--quote "${file_command}" --url "${protocol}://${ip}/" --output /dev/null |& tee /dev/null 2>&1
+    ret=${PIPESTATUS[0]}
+
+    clean-netrc
+    echo-curl-result ${ret}
+}
+
+get-progress-bar()
+{
+    local stderr_file=${1}
+
+    local progress_bar
+
+    case ${TERM} in
+	${WADMIN_TERM})
+	    if test -n "${stderr_file}" ; then
+		progress_bar="--stderr ${stderr_file}"
+	    else
+		progress_bar="--stderr /dev/null"
+	    fi
+	    ;;
+	${NOPROGRESS_TERM})
+	    progress_bar="--stderr /dev/null"
+	    ;;
+	dumb)
+	    # Cron
+	    ;;
+	'')
+	    progress_bar="--silent"
+	    ;;
+	*)
+	    if test "${NON_INTERACTIVE}" == 'yes' ; then
+		progress_bar="--stderr /dev/null"
+	    else
+		progress_bar="--progress-bar"
+	    fi
+	    ;;
+    esac
+
+    echo "${progress_bar}"
+}
+
+transfer-files()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 1
+    test -n "${3}" || return 1
+    test -n "${4}" || return 1
+    local cmd=${1}
+    local protocol=${2}
+    local ip=${3}
+    local files=${4}
+    local stderr_file=${5}
+    local file_type=${6}
+    local file_category=${7}
+
+    local max_time=900
+    local i=0 range  elt src_file dst_file
+    local loaded_files file
+    local convert2unix proxy
+    local connect_timeout
+    local ret
+
+    local curl_command=$(get-curl-command ${protocol} ${CURRENT_FTP_PASSIVE_MODE})
+    local curl_args
+
+    case "${file_category}" in
+	backup|patch)
+	    max_time=900
+	    ;;
+	urllist)
+	    max_time=600
+	    ;;
+	antiviruspack)
+	    max_time=600
+	    ;;
+	antivirus)
+	    max_time=400
+	    ;;
+	*)
+	    ;;
+    esac
+
+    unset TRAP_FILE_BEEING_LOADED
+
+    case ${cmd} in
+	load|save)
+	    ;;
+	*)
+	    return 1
+	    ;;
+    esac
+
+    case "${file_type}" in
+	ascii)
+	    convert2unix=yes
+	    ;;
+	binary)
+	    ;;
+	'')
+	    ;;
+	*)
+	    return 1
+	    ;;
+    esac
+
+    case ${protocol} in
+	ftp)
+	    gen-netrc ${ip} ${protocol} > ${HOME}/.netrc
+	    connect_timeout=7
+	    ;;
+	sftp)
+	    gen-netrc ${ip} ${protocol} > ${HOME}/.netrc
+	    connect_timeout=5
+	    ;;
+	http|https)
+	    test ${cmd} == load || return 1
+	    connect_timeout=4
+	    ;;
+	tftp)
+	    connect_timeout=3
+	    ;;
+	*)
+	    return 1
+	    ;;
+    esac
+
+    for elt in ${files}
+    do
+	range=$[${i} % 2]
+	case ${range} in
+	    0)
+		src_file=${elt}
+		;;
+	    1)
+		dst_file=${elt}
+
+		case ${cmd} in
+		    load)
+			fuser --silent ${dst_file} 2> /dev/null
+			if test ${?} -eq 0 ; then
+			    clean-netrc
+			    return 96
+			fi
+
+			loaded_files="${loaded_files} ${dst_file}"
+			test ${src_file:0:1} != '/' || src_file=${src_file:1}
+			curl_args="${curl_args} --url ${protocol}://${ip}/${src_file} --output ${dst_file}"
+			rm -f ${dst_file}
+			;;
+		    save)
+			test ${dst_file:0:1} != '/' || dst_file=${dst_file:1}
+			curl_args="${curl_args} --upload-file ${src_file} --url ${protocol}://${ip}/${dst_file}"
+			;;
+		    *)
+			;;
+		esac
+		;;
+	    *)
+		return 255
+		;;
+	esac
+	((i++))
+    done
+
+    local nb=$[(${i}+1)/2]
+    local progression=0 tee_stderr="/dev/null"
+    local progress_bar=$(get-progress-bar ${stderr_file})
+
+    case ${TERM} in
+	${WADMIN_TERM})
+	    test -z "${stderr_file}" || progression=1
+	    ;;
+	*)
+	    if test "${NON_INTERACTIVE}" != 'yes' ; then
+		if test -n "${stderr_file}" ; then
+		    progression=1
+		    tee_stderr="${stderr_file}"
+		fi
+	    fi
+	    ;;
+    esac
+
+    if test ${cmd} == load ; then
+	loaded_files="${loaded_files:1}"
+	TRAP_LOADED_FILES=${loaded_files}
+    else
+	unset TRAP_LOADED_FILES
+    fi
+    TRAP_PROGRESS_FILE=${stderr_file}
+
+    ${curl_command} \
+	--no-show-error ${progress_bar} \
+	--connect-timeout $[${nb} * ${connect_timeout}] --max-time $[${nb} * ${max_time}] \
+	--cacert ${SSL_VAR_DIR}/ca-bundle.crt --capath ${RUNTIME_ENV_DIR}/${SSL_LOCAL_CA_RDIR} \
+	--globoff --max-filesize $[${BACKUP_SZ} * 1024] ${curl_args} |& tee ${tee_stderr} 2> /dev/null
+    ret=${PIPESTATUS[0]}
+
+    if test ${cmd} == load ; then
+
+	if test -n "${convert2unix}" ; then
+	    for file in ${loaded_files}
+	    do
+		dos2unix -q ${file}
+	    done
+	fi
+    fi
+
+    if test ${progression} -eq 1 ; then
+	if test ${ret} -eq 0 ; then
+	    echo -n 100 > ${stderr_file}
+	else
+	    rm -f ${stderr_file}
+	fi
+    fi
+
+    clean-netrc
+    echo-curl-result ${ret}
+}
+
+save-files()
+{
+    transfer-files save "${1}" "${2}" "${3}" "${4}" "${5}" "${6}"
+}
+
+load-files()
+{
+    check-lock || return 123
+    transfer-files load "${1}" "${2}" "${3}" "${4}" "${5}" "${6}"
+    local ret=${?}
+    test ${ret} -eq 0 || clean-loaded-files
+    return ${ret}
+}
+
+get-remote-file-size()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    test -n "${3}" || return 3
+    local protocol=${1}
+    local ip=${2}
+    local file=${3}
+    local ftp_passive_mode=${4}
+
+    local file_size=0
+
+    if test ${protocol} == tftp ; then
+	echo ${file_size}
+	return 0
+    fi
+
+    local connect_timeout=5
+    local max_time=10
+
+    local curl_command=$(get-curl-command ${protocol} ${ftp_passive_mode})
+
+    local curl_args="--silent --globoff --connect-timeout ${connect_timeout} --max-time ${max_time}"
+    local ret
+
+    case ${protocol} in
+	ftp)
+	    curl_args="${curl_args} --head"
+	    gen-netrc ${ip} ${protocol} > ${HOME}/.netrc
+	    ;;
+	sftp)
+	    gen-netrc ${ip} ${protocol} > ${HOME}/.netrc
+	    ;;
+	*)
+	    ;;
+    esac
+
+    curl_args=( ${curl_args} )
+    test ${file:0:1} != '/' || file=${file:1}
+
+    local tmp_file_info=${ADMIN_TMP_DIR}/curl.file.info.${$}
+
+    case ${protocol} in
+	ftp)
+	    ${curl_command} \
+		"${curl_args[@]}" \
+		--url ${protocol}://${ip}/${file} --output ${tmp_file_info}
+	    ret=${?}
+
+	    if test ${ret} -ne 0 ; then
+		clean-netrc
+		rm -f ${tmp_file_info}
+		echo ${file_size}
+		return ${ret}
+	    fi
+
+	    local header value
+
+	    while read header value
+	    do
+		test -n "${value}" || continue
+		if test ${header} == 'Content-Length:' ; then
+		    file_size=${value}
+		    file_size=${file_size//[^[:print:]]/}
+		    ret=0
+		    break
+		fi
+	    done < ${tmp_file_info}
+	    ;;
+
+	sftp)
+	    local dir=$(file-dirname ${file})
+	    local base=$(file-basename ${file})
+
+	    dir=${dir}/
+
+	    ${curl_command} \
+		"${curl_args[@]}" \
+		--url ${protocol}://${ip}/${dir} --output ${tmp_file_info} 
+	    ret=${?}
+
+	    if test ${ret} -ne 0 ; then
+		clean-netrc
+		rm -f ${tmp_file_info}
+		echo ${file_size}
+		return ${ret}
+	    fi
+
+	    ret=11
+	    local rights size owner group size month day time name
+
+	    while read rights size owner group size month day time name
+	    do
+		test -n "${owner}" || continue
+		if test ${name} == ${base} ; then
+		    file_size=${size}
+		    ret=0
+		    break
+		fi
+	    done < ${tmp_file_info}
+	    ;;
+	*)
+	    ;;
+    esac
+
+    clean-netrc
+    rm -f ${tmp_file_info}
+    echo ${file_size}
+    return ${ret}
+}
+
+file-exist()
+{
+    get-remote-file-size "${@}" ${CURRENT_FTP_PASSIVE_MODE} > /dev/null 2>&1
+}
+
+load-files-header()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    test -n "${3}" || return 3
+    local protocol=${1}
+    local ip=${2}
+    local files=${3}
+
+    local loaded_files
+    local range i=0 elt src_file dst_file
+
+    local connect_timeout=3
+    local max_time=3
+
+    local curl_command=$(get-curl-command ${protocol} ${CURRENT_FTP_PASSIVE_MODE})
+    local curl_args
+
+    unset TRAP_FILE_BEEING_LOADED
+
+    case ${protocol} in
+	http)
+	    ;;
+	*)
+	    return 11
+	    ;;
+    esac
+
+    for elt in ${files}
+    do
+	range=$[${i} % 2]
+	case ${range} in
+	    0)
+		src_file=${elt}
+		;;
+	    1)
+		dst_file=${elt}
+
+		loaded_files="${loaded_files} ${dst_file}"
+		test ${src_file:0:1} != '/' || src_file=${src_file:1}
+		curl_args="${curl_args} --url ${protocol}://${ip}/${src_file} --output ${dst_file}"
+		;;
+	    *)
+		return 255
+		;;
+	esac
+	((i++))
+    done
+
+    curl_args=${curl_args:1}
+
+    loaded_files="${loaded_files:1}"
+    local nb=$[(${i}+1)/2]
+
+    TRAP_LOADED_FILES=${loaded_files}
+
+    gen-netrc ${ip} ${protocol} > ${HOME}/.netrc
+
+    ${curl_command} \
+	--head --use-ascii --silent \
+	--cacert ${SSL_VAR_DIR}/ca-bundle.crt --capath ${RUNTIME_ENV_DIR}/${SSL_LOCAL_CA_RDIR} \
+	--connect-timeout $[${nb} * ${connect_timeout}] --max-time $[${nb} * ${max_time}] \
+	--globoff ${curl_args}
+
+    local ret=${?}
+
+    clean-netrc
+
+    return ${ret}
+}
+
+send-email()
+{
+    if test "${__EMAIL_OUTPUT}" != stdout ; then
+	if test -z "${CURRENT_EMAIL_ACCOUNT_SERVER_FQDN}" ; then
+	    INDIRECT_ERROR_CODE=512
+	    return 254
+	fi
+
+	if test -z "${CURRENT_EMAIL_ACCOUNT_SERVER_PORT}" ; then
+	    INDIRECT_ERROR_CODE=513
+	    return 254
+	fi
+
+	if test -z "${CURRENT_EMAIL_ACCOUNT_USERNAME}" ; then
+	    INDIRECT_ERROR_CODE=514
+	    return 254
+	fi
+    fi
+
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    test -n "${3}" || return 3
+    local email=${1}
+    local subject=${2}
+    local html_file_path=${3}
+    local name=${4}
+    local attached_file_name=${5}
+    local attached_file_path=${6}
+    local attached_file_mime=${7}
+
+    if test -n "${attached_file_name}" ; then
+	test -n "${attached_file_path}" || return 255
+	test -f ${attached_file_path} || return 255
+    fi
+
+    local curl_command=$(get-curl-command)
+
+    padding=10px
+    border_radius=5px
+    main_color=Lavender
+    footer_color=#DEF3FF
+
+    test -n "${attached_file_mime}" || attached_file_mime="octet-stream"
+
+    local date=$(date +"%a, %d %b %Y %T" 2> /dev/null)
+    local password=${CURRENT_EMAIL_ACCOUNT_PASSWORD}
+    local progress_bar=$(get-progress-bar)
+    local boundary="$(get-md5sum ${date})"
+    local message_id=$(random-phrase-base62 16)@$(random-phrase-base62 12)
+
+    local from to ret
+
+    if test -n "${CURRENT_ADMINISTRATOR_NAME}" ; then
+	from="${CURRENT_ADMINISTRATOR_NAME} <${CURRENT_ADMINISTRATOR_EMAIL}>"
+    else
+	from="${CURRENT_ADMINISTRATOR_EMAIL}"
+    fi
+
+    if test -n "${name}" ; then
+	to="${name} <${email}>"
+    else
+	to="${email}"
+    fi
+
+    local email_file=/tmp/send-email.${$}
+
+    cat << EOT > ${email_file}
+From: ${from}
+To: ${to}
+Subject: ${subject}
+Date: ${date}
+MIME-Version: 1.0
+Message-Id: <${message_id}>
+Content-Type: multipart/mixed; boundary="${boundary}"
+--${boundary}
+Content-Type: text/html; charset="ISO-8859-1"
+Content-Transfer-Encoding: 8bit
+
+<!DOCTYPE html>
+<html>
+<header>
+<meta http-equiv='Content-Type' content='text/html; charset=UTF-8' />
+</header>
+<body bgcolor='Gainsboro' style='margin:0; padding:10px;'>
+<div id='outer' style='margin:0; padding:0;'>
+<div id='inner' style='display:table;margin:0 auto; padding:0; width:70%; min-width:600px; max-width:600px;'>
+<div style='float:right; font-size:80%; text-align:right;'>
+</div>
+<br />
+<div style='font-size:95%; text-align:justify; background-color:${main_color}; margin:0; margin-top:5px; margin-bottom:5px; padding:${padding}; border-radius:${border_radius};'>
+<div style='margin:0; padding:${padding};'>
+EOT
+    cat ${html_file_path} >> ${email_file}
+    cat << EOT >> ${email_file}
+</div>
+</div>
+</div>
+</div>
+</body>
+</html>
+EOT
+
+    if test -n "${attached_file_name}" -a -n "${attached_file_path}" ; then
+
+	local attached_file_len=$(get-file-length ${attached_file_path})
+
+	cat << EOT >> ${email_file}
+--${boundary}
+Content-Type: application/${attached_file_mime}; name="${attached_file_name}"
+Content-Length: ${attached_file_len}
+Content-Transfer-Encoding: base64
+Content-Disposition: attachment; filename="${attached_file_name}"
+
+EOT
+	base64 ${attached_file_path} > ${attached_file_path}.base64
+	cat ${attached_file_path}.base64 >> ${email_file}
+	rm -f ${attached_file_path}.base64
+    fi
+
+    cat << EOT >> ${email_file}
+--${boundary}
+Content-Type: text/plain; charset="ISO-8859-1"
+Content-Transfer-Encoding: 8bit
+
+The content of this message is confidential. If you have received it by mistake, please inform us and then delete the message. It is forbidden to copy, forward, or in any way reveal the contents of this message to anyone. The integrity and security of this email cannot be guaranteed. Therefore, the sender will not be held liable for any damage caused by the message.
+--${boundary}
+EOT
+    if test "${__EMAIL_OUTPUT}" != stdout ; then
+	${curl_command} \
+	    --no-show-error ${progress_bar} \
+	    --connect-timeout 10 --max-time  20 \
+	    --cacert ${SSL_VAR_DIR}/ca-bundle.crt \
+	    --capath ${RUNTIME_ENV_DIR}/${SSL_LOCAL_CA_RDIR} \
+	    --ssl-reqd \
+	    --login-options 'AUTH=PLAIN' \
+	    --user "${CURRENT_EMAIL_ACCOUNT_USERNAME}:${password}" \
+	    --mail-from ${CURRENT_ADMINISTRATOR_EMAIL} \
+	    --mail-rcpt ${email} \
+	    --upload-file ${email_file} \
+	    --url smtp://${CURRENT_EMAIL_ACCOUNT_SERVER_FQDN}:${CURRENT_EMAIL_ACCOUNT_SERVER_PORT}
+
+	ret=${?}
+	echo-curl-result ${ret}
+    else
+	cat ${email_file}
+	ret=${?}
+    fi
+
+    rm -f ${email_file}
+
+    if test ${ret} -ne 0 ; then
+	INDIRECT_ERROR_CODE=515
+	return 254
+    fi
+
+    return 0
+}

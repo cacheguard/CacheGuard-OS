@@ -1,0 +1,2 @@
+Web Gateway Failure
+A non-recoverable internal failure or configuration problem prevents this request from being completed

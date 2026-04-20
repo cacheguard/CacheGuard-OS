@@ -1,0 +1,78 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       Scripts
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+test ! -f /var/lock/apl_ip_neighbour || exit 1
+touch /var/lock/apl_ip_neighbour
+
+CACHEGUARD_DIR=/etc/sysconfig/cacheguard
+source ${CACHEGUARD_DIR}/constant
+source ${APPLIANCE_DIR}/etc/role
+
+clean-exit()
+{
+    trap "" USR1 INT QUIT TERM
+    
+    local code=${1}
+
+    rm -f /var/lock/apl_ip_neighbour
+    rm -f ${RUN_DIR}/${WAITING_PROCESS}.${CALLER_PID}
+
+    exit ${code}
+}
+
+init-clean-end-trap()
+{
+    trap "clean-exit 1" USR1 INT QUIT TERM
+    touch ${RUN_DIR}/${WAITING_PROCESS}.${CALLER_PID}
+}
+
+show-ip-neighbour()
+{
+    if test -n "${1}" ; then
+	CALLER_PID=${1}
+    else
+	CALLER_PID=${$}
+    fi
+
+    init-clean-end-trap
+
+    local ip dummy dev itype mac state
+    local tmp_file=/tmp/ip.neighbour.${$}
+
+    ip neighbour > ${tmp_file} 2> /dev/null
+
+    while read ip dummy dev itype mac state
+    do
+	test ${itype} != FAILED || continue
+	test ${itype} == lladdr || continue
+	echo ${ip} ${dev} ${mac}
+    done < ${tmp_file} > ${RUN_DIR}/${IP_NEIGHBOUR_FILENAME}
+
+    rm -f ${tmp_file}
+    clean-exit 0
+}
+
+# Main()
+
+show-ip-neighbour "${@}"

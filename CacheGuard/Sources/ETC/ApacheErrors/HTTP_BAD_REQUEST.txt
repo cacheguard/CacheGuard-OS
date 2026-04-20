@@ -1,0 +1,3 @@
+400
+Bad request
+Your browser (or proxy) sent a request that this Web Gateway could not understand

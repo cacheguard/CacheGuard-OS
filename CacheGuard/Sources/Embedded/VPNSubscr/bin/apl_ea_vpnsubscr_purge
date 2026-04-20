@@ -1,0 +1,160 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       VPN Subscription
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+CACHEGUARD_DIR=/etc/sysconfig/cacheguard
+source ${CACHEGUARD_DIR}/constant
+source ${LOCAL_DIR}/lib/apl_ea_vpnsubscr.env
+source ${LOCAL_DIR}/lib/apl_common
+source ${LOCAL_DIR}/lib/apl_ea_vpnsubscr_functions
+
+get-setup-service-name()
+{
+    test -f ${EMBEDDED_VPNSUBSCR_DB_FILE} || return 11
+
+    sqlite3 ${EMBEDDED_VPNSUBSCR_DB_FILE} << EOFSQL
+SELECT service_name FROM setup WHERE id = 0;
+EOFSQL
+}
+
+get-non-purged-subscribers()
+{
+    test -f ${EMBEDDED_VPNSUBSCR_DB_FILE} || return 11
+
+    sqlite3 ${EMBEDDED_VPNSUBSCR_DB_FILE} << EOFSQL
+SELECT username, device FROM subscriber WHERE alive_date <> 0 AND tls_password <> '';
+EOFSQL
+}
+
+purge-subscriber()
+{
+    test -f ${EMBEDDED_VPNSUBSCR_DB_FILE} || return 11
+
+    test -n "${1}" || return 1
+    local username=${1}
+
+    sqlite3 ${EMBEDDED_VPNSUBSCR_DB_FILE} << EOFSQL
+UPDATE subscriber SET tls_password = '' WHERE username = '${username}';
+EOFSQL
+}
+
+main()
+{
+    vpnsubscr-lock-script
+
+    local line rest
+    local username device
+    local profile_file instructions_file
+
+    local error_file=/tmp/vpnsubscr-error.${$}
+    local subscribers_file=/tmp/vpnsubscr-subscribers.${$}
+
+    local service_name=$(get-setup-service-name 2> ${error_file})
+
+    error=$(get-error-text ${error_file})
+
+    if test -n "${error}" ; then
+	vpnsubscr-log-error 11 "can't get the setup service name."
+	vpnsubscr-unlock-script
+	return 11
+    fi
+
+    if test -z "${service_name}" ; then
+	vpnsubscr-log-error 11 "can't get the setup service name."
+	vpnsubscr-unlock-script
+	return 13
+    fi
+
+    rm -f ${subscribers_file}
+    get-non-purged-subscribers > ${subscribers_file} 2> ${error_file}
+    error=$(get-error-text ${error_file})
+
+    if test -n "${error}" ; then
+	rm -f ${subscribers_file}
+	vpnsubscr-log-error 13 "can't get subscribers. The low level error is: ${error}."
+	vpnsubscr-unlock-script
+	return 15
+    fi
+
+    if test ! -s ${subscribers_file} ; then
+	rm -f ${subscribers_file}
+	vpnsubscr-unlock-script
+	return 0
+    fi
+
+    while read line
+    do
+	username=${line/|*}
+	rest=${line#*|}
+
+	device=${rest/|*} ; rest=${rest#*|}
+
+	device=$(get-cg-device ${device})
+	profile_file=$(get-profile-filename ${username} ${device} "${service_name}")
+	instructions_file=$(get-instructions-filename ${username})
+
+	rm -f \
+	   ${VPNSUBSCR_PROFILE_DIR}/${profile_file} \
+	   ${VPNSUBSCR_PROFILE_DIR}/${instructions_file}
+
+	su - ${ADMIN_NAME} -c "tls client del ${username} private" 2> ${error_file}
+	error=$(get-error-text ${error_file})
+
+	test -z "${error}" || \
+	    vpnsubscr-log-error 15 "can't delete the '${username}' account private information. The low level error is: ${error}."
+
+	((i++))
+    done < ${subscribers_file}
+
+    su - ${ADMIN_NAME} -c "apply force wait " 2> ${error_file}
+    error=$(get-error-text ${error_file})
+
+    if test -n "${error}" ; then
+	rm -f ${subscribers_file}
+	vpnsubscr-log-error 17 "can't apply the new configuration. The low level error is: ${error}."
+	vpnsubscr-unlock-script
+	return 17
+    fi
+
+    while read line
+    do
+	username=${line/|*}
+	rest=${line#*|}
+
+	purge-subscriber ${username} 2> ${error_file}
+	error=$(get-error-text ${error_file})
+
+	if test -n "${error}" ; then
+	    vpnsubscr-log-error 19 "can't purge the '${username}' account. The low level error is: ${error}."
+	    continue
+	fi
+    done < ${subscribers_file}
+
+    rm -f ${subscribers_file}
+
+    vpnsubscr-unlock-script
+}
+
+# Main()
+
+main "${@}"

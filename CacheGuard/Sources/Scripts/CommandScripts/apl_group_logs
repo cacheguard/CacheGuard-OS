@@ -1,0 +1,97 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       Scripts
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+CACHEGUARD_DIR=/etc/sysconfig/cacheguard
+source ${CACHEGUARD_DIR}/constant
+source ${APPLIANCE_DIR}/etc/role
+source ${HARD_DIR}/model.conf
+
+set-environment()
+{
+    test -n "${LOG_DIR}" || exit 1
+    test -d ${LOG_DIR} || exit 2
+
+    LOGNAME=system
+    EXTENSION=log
+
+    cd ${LOG_DIR}
+    LOG_FILES=$(ls *.${EXTENSION}.1 2> /dev/null)
+    test -n "${LOG_FILES}" || exit 3
+}
+
+log-rotate()
+{
+    local i j filename date
+
+    filename=$(ls ${LOGNAME}.[0-9]*.${EXTENSION}.${LOGROTATE_NB}.tar.gz 2> /dev/null)
+    if test -n "${filename}" ; then
+	if test -f ${filename} ; then
+	    rm -f ${filename}
+	fi
+    fi
+    
+    for ((i=${LOGROTATE_NB} ; i > 1; i--))
+    do
+
+	j=$[${i} - 1]
+	
+	filename=$(ls ${LOGNAME}.[0-9]*.${EXTENSION}.${j}.tar.gz 2> /dev/null)
+	filename=$(echo ${filename} | cut -d ' ' -f1 2> /dev/null)
+	
+	test -n "${filename}" || continue
+	test -f ${filename} || continue
+	
+	date=$(echo ${filename} | cut -d '.' -f2 2> /dev/null)
+	mv -f ${filename} ${LOGNAME}.${date}.${EXTENSION}.${i}.tar.gz
+    done
+}
+
+group-files()
+{
+    local date=$(date +"%s" 2> /dev/null)
+    local dirname=${LOGNAME}.${date}.${EXTENSION}
+
+    local file base
+
+    rm -rf ${dirname}
+    mkdir ${dirname}
+
+    for file in ${LOG_FILES}
+    do
+	base=$(basename ${file} ".1")
+	mv -f ${file} ${dirname}/${base}
+    done
+    
+    tar cPf ${dirname}.1.tar ${dirname}
+    test ${?} -ne 0 || rm -rf ${dirname}
+    test -f ${dirname}.1.tar || touch ${dirname}.1.tar
+    rm -f ${dirname}.1.tar.gz
+    gzip ${dirname}.1.tar
+}
+
+# Main()
+
+set-environment
+log-rotate
+group-files

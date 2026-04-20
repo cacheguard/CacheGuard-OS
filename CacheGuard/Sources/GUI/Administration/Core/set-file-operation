@@ -1,0 +1,99 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       GUI
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+get-exclusions()
+{
+    test -n "${1}" || return 1
+    local n=${1}
+
+    local exclusion exclusions i
+
+    for ((i=n ; i<${ATTRIBUTE_NB} ; i++))
+    do
+	exclusion=${ATTRIBUTES[${i}]}
+	exclusions="${exclusions} ${exclusion}"
+    done
+    exclusions=${exclusions:1}
+    exclusions=${exclusions//_/.}
+
+    echo ${exclusions}
+}
+
+set-file-operation()
+{
+    local operation="${VALUES[0]}"
+    test -n "${operation}" || return 1
+
+    if test ${operation} == 'clear' ; then
+	local exclusions=$(get-exclusions 1)
+	log-command "file" "${operation} ${exclusions}"
+	execute-command "file ${operation} ${exclusions}"
+	return 0
+    fi
+
+    local protocol="${VALUES[1]:1}"
+    local server="${VALUES[2]}"
+    local directory="${VALUES[3]}"
+
+    case "${operation}" in
+	load|save|del)
+	    ;;
+	*)
+	    return 3
+	    ;;
+    esac
+
+    case "${protocol}" in
+	ftp|sftp|tftp)
+	    ;;
+	*)
+	    return 5
+	    ;;
+    esac
+
+    local exclusions=$(get-exclusions 4)
+
+    case ${operation} in
+	del)
+	    local file_path=${directory}
+	    if test -z "${file_path}" ; then
+		gen-gui-error 6
+		return 0
+	    fi
+	    log-command "file" "${operation} ${protocol} ${server} ${file_path}"
+	    execute-command "file ${operation} ${protocol} ${server} ${file_path}"
+	    ;;
+	*)
+	    test -n "${directory}" || directory='/'
+	    if test -z "${directory}" -a -z "${exclusions}" ; then
+		log-command "file" "${operation} ${protocol} ${server}"
+	    else
+		log-command "file" "${operation} ${protocol} ${server} ${directory} ${exclusions}"
+	    fi
+	    execute-command "file ${operation} ${protocol} ${server} ${directory} ${exclusions}"
+	    ;;
+    esac
+}
+
+set-file-operation

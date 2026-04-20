@@ -1,0 +1,47 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       GUI
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+set-system-backup()
+{
+    local operation=${VALUES[0]}
+    
+    case "${operation}" in
+	create|clear)
+	    log-command "system" "backup ${operation}"
+	    execute-command "system backup ${operation}"
+	    ;;
+	load|save)
+	    if test -n "${VALUES[3]}" ; then
+		log-command "system" "backup ${operation} ${VALUES[1]:1} ${VALUES[2]} ${VALUES[3]}"
+		execute-command "system backup ${operation} ${VALUES[1]:1} ${VALUES[2]} ${VALUES[3]}"
+	    else
+		gen-gui-error 6
+	    fi
+	    ;;
+	*)
+	    ;;
+    esac
+}
+
+set-system-backup

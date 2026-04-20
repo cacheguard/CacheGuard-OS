@@ -1,0 +1,11 @@
+set default=0
+set timeout=30
+set color_normal=white/black
+set color_highlight=black/white
+set menu_color=white/black
+set menu_color_highlight=white/blue
+set gfxmode=640x480
+set gfxpayload=keep
+
+terminal_input console
+terminal_output console

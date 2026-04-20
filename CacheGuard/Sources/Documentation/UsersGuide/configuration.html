@@ -1,0 +1,44 @@
+<a name='main' class='doc-title'></a>
+<h1>Configuration Management</h1>
+
+A CacheGuard appliance is configured and administrated using online commands or the Web Administration GUI. There are primarily two types of commands: commands with an immediate effect and configuration commands. A CacheGuard configuration is represented by a set of configuration commands invoked with the appropriate arguments.
+<p>
+Configuration commands can be invoked with or without arguments. Without any arguments, a configuration command normally displays the configuration information related to that command. When invoked with one or more arguments, the command usually modifies the configuration. For example, the <a href="/doc/command/ip.html">ip</a> command, when invoked without arguments, displays all IP addresses associated with network interfaces. When invoked with a network interface name, an IP address, and a subnet mask, it modifies the IP address associated with that interface. For instance, the "<i>ip external 192.168.22.254 255.255.255.0</i>" command sets the IP address associated with the "<i>external</i>" network interface to <i>192.168.22.254 255.255.255.0</i>.
+<p>
+Invoked without any arguments, the <a href="/doc/command/conf.html">conf</a> command displays the list of all configuration commands and their associated arguments that form the configuration. In CacheGuard-OS, there is always a current (or running) configuration and a new configuration. The new configuration may be identical to or different from the current configuration. If a configuration command is invoked with arguments that modify the current configuration, the new and current configurations will differ. It is important to note that invoking configuration commands does not immediately affect the running configuration.
+<p>
+To activate a new configuration, or in other words to replace the running configuration with a new one, the <a href="/doc/command/apply.html">apply</a> command must be invoked. You can use the <strong>conf diff</strong> command to compare the new configuration with the running configuration and display their differences.
+
+<a name='parameters' class='doc-title'></a><h2>Command Arguments</h2>
+There are four types of command arguments:
+<ul>
+  <li>Scalar arguments (for example, an IP address)</li>
+  <li>Keyword arguments (for example, <strong>external</strong>)</li>
+  <li>Boolean parameters (valid values are <strong>on</strong> and <strong>off</strong>)</li>
+  <li>List arguments (for example, a list of static IP routes)</li>
+</ul>
+
+A Boolean parameter is typically used to activate (<strong>on</strong>) or deactivate (<strong>off</strong>) a sub-configuration state. For example, the <a href="/doc/command/mode.html">mode cache on</a> command activates Web caching. A list argument is managed using the following keyword arguments:
+<ul>
+  <li><strong>add</strong>: adds an element to the end of a list.</li>
+  <li><strong>insert</strong>: inserts an element before a specified element in a list.</li>
+  <li><strong>del</strong>: deletes an element from a list.</li>
+  <li><strong>raz</strong>: clears (empties) the list.</li>
+</ul>
+
+For example, the <a href="/doc/command/ip.html">ip route add <i>10.0.10.0 255.255.255.0 192.168.60.254</i></a> command adds a route to <i>10.0.10.0 255.255.255.0</i> via the <i>192.168.60.254</i> gateway to the list of static routes. The <a href="/doc/command/ip.html">ip route del <i>10.0.10.0 255.255.255.0 192.168.60.254</i></a> command removes that route, and the <a href="/doc/command/ip.html">ip route raz</a> command removes all routes from the list of static routes.
+
+<a name='apply' class='doc-title'></a><h2>Applying a Configuration</h2>
+In CacheGuard-OS, there is always a current (or running) configuration and a new configuration. To activate the new configuration, the <a href="/doc/command/apply.html">apply</a> command must be invoked. The apply operation is a background process that may take from a few seconds to several minutes, depending on the nature of the new configuration and the performance of the machine running CacheGuard-OS. The <a href="/doc/command/apply.html">apply report</a> command allows you to obtain an execution report of the most recent <strong>apply</strong> operation. If, after making a new configuration, you decide to discard it, use the <a href="/doc/command/cancel.html">cancel</a> command. The <a href="/doc/command/cancel.html">cancel</a> command cannot be invoked while an <strong>apply</strong> operation is running. To cancel an ongoing <strong>apply</strong> operation, use the <a href="/doc/command/apply.html">apply cancel</a> command.
+<p>
+The new configuration to be applied is a set of commands that must form a consistent configuration. In other words, commands in a configuration must be compatible with one another. For example, you cannot activate (or apply) a configuration that specifies a static route via a gateway that is not within the broadcast domain of a connected network interface. The <a href="/doc/command/apply.html">apply</a> command is responsible for ensuring the integrity and consistency of configurations. If the new configuration is inconsistent, the <a href="/doc/command/apply.html">apply</a> command rejects it, the apply operation does not start, and a list of integrity errors is displayed.
+
+<a name='load-save' class='doc-title'></a><h2>Load and Save a Configuration</h2>
+The current or new configuration can be saved on a file server (FTP, TFTP, etc.). Only trusted file servers are permitted to exchange files with a CacheGuard appliance. Therefore, it is necessary to trust a file server before saving a configuration on it. You must use the <a href="/doc/command/access.html">access</a> command to add a file server to the list of trusted file servers. For example, to trust a TFTP file server with the IP address <i>172.18.2.1</i> for file exchange via the <strong>internal</strong> network interface, use the following commands:
+<ul>
+  <li><i>access file add internal 172.18.2.1</i></li>
+  <li><i>apply</i></li>
+</ul>
+Once the apply operation is complete, you can save the current configuration to a file named <i>cacheguard.conf</i> on that server using the <a href="/doc/command/conf.html">conf save tftp <i>172.18.2.1 cacheguard.conf</i></a> command. The saved file will contain a list of configuration commands. The configuration file can be reloaded into the system at any time using the <a href="/doc/command/conf.html">conf load tftp <i>172.18.2.1 cacheguard.conf</i></a> command. Please note that the <a href="/doc/command/apply.html">apply</a> command is not included in the saved file and must be manually executed afterwards.
+<p>
+The configuration discussed in this section is also known as the logical configuration, as the real operational configuration may include additional data or files such as SSL certificates, custom WAF rules, and SSH public keys. To save all related data to a configuration in separate files on a file server, use the <a href="/doc/command/file.html">file</a> command. For example, to save all data related to a configuration in a folder named "<i>CGFiles</i>" on a TFTP file server with the IP address <i>172.18.2.1</i>, use the <a href="/doc/command/file.html">file save tftp <i>172.18.2.1 CGFiles</i></a> command. To reload those files back into the system, use the <a href="/doc/command/file.html">file load tftp <i>172.18.2.1 CGFiles</i></a> command.

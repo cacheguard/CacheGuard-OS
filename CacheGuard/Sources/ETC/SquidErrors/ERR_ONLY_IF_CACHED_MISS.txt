@@ -1,0 +1,2 @@
+URL is not cached
+Your Web Gateway could only deliver URL beeing already cached at this moment

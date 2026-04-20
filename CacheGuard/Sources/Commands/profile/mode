@@ -1,0 +1,187 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       Commands
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+__complete-mode()
+{
+    test -n "${COMP_CWORD-1}" || return 1
+
+    case ${COMP_CWORD} in
+	1)
+	    case ${COMP_WORDS[1]} in
+		a)
+		    COMPREPLY=(anonymous antivirus authenticate)
+		    ;;
+		an)
+		    COMPREPLY=(anonymous antivirus)
+		    ;;
+		ano|anon|anony|anonym|anonymo|anonymou|anonymous)
+		    COMPREPLY=(anonymous)
+		    ;;
+		ant|anti|antiv|antivi|antivir|antiviru|antivirus)
+		    COMPREPLY=(antivirus)
+		    ;;
+		au|aut|auth|authe|authen|authent|authenti|authentic|authentica|authenticat|authenticate)
+		    COMPREPLY=(authenticate)
+		    ;;
+		c)
+		    COMPREPLY=(cache compress)
+		    ;;
+		d)
+		    COMPREPLY=('' dhcp dns)
+		    ;;
+		dh|dhc|dhcp)
+		    COMPREPLY=(dhcp)
+		    ;;
+		dn|dns)
+		    COMPREPLY=(dns)
+		    ;;
+		ca|cac|cach|cache)
+		    COMPREPLY=(cache)
+		    ;;
+		co|com|comp|compr|compre|compres|compress)
+		    COMPREPLY=(compress)
+		    ;;
+		g|gu|gua|guar|guard)
+		    COMPREPLY=(guard)
+		    ;;
+		o|oc|ocs|ocsp)
+		    COMPREPLY=(ocsp)
+		    ;;
+		h|ha)
+		    COMPREPLY=(ha)
+		    ;;
+		r)
+		    COMPREPLY=(router rweb reverse)
+		    ;;
+		re|rev|reve|rever|revers|reverse)
+		    COMPREPLY=(reverse)
+		    ;;
+		ro|rou|rout|route|router)
+		    COMPREPLY=(router)
+		    ;;
+		rw|rwe|rweb)
+		    COMPREPLY=(rweb)
+		    ;;
+		s)
+		    COMPREPLY=(snat sslmediate)
+		    ;;
+		sn|sna|snat)
+		    COMPREPLY=(snat)
+		    ;;
+		ss|ssl|sslm|sslme|sslmed|sslmedi|sslmedia|sslmediat|sslmediate)
+		    COMPREPLY=(sslmediate)
+		    ;;
+		t)
+		    COMPREPLY=('' tweb transparent tnat)
+		    ;;
+		tn|tna|tnat)
+		    COMPREPLY=(tnat)
+		    ;;
+	        tr|tra|tran|trans|transp|transpa|transpar|transpare|transparen|transparent)
+		    COMPREPLY=(transparent)
+		    ;;
+		tw|twe|tweb)
+		    COMPREPLY=(tweb)
+		    ;;
+		f)
+		    COMPREPLY=('' forward firewall ftppassive)
+		    ;;
+		"fi")
+		    COMPREPLY=(firewall)
+		    ;;
+		fir|fire|firew|firewa|firewal|firewall)
+		    COMPREPLY=(firewall)
+		    ;;
+		fir|fire|firew|firewa|firewal|firewall)
+		    COMPREPLY=(firewall)
+		    ;;
+		ft|ftp|ftpp|ftppa|ftppas|ftppass|ftppassiv|ftppassive)
+		    COMPREPLY=(ftppassive)
+		    ;;
+		fo|"for"|forw|forwa|forwar|forward)
+		    COMPREPLY=(forward)
+		    ;;
+		l|lo|log)
+		    COMPREPLY=(log)
+		    ;;
+		v)
+		    COMPREPLY=('' vpnipsec vlan)
+		    ;;
+		vl|vla|vlan)
+		    COMPREPLY=(vlan)
+		    ;;
+		vp|vpn|vpni|vpnip|vpnips|vpnipse|vpnipsec)
+		    COMPREPLY=(vpnipsec)
+		    ;;
+		w)
+		    COMPREPLY=(waf web)
+		    ;;
+		wa|waf)
+		    COMPREPLY=(waf)
+		    ;;
+		we|web)
+		    COMPREPLY=(web)
+		    ;;
+		q|qo|qos)
+		    COMPREPLY=(qos)
+		    ;;
+		'')
+		    COMPREPLY=('' '<RET>' router snat transparent tweb tnat dns dhcp firewall vpnipsec vlan ha qos web rweb anonymous ftppassive sslmediate guard ocsp waf antivirus authenticate cache compress log forward reverse)
+		    ;;
+		*)
+		    COMPREPLY=()
+		    ;;
+	    esac
+	    ;;
+	2)
+	    case ${COMP_WORDS[1]} in
+		router|snat|transparent|tweb|tnat|dns|dhcp|firewall|vlan|vpnipsec|ha|qos|web|rweb|anonymous|ftppassive|sslmediate|guard|ocsp|waf|antivirus|authenticate|cache|compress|log|forward|reverse)
+		    case ${COMP_WORDS[2]} in
+			o)
+			    COMPREPLY=('' on off)
+			    ;;
+			of|off)
+			    COMPREPLY=(off)
+			    ;;
+			on)
+			    COMPREPLY=(on)
+			    ;;
+			'')
+			    COMPREPLY=('' '<RET>' on off)
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		*)
+		    COMPREPLY=()
+		    ;;
+	    esac
+	    ;;
+	*)
+	    COMPREPLY=()
+	    ;;
+    esac
+}

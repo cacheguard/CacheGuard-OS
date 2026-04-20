@@ -1,0 +1,56 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       Scripts
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+print-swapped-process()
+{
+    local file
+
+    for file in /proc/*/status
+    do
+	grep --with-filename 'VmSwap:' ${file}
+    done | sort --reverse --numeric-sort --key=2
+}
+
+main()
+{
+    local swapped_process=/tmp/swapped-process.${$}
+    local proc size kb pid name
+    
+    print-swapped-process > ${swapped_process} 2> /dev/null
+
+    while read proc size kb
+    do
+	test ${size} != "0" || continue
+	pid=${proc/\/proc\/}
+	pid=${pid/\/*}
+	name=$(cat /proc/${pid}/cmdline 2> /dev/null)
+	echo ${pid} ${name}: ${size} KB
+    done < ${swapped_process}
+
+    rm -f ${swapped_process}
+}
+
+# Main()
+
+main

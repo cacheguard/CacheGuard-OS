@@ -1,0 +1,10 @@
+health
+path
+keepalived
+squid
+httpd
+wadmind
+dhcpd
+named
+iked
+network

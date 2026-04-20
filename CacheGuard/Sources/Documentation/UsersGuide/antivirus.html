@@ -1,0 +1,51 @@
+<a name='main' class='doc-title'></a>
+<h1>Antivirus</h1>
+
+The antivirus detects malware (viruses, trojans, worms) in Web traffic incoming from the <strong>external</strong> zone and blocks them at the gateway before they can enter your networks. The antivirus can operate in forwarding/browsing (<strong>web</strong>) mode as well as in reverse (<strong>rweb</strong>) mode. In forwarding mode, it blocks all attempts to access malware in Web traffic, while in reverse mode, all attempts to upload malware to protected Web servers are prevented (in <strong>rweb</strong> mode, the CacheGuard appliance is deployed in front of Web servers). To activate the antivirus, use the <a href="/doc/command/mode.html">mode antivirus on</a> command followed by the <a href="/doc/command/apply.html">apply</a> command.
+
+<center><img width='600' src="/doc/image/web_antivirus.png" class="schema" /></center>
+
+The antivirus detects MS Office macro viruses, mobile malware, and other threats. It supports 32/64-bit Portable Executable files and 32-bit ELF files. It scans not only simple files but also inspects content within archive and compression files such as, but not limited to, ZIP (+SFX), RAR (+SFX), TAR, GZIP, BZIP2, MS OLE2, MS Cabinet files (+SFX), MS CHM (Compiled HTML), MS SZDD compression format, BinHex, SIS (SymbianOS packages), AutoIt, and NSIS. In addition, the following file types are inspected:
+
+<ul>
+  <li type='circle'>PE files compressed or obfuscated using tools such as Aspack (2.12), UPX (all versions), FSG (1.3, 1.31, 1.33, 2.0), Petite (2.x), PeSpin (1.1), NsPack, wwpack32 (1.20), MEW, Upack, and Y0da Cryptor (1.3).</li>
+  <li type='circle'>Almost every mail file format, including TNEF (winmail.dat) attachments.</li>
+  <li type='circle'>The most popular file formats such as MS Office and MacOffice files, RTF, PDF, and HTML.</li>
+  <li type='circle'>Various obfuscators, encoders, and files vulnerable to security risks, such as JPEG (exploit detection), RIFF (exploit detection), uuencode, and ScrEnc obfuscation.</li>
+</ul>
+
+<a name='auto' class='doc-title'></a><h2>Automatic Updating</h2>
+
+The CacheGuard appliance periodically checks the malware signature database and, if necessary, downloads updates. Updates are retrieved from a public service named <i>database.clamav.net</i> on the Internet. It is important to note that excessive or abusive download activity can result in temporary blocking by that service, which is outside the CacheGuard appliance’s control. To avoid being banned, it is recommended to allow the CacheGuard appliance to automatically update the signature database and to avoid manual updates unless absolutely necessary.
+<p>
+To complement the standard malware signature database provided by <i>database.clamav.net</i>, additional malware signatures are available as an optional service from CacheGuard Technologies. You can easily subscribe to this service. After subscribing, simply activate it on your CacheGuard appliance by setting the provided password and file server name (using the <a href="/doc/command/acccess.html">access file</a> and <a href="/doc/command/password.html">password file</a> commands).
+
+<a name='waf' class='doc-title'></a><h2>Antivirus and WAF</h2>
+
+When the CacheGuard appliance is deployed as a WAF in front of your Web servers (both <strong>rweb</strong> and <strong>waf</strong> modes activated), the antivirus scans all attempts to upload files to your protected or cloaked Web servers. If malware is detected in an uploaded file, the CacheGuard appliance immediately blocks the upload before the file can reach the Web servers. Note that the only upload method supported by the antivirus is the <i>POST</i> method with an encoding type of <i>multipart/form-data</i>. The following commands activate and configure the antivirus to scan file upload attempts on the Web server with the IP address 10.20.0.100, protected by the CacheGuard appliance:
+
+<ul>
+  <li><i>rweb site add www.example.com http</i></li>
+  <li><i>rweb host www.example.com add rweb http 10.20.0.100</i></li>
+  <li><i>mode rweb on</i></li>
+  <li><i>mode waf on</i></li>
+  <li><i>mode antivirus on</i></li>
+  <li><i>apply</i></li>
+</ul>
+
+<a name='mta' class='doc-title'></a><h2>Antivirus and MTA</h2>
+
+The antivirus is natively used by the integrated Web proxy to block malware in Web traffic. However, it can also be used as a service offered to external clients or services such as an MTA (Mail Transfer Agent). For instance, to grant access to a remote exim4 MTA with the IP address <i>10.20.0.200</i> communicating with the CacheGuard appliance via its internal network interface, use the following commands:
+
+<ul>
+  <li><i>ip internal 10.20.0.254 255.255.0.0</i></li>
+  <li><i>port antivirus 8083</i></li>
+  <li><i>access antivirus add internal 10.0.20.200 255.255.255.255</i></li>
+  <li><i>apply</i></li>
+</ul>
+
+In this example, the exim4 MTA must be configured to use the CacheGuard appliance as its antivirus service by adding the following line to its configuration file: <i>av_scanner = clamd: 10.20.0.254 8083</i>.
+
+<a name='test' class='doc-title'></a><h2>Testing the Antivirus</h2>
+
+The European Expert Group for IT Security provides virus test files for verification purposes. These files are available on the <a href="https://www.eicar.org/" target="_blank">https://www.eicar.org/</a> website. To test the antivirus using these files, download them to an HTTP (not HTTPS) Web server and attempt to download them through your CacheGuard appliance Web proxy. If your CacheGuard antivirus is properly configured, the download attempt should be blocked by the CacheGuard appliance. To test directly from the <a href="https://www.eicar.org/" target="_blank">http<strong><u>s</u></strong>://www.eicar.org/</a> website, which uses HTTP<strong><u>S</u></strong> (not HTTP), SSL mediation must be activated on your CacheGuard appliance. Please refer to the <a href="ssl_mediation.html">SSL Mediation</a> section to learn how to enable SSL mediation.

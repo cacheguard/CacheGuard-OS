@@ -1,0 +1,355 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       Commands
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+source functions
+
+check-vrrp-nb()
+{
+    test -n "${1}" || return 1
+    local dev=${1}
+    
+    local vrrp_list len
+    
+    case ${dev} in
+	internal)
+	    vrrp_list=${VRRP_INTERNAL_LIST}
+	    ;;
+	external)
+	    vrrp_list=${VRRP_EXTERNAL_LIST}
+	    ;;
+	auxiliary)
+	    vrrp_list=${VRRP_AUXILIARY_LIST}
+	    ;;
+	web)
+	    vrrp_list=${VRRP_WEB_LIST}
+	    ;;
+	rweb)
+	    vrrp_list=${VRRP_RWEB_LIST}
+	    ;;
+	antivirus)
+	    vrrp_list=${VRRP_AV_LIST}
+	    ;;
+	*)
+	    return 1
+    esac
+    len=$(record4-length-list "${vrrp_list}")
+    test ${len} -lt ${MAX_VRRP_NB}
+}
+
+check-vrid()
+{
+    test -n "${1}" || return 1
+    vrid=${1}
+    check-priority ${vrid}
+}
+
+check-vrrp-dev()
+{
+    test -n "${1}" || return 1
+    case "${1}" in
+	external|auxiliary|internal|web|rweb|antivirus)
+	    return 0
+	    ;;
+	*)
+	    return 1
+	    ;;
+    esac
+}
+
+show-vrrp-if1()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 1
+
+    local dev="${2}"
+    local vrrps="${3}"
+    
+    local i=0 n=0 elt range
+    local ip state prio id
+
+    echo-command-form "vrrp ${dev}"
+    if test "${1}" == "new" ; then
+	echo-mark-new
+    else
+	echo-mark-cur
+    fi
+
+    if test -z "${vrrps}" ; then
+	echo-value-null
+    else
+	for elt in ${vrrps}
+	do
+	    range=$[${i} % 4]
+	    case ${range} in
+		0)
+		    ip=${elt}
+		    ;;
+		1)
+		    state=${elt}
+		    ;;
+		2)
+		    priority=${elt}
+		    ;;
+		3)
+		    vrrp_id=${elt}
+		    test ${n} -eq 0 || echo-blank-command
+		    echo-value "${ip} ${state} ${priority} ${vrrp_id}"
+		    ((n++))
+		    ;;
+		*)
+		    return 1
+		    ;;
+	    esac
+	    ((i++))
+	done
+    fi
+}
+
+show-vrrp-if() {
+    
+    test -n "${1}" || return 1
+    local dev=${1}
+    local list current_list
+    
+    case ${dev} in
+	external)
+	    current_list="${CURRENT_VRRP_EXTERNAL_LIST}"
+	    list="${VRRP_EXTERNAL_LIST}"
+	    ;;
+	auxiliary)
+	    current_list="${CURRENT_VRRP_AUXILIARY_LIST}"
+	    list="${VRRP_AUXILIARY_LIST}"
+	    ;;
+	internal)
+	    current_list="${CURRENT_VRRP_INTERNAL_LIST}"
+	    list="${VRRP_INTERNAL_LIST}"
+	    ;;
+	web)
+	    current_list="${CURRENT_VRRP_WEB_LIST}"
+	    list="${VRRP_WEB_LIST}"
+	    ;;
+	rweb)
+	    current_list="${CURRENT_VRRP_RWEB_LIST}"
+	    list="${VRRP_RWEB_LIST}"
+	    ;;
+	antivirus)
+	    current_list="${CURRENT_VRRP_AV_LIST}"
+	    list="${VRRP_AV_LIST}"
+	    ;;
+	*)
+	    return 1
+	    ;;
+    esac
+    
+    show-vrrp-if1 current ${dev} "${current_list}"
+    test "${current_list}" == "${list}" || show-vrrp-if1 new ${dev} "${list}"
+}
+
+show-vrrp()
+{
+    local dev=${1}
+
+    echo-begin-show
+    if test -z "${dev}" ;then
+	show-vrrp-if internal
+	show-vrrp-if external
+	show-vrrp-if auxiliary
+	show-vrrp-if web
+	show-vrrp-if rweb
+	show-vrrp-if antivirus
+    else
+	show-vrrp-if ${dev}
+    fi
+    echo-end-show
+}
+
+vrrp-remove()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 1
+    
+    local in_list=${1}
+    local record=${2}
+    
+    local out_list
+    local f1 f2 f3 f4
+    local elt i=0 range
+    
+    for elt in ${in_list}
+    do
+	range=$[${i} % 4]
+	case ${range} in
+	    0)
+		f1=${elt}
+		;;
+	    1)
+		f2=${elt}
+		;;
+	    2)
+		f3=${elt}
+		;;
+	    3)
+		f4=${elt}
+		test "${f1}" == "${record}" || out_list="${out_list} ${f1} ${f2} ${f3} ${f4}"
+		;;
+	    *)
+		echo
+		return 1
+		;;
+	esac
+	((i++))
+    done
+
+    test -z "${out_list}" || out_list=${out_list:1}
+
+    echo "${out_list}"
+    return 0
+}
+
+run()
+{
+    contextual-command-is-allowed || return 207
+
+    if test -z "${ARGS[1]}" ; then show-vrrp ; return 0 ; fi
+    local interface=${ARGS[1]}
+    check-vrrp-dev ${interface} || return 46
+
+    if test -z "${ARGS[2]}" ; then show-vrrp ${interface} ; return 0 ; fi
+    local action=${ARGS[2]}
+    check-action ${action} || return 122
+
+    case ${action} in
+	add|del)
+	    local ip=${ARGS[3]}
+	    check-ip ${ip} || return 12
+	    test ${ip} != "127.0.0.1" || return 38
+	    case ${interface} in
+		internal)
+		    VRRP_INTERNAL_LIST=$(vrrp-remove "${VRRP_INTERNAL_LIST}" ${ip})
+		    ;;
+		external)
+		    VRRP_EXTERNAL_LIST=$(vrrp-remove "${VRRP_EXTERNAL_LIST}" ${ip})
+		    ;;
+		auxiliary)
+		    VRRP_AUXILIARY_LIST=$(vrrp-remove "${VRRP_AUXILIARY_LIST}" ${ip})
+		    ;;
+		web)
+		    VRRP_WEB_LIST=$(vrrp-remove "${VRRP_WEB_LIST}" ${ip})
+		    ;;
+		rweb)
+		    VRRP_RWEB_LIST=$(vrrp-remove "${VRRP_RWEB_LIST}" ${ip})
+		    ;;
+		antivirus)
+		    VRRP_AV_LIST=$(vrrp-remove "${VRRP_AV_LIST}" ${ip})
+		    ;;
+		*)
+		    return 255
+		    ;;
+	    esac
+	    if test ${action} == add ; then
+		test -n "${ARGS[4]}" || return 1
+		local state=${ARGS[4]}
+		check-ha-role ${state} || return 48
+		
+		if test -z "${ARGS[5]}" ; then
+		    case ${state} in
+			master)
+			    local priority=110
+			    ;;
+			backup)
+			    local priority=100
+			    ;;
+			*)
+			    error 255
+			    ;;
+		    esac
+		else
+		    local priority=${ARGS[5]}
+		    check-priority ${priority} || return 47
+		fi
+		
+		if test -z "${ARGS[6]}" ; then
+		    local vrrp_id=$(get-last-byte ${ip})
+		else
+		    local vrrp_id=${ARGS[6]}
+		    check-vrid ${vrrp_id} || return 50
+		fi
+		
+		check-vrrp-nb ${interface} || return 90
+		
+		case ${interface} in
+		    internal)
+			VRRP_INTERNAL_LIST="${VRRP_INTERNAL_LIST} ${ip} ${state} ${priority} ${vrrp_id}"
+			;;
+		    external)
+			VRRP_EXTERNAL_LIST="${VRRP_EXTERNAL_LIST} ${ip} ${state} ${priority} ${vrrp_id}"
+			;;
+		    auxiliary)
+			VRRP_AUXILIARY_LIST="${VRRP_AUXILIARY_LIST} ${ip} ${state} ${priority} ${vrrp_id}"
+			;;
+		    web)
+			VRRP_WEB_LIST="${VRRP_WEB_LIST} ${ip} ${state} ${priority} ${vrrp_id}"
+			;;
+		    rweb)
+			VRRP_RWEB_LIST="${VRRP_RWEB_LIST} ${ip} ${state} ${priority} ${vrrp_id}"
+			;;
+		    antivirus)
+			VRRP_AV_LIST="${VRRP_AV_LIST} ${ip} ${state} ${priority} ${vrrp_id}"
+			;;
+		    *)
+			error 255
+			;;
+		esac
+	    fi
+	    ;;
+	raz)
+	    case ${interface} in
+		internal)
+		    VRRP_INTERNAL_LIST=""
+		    ;;
+		external)
+		    VRRP_EXTERNAL_LIST=""
+		    ;;
+		auxiliary)
+		    VRRP_AUXILIARY_LIST=""
+		    ;;
+		web)
+		    VRRP_WEB_LIST=""
+		    ;;
+		rweb)
+		    VRRP_RWEB_LIST=""
+		    ;;
+		antivirus)
+		    VRRP_AV_LIST=""
+		    ;;
+		*)
+		    error 255
+		    ;;
+	    esac
+	    ;;
+    esac
+    SAVENV=1
+}
+
+main "${@}"

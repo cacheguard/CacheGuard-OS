@@ -1,0 +1,422 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       Commands
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+source functions
+
+set-environment()
+{
+    TMP_ERROR_FILE=${ADMIN_TMP_DIR}/file-error.${?}
+}
+
+reset-file-log()
+{
+    echo -n > ${FILE_OPERATION_LOG}
+}
+
+file-log()
+{
+    test -n "${1}" || return 1
+    local message=${1}
+
+    local date=$(date +"%Y/%m/%d-%T")
+    echo -n "0 ${date} ${message}" >> ${FILE_OPERATION_LOG}
+}
+
+file-log-ret()
+{
+    test -n "${1}" || return 1
+    local err_code=${1}
+
+    if test ${err_code} -eq 0 ; then
+	echo "[OK]" >> ${FILE_OPERATION_LOG}
+    else
+	echo -n " (${err_code})" >> ${FILE_OPERATION_LOG}
+	echo "[KO]" >> ${FILE_OPERATION_LOG}
+	if test -s ${TMP_ERROR_FILE} ; then
+	    file-log "Last error: ${Errors[${err_code}],}"
+	    file-log-ret 0
+	fi
+    fi
+}
+
+check-file-presence()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    test -n "${3}" || return 3
+    local proto=${1}
+    local ip=${2}
+    local file=${3}
+
+    file-exist ${proto} ${ip} ${file}
+    local ret=${?}
+
+    test ${ret} -ne 0 || return ${ret}
+
+    local base=$(file-basename ${file})
+
+    file-log "Checking the '${base}' file presence"
+    file-log-ret ${ret}
+    return ${ret}
+}
+
+clean-tmp-error()
+{
+    rm -f ${TMP_ERROR_FILE}
+}
+
+file-unlock()
+{
+    rm -f /var/lock/apl_file
+}
+
+file-lock()
+{
+    touch /var/lock/apl_file
+}
+
+is-file-locked()
+{
+    test -f /var/lock/apl_file
+}
+
+clean-exit()
+{
+    trap "" USR1 INT QUIT TERM
+
+    local code=${1}
+    wait
+    file-log "Aborting the External Files Operation"
+
+    file-unlock &&
+	clean-tmp-error
+
+    file-log-ret ${?}
+    exit ${code}
+}
+
+main()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    test -n "${3}" || return 3
+    local op=${1}
+    local proto=${2}
+    local ip=${3}
+    local dir=${4}
+    shift ; shift ; shift ; shift
+    local exclusions=${@}
+
+    ! is-file-locked || return 11
+
+    trap "clean-exit 100" USR1 INT QUIT TERM
+    file-lock
+    reset-file-log
+
+    local operation ids id tls bypass key
+    local elt range i=0
+    local ret
+
+    case ${op} in
+	load)
+	    operation='Loading'
+	    ;;
+	save)
+	    operation='Saving'
+	    ;;
+	*)
+	    operation='(?)'
+	    ;;
+    esac
+
+    if test -n "${dir}" ; then
+	if test ${dir} == '/' ; then
+	    unset dir
+	else
+	    local len=${#dir}
+	    ((len--))
+	    if test ${dir:${len}:1} != '/' ; then
+		dir="${dir}/"
+	    fi
+	fi
+    fi
+
+    file-log "Beginig the configuration related files ${operation}" ; file-log-ret ${?}
+
+    if contextual-command-is-allowed ; then
+	if ! member "${exclusions}" tls.ca.system ; then
+
+	    for tls in certificate key
+	    do
+		case ${op} in
+		    load)
+			check-file-presence ${proto} ${ip} ${dir}tls.ca.system.${tls} || continue
+			;;
+		    save)
+			;;
+		    *)
+			return 1
+			;;
+		esac
+
+		file-log "tls ca system ${op} ${tls} ${proto} ${ip} ${dir}tls.ca.system.${tls}"
+		tls ca system ${op} ${tls} ${proto} ${ip} ${dir}tls.ca.system.${tls} 2> ${TMP_ERROR_FILE} ; ret=${?}
+		file-log-ret ${ret}
+	    done
+
+	    if test ${op} == save ; then
+		tls=der
+		file-log "tls ca system ${op} ${tls} ${proto} ${ip} ${dir}tls.ca.system.${tls}"
+		tls ca system ${op} ${tls} ${proto} ${ip} ${dir}tls.ca.system.${tls} 2> ${TMP_ERROR_FILE} ; ret=${?}
+		file-log-ret ${ret}
+	    fi
+	fi
+
+	if test ${op} == 'load' ; then
+	    if ! member "${exclusions}" tls.ca.third ; then
+		i=0
+		for elt in ${TLS_CA_LIST}
+		do
+		    range=$[${i} % 2]
+		    case ${range} in
+			0)
+			    id=${elt}
+			    ;;
+			1)
+			    check-file-presence ${proto} ${ip} ${dir}tls.ca.third.${id} || continue
+			    file-log "tls ca third ${op} ${id} ${proto} ${ip} ${dir}tls.ca.third.${id}"
+			    tls ca third ${op} ${id} ${proto} ${ip} ${dir}tls.ca.third.${id} 2> ${TMP_ERROR_FILE} ; ret=${?}
+			    file-log-ret ${ret}
+			    ;;
+			*)
+			    return 255
+			    ;;
+		    esac
+		    ((i++))
+		done
+	    fi
+
+	    if ! member "${exclusions}" antivirus.whitelist.signature ; then
+		if check-file-presence ${proto} ${ip} ${dir}antivirus.whitelist.signature ; then
+		    file-log "antivirus whitelist signature ${op} ${proto} ${ip} ${dir}antivirus.whitelist.signature"
+		    antivirus whitelist signature ${op} ${proto} ${ip} ${dir}antivirus.whitelist.signature 2> ${TMP_ERROR_FILE} ; ret=${?}
+		    file-log-ret ${ret}
+		fi
+	    fi
+	fi
+    fi
+
+    if contextual-command-is-allowed ; then
+	if test ${op} == 'load' ; then
+	    if ! member "${exclusions}" admin.snmp.certificate ; then
+		if check-file-presence ${proto} ${ip} ${dir}admin.snmp.certificate ; then
+		    file-log "admin snmp certificate ${op} ${id} ${proto} ${ip} ${dir}admin.snmp.certificate"
+		    admin snmp certificate ${op} ${id} ${proto} ${ip} ${dir}admin.snmp.certificate 2> ${TMP_ERROR_FILE} ; ret=${?}
+		    file-log-ret ${ret}
+		fi
+	    fi
+	fi	
+    fi
+
+    if test ${op} == 'load' ; then
+	if ! member "${exclusions}" admin.ssh.key ; then
+	    for id in ${SSH_KEY_LIST}
+	    do
+		check-file-presence ${proto} ${ip} ${dir}admin.ssh.key.${id} || continue
+		file-log "admin ssh key ${op} ${id} ${proto} ${ip} ${dir}admin.ssh.key.${id}"
+		admin ssh key ${op} ${id} ${proto} ${ip} ${dir}admin.ssh.key.${id} 2> ${TMP_ERROR_FILE} ; ret=${?}
+		file-log-ret ${ret}
+	    done
+
+	    i=0
+	    for elt in ${ACCESS_MANAGER_LIST}
+	    do
+		range=$[${i} % 3]
+		case ${range} in
+		    0)
+			id=$(get-manager-key-id ${elt})
+			;;
+		    1)
+			;;
+		    2)
+			check-file-presence ${proto} ${ip} ${dir}admin.ssh.key.${id} || continue
+			file-log "admin ssh key ${op} ${id} ${proto} ${ip} ${dir}admin.ssh.key.${id}"
+			admin ssh key ${op} ${id} ${proto} ${ip} ${dir}admin.ssh.key.${id} 2> ${TMP_ERROR_FILE} ; ret=${?}
+			file-log-ret ${ret}
+			;;
+		    *)
+			return 255
+			;;
+		esac
+		((i++))
+	    done
+	fi
+
+	if test ${APL_ROLE} == 'manager' ; then
+
+	    id=$(get-manager-key-id peer)
+
+	    if check-file-presence ${proto} ${ip} ${dir}admin.ssh.key.${id} ; then
+		file-log "admin ssh key ${op} ${id} ${proto} ${ip} ${dir}admin.ssh.key.${id}"
+		admin ssh key ${op} ${id} ${proto} ${ip} ${dir}admin.ssh.key.${id} 2> ${TMP_ERROR_FILE} ; ret=${?}
+		file-log-ret ${ret}
+	    fi
+	fi
+    fi
+
+    if contextual-command-is-allowed ; then
+	local list
+	case ${op} in
+	    save)
+		list='certificate key password pfx pkcs12'
+		;;
+	    load)
+		list='certificate'
+		;;
+	    *)
+		;;
+	esac
+
+	if ! member "${exclusions}" tls.client ; then
+
+	    cd ${SSL_CLIENT_DIR}
+
+	    ids=$(ls -1d *.cur 2> /dev/null)
+	    for id in ${ids}
+	    do
+		id=${id%\.cur}
+		for tls in ${list}
+		do
+		    case ${op} in
+			load)
+			    check-file-presence ${proto} ${ip} ${dir}tls.client.${tls}.${id} || continue
+			    ;;
+			save)
+			    test -f ${id}.cur/${id}.${tls} || continue
+			    ;;
+			*)
+			    return 1
+			    ;;
+		    esac
+		    file-log "tls client ${op} ${id} ${tls} ${proto} ${ip} ${dir}tls.client.${tls}.${id}"
+		    tls client ${op} ${id} ${tls} ${proto} ${ip} ${dir}tls.client.${tls}.${id} 2> ${TMP_ERROR_FILE} ; ret=${?}
+		    file-log-ret ${ret}
+		done
+	    done
+
+	    cd ${HOME}
+	fi
+    fi
+
+    if ! member "${exclusions}" tls.server ; then
+	for id in ${TLS_SERVER_LIST}
+	do
+	    for tls in certificate key
+	    do
+		case ${op} in
+		    load)
+			check-file-presence ${proto} ${ip} ${dir}tls.server.${tls}.${id} || continue
+			;;
+		    save)
+			test -f ${SSL_SERVER_DIR}/${id}.${tls} || continue
+			;;
+		    *)
+			return 1
+			;;
+		esac
+
+		file-log "tls server ${op} ${id} ${tls} ${proto} ${ip} ${dir}tls.server.${tls}.${id}"
+		tls server ${op} ${id} ${tls} ${proto} ${ip} ${dir}tls.server.${tls}.${id} 2> ${TMP_ERROR_FILE} ; ret=${?}
+		file-log-ret ${ret}
+	    done
+	done
+    fi
+
+    if contextual-command-is-allowed ; then
+	if ! member "${exclusions}" waf.rweb.custom ; then
+
+	    unset ids
+
+	    case ${op} in
+		load)
+		    i=0
+		    for elt in ${RWEB_SITE_LIST}
+		    do
+			range=$[${i} % 5]
+			case ${range} in
+			    0)
+				id=${elt}
+				;;
+			    1|2|3)
+				;;
+			    4)
+				member "${ids}" ${id} || ids="${ids} ${id}"
+				;;
+			    *)
+			return 255
+			;;
+			esac
+			((i++))
+		    done
+		    ids="${ids:1}"
+		    ;;
+		save)
+		    ids=$(ls ${WAF_DIR}/*.rules.current 2> /dev/null)
+		    ;;
+		*)
+		    ;;
+	    esac
+
+	    for id in ${ids}
+	    do
+		id=$(file-basename ${id} .rules.current)
+		test ${op} == save || check-file-presence ${proto} ${ip} ${dir}waf.rweb.custom.${id} || continue
+		file-log "waf rweb custom ${id} ${op} ${proto} ${ip} ${dir}waf.rweb.custom.${id}"
+		waf rweb custom ${id} ${op} ${proto} ${ip} ${dir}waf.rweb.custom.${id} 2> ${TMP_ERROR_FILE} ; ret=${?}
+		file-log-ret ${ret}
+	    done
+	fi
+    fi
+
+    if test ${APL_ROLE} == 'manager' ; then
+	if ! member "${exclusions}" manager.ssh ; then
+	    for key in public private
+	    do
+		file-log "manager ssh ${key} ${op} ${proto} ${ip} ${dir}manager.ssh.${key}"
+		manager ssh ${key} ${op} ${proto} ${ip} ${dir}manager.ssh.${key} 2> ${TMP_ERROR_FILE} ; ret=${?}
+		file-log-ret ${ret}
+	    done
+	fi
+    fi
+
+    file-log "Ending the configuration related files operation"
+    file-unlock && clean-tmp-error
+    file-log-ret ${?}
+}
+
+# Main()
+
+
+set-environment
+main "${@}"

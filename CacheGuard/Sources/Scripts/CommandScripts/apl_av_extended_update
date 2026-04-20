@@ -1,0 +1,806 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       Scripts
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+CACHEGUARD_DIR=/etc/sysconfig/cacheguard
+source ${CACHEGUARD_DIR}/constant
+source ${APPLIANCE_DIR}/etc/role
+
+export LOG_NAME=/var/log/av-extended.log
+export LOG_WAITING_RESULT=no
+
+av-extended-update-is-locked()
+{
+    test -f ${LOCK_DIR}/apl_av_extended_update
+}
+
+locked-av-extended-update-is()
+{
+    touch ${LOCK_DIR}/apl_av_extended_update
+}
+
+unlocked-av-extended-update()
+{
+    rm -f ${LOCK_DIR}/apl_av_extended_update
+}
+
+! av-extended-update-is-locked || exit 0
+
+source ${LOCAL_DIR}/lib/apl_functions
+source ${APPLIANCE_DIR}/lib/lib-check
+source ${APPLIANCE_DIR}/lib/lib-job
+source ${APPLIANCE_DIR}/lib/lib-file
+
+av-extended-log()
+{
+    test -n "${1}" || return 1
+    local message=${1}
+    
+    local date=$(date +"%Y/%m/%d-%T")
+    echo -n "${date} ${message}" >> ${LOG_NAME}
+    test -z "${REPORT_LOG}" || echo -n "0 ${date} ${message}" >> ${REPORT_LOG}
+
+    LOG_WAITING_RESULT=yes
+}
+
+av-extended-log-ret()
+{
+    test -n "${1}" || return 1
+    local err_code=${1}
+
+    if test ${err_code} -eq 0 ; then
+	echo "[OK]" >> ${LOG_NAME}
+	test -z "${REPORT_LOG}" || echo "[OK]" >> ${REPORT_LOG}
+    else
+	echo " (${err_code}) [KO]" >> ${LOG_NAME}
+	test -z "${REPORT_LOG}" || echo " (${err_code}) [KO]" >> ${REPORT_LOG}
+    fi
+
+    LOG_WAITING_RESULT=no
+}
+
+av-extended-log-result()
+{
+    av-extended-log "${1}"
+    av-extended-log-ret ${2}
+}
+
+av-extended-alert()
+{
+    test -n "${1}" || return 1
+    local code=${1}
+    local value=${2}
+
+    local description=${AV_EXTENDED_ERRORS[${code}]//@VALUE@/${value}}
+    message="The Antivirus extended signatures update script failed with the error code [${code}]: ${description}."
+    logger -p daemon.alert -t apl_av_extended_update -- "${message}"
+    ${LOCAL_DIR}/bin/apl_rlogger "${message}"
+    test "${CURRENT_ADMIN_SNMP}" == False || ${LOCAL_DIR}/bin/apl_snmp_trap 22 "AVExtendedUpdateFailed" "${code}" "${message}"
+}
+
+av-extended-log-abort()
+{
+    test ${LOG_WAITING_RESULT} == yes || return 0
+
+    echo >> ${LOG_NAME}
+    test -z "${REPORT_LOG}" || echo >> ${REPORT_LOG}
+}
+
+clean-exit()
+{
+    trap "" USR1 INT QUIT TERM
+
+    local code=${1}
+
+    if test ${code} -lt 11 ; then
+	local description=${AV_EXTENDED_ERRORS[${code}]}
+    else
+	local description="Illegal script call"
+    fi
+
+    if test ${code} -eq 0 ; then
+	av-extended-log-result "Ending the AV extended signatures DB ${MODE_TITLE}" 0
+	rm -rf ${PUSHED_DIR}
+	unlocked-av-extended-update
+	exit 0
+    fi
+    
+    wait
+
+    test ${code} -ge 11 || av-extended-alert ${code}
+
+    av-extended-log-abort
+    av-extended-log-result "${description}" ${code}
+
+    rm -rf ${PUSHED_DIR}
+
+    unlocked-av-extended-update
+    exit ${code}
+}
+
+set-environment()
+{
+    test -n "${1}" || return 21
+    local state=${1}
+    local mode=${2}
+
+    export AV_FTP_PASSIVE_MODE
+    unset  AV_EXTENDED_ERRORS
+    export AV_EXTENDED_ERRORS
+    
+    export DOWNLOAD_ACCOUNT_DIR=${ABASE_DIR}
+
+    AV_EXTENDED_ERRORS[0]=""
+    AV_EXTENDED_ERRORS[1]="The Antivirus extended update program has been killed"
+    AV_EXTENDED_ERRORS[2]="The downloaded Antivirus extended DB '@VALUE@' is not authentic"
+    AV_EXTENDED_ERRORS[3]="Can't download the Antivirus extended Index file"
+    AV_EXTENDED_ERRORS[4]="Error(s) during the Antivirus extended DB file(s)"
+
+    PUSHED_DIR=${TMP_DIR}/${MANAGER_PUSHED}.avextended.${$}
+    PUSHED_RDIR=${PUSHED_DIR/${ADMIN_DIR}}
+
+    rm -rf ${PUSHED_DIR}
+    mkdir -p ${PUSHED_DIR}
+
+    case ${state} in
+	cur)
+	    source ${ABASE_DIR}/${ENV_RDIR}/${ENV_CURRENT_NAME}
+	    AV_FTP_PASSIVE_MODE=${CURRENT_FTP_PASSIVE_MODE}
+	    ;;
+	new)
+	    source ${ABASE_DIR}/${ENV_RDIR}/${ENV_NAME}
+	    AV_FTP_PASSIVE_MODE=${FTP_PASSIVE_MODE}
+	    ;;
+	*)
+	    return 31
+	    ;;
+    esac
+
+    set-av-extended-parameters ${state} || return 33
+
+    case ${state} in
+	cur)
+	    export _AV_EXTENDED_MODE=${CURRENT_AV_EXTENDED_MODE}
+	    export _AV_EXTENDED_URL=${CURRENT_AV_EXTENDED_URL}
+	    export _AV_EXTENDED_METHOD=${CURRENT_AV_EXTENDED_METHOD}
+	    ;;
+	new)
+	    export _AV_EXTENDED_MODE=${AV_EXTENDED_MODE}
+	    export _AV_EXTENDED_URL=${AV_EXTENDED_URL}
+	    export _AV_EXTENDED_METHOD=${AV_EXTENDED_METHOD}
+	    ;;
+	*)
+	    return 35
+	    ;;
+    esac
+
+    case ${mode} in
+	create)
+	    export MODE_TITLE="creation"
+	    ;;
+	update)
+	    export MODE_TITLE="updating"
+	    ;;
+	*)
+	    export MODE_TITLE="operation"
+	    ;;
+    esac
+}
+
+purge-av-extended-cache()
+{
+    local db_name=${1}
+    
+    if test -n "${db_name}" ; then
+	rm -f \
+	   ${AV_EXTENDED_CACHE_DB_DIR}/${db_name}.gz.md5 \
+	   ${AV_EXTENDED_CACHE_DB_DIR}/${db_name}.gz.${SIGNATURE} \
+	   ${AV_EXTENDED_CACHE_DB_DIR}/${db_name}.gz \
+	   ${AV_EXTENDED_CACHE_DB_DIR}/${db_name}.old \
+	   ${AV_EXTENDED_CACHE_DB_DIR}/${db_name}
+    else
+	rm -f ${AV_EXTENDED_CACHE_DB_DIR}/*
+    fi
+}
+
+purge-loaded-db()
+{
+    rm -f \
+       /var/tmp/${db_name}.gz \
+       /var/tmp/${db_name}.gz.md5 \
+       /var/tmp/${db_name}.gz.${SIGNATURE}
+}
+
+commit-loaded-db()
+{
+    test -n "${1}" || return 1
+    local db_name=${1}
+
+    test ! -f /var/tmp/${db_name}.gz || \
+	install -m 664 -o ${MANAGER_NAME} -g ${GROUP_NAME} /var/tmp/${db_name}.gz ${AV_EXTENDED_CACHE_DB_DIR}
+
+    test ! -f /var/tmp/${db_name}.gz.md5 || \
+	install -m 664 -o ${MANAGER_NAME} -g ${GROUP_NAME} /var/tmp/${db_name}.gz.md5 ${AV_EXTENDED_CACHE_DB_DIR}
+
+    test ! -f /var/tmp/${db_name}.gz.${SIGNATURE} || \
+	install -m 664 -o ${MANAGER_NAME} -g ${GROUP_NAME} /var/tmp/${db_name}.gz.${SIGNATURE} ${AV_EXTENDED_CACHE_DB_DIR}
+
+    purge-loaded-db ${db_name}
+}
+
+purge-removed-av-extended-db()
+{
+    test -f ${AV_EXTENDED_CACHE_DIR}/${AV_EXTENDED_INDEX_FILENAME} || return 0
+
+    local db sz md5
+    local db_files db_file db_name1 db_name2
+    local ret modified
+
+    case ${APL_ROLE} in
+	gateway)
+	    db_files=$(ls -1 ${AV_DB_DIR} 2> /dev/null)
+	    ;;
+	manager)
+	    db_files=$(ls -1 ${AV_EXTENDED_CACHE_DB_DIR}/*.gz 2> /dev/null)
+	    ;;
+	*)
+	    ;;
+    esac
+
+    for db_file in ${db_files}
+    do
+	case ${APL_ROLE} in
+	    gateway)
+		db_name1=$(file-basename ${db_file})
+		test ${db_name1} != main.cvd || continue
+		test ${db_name1} != main.cld || continue
+		test ${db_name1} != daily.cvd || continue
+		test ${db_name1} != daily.cld || continue
+		test ${db_name1} != bytecode.cvd || continue
+		test ${db_name1} != bytecode.cld || continue
+		test ${db_name1} != mirrors.dat || continue
+		test ${db_name1} != freshclam.dat || continue
+		test ${db_name1:0:4} != "${CLAMAV_TMP_DIR_PREFIX}" || continue
+		;;
+	    manager)
+		db_name1=$(file-basename ${db_file} .gz)
+		;;
+	    *)
+		;;
+	esac
+
+	while read db sz md5
+	do
+	    test -n "${md5}" || continue
+	    test ${db:0:1} != '#' || continue
+	    db_name2=${db%\.gz}
+	    test "${db_name1}" != "${db_name2}" || break
+	done < ${AV_EXTENDED_CACHE_DIR}/${AV_EXTENDED_INDEX_FILENAME}
+
+	if test "${db_name1}" != "${db_name2}" ; then
+	    modified=yes
+	    av-extended-log "Purging the '${db_name1}' DB"
+	    purge-av-extended-cache ${db_name1}
+	    ret=${?}
+	    test ${APL_ROLE} != gateway || rm -f ${AV_DB_DIR}/${db_name1} || ((ret++))
+	    av-extended-log-ret ${ret}
+	fi
+    done
+
+    test -z "${modified}"
+}
+
+update-gateway-push-status()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    local id=${1}
+    local status=${2}
+
+    local date=$(date +"%s" 2> /dev/null)
+    echo ${status} ${date} > /var/tmp/date.${$}
+    install -m 664 -o ${ADMIN_NAME} -g ${GROUP_NAME} /var/tmp/date.${$} ${AV_VAR_DIR}/${id}.${MPUSHED_STATUS}
+    rm -f /var/tmp/date.${$}
+}
+
+manager-push-av-extended()
+{
+    local gateway_index_file=${ABASE_DIR}/${MANAGER_GATEWAY_INDEX}
+    test -s ${gateway_index_file} || return 0
+
+    local uuid domain id ip
+    local userenv_filename av_mode av_extended_method
+    local push_status previous_push_status previous_push_date
+    local pushed_dir rpushed_dir db_file db_name db_date additional_db_files
+
+    local db_files=$(ls -1 ${AV_EXTENDED_CACHE_DB_DIR}/*.gz 2> /dev/null)
+
+    while read uuid domain id ip
+    do
+	userenv_filename=${ABASE_DIR}/${MANAGER_GATEWAY_RDIR}/${id}/${ENV_CURRENT_NAME}
+	test -f ${userenv_filename} || continue
+
+	av_mode=$(get-variable-value-from-file ${userenv_filename} CURRENT_AV_MODE)
+	av_extended_method=$(get-variable-value-from-file ${userenv_filename} CURRENT_AV_EXTENDED_METHOD)
+
+	test ${av_mode} == True -a ${av_extended_method} == push || continue
+
+	if test -f ${AV_VAR_DIR}/${id}.${MPUSHED_STATUS} ; then
+	    read previous_push_status previous_push_date < ${AV_VAR_DIR}/${id}.${MPUSHED_STATUS}
+	else
+	    previous_push_status=11
+	    previous_push_date=0
+	fi
+
+	if test ${previous_push_status} -ne 0 ; then
+
+	    pushed_dir=${TMP_DIR}/${MANAGER_PUSHED}.${id}.avextended.${$}
+	    rpushed_dir=${pushed_dir/${ADMIN_DIR}}
+
+	    rm -rf ${pushed_dir}
+	    mkdir -p ${pushed_dir}
+
+	    for db_file in ${db_files}
+	    do
+		db_name=$(file-basename ${db_file} .gz)
+		test ! -f ${PUSHED_DIR}/${MPUSHED}.${AV_EXTENDED_PUSHED_NAME}.${db_name} || continue
+		db_date=$(get-modification-time ${db_file})
+
+		if test ${db_date} -gt ${previous_push_date} ; then
+		    cp -af ${db_file} ${pushed_dir}/${MPUSHED}.${AV_EXTENDED_PUSHED_NAME}.${db_name}.gz 2> /dev/null &&
+			cp -af ${AV_EXTENDED_CACHE_DB_DIR}/${db_name}.gz.md5 ${pushed_dir}/${MPUSHED}.${AV_EXTENDED_PUSHED_NAME}.${db_name}.gz.md5 2> /dev/null
+		fi
+	    done
+	fi
+
+	additional_db_files=$(ls -1 ${pushed_dir}/*.gz 2> /dev/null)
+
+	av-extended-log "Pushing AV signatures to '${id}' Gateway"
+
+	chroot ${ADMIN_DIR} /bin/bash -c "cd ${PUSHED_RDIR} ; scp -4BCpqOr -i /home/${ADMIN_NAME}/.ssh/id_rsa ${MPUSHED}.${AV_EXTENDED_PUSHED_NAME}.* ${ADMIN_NAME}@${ip}:/tmp" > /dev/null 2>&1
+	push_status=${PIPESTATUS[0]}
+
+	if test ${push_status} -eq 0 ; then
+	    if test ${previous_push_status} -eq 0 ; then
+		update-gateway-push-status ${id} ${push_status}
+	    else
+		if test -n "${additional_db_files}" ; then
+	   	    chroot ${ADMIN_DIR} /bin/bash -c "cd ${rpushed_dir} ; scp -4BCpqOr -i /home/${ADMIN_NAME}/.ssh/id_rsa ${MPUSHED}.${AV_EXTENDED_PUSHED_NAME}.* ${ADMIN_NAME}@${ip}:/tmp" > /dev/null 2>&1
+		    push_status=${PIPESTATUS[0]}
+
+		    if test ${push_status} -eq 0 ; then
+			update-gateway-push-status ${id} ${push_status}
+		    fi
+		else
+		    update-gateway-push-status ${id} ${push_status}
+		fi
+	    fi
+	else
+	    if test ${previous_push_status} -eq 0 ; then
+		update-gateway-push-status ${id} ${push_status}
+	    fi
+	fi
+
+	av-extended-log-ret ${push_status}
+	test ${previous_push_status} -eq 0 || rm -rf ${pushed_dir}
+
+    done < ${gateway_index_file}
+}
+
+apl-av-extended-update()
+{
+    test -n "${1}" || return 41
+    test -n "${2}" || return 43
+    test -n "${3}" || return 45
+    local state=${1}
+    local mode=${2}
+    local index=${3}
+
+    local do_download av_reload ret=0
+    local total_sz
+
+    case ${APL_ROLE} in
+	gateway)
+	    if test "${_AV_EXTENDED_METHOD}" != push ; then
+		rm -f ${TMP_DIR}/${MPUSHED}.${AV_EXTENDED_PUSHED_NAME}.*
+		do_download=yes
+	    fi
+	    ;;
+	manager)
+	    do_download=yes
+	    ;;
+	*)
+	    ;;
+    esac
+
+    av-extended-log-result "Beginning the AV extended signatures DB ${MODE_TITLE}" 0
+
+    if test -n "${do_download}" ; then
+
+	local av_protocol_server_path=$(get-protocol-server-path-from-url "${_AV_EXTENDED_URL}")
+	local av_protocol=$(get-record-field "${av_protocol_server_path}" 1)
+	local av_server=$(get-record-field "${av_protocol_server_path}" 2)
+	local av_path=$(get-record-field "${av_protocol_server_path}" 3)
+	local av_files
+
+	case ${mode} in
+	    update)
+		case ${index} in
+		    index)
+			av-extended-log "Downloading AV signatures Index file"
+			download-av-extended-index ${state}
+			ret=${?}
+			;;
+		    noindex)
+			;;
+		    *)
+			return 255
+			;;
+		esac
+		;;
+	    create)
+		purge-av-extended-cache
+		test ${APL_ROLE} != manager || rm -f ${AV_VAR_DIR}/*.${MPUSHED_STATUS}
+
+		total_sz=$(get-remote-file-size ${av_protocol} ${av_server} ${av_path}/${AV_EXTENDED_PACK_NAME}.tar.gz ${AV_FTP_PASSIVE_MODE})
+
+		echo ${total_sz} > ${RUN_DIR}/${AV_EXTENDED_PACK_SZ_FILENAME}
+		echo 0 > ${RUN_DIR}/${AV_EXTENDED_PACK_DOWNLOADED_SZ_FILENAME}
+
+		echo 0 > ${RUN_DIR}/${AV_EXTENDED_DB_SZ_FILENAME}
+		echo 0 > ${RUN_DIR}/${AV_EXTENDED_DB_DOWNLOADED_SZ_FILENAME}
+
+		av_files="${av_path}/${AV_EXTENDED_PACK_NAME}.tar.gz /var/tmp/${AV_EXTENDED_PACK_NAME}.tar.gz"
+		test "${_AV_EXTENDED_METHOD}" != vload || av_files="${av_files} ${av_path}/${AV_EXTENDED_PACK_NAME}.tar.gz.${SIGNATURE} /var/tmp/${AV_EXTENDED_PACK_NAME}.tar.gz.${SIGNATURE}"
+
+		av-extended-log "Downloading the packed signatures DB"
+
+		TERM='' load-files ${av_protocol} ${av_server} "${av_files}" '' '' antiviruspack 2> /dev/null
+		ret=${?}
+		av-extended-log-ret ${ret}
+
+		if test "${_AV_EXTENDED_METHOD}" == vload ; then
+
+		    av-extended-log "Verifying the packed signatures DB signature"
+		    check-vloaded-signature /var/tmp/${AV_EXTENDED_PACK_NAME}.tar.gz
+		    ret=${?}
+		    av-extended-log-ret ${ret}
+		else
+		    ret=0
+		fi
+
+		if test ${ret} -ne 0 ; then
+		    rm -f /var/tmp/${AV_EXTENDED_PACK_NAME}.tar.gz /var/tmp/${AV_EXTENDED_PACK_NAME}.tar.gz.${SIGNATURE}
+		else
+		    echo ${total_sz} > ${RUN_DIR}/${AV_EXTENDED_PACK_DOWNLOADED_SZ_FILENAME}
+		    rm -f /var/tmp/${AV_EXTENDED_PACK_NAME}.tar.gz.${SIGNATURE}
+
+		    av-extended-log "Extracting the AV signatures Index file"
+
+		    local index_files=${av_path}/${AV_EXTENDED_INDEX_FILENAME}
+		    test "${_AV_EXTENDED_METHOD}" != vload || index_files="${index_files} ${av_path}/${AV_EXTENDED_INDEX_FILENAME}.${SIGNATURE}"
+
+		    tar --one-top-level=/var/tmp --strip-components=1 -xf /var/tmp/${AV_EXTENDED_PACK_NAME}.tar.gz ${index_files} 2> /dev/null
+		    ret=${?}
+		    av-extended-log-ret ${ret}
+
+		    if test ${ret} -ne 0 ; then
+			purge-loaded-av-extended-index
+			rm -f /var/tmp/${AV_EXTENDED_PACK_NAME}.tar.gz
+		    else
+			commit-loaded-av-extended-index
+
+			av-extended-log "Unpacking the packed signatures DB"
+			tar --one-top-level=/var/tmp --strip-components=1 -xf /var/tmp/${AV_EXTENDED_PACK_NAME}.tar.gz 2> /dev/null
+			ret=${?}
+			av-extended-log-ret ${ret}
+
+			purge-loaded-av-extended-index
+			rm -f /var/tmp/${AV_EXTENDED_PACK_NAME}.tar.gz{,.${SIGNATURE}}
+		    fi
+		fi
+		;;
+	    *)
+		;;
+	esac
+
+	case ${index} in
+	    index)
+		if test ${ret} -eq 0 -a ${APL_ROLE} == manager ; then
+		    if test -f ${AV_EXTENDED_CACHE_DIR}/${AV_EXTENDED_INDEX_FILENAME} ; then
+			cp -af \
+			   ${AV_EXTENDED_CACHE_DIR}/${AV_EXTENDED_INDEX_FILENAME} \
+			   ${PUSHED_DIR}/${MPUSHED}.${AV_EXTENDED_PUSHED_NAME}.${AV_EXTENDED_INDEX_FILENAME} 2> /dev/null
+			ret=${?}
+		    fi
+		fi
+		av-extended-log-ret ${ret}
+		;;
+	    noindex)
+		;;
+	    *)
+		return 255
+		;;
+	esac
+    else
+	if test ${APL_ROLE} == gateway ; then
+	    if test -f ${TMP_DIR}/${MPUSHED}.${AV_EXTENDED_PUSHED_NAME}.${AV_EXTENDED_INDEX_FILENAME} ; then
+		av-extended-log-result "Beginning the AV extended signatures DB update" 0
+		av-extended-log "Committing the pushed AV signatures Index file"
+		mv -f ${TMP_DIR}/${MPUSHED}.${AV_EXTENDED_PUSHED_NAME}.${AV_EXTENDED_INDEX_FILENAME} ${AV_EXTENDED_CACHE_DIR}/${AV_EXTENDED_INDEX_FILENAME} 2> /dev/null
+		ret=${?}
+		av-extended-log-ret ${ret}
+	    else
+		return 0
+	    fi
+	fi
+    fi
+
+    test ${ret} -eq 0 || return 51
+
+    purge-removed-av-extended-db || av_reload=yes
+
+    local db sz md5
+    local old_md5 db_name dn_sz av_db_file
+    local downloaded_sz=0
+    local global_ret=0
+    local i=0 n db_name_t db_size_t
+    declare -a db_name_t db_size_t
+
+    total_sz=0
+
+    while read db sz md5
+    do
+	test -n "${md5}" || continue
+	test ${db:0:1} != '#' || continue
+
+	db_name=${db%\.gz}
+	((total_sz += sz))
+
+	case ${APL_ROLE} in
+	    gateway)
+		av_db_file=${AV_DB_DIR}/${db_name}
+		;;
+	    manager)
+		av_db_file=${AV_EXTENDED_CACHE_DB_DIR}/${db_name}.gz
+		;;
+	    *)
+		;;
+	esac
+
+	if test ! -f ${av_db_file} ; then
+	    db_name_t[${i}]=${db_name}
+	    db_size_t[${i}]=${sz}
+	else
+	    if test -f ${AV_EXTENDED_CACHE_DB_DIR}/${db}.md5 ; then
+		old_md5=$(cat ${AV_EXTENDED_CACHE_DB_DIR}/${db}.md5 2> /dev/null)
+		if test "${md5}" == "${old_md5}" ; then
+		    av-extended-log "The '${db_name}' DB has not been changed"
+		    if test -z "${do_download}" ; then
+			rm -f \
+			   ${TMP_DIR}/${MPUSHED}.${AV_EXTENDED_PUSHED_NAME}.${db_name}.gz.md5 \
+			   ${TMP_DIR}/${MPUSHED}.${AV_EXTENDED_PUSHED_NAME}.${db_name}.gz
+			ret=${?}
+		    else
+			ret=0
+		    fi
+		    av-extended-log-ret ${ret}
+		    ((downloaded_sz += sz))
+		    continue
+		else
+		    db_name_t[${i}]=${db_name}
+		    db_size_t[${i}]=${sz}
+		fi
+	    else
+		db_name_t[${i}]=${db_name}
+		db_size_t[${i}]=${sz}
+	    fi
+	fi
+	((i++))
+    done < ${AV_EXTENDED_CACHE_DIR}/${AV_EXTENDED_INDEX_FILENAME}
+    ((n=i))
+
+    echo ${total_sz} > ${RUN_DIR}/${AV_EXTENDED_DB_SZ_FILENAME}
+    echo ${downloaded_sz} > ${RUN_DIR}/${AV_EXTENDED_DB_DOWNLOADED_SZ_FILENAME}
+
+    for ((i=0 ; i<n ; i++))
+    do
+	db_name=${db_name_t[${i}]}
+	db_sz=${db_size_t[${i}]}
+
+	if test -n "${do_download}" ; then
+
+	    if test ${mode} == update ; then
+		av_files="${av_path}/${db_name}.gz /var/tmp/${db_name}.gz"
+		test "${_AV_EXTENDED_METHOD}" != vload || av_files="${av_files} ${av_path}/${db_name}.gz.${SIGNATURE} /var/tmp/${db_name}.gz.${SIGNATURE}"
+		av_files="${av_files} ${av_path}/${db_name}.gz.md5 /var/tmp/${db_name}.gz.md5"
+
+		av-extended-log "Downloading the '${db_name}.gz' DB"
+		TERM='' load-files ${av_protocol} ${av_server} "${av_files}" '' '' antivirus 2> /dev/null
+		ret=${?}
+		av-extended-log-ret ${ret}
+	    else
+		ret=0
+	    fi
+
+	    if test ${ret} -eq 0 ; then
+		if test "${_AV_EXTENDED_METHOD}" == vload ; then
+		    av-extended-log "Verifying the '${db_name}.gz' DB signature"
+		    check-vloaded-signature /var/tmp/${db_name}.gz
+		    ret=${?}
+
+		    if test ${ret} -eq 0 ; then
+			av-extended-log-ret ${ret}
+		    else
+			((global_ret++))
+			purge-loaded-db ${db_name}
+			av-extended-alert 2 "${db_name}"
+			av-extended-log-ret ${ret}
+			continue
+		    fi
+		fi
+	    else
+		((global_ret++))
+		purge-loaded-db ${db_name}
+		continue
+	    fi
+	    commit-loaded-db ${db_name}
+	else
+	    if test ${APL_ROLE} == gateway ; then
+		av-extended-log "Committing the pushed '${db_name}.gz' DB"
+		if test -f ${TMP_DIR}/${MPUSHED}.${AV_EXTENDED_PUSHED_NAME}.${db_name}.gz -a \
+			-f ${TMP_DIR}/${MPUSHED}.${AV_EXTENDED_PUSHED_NAME}.${db_name}.gz.md5 ; then
+
+		    ret=0
+		    mv -f ${TMP_DIR}/${MPUSHED}.${AV_EXTENDED_PUSHED_NAME}.${db_name}.gz ${AV_EXTENDED_CACHE_DB_DIR}/${db_name}.gz 2> /dev/null || ((ret++))
+		    mv -f ${TMP_DIR}/${MPUSHED}.${AV_EXTENDED_PUSHED_NAME}.${db_name}.gz.md5 ${AV_EXTENDED_CACHE_DB_DIR}/${db_name}.gz.md5 2> /dev/null || ((ret++))
+
+		    av-extended-log-ret ${ret}
+		else
+		    ret=101
+		    av-extended-log-ret ${ret}
+		fi
+	    fi
+	fi
+
+	if test -f ${AV_EXTENDED_CACHE_DB_DIR}/${db_name}.gz -a -f ${AV_EXTENDED_CACHE_DB_DIR}/${db_name}.gz.md5 ; then
+	    case ${APL_ROLE} in
+		manager)
+		    ret=0
+		    cp -af \
+		       ${AV_EXTENDED_CACHE_DB_DIR}/${db_name}.gz \
+		       ${PUSHED_DIR}/${MPUSHED}.${AV_EXTENDED_PUSHED_NAME}.${db_name}.gz 2> /dev/null || ((ret++))
+
+		    cp -af \
+		       ${AV_EXTENDED_CACHE_DB_DIR}/${db_name}.gz.md5 \
+		       ${PUSHED_DIR}/${MPUSHED}.${AV_EXTENDED_PUSHED_NAME}.${db_name}.gz.md5 2> /dev/null || ((ret++))
+
+		    if test ${ret} -eq 0 ; then
+			((downloaded_sz += db_sz))
+			echo ${downloaded_sz} > ${RUN_DIR}/${AV_EXTENDED_DB_DOWNLOADED_SZ_FILENAME}
+		    else
+			continue
+		    fi
+		    ;;
+
+		gateway)
+		    av-extended-log "Uncompressing the '${db_name}.gz' DB"
+		    rm -f ${AV_EXTENDED_CACHE_DB_DIR}/${db_name} &&
+			gunzip ${AV_EXTENDED_CACHE_DB_DIR}/${db_name}.gz
+		    ret=${?}
+
+		    if test ${ret} -eq 0 ; then
+			av-extended-log-ret ${ret}
+		    else
+			purge-av-extended-cache ${db_name}
+			((global_ret++))
+			av-extended-log-ret ${ret}
+			continue
+		    fi
+
+		    av-extended-log "Checking the '${db_name}' DB integrity"
+		    /usr/local/bin/clamscan --quiet --database="${AV_EXTENDED_CACHE_DB_DIR}/${db_name}" ${AV_EXTENDED_CACHE_DIR}/.av-test.txt 2> /dev/null
+		    ret=${?}
+
+		    if test ${ret} -eq 0 ; then
+			av-extended-log-ret ${ret}
+		    else
+			((global_ret++))
+			purge-av-extended-cache ${db_name}
+			av-extended-log-ret ${ret}
+			continue
+		    fi
+
+		    av-extended-log "Installing the '${db_name}' DB"
+		    ret=0
+
+		    test ! -f ${AV_DB_DIR}/${db_name} || cp -af ${AV_DB_DIR}/${db_name} /var/tmp/${db_name}.${$}
+		    install -m 664 -o ${AV_USER} -g ${AV_GROUP} ${AV_EXTENDED_CACHE_DB_DIR}/${db_name} ${AV_DB_DIR}/${db_name} 2> /dev/null &&
+			rm -f ${AV_EXTENDED_CACHE_DB_DIR}/${db_name}
+
+		    if test ${ret} -eq 0 ; then
+			rm -f /var/tmp/${db_name}.${$}
+			((downloaded_sz += db_sz))
+			echo ${downloaded_sz} > ${RUN_DIR}/${AV_EXTENDED_DB_DOWNLOADED_SZ_FILENAME}
+		    else
+			cp -af /var/tmp/${db_name}.${$} ${AV_DB_DIR}/${db_name}
+			rm -f /var/tmp/${db_name}.${$}
+			((global_ret++))
+		    fi
+
+		    av_reload=yes
+		    av-extended-log-ret ${ret}
+		    ;;
+		*)
+		    ;;
+	    esac
+	fi
+    done
+
+    date +"%s" > /var/tmp/${AV_EXTENDED_LAST_UPDATE_FILENAME}.${$} 2> /dev/null
+    install -m 664 -o ${ADMIN_NAME} -g ${GROUP_NAME} /var/tmp/${AV_EXTENDED_LAST_UPDATE_FILENAME}.${$} ${AV_VAR_DIR}/${AV_EXTENDED_LAST_UPDATE_FILENAME}
+    rm -f /var/tmp/${AV_EXTENDED_LAST_UPDATE_FILENAME}.${$}
+
+    case ${APL_ROLE} in
+	gateway)
+	    if test -z "${NO_RELOAD_AV}" ; then
+		if test -n "${av_reload}" ; then
+		    av-extended-log "Reloading the Antivirus signature DBs"
+		    /etc/rc.d/init.d/clamd reload > /dev/null 2>&1
+		    ret=${?}
+		    test ${ret} -eq 0 || ((global_ret++))
+		    av-extended-log-ret ${ret}
+		fi
+	    fi
+	    ;;
+	manager)
+	    manager-push-av-extended
+	    ;;
+	*)
+	    ;;
+    esac
+
+    test ${global_ret} -eq 0 || global_ret=53
+    return ${global_ret}
+}
+
+main()
+{
+    test -n "${1}" || clean-exit 1
+    local state=${1}
+    test "${state}" == new -o "${state}" == cur || clean-exit 11
+
+    set-environment ${@}
+
+    test ${APL_ROLE} != manager || test ${CURRENT_MANAGER_SYNC_ROLE} != slave || clean-exit 0
+    test "${_AV_EXTENDED_MODE}" == True || clean-exit 0
+
+    trap "clean-exit 1" USR1 INT QUIT TERM
+
+    apl-av-extended-update "${@}"
+    clean-exit ${?}
+}
+
+# Main()
+
+main "${@}"

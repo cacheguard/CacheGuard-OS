@@ -1,0 +1,73 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       GUI
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+urllist-auto()
+{
+    local pos=2
+
+    local transaction=/tmp/${TRANSACTION_FILE}.wadmin.${REMOTE_USER}.${$}
+    rm -f ${transaction}
+
+    local urllist_pos state_pos load_pos operation_pos period_pos protocol_pos ip_pos filename_pos
+    local urllist state load operation period protocol ip filename
+
+    while test ${pos} -lt ${ATTRIBUTE_NB}
+    do
+	urllist_pos=${pos}
+	state_pos=$[${pos} + 1]
+	
+	urllist=${VALUES[${urllist_pos}]}
+	state=${VALUES[${state_pos}]}
+	
+	case ${state} in
+	    on)
+		load_pos=$[${pos} + 2]
+		operation_pos=$[${pos} + 3]
+		period_pos=$[${pos} + 4]
+		protocol_pos=$[${pos} + 5]
+		ip_pos=$[${pos} + 6]
+		filename_pos=$[${pos} + 7]
+		
+		load=${VALUES[${load_pos}]}
+		operation=${VALUES[${operation_pos}]}
+		period=${VALUES[${period_pos}]}
+		protocol=${VALUES[${protocol_pos}]:1}
+		ip=${VALUES[${ip_pos}]}
+		filename=${VALUES[${filename_pos}]}
+		
+		echo "urllist auto ${urllist} on ${load} ${operation} ${period} ${protocol} ${ip} '${filename}'" >> ${transaction}
+		;;
+	    off)
+		echo "urllist auto ${urllist} off" >> ${transaction}
+		;;
+	    *)
+		;;
+	esac
+	pos=$[${pos} + 8]
+    done
+
+    execute-transaction ${transaction}
+}
+
+urllist-auto

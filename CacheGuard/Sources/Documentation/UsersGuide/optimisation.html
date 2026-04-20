@@ -1,0 +1,137 @@
+<a name='main' class='doc-title'></a>
+<h1>WAN Optimisation</h1>
+
+A CacheGuard appliance uses several technologies to optimise WAN (and LAN) bandwidth usage to improve availability and Quality of Service (QoS). Technologies such as HTTP compression and Web caching help save network bandwidth during Web browsing, while traffic shaping can reserve bandwidth for critical applications. All these features can be activated simultaneously on the same CacheGuard appliance.
+
+<a name='cache' class='doc-title'></a>
+<h2>Web Caching</h2>
+
+Web caching is one of the core and historical features of a CacheGuard appliance. It stores browsed (or served, in reverse mode) Web content on disks before sending it to Web clients. Cached Web content can then be retrieved locally instead of being downloaded again from the Web, significantly saving network bandwidth. You can use the <a href="/doc/command/mode.html">mode cache on</a> command to activate Web caching.
+
+<a name='object' class='doc-title'></a><h3>Cached Object Size</h3>
+
+For performance reasons, a CacheGuard appliance caches only objects within a defined size range. The <a href="/doc/command/cache.html">cache</a> command can be used to modify the upper and lower cache size limits.  
+<p>
+It is important to adjust these limits with care: caching all objects (even very small ones) may decrease performance, as disk I/O can become slower than network I/O. Similarly, caching overly large objects can quickly saturate the cache with content rarely reused.  
+<p>
+To configure Web caching to store only objects between 20 KB and 51200 KB, use the following commands:
+<ul>
+  <li><i>cache object 20 51200</i></li>
+  <li><i>apply</i></li>
+</ul>
+
+<a name='bigobject' class='doc-title'></a><h3>Caching Big Objects</h3>
+
+In some cases, it is useful to cache very large objects that are shared by many users, such as operating system updates for PCs or smartphones. To cache large objects (greater than 256 MB—the default upper limit), you must enable the big-object caching feature and define its limits.  
+<p>
+Big-object caching reserves a specific area of disk space for large files, preventing them from occupying the entire cache. The size of this area depends on your disk capacity and installation parameters.  
+<p>
+To enable caching for objects between 131073 KB (128 MB) and 2097152 KB (2 GB), use:
+<ul>
+  <li><i>cache bigobject on 131073 2097152</i></li>
+  <li><i>apply</i></li>
+</ul>
+
+<a name='peer' class='doc-title'></a>
+<h2>Peer Caches</h2>
+
+Two or more CacheGuard appliances can be paired to share their respective Web caches. Use the <a href="/doc/command/peer.html">peer</a> command to configure peering between appliances. A paired CacheGuard appliance is referred to as a <strong>peer</strong>.  
+<p>
+Peers can be configured in parallel or chained modes:  
+<ul>
+  <li><strong>Parallel mode:</strong> The appliance checks its own cache first. If the requested content is not found, it queries its peers before fetching it from the internet.</li>
+  <li><strong>Chained mode:</strong> The appliance checks its own cache first. If the object is not found, it always queries its chained peers (called next peers) instead of the internet directly. Each remote peer must be configured to accept connections from its previous peers.</li>
+</ul>
+
+If more than one next peer is defined, the appliance distributes requests among them in a load-balanced manner.
+
+<center><img width='600' src="/doc/image/load_sharing.png" class="schema" /></center>
+
+<a name='compress' class='doc-title'></a>
+<h2>HTTP Compression</h2>
+
+A CacheGuard appliance can compress Web traffic to reduce its size and save bandwidth. HTTP compression is particularly beneficial for low-bandwidth networks prone to packet loss, such as Wi-Fi or satellite-based links.  
+<p>
+When HTTP compression is enabled, the appliance compresses textual content (HTML, JavaScript, XML, etc.) before sending it to clients. Modern browsers automatically decompress this content.  
+<p>
+To enable HTTP compression, use the <a href="/doc/command/mode.html">mode compress on</a> command.
+
+<a name='qos' class='doc-title'></a>
+<h2>Traffic Shaping</h2>
+
+A CacheGuard appliance includes a bandwidth manager that allows you to shape and schedule network traffic. The system distinguishes between:
+<ul>
+  <li>Traffic exchanged directly with the appliance.</li>
+  <li>Traffic routed through the appliance (where the source or destination is external).</li>
+</ul>
+
+Use the <a href="/doc/command/mode.html">mode qos on</a> command to enable traffic shaping, and configure it using the <a href="/doc/command/qos.html">qos</a> command.  
+<p>
+Traffic types that can be managed include:
+<ul>
+  <li><strong>antivirus</strong>: Traffic between the embedded antivirus and external services.</li>
+  <li><strong>file</strong>: File transfers between the appliance and file servers.</li>
+  <li><strong>peer</strong>: Traffic between CacheGuard peers.</li>
+  <li><strong>rweb</strong>: Reverse proxy traffic between the appliance and real Web servers.</li>
+  <li><strong>tweb</strong>: Transparent Web proxy traffic between the appliance and Web clients.</li>
+  <li><strong>web</strong>: Forward proxy traffic between the appliance and Web clients.</li>
+  <li><strong>vpnipsec</strong>: Encrypted IPsec VPN traffic.</li>
+  <li><strong>default</strong>: Any other traffic not matched by the above categories.</li>
+</ul>
+
+<center><img width='600' src="/doc/image/subnet_shaping.png" class="schema" /></center>
+
+To configure bandwidth limits, first define the total available (incoming and outgoing) bandwidth for each interface in kbps, then assign percentages or absolute values to each traffic type.  
+<p>
+For example, to set the total bandwidth of the external interface to 10,000 kbps (10 Mbps) and other interfaces to 1,000,000 kbps (1 Gbps):
+<ul>
+  <li><i>mode qos on</i></li>
+  <li><i>qos bandwidth external ingress 10000</i></li>
+  <li><i>qos bandwidth external egress 10000</i></li>
+  <li><i>qos bandwidth internal ingress 1000000</i></li>
+  <li><i>qos bandwidth internal egress 1000000</i></li>
+  <li><i>qos bandwidth auxiliary ingress 1000000</i></li>
+  <li><i>qos bandwidth auxiliary egress 1000000</i></li>
+  <li><i>apply</i></li>
+</ul>
+
+To reserve 40% of external bandwidth for Web browsing and 60% for reverse Web traffic:
+<ul>
+  <li><i>qos shape web external ingress 40%</i></li>
+  <li><i>qos shape web external egress 40%</i></li>
+  <li><i>qos shape rweb external ingress 60%</i></li>
+  <li><i>qos shape rweb external egress 60%</i></li>
+  <li><i>apply</i></li>
+</ul>
+
+<img width='400' src="/doc/image/chaining.png" class="schema" align="right" />
+
+<a name='borrow' class='doc-title'></a><h3>Bandwidth Borrowing</h3>
+
+Traffic shaping can be strict or flexible. In flexible mode, unused reserved bandwidth for one traffic type can be temporarily borrowed by others.  
+<p>
+For example, if 60% of external bandwidth (6 Mbps) is allocated to reverse Web traffic but only 4 Mbps is in use, the remaining 2 Mbps can be borrowed by other traffic types.  
+<p>
+To enforce strict allocation (no borrowing), disable it as follows:
+<ul>
+  <li><i>qos borrow external ingress off</i></li>
+  <li><i>qos borrow external egress off</i></li>
+  <li><i>apply</i></li>
+</ul>
+
+<a name='fine-tune' class='doc-title'></a><h3>QoS Fine-Tuning</h3>
+
+Traffic shaping can be fine-tuned to prioritise specific networks. For instance, you can reserve 90% of browsing bandwidth for one network and limit another to 10%.  
+<p>
+This setting can be defined contextually, such as when using the <a href="/doc/command/access.html">access web</a> command.  
+<p>
+Example:
+<ul>
+  <li><i>qos shape web internal ingress 30%</i></li>
+  <li><i>qos shape web internal egress 30%</i></li>
+  <li><i>access web add internal 10.26.0.0 255.255.0.0 90%</i></li>
+  <li><i>access web add internal 172.18.2.0 255.255.255.0 10%</i></li>
+  <li><i>apply</i></li>
+</ul>
+
+You can combine Web caching, peering, HTTP compression, and traffic shaping to achieve maximum bandwidth optimisation.

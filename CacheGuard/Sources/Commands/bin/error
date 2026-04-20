@@ -1,0 +1,60 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       Commands
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+source functions
+
+run()
+{
+    test -z "${TRANSACTION}" || return 106
+
+    local code=${1}
+
+    local description
+
+    if test -n "${code}" ; then
+	check-digit ${code} || return 1
+	description=${Errors[${code}]}
+	test -n "${description}" || return 255
+	echo-begin-show
+	echo Error ${code} - ${description}
+	echo-end-show
+	return 0
+    fi
+
+    local i n=${#Errors[@]}
+
+    echo-begin-show
+
+    for ((i=1 ; i<=n ; i++))
+    do
+	description=${Errors[${i}]}
+	test -n "${description}" || continue
+	echo Error ${i} - ${description}
+	test ${i} == ${n} || echo
+    done
+
+    echo-end-show
+}
+
+main __noenv "${@}"

@@ -1,0 +1,99 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       InitScript
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+source /lib/lsb/init-functions
+
+CACHEGUARD_DIR=/etc/sysconfig/cacheguard
+source ${CACHEGUARD_DIR}/constant
+source ${APPLIANCE_DIR}/etc/role
+
+PROG="wadmind"
+RPROG="sbin/${PROG}"
+FPROG="${WEB_SERVER_DIR}/${RPROG}"
+
+[ -x ${FPROG} ] || exit 0
+[ -f ${GUI_DIR}/etc/${PROG}.conf ] || exit 0
+
+SERV="W-Administration Service"
+RETVAL=0
+
+reset-waf-persistent-data()
+{
+    test -n "${ADMIN_DIR}" || return 11
+    test -d ${ADMIN_DIR}/tmp || return 13
+    rm -f ${ADMIN_DIR}/tmp/*-{global,ip}.{pag,dir}
+}
+
+case "${1}" in
+    start)
+	# Start daemons.
+	if [ -n "$(pidof ${PROG})" ] ; then
+	    echo $"${PROG}: already running"
+	    exit 1
+	fi
+
+	log_info_msg "Starting ${SERV}..."
+	rm -f ${ADMIN_DIR}/var/log/${PROG}.log
+	rm -f ${RUN_DIR}/${PROG}.pid
+	nice --adjustment=-14 ${FPROG} -f ${GUI_DIR}/etc/${PROG}.conf 2> /dev/null
+	RETVAL=${?}
+	[ ${RETVAL} -eq 0 ] && touch /var/lock/${PROG}
+	evaluate_retval
+	exit ${RETVAL}
+	;;
+
+    stop)
+	# Stop daemons.
+	log_info_msg "Stopping ${SERV}..."
+	killproc -p ${RUN_DIR}/${PROG}.pid ${FPROG}
+	RETVAL=${?}
+	usleep 500000
+	[ $RETVAL -eq 0 ] && rm -f /var/lock/${PROG} ${RUN_DIR}/${PROG}.pid
+	evaluate_retval
+	reset-waf-persistent-data
+	exit $RETVAL
+	;;
+
+    restart)
+	${0} stop
+	${0} start
+	;;
+    
+    status)
+	statusproc ${PROG}
+	;;
+
+    reload)
+	log_info_msg "Reloading ${SERV}..."
+	killproc -p ${RUN_DIR}/${PROG}.pid ${FPROG} -HUP
+	RETVAL=${?}
+	[ ${RETVAL} -eq 0 ]
+	evaluate_retval
+	exit ${RETVAL}
+	;;
+    *)
+	echo "Usage: ${0} {start|stop|restart|status}"
+	exit 1
+	;;
+esac

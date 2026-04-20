@@ -1,0 +1,70 @@
+<a name='main' class='doc-title'></a>
+<h1>Operating System</h1>
+
+<a name='register' class='doc-title'></a><h2>Registration & Subscription</h2>
+The registration process enables you to obtain a free serial number (S/N) that uniquely identifies your CacheGuard appliance. For commercial installations, the S/N is used to purchase a subscription, which permits the use of your appliance for a specified period. A subscription is validated by a licence key, which is provided upon your first purchase. Following the initial subscription period, renewal is required to continue using your appliance.
+<p>
+The registration process is generally manual and should be initiated from an already installed appliance. Note that a CacheGuard appliance deployed on a public cloud is automatically registered during its deployment. To begin the registration process, it is more convenient to use the Web administration GUI, as you will be prompted to connect to the CacheGuard appliance registration Web portal to obtain a One-Time Password (OTP).
+<p>
+To start the registration process, navigate to <i>[GENERAL] &gt; [Main Settings] &gt; [Registration & Subscription]</i> in the Web administration GUI and follow the displayed instructions. Refer to the <a href="/doc/command/register.html">register</a> command in the Commands Manual for further information.
+
+<a name='backup' class='doc-title'></a><h2>Backup & Restore</h2>
+To enable the quick recovery of a failed system caused by hardware or software issues, the configuration of a CacheGuard appliance and its essential data (antivirus signatures, URL lists, SSL certificates, etc.) can be saved on a file server and later restored on a freshly installed appliance. This is done by reinstalling CacheGuard-OS on a new machine. 
+<p>
+To back up a CacheGuard appliance, the system must first create a backup file locally, which can then be saved on a trusted file server. The backup creation process runs in the background; you must wait for its completion before saving the generated backup file.
+<p>
+To create and save a system backup named "<i>cacheguard.backup</i>" on the trusted TFTP server with the IP address <i>172.18.2.1</i>, use the following commands:
+<ul>
+  <li><i>system backup create</i></li>
+  <li><i>system backup create report</i></li>
+  <li><i># Wait for the backup process to complete...</i></li>
+  <li><i>system backup save tftp 172.18.2.1 cacheguard.backup</i></li>
+</ul>
+Backup files can only be saved on trusted file servers. To declare a file server as trusted, use the <a href="/doc/command/access.html">access file</a> command.  
+<p>
+To restore a previously saved backup named "<i>cacheguard.backup</i>" from the trusted TFTP server with the IP address <i>172.18.2.1</i>, use:
+<ul>
+  <li><i>system backup load tftp 172.18.2.1 cacheguard.backup</i></li>
+  <li><i>apply</i></li>
+</ul>
+Please note that this backup and restore method is valid only if both the freshly installed and the failed CacheGuard appliances run the same CacheGuard-OS version. If they differ, a logical restore will be required. The logical restore procedure is described in the <u>Reinstalling the OS</u> section below and requires a copy of your appliance’s logical configuration.
+
+<a name='patch' class='doc-title'></a><h2>Patching the OS</h2>
+CacheGuard Technologies periodically releases new CacheGuard-OS versions and provides OS patches to upgrade existing installations. It is strongly recommended to keep your CacheGuard appliance up to date by installing the latest available patches.
+<p>
+Applying OS patches carries some inherent risk. Therefore, it is highly advisable to save your logical configuration and related data/files (such as SSL certificates, custom WAF rules, and antivirus whitelists) on a trusted file server before patching. This precaution ensures that you can reinstall your appliance from scratch using the latest version and then restore your configuration. The <u>Reinstalling the OS</u> section below explains this recovery process.
+<p>
+OS patches can be loaded from a trusted file server and applied to your CacheGuard appliance. (Refer to the <a href="/doc/command/access.html">access file</a> command to declare a file server as trusted.) To load a patch file named <i>CacheGuard-UF-64-2.1.3-patch.cgp</i> from a trusted TFTP server with the IP address <i>172.18.2.1</i>, use the following commands:
+<ul>
+  <li><i>system patch tftp 172.18.2.1 CacheGuard-UF-64-2.1.3-patch.cgp</i></li>
+  <li><i>apply</i></li>
+</ul>
+CacheGuard-OS patches can be downloaded from official CacheGuard servers on the Internet and directly applied from an appliance. Refer to the <a href="/doc/command/system.html">system</a> command in the Commands Manual for details.
+<p>
+<strong>Caution:</strong> During the patching process, ensure that power to the appliance is stable. If a power failure or interruption occurs during patching, or if the process fails for any unforeseen reason, the appliance may become inconsistent. In such a case, the only recovery option will be to reinstall CacheGuard-OS and manually restore your configuration.
+
+<a name='upgrade' class='doc-title'></a><h2>Reinstalling the OS</h2>
+Some major CacheGuard-OS releases are distributed without an accompanying patch. In such cases, you must reinstall CacheGuard-OS from scratch. To simplify recovery, you can save the appliance’s logical configuration and its related data/files (e.g. SSL certificates, custom WAF rules, antivirus whitelist) on a trusted file server for later restoration.
+<p>
+To save the logical configuration in a file named "<i>CG.conf</i>" and related data in a folder named "<i>CGFiles</i>" located on a TFTP server with the IP address <i>172.18.2.1</i>, use:
+<ul>
+  <li><i>conf save tftp 172.18.2.1 CG.conf</i></li>
+  <li><i>file save tftp 172.18.2.1 CGFiles</i></li>
+</ul>
+To restore the configuration and related files, use:
+<ul>
+  <li><i>conf load tftp 172.18.2.1 CG.conf</i></li>
+  <li><i>file load tftp 172.18.2.1 CGFiles</i></li>
+  <li><i>apply</i></li>
+</ul>
+Please note that there are limitations to this logical backup and restore method. The following data/files are not saved and therefore cannot be restored:
+<ul>
+  <li>Administrator passwords</li>
+  <li>Antivirus signatures</li>
+  <li>URL lists</li>
+</ul>
+However, antivirus signatures and URL lists are automatically downloaded from trusted servers during the <i>apply</i> operation. If you have secondary administrator users, you will need to recreate them manually.
+
+<a name='reboot' class='doc-title'></a><h2>Rebooting the Appliance</h2>
+
+In certain circumstances, you may need to reboot your CacheGuard appliance. To reboot the appliance, use the <a href="/doc/command/reboot.html">reboot</a> command.

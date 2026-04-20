@@ -1,0 +1,459 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       Commands
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+source functions
+
+check-dhcp()
+{
+    test -n "${1}" || return 1
+
+    case "${1}" in
+	fixed|range|peer|report)
+	    return 0
+	    ;;
+	*)
+	    return 1
+	    ;;
+    esac
+}
+
+check-dhcp-peer-role()
+{
+    test -n "${1}" || return 1
+
+    case "${1}" in
+	master|slave)
+	    return 0
+	    ;;
+	*)
+	    return 1
+	    ;;
+    esac
+}
+
+show-fixed-ips1() {
+
+    local new
+    local ranges=${2}
+
+    echo-command-form "dhcp fixed"
+    if test "${1}" == "new" ; then
+	echo-mark-new
+    else
+	echo-mark-cur
+    fi
+
+    if test -z "${ranges}" ; then
+	echo-value-null
+    else
+	local hostname mac ip
+	local i=0 n=0 elt range
+
+	for elt in ${ranges}
+	do
+	    range=$[${i} % 3]
+	    case ${range} in
+		0)
+		    hostname=${elt}
+		    ;;
+		1)
+		    mac=${elt}
+		    ;;
+		2)
+		    ip=${elt}
+		    test ${n} -eq 0 || echo-blank-command
+		    echo-value "${hostname} ${mac} ${ip}"
+		    ((n++))
+		    ;;
+		*)
+		    echo
+		    return 255
+		    ;;
+	    esac
+	    ((i++))
+	done
+    fi
+}
+
+show-fixed-ips()
+{
+    show-fixed-ips1 'cur' "${CURRENT_DHCP_FIXED_LIST}"
+    test "${DHCP_FIXED_LIST}" == "${CURRENT_DHCP_FIXED_LIST}" || show-fixed-ips1 'new' "${DHCP_FIXED_LIST}"
+}
+
+check-range-nb()
+{
+    local len=$(record2-length-list "${DHCP_RANGE_LIST}")
+    test ${len} -lt ${MAX_DHCP_RANGE_NB}
+}
+
+show-ranges1() {
+
+    local new
+    local ranges=${2}
+
+    echo-command-form "dhcp range"
+    if test "${1}" == "new" ; then
+	echo-mark-new
+    else
+	echo-mark-cur
+    fi
+
+
+    if test -z "${ranges}" ; then
+	echo-value-null
+    else
+
+	local ip1 ip2
+	local i=0 n=0 elt range
+
+	for elt in ${ranges}
+	do
+	    range=$[${i} % 2]
+	    case ${range} in
+		0)
+		    ip1=${elt}
+		    ;;
+		1)
+		    ip2=${elt}
+		    test ${n} -eq 0 || echo-blank-command
+		    echo-value "${ip1} ${ip2}"
+		    ((n++))
+		    ;;
+		*)
+		    return 255
+		    ;;
+	    esac
+	    ((i++))
+	done
+    fi
+}
+
+show-ranges()
+{
+    show-ranges1 'cur' "${CURRENT_DHCP_RANGE_LIST}"
+    test "${DHCP_RANGE_LIST}" == "${CURRENT_DHCP_RANGE_LIST}" || show-ranges1 'new' "${DHCP_RANGE_LIST}"
+}
+
+range-remove()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    local in_ip1=${1}
+    local in_ip2=${2}
+
+    local out_list
+    local ip1 ip2
+    local elt i=0 range
+
+    for elt in ${DHCP_RANGE_LIST}
+    do
+	range=$[${i} % 2]
+	case ${range} in
+	    0)
+		ip1=${elt}
+		;;
+	    1)
+		ip2=${elt}
+		test "${ip1} ${ip2}" == "${in_ip1} ${in_ip2}" || out_list="${out_list} ${ip1} ${ip2}"
+		;;
+	    *)
+		return 1
+		;;
+	esac
+	((i++))
+    done
+    out_list="${out_list:1}"
+    echo -n "${out_list}"
+    return 0
+}
+
+check-peer-nb()
+{
+    local len
+    len=$(length-list "${DHCP_PEER_LIST}")
+    test ${len} -lt ${MAX_DHCP_PEER_NB}
+}
+
+show-peers1()
+{
+    local new
+
+    local peers=${2}
+
+    echo-command-form "dhcp peer"
+    if test "${1}" == "new" ; then
+	echo-mark-new
+    else
+	echo-mark-cur
+    fi
+
+    if test -z "${peers}" ; then
+	echo-value-null
+    else
+	local i=0 n=0 elt range
+	local role ip
+
+	for elt in ${peers}
+	do
+	    range=$[${i} % 2]
+	    case ${range} in
+		0)
+		    role=${elt}
+		    ;;
+		1)
+		    ip=${elt}
+		    test ${n} -eq 0 || echo-blank-command
+		    echo-value "${role} ${ip}"
+		    ((n++))
+		    ;;
+		*)
+		    return 1
+		    ;;
+	    esac
+	    ((i++))
+	done
+    fi
+}
+
+show-peers()
+{
+    show-peers1 'cur' "${CURRENT_DHCP_PEER_LIST}"
+    test "${CURRENT_DHCP_PEER_LIST}" == "${DHCP_PEER_LIST}" || show-peers1 'new' "${DHCP_PEER_LIST}"
+}
+
+peer-remove()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 1
+    local in_role=${1}
+    local in_ip=${2}
+
+    local out_list=""
+    local role ip
+    local elt i=0 range
+    
+    for elt in ${DHCP_PEER_LIST}
+    do
+	range=$[${i} % 2]
+	case ${range} in
+	    0)
+		role=${elt}
+		;;
+	    1)
+		ip=${elt}
+		if test "${role} ${ip}" != "${in_role} ${in_ip}" ; then
+		    out_list="${out_list} ${role} ${ip}"
+		fi
+		;;
+	    *)
+		return 1
+		;;
+	esac
+	i=$[${i} + 1]
+    done
+    echo "${out_list}"
+    return 0
+}
+
+show-dhcp()
+{
+    echo-begin-show
+    case "${1}" in
+	fixed)
+	    show-fixed-ips
+	    ;;
+	range)
+	    show-ranges
+	    ;;
+	peer)
+	    show-peers
+	    ;;
+	leases)
+	    show-dhcp-leases
+	    ;;
+	"")
+	    show-fixed-ips
+	    show-ranges
+	    show-peers
+	    ;;
+	*)
+	    error 255
+	    ;;
+    esac
+    echo-end-show
+}
+
+run()
+{
+    contextual-command-is-allowed || return 207
+
+    if test -z "${ARGS[1]}" ; then
+	show-dhcp
+	return 0
+    fi
+
+    local dt=${ARGS[1]}
+    check-dhcp ${dt} || return 1
+    
+    if test -z "${ARGS[2]}" ; then
+	case ${dt} in
+	    fixed)
+		show-dhcp fixed
+		;;
+	    range)
+		show-dhcp range
+		;;
+	    peer)
+		show-dhcp peer
+		;;
+	    report)
+		show-dhcp leases
+		;;
+	    *)
+		error 255
+		;;
+	esac
+	return 0
+    fi
+    
+    local act=${ARGS[2]}
+    check-action ${act} || return 122
+
+    case ${act} in
+	raz)
+	    case ${dt} in
+		fixed)
+		    unset DHCP_FIXED_LIST
+		    ;;
+		range)
+		    unset DHCP_RANGE_LIST
+		    ;;
+		peer)
+		    unset DHCP_PEER_LIST
+		    ;;
+		*)
+		    error 255
+		    ::
+	    esac
+	    ;;
+	add|del)
+	    case ${dt} in
+		fixed)
+		    test -n "${ARGS[3]}" || return 1
+		    local hostname=${ARGS[3]}
+		    check-domainname ${hostname} || return 16
+		    ;;
+		range)
+		    test -n "${ARGS[3]}" || return 1
+		    local ip1=${ARGS[3]}
+		    check-ip ${ip1} || return 12
+		    
+		    test -n "${ARGS[4]}" || return 1
+		    local ip2=${ARGS[4]}
+		    check-ip ${ip2} || return 12
+		    ;;
+		peer)
+		    test -n "${ARGS[3]}" || return 1
+		    local role=${ARGS[3]}
+		    check-dhcp-peer-role ${role} || return 69
+
+		    test -n "${ARGS[4]}" || return 1
+		    local ip1=${ARGS[4]}
+		    check-ip ${ip1} || return 12
+		    ;;
+		*)
+		    error 255
+		    ::
+	    esac
+	    
+	    if test ${act} == add ; then
+		case ${dt} in
+		    fixed)
+			test -n "${ARGS[4]}" || return 1
+			local mac=${ARGS[4]}
+			check-mac ${mac} || return 189
+
+			test -n "${ARGS[5]}" || return 1
+			local ip=${ARGS[5]}
+			check-ip ${ip} || return 12
+			local len=$(record3-length-list "${DHCP_FIXED_LIST}")
+			test ${len} -le ${MAX_DHCP_FIXED_NB} || return 90
+
+			mac=${mac^^}
+			;;
+		    range)
+			check-range-nb || return 90
+			test ${ip1} == ${ip2} || ip-lt ${ip1} ${ip2} || return 68
+			;;
+		    peer)
+			check-peer-nb || return 90
+			;;
+		    *)
+			error 255
+			::
+		esac
+	    fi
+	    
+	    case ${dt} in
+		fixed)
+		    test ${act} != del || DHCP_FIXED_LIST=$(remove-record-from-list 3 1 "${hostname}" "${DHCP_FIXED_LIST}")
+		    ;;
+		range)
+		    export DHCP_RANGE_LIST=$(range-remove ${ip1} ${ip2})
+		    ;;
+		peer)
+		    export DHCP_PEER_LIST=$(peer-remove ${role} ${ip1})
+		    ;;
+		*)
+		    error 255
+		    ::
+	    esac
+	    
+	    if test ${act} == add ; then
+		case ${dt} in
+		    fixed)
+			DHCP_FIXED_LIST=$(insert-record-in-slist 3 1 "${hostname} ${mac} ${ip}" "${DHCP_FIXED_LIST}")
+			;;
+		    range)
+			DHCP_RANGE_LIST="${DHCP_RANGE_LIST} ${ip1} ${ip2}"
+			;;
+		    peer)
+			DHCP_PEER_LIST="${DHCP_PEER_LIST} ${role} ${ip1}"
+			;;
+		    *)
+			error 255
+			;;
+		esac
+	    fi
+	    ;;
+	*)
+	    error 255
+	    ;;
+    esac
+    
+    SAVENV=1
+}
+
+main "${@}"

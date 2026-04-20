@@ -1,0 +1,2 @@
+Connection failed
+The remote domain <code><strong>%H</strong></code> is unreachable at this moment

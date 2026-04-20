@@ -1,0 +1,626 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       Commands
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+source functions
+
+initialise-setup()
+{
+    test -n "${1}" || retrun 1
+    local role=${1}
+
+    local i bar len_bar=79
+    local i blk="|"
+    local len_blk=$((len_bar - 2))
+
+    for ((i=0 ; i< ${len_blk} ; i++))
+    do
+	bar="${bar}-"
+	blk="${blk} "
+    done
+    bar="${bar}--"
+    blk="${blk}|"
+
+    SETUP_DIALOG_OK=0
+    SETUP_DIALOG_OPTIONS="--no-shadow --ascii-lines --colors"
+    SETUP_PROGRAM_NAME="Startup Configuration"
+    SETUP_BACK_TITLE="${COMMERCIAL_NAME} ${role^} ${SETUP_PROGRAM_NAME}"
+    SETUP_FILE=${ADMIN_TMP_DIR}/${SETUP}.conf.${$}
+    SETUP_BAR=${bar}
+    SETUP_BLK=${blk}
+    SETUP_SYSTEM_HARD=$(get-machine-type)
+
+    set-first-startup-action
+    initialise ${MANAGER_CONTEXT_ENV}
+}
+
+clean-setup()
+{
+    rm -f ${SETUP_FILE}
+}
+
+exit-cb()
+{
+    clean-setup
+    echo ; echo
+    exit 0
+}
+
+exec-setup-conf()
+{
+    test -n "${1}" || return 1
+    local message=${1}
+    test -f ${SETUP_FILE} || return 11
+
+    local ret path=${PATH}
+    PATH=${COMMAND_PATH}:${path}
+    local tty=$(tty 2> /dev/null)
+
+    transaction close
+    test ! -s ${SETUP_FILE} || transaction open < ${SETUP_FILE}
+
+    transaction commit log 2>&1 | dialog ${SETUP_DIALOG_OPTIONS} --backtitle "${SETUP_BACK_TITLE}" --title "${message}" --programbox "List of commands to execute:" 22 65
+
+    ret=${PIPESTATUS[0]}
+
+    clean-setup
+
+    PATH=${path}
+    return ${ret}
+}
+
+display-errors()
+{
+    local errors=${1}
+    local err
+
+    for err in ${errors}
+    do
+	display-error ${err}
+    done
+}
+
+check-gw-connected()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 1
+    test -n "${3}" || return 1
+    local gw=${1}
+    local ip=${2}
+    local mk=${3}
+
+    local net_brd
+
+    local net=$(ipcalc -s ${ip} ${mk} -n)
+    local brd=$(ipcalc -s ${ip} ${mk} -b)
+
+    net=${net/NETWORK=/}
+    brd=${brd/BROADCAST=/}
+
+    net_brd=$(ip-is-included-in-valid-boradcast ${gw} ${net} ${brd} ${mk})
+}
+
+echo-welcome-msg()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    test -n "${3}" || return 3
+    test -n "${4}" || return 4
+    test -n "${5}" || return 5
+    local message_title=${1}
+    local message_overview=${1}
+    local message_read=${3}
+    local message_exec=${4}
+    local message_apply=${5}
+
+    clear
+
+    dialog ${SETUP_DIALOG_OPTIONS} --backtitle "${SETUP_BACK_TITLE}" --title "Welcome" --msgbox "\nWelcome to the \Z1setup\Zn program. ${message_overview}\n\n${message_read}\n${message_exec}\n${message_apply}" 12 60
+}
+
+read-timezone-conf()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    local message=${1}
+    local main_title=${2}
+
+    test ${SETUP_SYSTEM_HARD} != "OS" || return 0
+
+    local continent timezones timezone
+
+    dialog ${SETUP_DIALOG_OPTIONS} --backtitle "${SETUP_BACK_TITLE}" --title "${message}" --no-cancel --default-item "${TIMEZONE/\/*}" --menu "\nPlease select your continent:\n\n" 17 50 8 Africa "The Africa Continent" America "The America Continent" Antarctica "The Antarctica Continent" Asia "The Asia Continent" Atlantic "The Atlantic Continent" Australia "The Australia Continent" Europe "The Europe Continent" Pacific "The Pacific Continent" 2> ${ADMIN_TMP_DIR}/setup.${$}
+
+    read continent < ${ADMIN_TMP_DIR}/setup.${$}
+    rm -f ${ADMIN_TMP_DIR}/setup.${$}
+
+    while read timezone
+    do
+	test -n "${timezone}" || continue
+	test "${timezone/\/*}" == "${continent}" || continue
+	timezones="${timezones} ${timezone/${continent}\/} ${timezone}"
+    done < /etc/timezones
+    timezones=${timezones:1}
+
+    dialog ${SETUP_DIALOG_OPTIONS} --backtitle "${SETUP_BACK_TITLE}" --title "${main_title}" --no-cancel --default-item ${TIMEZONE/${continent}\/} --menu "\nPlease select your timezone:\n\n" 20 0 16 ${timezones} 2> ${ADMIN_TMP_DIR}/setup.${$}
+    read timezone < ${ADMIN_TMP_DIR}/setup.${$}
+    rm -f ${ADMIN_TMP_DIR}/setup.${$}
+
+    TIMEZONE=${continent}/${timezone}
+}
+
+read-network-conf()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    local role=${1}
+    local message=${2}
+
+    case ${role} in
+	gateway)
+	    local ip_internal_ip=${DEFAULT_GATEWAY_IP_INTERNAL_IP}
+	    local default_ip_internal_ip=$(if test ${IP_INTERNAL_IP} == 0.0.0.0 ; then echo ${ip_internal_ip} ; else echo ${IP_INTERNAL_IP} ; fi)
+
+	    local ip_internal_mk=${DEFAULT_GATEWAY_IP_INTERNAL_MASK}
+	    local default_ip_internal_mk=$(if test ${IP_INTERNAL_MASK} == 0.0.0.0 ; then echo ${ip_internal_mk} ; else echo ${IP_INTERNAL_MASK} ; fi)
+
+	    local ip_external_ip=${DEFAULT_IP_EXTERNAL_IP}
+	    local default_ip_external_ip=$(if test ${IP_EXTERNAL_IP} == 0.0.0.0 ; then echo ${ip_external_ip} ; else echo ${IP_EXTERNAL_IP} ; fi)
+
+	    local ip_external_mk=${DEFAULT_IP_EXTERNAL_MASK}
+	    local default_ip_external_mk=$(if test ${IP_EXTERNAL_MASK} == 0.0.0.0 ; then echo ${ip_external_mk} ; else echo ${IP_EXTERNAL_MASK} ; fi)
+
+	    local dns_ip=127.0.0.1
+	    ;;
+	manager)
+	    local ip_internal_ip=${DEFAULT_MANAGER_IP_INTERNAL_IP}
+	    local default_ip_internal_ip=$(if test ${IP_INTERNAL_IP} == 0.0.0.0 ; then echo ${ip_internal_ip} ; else echo ${IP_INTERNAL_IP} ; fi)
+
+	    local ip_internal_mk=${DEFAULT_MANAGER_IP_INTERNAL_MASK}
+	    local default_ip_internal_mk=$(if test ${IP_INTERNAL_MASK} == 0.0.0.0 ; then echo ${ip_internal_mk} ; else echo ${IP_INTERNAL_MASK} ; fi)
+
+	    local dns_ip
+	    ;;
+	*)
+	    return 255
+	    ;;
+    esac
+
+    local ip_default_route_ip
+    local in_errors ex_errors ns_errors gw_errors
+    local errors error
+
+    local port_wadmin_port=8090
+    local port_proxy_port=8080
+
+    ip_internal_ip=${default_ip_internal_ip}
+    ip_internal_mk=${default_ip_internal_mk}
+
+    case ${role} in
+	gateway)
+	    ip_external_ip=${default_ip_external_ip}
+	    ip_external_mk=${default_ip_external_mk}
+	    ip_default_route_ip=$(get-last-ip ${ip_external_ip} ${ip_external_mk})
+
+	    local line i
+
+	    while true
+	    do
+		case ${CLOUD_NAME} in
+		    aws|azure)
+			break
+		    ;;
+		    "")
+			dialog ${SETUP_DIALOG_OPTIONS} --backtitle "${SETUP_BACK_TITLE}" --title "${message}" --no-cancel --form "\nPlease enter your network configuration:\n(use arrow keys)" 0 0 5 \
+			       "Internal IP address:" 1 1  "${ip_internal_ip}" 1 40 16 0 \
+			       "Internal IP mask:" 2 1  "${ip_internal_mk}" 2 40 16 0 \
+			       "External IP address:" 3 1  "${ip_external_ip}" 3 40 16 0 \
+			       "External IP mask:" 4 1  "${ip_external_mk}" 4 40 16 0 \
+			       "Default gateway IP address:" 5 1  "${ip_default_route_ip}" 5 40 16 0 \
+			       2> ${ADMIN_TMP_DIR}/setup.${$}
+			;;
+		    *)
+			;;
+		esac
+
+		ret=${?}
+
+		unset in_errors ex_errors gw_errors errors
+
+		i=0
+		while read line
+		do
+		    case ${i} in
+			0)
+			    ip_internal_ip=${line}
+			    ;;
+			1)
+			    ip_internal_mk=${line}
+			    ;;
+			2)
+			    ip_external_ip=${line}
+			    ;;
+			3)
+			    ip_external_mk=${line}
+			    ;;
+			4)
+			    ip_default_route_ip=${line}
+			    ;;
+			*)
+			    ;;
+		    esac
+		    ((i++))
+		done < ${ADMIN_TMP_DIR}/setup.${$}
+		rm -f ${ADMIN_TMP_DIR}/setup.${$}
+
+		check-ip ${ip_internal_ip} || in_errors="${in_errors} 12"
+		check-mask ${ip_internal_mk} || in_errors="${in_errors} 13"
+		test -n "${in_errors}" || host-ip-address ${ip_internal_ip} ${ip_internal_mk} || in_errors="${in_errors} 62"
+
+		check-ip ${ip_external_ip} || ex_errors="${ex_errors} 12"
+		check-mask ${ip_external_mk} || ex_errors="${ex_errors} 13"
+		test -n "${ex_errors}" || host-ip-address ${ip_external_ip} ${ip_external_mk} || ex_errors="${ex_errors} 62"
+
+		if test -n "${ip_default_route_ip}" ; then
+		    check-ip ${ip_default_route_ip} || gw_errors="${gw_errors} 12"
+		    check-gw-connected ${ip_default_route_ip} ${ip_external_ip} ${ip_external_mk} || gw_errors="${gw_errors} 110"
+		fi
+
+		in_errors=${in_errors:1}
+		ex_errors=${ex_errors:1}
+		gw_errors=${gw_errors:1}
+
+		test -n "${in_errors}" -o -n "${ex_errors}" -o -n "${gw_errors}" || break
+
+		if test -n "${in_errors}" ; then
+		    errors="${errors}\n\Z1Internal IP ${ip_internal_ip}/${ip_internal_mk}:\Zn\n"
+		    for error in ${in_errors}
+		    do
+			errors="${errors}*** Errors ${error}: ${Errors[${error}]}\n"
+		    done
+		fi
+
+		if test -n "${ex_errors}" ; then
+		    errors="${errors}\n\Z1External IP ${ip_external_ip}/${ip_external_mk}:\Zn\n"
+		    for error in ${ex_errors}
+		    do
+			errors="${errors}*** Errors ${error}: ${Errors[${error}]}\n"
+		    done
+		fi
+
+		if test -n "${gw_errors}" ; then
+		    errors="${errors}\n\Z1Default Gateway ${ip_default_route_ip}:\Zn\n"
+		    for error in ${gw_errors}
+		    do
+			errors="${errors}*** Errors ${error}: ${Errors[${error}]}\n"
+		    done
+		fi
+
+		dialog ${SETUP_DIALOG_OPTIONS} --backtitle "${SETUP_BACK_TITLE}" --title "Network configuration error" --msgbox "${errors}" 0 0
+	    done
+	    ;;
+	manager)
+	    ip_default_route_ip=$(get-last-ip ${ip_internal_ip} ${ip_internal_mk})
+	    dns_ip=${ip_default_route_ip}
+
+	    local line i
+
+	    while true
+	    do
+		case ${CLOUD_NAME} in
+		    aws|azure)
+			break
+		    ;;
+		    "")
+			dialog ${SETUP_DIALOG_OPTIONS} --backtitle "${SETUP_BACK_TITLE}" --title "${message}" --no-cancel --form "\nPlease enter your network configuration:\n(use arrow keys)" 0 0 4 \
+			       "Internal IP address:" 1 1  "${ip_internal_ip}" 1 40 16 0 \
+			       "Internal IP mask:" 2 1  "${ip_internal_mk}" 2 40 16 0 \
+			       "Default gateway IP address:" 3 1  "${ip_default_route_ip}" 3 40 16 0 \
+			       "DNS IP address:" 4 1  "${dns_ip}" 4 40 16 0 \
+			       2> ${ADMIN_TMP_DIR}/setup.${$}
+			;;
+		    *)
+			;;
+		esac
+
+		ret=${?}
+
+		unset in_errors ns_errors gw_errors errors
+
+		i=0
+		while read line
+		do
+		    case ${i} in
+			0)
+			    ip_internal_ip=${line}
+			    ;;
+			1)
+			    ip_internal_mk=${line}
+			    ;;
+			2)
+			    ip_default_route_ip=${line}
+			    ;;
+			3)
+			    dns_ip=${line}
+			    ;;
+			*)
+			    ;;
+		    esac
+		    ((i++))
+		done < ${ADMIN_TMP_DIR}/setup.${$}
+		rm -f ${ADMIN_TMP_DIR}/setup.${$}
+
+		check-ip ${ip_internal_ip} || in_errors="${in_errors} 12"
+		check-mask ${ip_internal_mk} || in_errors="${in_errors} 13"
+		test -n "${in_errors}" || host-ip-address ${ip_internal_ip} ${ip_internal_mk} || in_errors="${in_errors} 62"
+
+		if test -n "${ip_default_route_ip}" ; then
+		    check-ip ${ip_default_route_ip} || gw_errors="${gw_errors} 12"
+		    check-gw-connected ${ip_default_route_ip} ${ip_internal_ip} ${ip_internal_mk} || gw_errors="${gw_errors} 110"
+		fi
+
+		if test -n "${dns_ip}" ; then
+		    check-ip ${dns_ip} || ns_errors="${ns_errors} 12"
+		    check-local-ip ${dns_ip} || ns_errors="${ns_errors} 38"
+		fi
+
+		in_errors=${in_errors:1}
+		gw_errors=${gw_errors:1}
+		ns_errors=${ns_errors:1}
+
+		test -n "${in_errors}" -o -n "${ns_errors}" -o -n "${gw_errors}" || break
+
+		if test -n "${in_errors}" ; then
+		    errors="${errors}\n\Z1Internal IP ${ip_internal_ip}/${ip_internal_mk}:\Zn\n"
+		    for error in ${in_errors}
+		    do
+			errors="${errors}*** Errors ${error}: ${Errors[${error}]}\n"
+		    done
+		fi
+
+		if test -n "${ns_errors}" ; then
+		    errors="${errors}\n\Z1DNS IP ${dns_ip}:\Zn\n"
+		    for error in ${ns_errors}
+		    do
+			errors="${errors}*** Errors ${error}: ${Errors[${error}]}\n"
+		    done
+		fi
+
+		if test -n "${gw_errors}" ; then
+		    errors="${errors}\n\Z1Default Gateway ${ip_default_route_ip}:\Zn\n"
+		    for error in ${gw_errors}
+		    do
+			errors="${errors}*** Errors ${error}: ${Errors[${error}]}\n"
+		    done
+		fi
+
+		dialog ${SETUP_DIALOG_OPTIONS} --backtitle "${SETUP_BACK_TITLE}" --title "Network configuration error" --msgbox "${errors}" 0 0
+	    done
+	    ;;
+	*)
+	    return 255
+	    ;;
+    esac
+
+    local admin_internal_net=$(get-network ${ip_internal_ip} ${ip_internal_mk})
+    local admin_external_net=$(get-network ${ip_external_ip} ${ip_external_mk})
+    local ip_file_ip=$(get-first-ip ${ip_internal_ip} ${ip_internal_mk})
+
+    clean-setup
+
+    case ${role} in
+	gateway)
+	    case ${CLOUD_NAME} in
+		aws|azure)
+		    ;;
+		"")
+		    echo ip internal ${ip_internal_ip} ${ip_internal_mk}		>> ${SETUP_FILE}
+		    echo ip external ${ip_external_ip} ${ip_external_mk}		>> ${SETUP_FILE}
+		    echo ip route raz							>> ${SETUP_FILE}
+		    test -z "${ip_default_route_ip}" || \
+			echo ip route add default ${ip_default_route_ip}		>> ${SETUP_FILE}
+		    ;;
+		*)
+		    ;;
+	    esac
+
+	    echo dns raz      								>> ${SETUP_FILE}
+	    echo dns add ${dns_ip}      						>> ${SETUP_FILE}
+
+	    if test -z "${CLOUD_NAME}" ; then
+		echo access file add internal ${ip_file_ip}	      			>> ${SETUP_FILE}
+		echo access mon add internal ${ip_file_ip}	      			>> ${SETUP_FILE}
+	    fi
+
+	    echo port wadmin ${port_wadmin_port} 					>> ${SETUP_FILE}
+    	    echo admin ssh on 								>> ${SETUP_FILE}
+	    echo admin wadmin on 							>> ${SETUP_FILE}
+	    echo mode transparent on 							>> ${SETUP_FILE}
+	    ;;
+
+	manager)
+	    case ${CLOUD_NAME} in
+		aws|azure)
+		    ;;
+		"")
+		    echo ip internal ${ip_internal_ip} ${ip_internal_mk}		>> ${SETUP_FILE}
+		    echo ip route raz							>> ${SETUP_FILE}
+		    test -z "${ip_default_route_ip}" || \
+			echo ip route add default ${ip_default_route_ip}		>> ${SETUP_FILE}
+		    ;;
+		*)
+		    ;;
+	    esac
+
+	    echo dns raz      								>> ${SETUP_FILE}
+	    test -z "${dns_ip}" || echo dns add ${dns_ip}      				>> ${SETUP_FILE}
+
+	    if test -z "${CLOUD_NAME}" ; then
+		echo access file add internal ${ip_file_ip}	      			>> ${SETUP_FILE}
+		echo access mon add internal ${ip_file_ip}	      			>> ${SETUP_FILE}
+	    fi
+
+	    echo port wadmin ${port_wadmin_port} 					>> ${SETUP_FILE}
+	    echo admin ssh on 								>> ${SETUP_FILE}
+	    echo admin wadmin on 							>> ${SETUP_FILE}
+	    ;;
+
+	*)
+	    return 255
+	    ;;
+    esac
+
+    test ${SETUP_SYSTEM_HARD} == "OS" || echo timezone ${TIMEZONE}			>> ${SETUP_FILE}
+
+    ADMIN_URL="https://${ip_internal_ip}:${port_wadmin_port}"
+}
+
+apply-setup-conf()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    local message_apply=${1}
+    local message_setup=${2}
+
+    local ret
+
+    dialog ${SETUP_DIALOG_OPTIONS} --backtitle "${SETUP_BACK_TITLE}" --title "${message_apply}" --yesno "\nDo you confirm the apply operation?" 0 0
+    if test ${?} -eq ${SETUP_DIALOG_OK} ; then
+	apply force
+	ret=${?}
+    else
+	dialog ${SETUP_DIALOG_OPTIONS} --backtitle "${SETUP_BACK_TITLE}" --title "Apply abandoned" --msgbox "${message_setup}" 6 40
+	ret=11
+    fi
+
+    return ${ret}
+}
+
+apply-performed-msg()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    local message_title=${1}
+    local message_setup=${2}
+
+    local message_0="You have performed a basic startup configuration."
+
+    local message_1="1- Wait a few seconds for the apply termination."
+    local message_11="   Use the command 'apply report' to follow the apply state."
+
+    local message_2="2- Connect the internal (${BOND_INTERNALS/ *}) port to your LAN."
+    local message_21="   Connect the external (${BOND_EXTERNALS/ *}) port to your internet router."
+    
+    local message_3="3- Configure the appliance via the CLI or the Web GUI."
+    local message_31="   The Web GUI administration URL is: ${ADMIN_URL}"
+    local message_32="   If using the CLI, use the command 'help' to get help. Use the"
+    local message_33="   <TAB> key to get command completions and arguments."
+
+    dialog ${SETUP_DIALOG_OPTIONS} --backtitle "${SETUP_BACK_TITLE}" --title "Final instructions" --msgbox "\n${message_0}\n\n${message_1}\n${message_11}\n\n${message_2}\n${message_21}\n\n${message_3}\n${message_31}\n${message_32}\n${message_33}\n\n${message_setup}" 18 70
+    clear
+}
+
+align-message()
+{
+    test -n "${1}" || retrun 1
+    
+    local len=${1}
+    local message="| ${2}"
+
+    local len_message=${#message} i
+    len=$[${len} - ${len_message} - 2]
+    
+    for ((i=0 ; i < ${len} ; i++))
+    do
+	message="${message} "
+    done
+
+    local message="${message} |"
+
+    echo "${message}"
+    return 0
+}
+
+run()
+{
+    test -n "${1}" || retrun 1
+    local role=${1}
+    shift
+
+    test -z "${TRANSACTION}" || return 106
+    test ${TERM} != ${WADMIN_TERM} || return 0
+    test "${__BATCH_MODE}" != yes || error 111
+
+    check-lock || return 123
+
+    push-args "${@}"
+    initialise-setup ${role}
+
+    trap exit-cb INT QUIT TERM
+
+    local message_title="${SETUP_BACK_TITLE}"
+    local message_overview="This program performs a startup configuration by:"
+    local message_read="1- Reading some basic parameters."
+    local message_exec="2- Executing commands with entered parameters."
+    local message_apply="3- Applying the new configuration to the system."
+    local message_setup="You can run this program at any time by typing the 'setup' command."
+
+    echo-welcome-msg "${message_title}" "${message_overview}" "${message_read}" "${message_exec}" "${message_apply}" || return 0
+    read-timezone-conf "${message_read}" "${message_read}" || return 0
+    read-network-conf ${role} "${message_read}" || return 0
+    exec-setup-conf "${message_exec}" || return 0
+    apply-setup-conf "${message_apply}" "${message_setup}" || return 0
+    apply-performed-msg "${message_title}" "${message_setup}" || return 0
+}
+
+run-setup()
+{
+    test -z "${TRANSACTION}" || return 106
+    local role=$(get-contextual-role)
+
+    case ${role} in
+	gateway)
+	    ;;
+	manager)
+	    ! is-in-manager-exec-context || error 234
+	    ;;
+	*)
+	    error 255
+	    return 255
+	    ;;
+    esac
+
+    if ! user-has-admin-rights ; then
+	error 31
+	return 31
+    fi
+
+    local ret
+
+    run ${role} "${@}"
+    ret=${?}
+
+    test ${ret} -eq 0 || error ${ret}
+}
+
+run-setup "${@}"

@@ -1,0 +1,9 @@
+Options -Indexes -FollowSymLinks
+AddType application/x-x509-ca-cert .crt
+AddType application/x-pkcs12 .p12 .pfx
+AddType application/x=apple-aspen-config .mobileconfig
+AddType application/vnd.strongswan.profile .sswan
+AddType application/x-openvpn-profile .ovpn
+AddType application/x-openvpn-certificate .ovpn12
+AddType application/octet-stream .ps1
+AddType application/octet-stream .bash

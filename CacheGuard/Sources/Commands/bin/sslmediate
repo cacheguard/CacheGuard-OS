@@ -1,0 +1,400 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       Commands
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+source functions
+
+SSLMEDIATE_EXCEPTION_COL=38
+
+show-sslmediate-transparent()
+{
+    echo-begin-show
+    echo-command-form "sslmediate transparent"
+    local val=$(external-form ${CURRENT_SSLMEDIATE_TRANSPARENT})
+    echo-mark-cur
+    echo-value "${val}"
+
+    if test "${CURRENT_SSLMEDIATE_TRANSPARENT}" != "${SSLMEDIATE_TRANSPARENT}" ; then
+	echo-command-form "sslmediate transparent"
+	echo-mark-new
+	val=$(external-form ${SSLMEDIATE_TRANSPARENT})
+	echo-value "${val}"
+    fi
+    echo-end-show
+}
+
+show-sslmediate-expired()
+{
+    echo-command-form "sslmediate expired"
+    local val=$(external-form ${CURRENT_SSLMEDIATE_EXPIRED})
+    echo-mark-cur
+    echo-value "${val}"
+
+    if test "${CURRENT_SSLMEDIATE_EXPIRED}" != "${SSLMEDIATE_EXPIRED}" ; then
+	echo-command-form "sslmediate expired"
+	echo-mark-new
+	val=$(external-form ${SSLMEDIATE_EXPIRED})
+	echo-value "${val}"
+    fi
+}
+
+show-sslmediate-premature()
+{
+    echo-command-form "sslmediate premature"
+    local val=$(external-form ${CURRENT_SSLMEDIATE_PREMATURE})
+    echo-mark-cur
+    echo-value "${val}"
+
+    if test "${CURRENT_SSLMEDIATE_PREMATURE}" != "${SSLMEDIATE_PREMATURE}" ; then
+	echo-command-form "sslmediate premature"
+	echo-mark-new
+	val=$(external-form ${SSLMEDIATE_PREMATURE})
+	echo-value "${val}"
+    fi
+}
+
+show-sslmediate-selfsigned()
+{
+    echo-command-form "sslmediate selfsigned"
+    local val=$(external-form ${CURRENT_SSLMEDIATE_SELFSIGNED})
+    echo-mark-cur
+    echo-value "${val}"
+
+    if test "${CURRENT_SSLMEDIATE_SELFSIGNED}" != "${SSLMEDIATE_SELFSIGNED}" ; then
+	echo-command-form "sslmediate selfsigned"
+	echo-mark-new
+	val=$(external-form ${SSLMEDIATE_SELFSIGNED})
+	echo-value "${val}"
+    fi
+}
+
+show-sslmediate()
+{
+    echo-begin-show
+    case "${1}" in
+	premature|expired|selfsigned)
+	    show-sslmediate-${1}
+	    ;;
+	"")
+	    show-sslmediate-expired
+	    show-sslmediate-premature
+	    show-sslmediate-selfsigned
+ 	    ;;
+	*)
+	    return 255
+	    ;;
+    esac
+    echo-end-show
+}
+
+show-sslmediate-policy()
+{
+    echo-begin-show
+    echo-command-form "sslmediate policy"
+    echo-mark-cur
+    echo-value "${CURRENT_SSLMEDIATE_POLICY}"
+
+    if test "${CURRENT_SSLMEDIATE_POLICY}" != "${SSLMEDIATE_POLICY}" ; then
+	echo-command-form "sslmediate policy"
+	echo-mark-new
+	echo-value "${SSLMEDIATE_POLICY}"
+    fi
+    echo-end-show
+}
+
+show-sslmediate-exception-domainname2()
+{
+    local exceptions=${2}
+
+    echo-command-form "sslmediate exception domainname"
+    if test "${1}" == "new" ; then
+	echo-mark-new
+    else
+	echo-mark-cur
+    fi
+
+
+    if test -z "${exceptions}" ; then
+	echo-value-null ${SSLMEDIATE_EXCEPTION_COL}
+    else
+	local name i=0
+
+	for name in ${exceptions}
+	do
+	    test ${i} -eq 0 || echo-blank-command
+	    echo-value "${name}" ${SSLMEDIATE_EXCEPTION_COL}
+	    ((i++))
+	done
+    fi
+}
+
+show-sslmediate-exception-urllist2()
+{
+    local exceptions=${2}
+
+    echo-command-form "sslmediate exception urllist"
+    if test "${1}" == "new" ; then
+	echo-mark-new
+    else
+	echo-mark-cur
+    fi
+
+
+    if test -z "${exceptions}" ; then
+	echo-value-null ${SSLMEDIATE_EXCEPTION_COL}
+    else
+	local name i=0
+
+	for name in ${exceptions}
+	do
+	    test ${i} -eq 0 || echo-blank-command
+	    echo-value "${name}" ${SSLMEDIATE_EXCEPTION_COL}
+	    ((i++))
+	done
+    fi
+}
+
+show-sslmediate-exception-domainname1()
+{
+    show-sslmediate-exception-domainname2 'current' "${CURRENT_SSLMEDIATE_EXCEPTION_DOMAINNAME_LIST}"
+
+    if test "${CURRENT_SSLMEDIATE_EXCEPTION_DOMAINNAME_LIST}" != "${SSLMEDIATE_EXCEPTION_DOMAINNAME_LIST}" ; then
+	show-sslmediate-exception-domainname2 'new' "${SSLMEDIATE_EXCEPTION_DOMAINNAME_LIST}"
+	echo-command-form "sslmediate exception domainname"
+	echo-mark-dif
+	show-diff-list "${CURRENT_SSLMEDIATE_EXCEPTION_DOMAINNAME_LIST}" "${SSLMEDIATE_EXCEPTION_DOMAINNAME_LIST}" ${SSLMEDIATE_EXCEPTION_COL}
+    fi
+}
+
+show-sslmediate-exception-urllist1()
+{
+    show-sslmediate-exception-urllist2 'current' "${CURRENT_SSLMEDIATE_EXCEPTION_URLLIST_LIST}"
+
+    if test "${CURRENT_SSLMEDIATE_EXCEPTION_URLLIST_LIST}" != "${SSLMEDIATE_EXCEPTION_URLLIST_LIST}" ; then
+	show-sslmediate-exception-urllist2 'new' "${SSLMEDIATE_EXCEPTION_URLLIST_LIST}"
+	echo-command-form "sslmediate exception urllist"
+	echo-mark-dif
+	show-diff-list "${CURRENT_SSLMEDIATE_EXCEPTION_URLLIST_LIST}" "${SSLMEDIATE_EXCEPTION_URLLIST_LIST}" ${SSLMEDIATE_EXCEPTION_COL}
+    fi
+}
+
+show-sslmediate-exception-urllist()
+{
+    echo-begin-show
+    show-sslmediate-exception-urllist1
+    echo-end-show
+}
+
+show-sslmediate-exception-domainname()
+{
+    echo-begin-show
+    show-sslmediate-exception-domainname1
+    echo-end-show
+}
+
+show-sslmediate-exception()
+{
+    echo-begin-show
+    show-sslmediate-exception-domainname1
+    show-sslmediate-exception-urllist1
+    echo-end-show
+}
+
+manage-sslmediate-exception-domainname()
+{
+    if test -z "${1}" ; then show-sslmediate-exception-domainname ; return 0 ; fi
+
+    local action=${1}
+
+    case ${action} in
+	add|del)
+	    if test "${action}" == "add" ; then
+		local len=$(length-list "${SSLMEDIATE_EXCEPTION_DOMAINNAME_LIST}")
+		test ${len} -lt ${MAX_SSLMEDIATE_EXCEPTIONS_DOMAINNAME_NB} || return 90
+	    fi
+
+	    test -n "${2}" || return 1
+	    local name=${2}
+	    check-domainname ${name} || return 16
+
+	    case ${action} in
+		del)
+		    export SSLMEDIATE_EXCEPTION_DOMAINNAME_LIST=$(remove-record-from-list 1 1 "${name}" "${SSLMEDIATE_EXCEPTION_DOMAINNAME_LIST}")
+		    ;;
+		add)
+		    export SSLMEDIATE_EXCEPTION_DOMAINNAME_LIST=$(insert-record-in-slist 1 1 "${name}" "${SSLMEDIATE_EXCEPTION_DOMAINNAME_LIST}")
+		    ;;
+		*)
+		    return 255
+		    ;;
+	    esac
+	    SAVENV=1
+	    ;;
+	raz)
+	    export SSLMEDIATE_EXCEPTION_DOMAINNAME_LIST=''
+	    SAVENV=1
+	    ;;
+	*)
+	    return 1
+	    ;;
+    esac
+}
+
+manage-sslmediate-exception-urllist()
+{
+    if test -z "${1}" ; then show-sslmediate-exception-urllist ; return 0 ; fi
+
+    local action=${1}
+
+    case ${action} in
+	add|del)
+	    if test "${action}" == "add" ; then
+		local len=$(length-list "${SSLMEDIATE_EXCEPTION_URLLIST_LIST}")
+		test ${len} -lt ${MAX_URLLIST_NB} || return 90
+	    fi
+
+	    test -n "${2}" || return 1
+	    local name=${2}
+
+	    case ${action} in
+		del)
+		    export SSLMEDIATE_EXCEPTION_URLLIST_LIST=$(remove-record-from-list 1 1 "${name}" "${SSLMEDIATE_EXCEPTION_URLLIST_LIST}")
+		    ;;
+		add)
+		    export SSLMEDIATE_EXCEPTION_URLLIST_LIST=$(insert-record-in-slist 1 1 "${name}" "${SSLMEDIATE_EXCEPTION_URLLIST_LIST}")
+		    ;;
+		*)
+		    return 255
+		    ;;
+	    esac
+	    SAVENV=1
+	    ;;
+	raz)
+	    export SSLMEDIATE_EXCEPTION_URLLIST_LIST=''
+	    SAVENV=1
+	    ;;
+	*)
+	    return 1
+	    ;;
+    esac
+}
+
+manage-sslmediate-exception()
+{
+    if test -z "${1}" ; then show-sslmediate-exception ; return 0 ; fi
+
+    local exception_type=${1}
+
+    case ${exception_type} in
+	domainname|urllist)
+	    shift
+	    manage-sslmediate-exception-${exception_type} ${*}
+	    ;;
+	*)
+	    return 183
+	    ;;
+    esac
+}
+
+run()
+{
+    contextual-command-is-allowed || return 207
+
+    if test -z "${ARGS[1]}" ; then show-sslmediate ; return 0 ; fi
+
+    if test -z "${ARGS[2]}" ; then
+	case ${ARGS[1]} in
+	    premature|expired|selfsigned)
+		show-sslmediate ${ARGS[1]}
+		return 0
+		;;
+	    transparent)
+		show-sslmediate-transparent
+		return 0
+		;;
+	    policy)
+		show-sslmediate-policy
+		return 0
+		;;
+	    exception)
+		show-sslmediate-exception
+		return 0
+		;;
+	    *)
+		return 1
+		;;
+	esac
+    fi
+    
+    case ${ARGS[1]} in
+	expired|premature|selfsigned|transparent)
+	    local mode=${ARGS[1]}
+	    local value=${ARGS[2]}
+
+	    check-boolean ${value} || return 18
+	    local bool=$(internal-form ${value})
+
+	    case "${mode}" in
+		premature)
+		    export SSLMEDIATE_PREMATURE=${bool}
+		    ;;
+		expired)
+		    export SSLMEDIATE_EXPIRED=${bool}
+		    ;;		
+		selfsigned)
+		    export SSLMEDIATE_SELFSIGNED=${bool}
+		    ;;
+		transparent)
+		    export SSLMEDIATE_TRANSPARENT=${bool}
+		    ;;
+		*)
+		    error 255
+		    ;;
+	    esac
+	    SAVENV=1
+	    ;;
+
+	policy)
+	    local policy=${ARGS[2]}
+	    case ${policy} in
+		allow|deny)
+		    export SSLMEDIATE_POLICY=${policy}
+		    SAVENV=1
+		    ;;
+		*)
+		    return 36
+		    ;;
+	    esac
+	    ;;
+
+	exception)	
+	    shift-args
+	    manage-sslmediate-exception ${ALLARGS}
+	    ;;
+	*)
+	    return 1
+	    ;;
+    esac
+}
+
+main "${@}"

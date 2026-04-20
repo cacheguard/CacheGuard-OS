@@ -1,0 +1,87 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       Scripts
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+[ ! -f /etc/sysconfig/rlogger ] || source /etc/sysconfig/rlogger
+test -n "${SYSLOG_SERVERS}" || exit 0
+
+CACHEGUARD_DIR=/etc/sysconfig/cacheguard
+source ${CACHEGUARD_DIR}/constant
+source ${APPLIANCE_DIR}/etc/role
+
+main()
+{
+    test -n "${1}" || return 1
+    local message=${1}
+
+    local protocol_server_port
+    local protocol server port
+    local server_port
+    local syslog_ca ca_certificate
+
+    local tag="${TECHNICAL_NAME}:"
+
+    local facility='local7'
+    local severity='info'
+    local priority=190
+    local facility_integer=23 # ${priority} / 8
+    local severity_integer=6  # ${priority} % 8
+
+    local smessage="<${priority}>${HOSTNAME} ${tag} ${message}"
+
+    if test -n "${SYSLOG_CA}" ; then
+	syslog_ca=${SYSLOG_CA}
+    else
+	syslog_ca=${SYSTEM_CA_ID}
+    fi
+
+    ca_certificate=${SSL_LOCAL_CA_DIR}/${syslog_ca}.certificate
+
+    for protocol_server_port in ${SYSLOG_SERVERS}
+    do
+	protocol=${protocol_server_port/:*}
+	server_port=${protocol_server_port#*:}
+	server=${server_port/:*}
+	port=${server_port/*:}
+
+	case ${protocol} in
+	    tcp|udp)
+		logger \
+		    --server ${server} --${protocol} --port ${port} \
+		    --priority ${facility}.${severity} --tag ${tag} \
+		    -- ${message} > /dev/null 2>&1
+		;;
+	    tls)
+		echo "${smessage}" | openssl s_client \
+					     -CAfile ${ca_certificate} \
+					     -connect ${server}:${port} > /dev/null 2>&1
+		;;
+	    *)
+		;;
+	esac
+    done
+}
+
+# Main()
+
+main "${@}"

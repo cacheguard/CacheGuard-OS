@@ -1,0 +1,489 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       Scripts
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+source /usr/local/lib/apl_functions
+source ${BASE_DIR}/${ADMIN_NAME}/${ENV_RDIR}/${ENV_CURRENT_NAME}
+
+set-environment()
+{
+    test -n "${1}" || return 1
+    local admin_login=${1}
+
+    local base_name=${0/*\/}
+
+    REALM=${CURRENT_DOMAIN_NAME^^}
+    PASSWORD_MESSAGE="Password for ${admin_login}@${REALM}"
+    PASSWORD_MESSAGE_LEN=${#PASSWORD_MESSAGE}
+    TMP_ERROR_FILE=/tmp/${base_name}.error.${$}
+
+    set-proxy2-parameters-cur
+}
+
+reset-kerberos-create-log()
+{
+    echo -n > ${KERBEROS_CREATE_LOG}
+    chmod 640 ${KERBEROS_CREATE_LOG}
+    chown ${ADMIN_NAME}:${GROUP_NAME} ${KERBEROS_CREATE_LOG}
+}
+
+kerberos-create-log()
+{
+    test -n "${1}" || return 1
+    local message=${1}
+
+    local date=$(date +"%Y/%m/%d-%T")
+    echo -n "0 ${date} ${message}" >> ${KERBEROS_CREATE_LOG}
+}
+
+kerberos-create-internal-log()
+{
+    kerberos-create-log "Internal message: ${@}"
+}
+
+kerberos-create-log-abort()
+{
+    echo >> ${KERBEROS_CREATE_LOG}
+}
+
+kerberos-create-log-ret()
+{
+    test -n "${1}" || return 1
+    local err_code=${1}
+
+    if test ${err_code} -eq 0 ; then
+	echo "[OK]" >> ${KERBEROS_CREATE_LOG}
+    else
+	echo " (${err_code}) [KO]" >> ${KERBEROS_CREATE_LOG}
+    fi
+}
+
+clean-exit()
+{
+    trap "" USR1 INT QUIT TERM
+
+    local code=${1}
+    wait
+    manage-appliance-unlock
+    kerberos-create-log-abort
+    kerberos-create-log "Aborting the Kerberos Create operation"
+    kerberos-create-log-ret ${?}
+    exit ${code}
+}
+
+kerberos-keytab-create()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    test -n "${3}" || return 3
+    test -n "${4}" || return 4
+    test -n "${5}" || return 5
+    test -n "${6}" || return 6
+    test -n "${7}" || return 7
+    local keytab_file=${1}
+    local computer_name=${2}
+    local full_service_name=${3}
+    local kerberos_server=${4}
+    local enctypes=${5}
+    local description=${6}
+    local tag=${7}
+    local ha_options=${8}
+
+    local message
+    local errors i=0 n
+    declare -a errors
+    kerberos-create-log "Creating the '${computer_name}' object and its associated Key Table entry"
+
+    msktutil create \
+	     --user-creds-only --no-reverse-lookups --server-behind-nat \
+	     --auto-update-interval ${KERBEROS_PASSWORD_VALIDITY_DAYS} \
+	     --enctypes ${enctypes} \
+	     --keytab ${keytab_file} \
+	     --base "${CURRENT_AD_WEBGATEWAY_RDN}" \
+	     --server ${kerberos_server} \
+	     --service HTTP/${full_service_name} \
+	     --service host/${full_service_name} \
+	     --upn host/${computer_name}.${CURRENT_DOMAIN_NAME}@${REALM} \
+	     --computer-name ${computer_name} \
+	     --hostname ${full_service_name} \
+	     --sasl-mechanisms "GSS-SPNEGO GSSAPI" \
+	     --description "${description}" \
+	     --check-replication \
+	     ${ha_options} \
+	     > ${TMP_ERROR_FILE} 2>&1
+
+    local found=yes
+
+    while read message
+    do
+	test -n "${message}" || continue
+	case "${message}" in
+	    "No computer account for ${computer_name} found, creating a new one.")
+		unset found
+		;;
+	    *)
+		errors[${i}]=${message} ; ((i++))
+		;;
+	esac
+    done < ${TMP_ERROR_FILE}
+    rm -f ${TMP_ERROR_FILE}
+
+    n=${#errors[@]}
+
+    if test ${n} -eq 0 ; then
+	kerberos-create-log-ret 0
+	if test -z "${found}" ; then
+	    local seconds=2
+	    kerberos-create-log "Waiting a few seconds for the '${computer_name}' creation"
+	    sleep ${seconds}
+	    kerberos-create-log-ret 0
+	fi
+	return 0
+    else
+	kerberos-create-log-ret 1
+	for ((i=0 ; i<n ; i++))
+	do
+	    message=${errors[${i}]}
+	    kerberos-create-internal-log "${message}" ; kerberos-create-log-ret $[111 + ${i}] 
+	    message="KEYTAB CREATE (${tag}/${computer_name}): ${message}"
+	    logger -p daemon.alert -t apl_kerberos_create -- "${message}"
+	    ${LOCAL_DIR}/bin/apl_rlogger "${message}"
+	done
+	kdestroy -q -A &&
+	    rm -f ${keytab_file}
+	return 111
+    fi
+}
+
+kerberos-keytab-update()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    test -n "${3}" || return 3
+    test -n "${4}" || return 4
+    local keytab_file=${1}
+    local computer_name=${2}
+    local full_service_name=${3}	
+    local tag=${4}
+
+    local message
+    local errors i=0 n
+    declare -a errors
+
+    kerberos-create-log "Updating the Key Table file for '${computer_name}'"
+    msktutil auto-update \
+	     --no-reverse-lookups --server-behind-nat \
+	     --auto-update-interval ${KERBEROS_PASSWORD_VALIDITY_DAYS} \
+	     --keytab ${keytab_file} \
+	     --computer-name ${computer_name} \
+	     --hostname ${full_service_name} \
+	     --sasl-mechanisms "GSS-SPNEGO GSSAPI" \
+	     > ${TMP_ERROR_FILE} 2>&1
+
+    while read message
+    do
+	test -n "${message}" || continue
+	errors[${i}]=${message} ; ((i++))
+    done < ${TMP_ERROR_FILE}
+    rm -f ${TMP_ERROR_FILE}
+
+    n=${#errors[@]}
+
+    if test ${n} -eq 0 ; then
+	kerberos-create-log-ret 0
+	return 0
+    else
+	kerberos-create-log-ret 1
+	for ((i=0 ; i<n ; i++))
+	do
+	    message=${errors[${i}]}
+	    kerberos-create-internal-log "${message}" ; kerberos-create-log-ret $[211 + ${i}] 
+	    message="KEYTAB UPDATE (${tag}/${computer_name}): ${message}"
+	    logger -p daemon.alert -t apl_kerberos_create -- "${message}"
+	    ${LOCAL_DIR}/bin/apl_rlogger "${message}"
+	done
+	return 211
+    fi
+}
+
+kerberos-create()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    local admin_login=${1}
+    local admin_password=${2}
+
+    local kerberos_server=${CURRENT_KERBEROS_SERVER_LIST/ *}
+    test -n "${kerberos_server}" || return 11
+
+    local kinit_options="-F -P -A"
+
+    local keytab_file_sz
+    local enctypes message token ret
+    local name names
+    local ha_options
+
+    test ${CURRENT_HA_MODE} == False || \
+	ha_options="--dont-expire-password --password '${CURRENT_KERBEROS_HA_SHARED_PASSWORD}'"
+
+    kerberos-create-log "Resetting Key Table files"
+
+    kdestroy -q -A
+    rm -f \
+       ${PROXY_DIR}${KERBEROS_KEYTAB_FILE_PROXY1} \
+       ${WEB_SERVER_DIR}${KERBEROS_KEYTAB_FILE_PROXY2}
+
+    kerberos-create-log-ret ${?}
+
+    kerberos-create-log "Obtaining a Ticket-Granting Ticket"
+    echo "${admin_password}" | kinit ${kinit_options} ${admin_login} > ${TMP_ERROR_FILE} 2>&1
+    ret=${?}
+    kerberos-create-log-ret ${ret}
+
+    if test ${ret} -ne 0 ; then
+	while read message
+	do
+	    test -n "${message}" || continue
+	    message=${message/kinit: }
+	    test "${message:0:${PASSWORD_MESSAGE_LEN}}" != "${PASSWORD_MESSAGE}" || continue
+	    kerberos-create-internal-log "${message}" ; kerberos-create-log-ret 13
+	    message="KERBEROS TGT: ${message}"
+	    logger -p daemon.alert -t apl_kerberos_create -- "${message}"
+	    ${LOCAL_DIR}/bin/apl_rlogger "${message}"
+	done < ${TMP_ERROR_FILE}
+	rm -f ${TMP_ERROR_FILE}
+	return 13
+    fi
+    rm -f ${TMP_ERROR_FILE}
+
+    case ${CURRENT_KERBEROS_ENCRYPT_TYPE} in
+	des)
+	    enctypes='0x03'
+	    ;;
+	aes)
+	    enctypes='0x1c'
+	    ;;
+	*)
+	    enctypes='0x1f'
+	    ;;
+    esac
+
+    if test-current-kerberos-web-is-active ; then
+	kerberos-keytab-create \
+	    ${PROXY_DIR}${KERBEROS_KEYTAB_FILE_PROXY1} \
+	    ${CURRENT_KERBEROS_SERVICE_NAME} \
+	    ${CURRENT_KERBEROS_SERVICE_NAME}.${CURRENT_DOMAIN_NAME} \
+	    ${kerberos_server} \
+	    ${enctypes} \
+	    "${COMMERCIAL_NAME} UTM Appliance" \
+	    fProxy \
+	    "${ha_options}" \
+	    || return ${?}
+
+	if test -f ${PROXY_DIR}${KERBEROS_KEYTAB_FILE_PROXY1} ; then
+	    chgrp cache ${PROXY_DIR}${KERBEROS_KEYTAB_FILE_PROXY1}
+	    chmod g+r ${PROXY_DIR}${KERBEROS_KEYTAB_FILE_PROXY1}
+	else
+	    kdestroy -q -A
+	    return 15
+	fi
+
+	kerberos-create-log "Getting a testing Token for '${CURRENT_KERBEROS_SERVICE_NAME}'"
+	token=$(${PROXY_DIR}/libexec/negotiate_kerberos_auth_test ${kerberos_server} 2> ${TMP_ERROR_FILE})
+	token=${token/Token: }
+	message=$(cat ${TMP_ERROR_FILE} 2> /dev/null) ; rm -f ${TMP_ERROR_FILE}
+
+	test -n "${token}" -a "${token}" != NULL
+	if test ${?} -eq 0 ; then
+	    kerberos-create-log-ret 0
+	else
+	    kerberos-create-log-ret 1
+	    if test -n "${message}" ; then
+		kerberos-create-internal-log "${message}" ; kerberos-create-log-ret 17
+		message="GET TOKEN (fProxy): ${message}"
+		logger -p daemon.alert -t apl_kerberos_create -- "${message}"
+		${LOCAL_DIR}/bin/apl_rlogger "${message}"
+		kdestroy -q -A
+		return 17
+	    fi
+	fi
+    fi
+
+    if test-current-kerberos-rweb-is-active ; then
+	local computer_name site_name
+	local i=0 elt range
+
+	for elt in ${CURRENT_KERBEROS_RWEB_LIST}
+	do
+	    range=$[${i} % 2]
+	    case ${range} in
+		0)
+		    site_name=${elt}
+		    ;;
+		1)
+		    computer_name=${elt}
+		    kerberos-keytab-create \
+			${PROXY_DIR}${KERBEROS_KEYTAB_FILE_PROXY1} \
+			${computer_name} \
+			${site_name} \
+			${kerberos_server} \
+			${enctypes} \
+			"The ${site_name} Cloaked by ${COMMERCIAL_NAME}" \
+			rProxy \
+			"${ha_options}" \
+			|| break
+		    ;;
+		*)
+		    return 1
+		    ;;
+	    esac
+	    ((i++))
+	done
+    fi
+
+    kdestroy -q -A
+
+    if test ${CURRENT_HA_MODE} == False ; then
+	if test-current-kerberos-web-is-active ; then
+	    kerberos-keytab-update \
+		${PROXY_DIR}${KERBEROS_KEYTAB_FILE_PROXY1} \
+		${CURRENT_KERBEROS_SERVICE_NAME} \
+		${CURRENT_KERBEROS_SERVICE_NAME}.${CURRENT_DOMAIN_NAME} \
+		fProxy \
+		|| return ${?}
+	fi
+	if test-current-kerberos-rweb-is-active ; then
+	    i=0
+	    for elt in ${CURRENT_KERBEROS_RWEB_LIST}
+	    do
+		range=$[${i} % 2]
+		case ${range} in
+		    0)
+			site_name=${elt}
+			;;
+		    1)
+			computer_name=${elt}
+			kerberos-keytab-update \
+			    ${PROXY_DIR}${KERBEROS_KEYTAB_FILE_PROXY1} \
+			    ${computer_name} \
+			    ${site_name} \
+			    rProxy \
+			    || break
+			;;
+		    *)
+			return 1
+			;;
+		esac
+		((i++))
+	    done
+	fi
+    fi
+
+    if test -f ${PROXY_DIR}${KERBEROS_KEYTAB_FILE_PROXY1} ; then
+	cp -f ${PROXY_DIR}${KERBEROS_KEYTAB_FILE_PROXY1} ${WEB_SERVER_DIR}${KERBEROS_KEYTAB_FILE_PROXY2}
+	chgrp filter ${WEB_SERVER_DIR}${KERBEROS_KEYTAB_FILE_PROXY2}
+	chmod g+r ${WEB_SERVER_DIR}${KERBEROS_KEYTAB_FILE_PROXY2}
+    else
+	return 19
+    fi
+}
+
+main()
+{
+    trap "clean-exit 100" USR1 INT QUIT TERM
+
+    test -n "${1}" || return 1
+    local admin_login=${1}
+    local admin_password=${2}
+    shift 2
+
+    manage-appliance-lock
+
+    if test -z "${admin_password}"; then
+	echo -n "${PASSWORD_MESSAGE}: "
+	stty -echo
+	read admin_password
+	stty echo
+	echo
+    fi
+
+    local ret
+    reset-kerberos-create-log
+
+    kerberos-create-log "Beginig Kerberos Create operation"
+    kerberos-create-log-ret ${?}
+
+    kerberos-create-log "Checking the Kerberos authentication mode state"
+    test-current-kerberos-auth-state ; ret=${?}
+    kerberos-create-log-ret ${ret}
+    
+    if test ${ret} -eq 0 -a -n "${admin_password}" ; then
+
+	kerberos-create-log "Stopping the Health Check service"
+	/etc/rc.d/init.d/health stop > /dev/null 2>&1
+	kerberos-create-log-ret ${?}
+
+	if test-current-kerberos-web-is-active ; then
+	    kerberos-create-log "Stopping the Proxy Cache service"
+	    /etc/rc.d/init.d/squid stop > /dev/null 2>&1
+	    kerberos-create-log-ret ${?}
+	fi
+
+	if test ${CURRENT_PROXY2_MODE} == True ; then
+	    if test-current-kerberos-rweb-is-active ; then
+		kerberos-create-log "Stopping the Web Server service"
+		/etc/rc.d/init.d/httpd stop > /dev/null 2>&1
+		kerberos-create-log-ret ${?}
+	    fi
+	fi
+
+	! kerberos-create "${admin_login}" "${admin_password}" "${@}" || rm -f ${TMP_DIR}/${KERBEROS_CREATE_FILENAME}
+
+	if test ${CURRENT_PROXY2_MODE} == True ; then
+	    if test-current-kerberos-rweb-is-active ; then
+		kerberos-create-log "Starting the Web Server service"
+		/etc/rc.d/init.d/httpd start > /dev/null 2>&1
+		kerberos-create-log-ret ${?}
+	    fi
+	fi
+
+	if test-current-kerberos-web-is-active ; then
+	    kerberos-create-log "Starting the Proxy Cache service"
+	    /etc/rc.d/init.d/squid start > /dev/null 2>&1
+	    kerberos-create-log-ret ${?}
+	fi
+
+	kerberos-create-log "Starting the Health Check service"
+	/etc/rc.d/init.d/health start > /dev/null 2>&1
+	kerberos-create-log-ret ${?}
+    fi
+    
+    kerberos-create-log "Ending the Kerberos Create operation"
+    kerberos-create-log-ret ${?}
+    manage-appliance-unlock
+}
+
+# Main()
+
+set-environment "${@}"
+main "${@}"

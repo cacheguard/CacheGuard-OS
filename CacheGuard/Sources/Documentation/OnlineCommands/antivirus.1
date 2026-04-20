@@ -1,0 +1,172 @@
+Configure the antivirus
+.SH SYNOPSIS
+
+[1] \fBantivirus\fR [\fBauto\fR [\fI<country-code>\fR]]
+
+[2] \fBantivirus\fR [\fBextended\fR [\fBurl\fR [\fI<URL>\fR]] | \fBvload\fR [(\fBon\fR | \fBoff\fR)]]
+
+[3] \fBantivirus whitelist signature\fR (\fBload\fR (\fBftp\fR | \fBsftp\fR | \fBtftp\fR) \fI<file-server>\fR \fI<file-path>\fR | \fBclear\fR)
+
+[4] \fBantivirus whitelist domainname\fR [(\fBadd\fR | \fBdel\fR) \fI<domain-name>\fR | \fBraz\fR]
+
+[5] \fBantivirus\fR [\fBmaxobject\fR [\fI<file-size>\fR]]
+
+[6] \fBantivirus\fR [\fBpua\fR [(\fBon\fR | \fBoff\fR)]]b
+
+[7] \fBantivirus\fR \fBtopology\fR (\fBinternal\fR | \fBexternal\fR | \fBauxiliary\fR | \fBvpnipsec\fR) [\fBon\fR | \fBoff\fR]
+
+[8] \fBantivirus\fR (\fBupdate\fR | \fBcreate\fR) [\fBreport\fR | \fBforce\fR [\fBwait\fR]]
+
+[9] \fBantivirus\fR [\fBreport\fR]
+
+.SH DESCRIPTION
+
+When the antivirus mode is activated, malware (viruses, trojans and worms) coming from the Web are eradicated by the system even before entering into your local networks. The command \fBantivirus\fR is used to configure and manage this antivirus. To activate the antivirus, use the command \fBmode antivirus on\fR.
+
+The antivirus works in both forwarding (\fBweb\fR) and reverse (\fRBrweb\fR) modes. In forwarding mode, it blocks all browsing accesses to malware objects while in reverse mode all attempts to upload malware on a protected Web server are blocked.
+
+The antivirus detects MS Office macro viruses, mobile malware, and other threats. It supports 32/64-bit Portable Executable files and 32-bit ELF files. Additionally, it handles the following files:
+
+\(bu PE files compressed or obfuscated with the following tools: Aspack (2.12), UPX (all versions), FSG (1.3, 1.31, 1.33, 2.0), Petite (2.x), PeSpin (1.1), NsPack, wwpack32 (1.20), MEW, Upack, Y0da Cryptor (1.3).
+
+\(bu Almost every mail file format including TNEF (winmail.dat) attachments are supported.
+
+\(bu The most popular file formats like:  MS Office and MacOffice files, RTF, PDF, HTML.
+
+\(bu Various obfuscators, encoders, files vulnerable to security risks such as: JPEG (exploit detection), RIFF (exploit detection), uuencode, ScrEnc obfuscation.
+
+The antivirus scans not only simple files but looks inside archive and compression files. The following archive and compression formats are supported: Zip (+ SFX), RAR (+ SFX), Tar, Gzip, Bzip2, MS OLE2, MS Cabinet Files (+ SFX), MS CHM (Compiled HTML), MS SZDD compression format, BinHex, SIS (SymbianOS packages), AutoIt, NSIS.
+
+Note that for performance reasons video/audio streaming contents are not checked by the antivirus in forwarding mode. In reverse mode all uploaded contents are checked.
+
+Every 60 minutes the system automatically checks for virus signature DB updates and if necessary, downloads new virus signatures by connecting to regional servers using HTTPS. Updates are downloaded from \fIdb.\fI<country-code>\fR.clamav.net\fR (where the \fI<country-code>\fR is a two letter ISO 3166-1 alpha-2 code) or from \fIdatabase.clamav.net\fR. The first [1] usage form allows you to set the regional update server name. To set the regional update server name use the keyword \fBauto\fR followed by your two letter country code. Use the command \fBcountrylist\fR to get a list of valid country codes.
+
+For a higher level of protection, extended antivirus signatures can be loaded into the system. The second [2] usage form allows you to configure the extended antivirus. Extended antivirus signatures can be loaded into the system using a supported file transfer protocol from a location that you should specify as a URL. Supported file  protocols are \fBsftp\fR, \fBftp\fR and \fBtftp\fR. The second usage form allows you to define that URL using the keywords \fBextended url\fR followed by a valid URL (\fIftp://ftp.cacheguard.net/AV\fI for instance). To allow the system to automatically load extended antivirus signatures from the specified URL, the  URL host part should belong to the list of trusted file servers defined with the \fBaccess\fR command. Additionally, if the file server is protected by username/password, it must be configured using the \fBpassword\fR command.
+
+To load extended antivirus signatures, three methods can be used. The \fBload\fR method simply downloads signature files without any verifications. The \fBvload\fR (verify load) method allows you to secure downloads by verifying downloaded files contents. This is useful when you download signatures files from a file server managed by CacheGuard Technologies or one of its referenced partners. When using the \fBvload\fR method, a signature file is downloaded alongside the antivirus signatures file and the antivirus signatures file is verified using that signature file to assure that the downloaded antivirus signatures file has not been altered during its transfer. The signature file name has the same name as the downloaded antivirus signatures file followed by the extension \fI.sig\fR. If the \fIgateway\fR system is managed by a \fImanager\fR system (see the \fBmanager\fR command), extended antivirus signatures can be pushed by the manager. In this case you can use the \fBpush\fR method. The loading method can be set using the \fBextended method\fR keywords followed by the chosen method name (\fBload\fR, \fBvload\fR, \fBpush\fR). Please note that if you modify the extended antivirus URL or its loading method, extended antivirus signatures are not updated during the \fBapply\fR operation. To effectively update extended signatures you should explicitly update the extended signatures by using the \fBantivirus update\fR usage form (see below) or wait for the next automatic update. If the chosen method is \fBpush\fR, updates are done in two asynchronous phases: first, updates are pushed by the manager to the gateway and then they are asynchronously taken into account by the gateway.
+
+In case where you encounter a false positive signature match, you should contact our support services to submit your case so we can study it and possibly fix it. Meanwhile, if your activity is blocked because of false positive matches, you have the possibility to bypass their checks with your own whit list of virus names. The third [3] usage form allows you to load a white list of virus signatures form a trusted file server. To load a white list from a file server use the keywords \fBwhitelist signature load\fR followed by the protocol to use, the file server name or IP address and the white list file name. Only trusted file servers are allowed. Trusted file servers are allowed using the command \fBaccess\fR. A valid white list of virus signatures is a plain text file containing virus names (one virus name per line). To clear a previously loaded white list use the keywords \fBwhitelist signature clear\fR. On a \fImanager\fR system, the white list of virus signatures is managed globally (ie. is not specific to a template or gateway context and can only be loaded outside a template or gateway context).
+
+The fourth [4] usage form allows you to define a white list of domain names for which the antivirus at the Web gateway is bypassed in forwarding mode. You can use this usage form to white list websites such as \fIwww.phishtank.com\fR.
+
+The antivirus scans only files smaller than an upper limit. The fifth [5] usage form allows you to set this upper limit. By default the upper limit is 2048 kilobytes. To change this value use the keyword \fBmaxobject\fR followed by the required size in kilobytes. Note that for optimal performance you should not leverage this value. The minimum and maximum authorized values are respectively 1024K and 24576 KB.
+
+Additionally the antivirus may detect, Possibly Unwanted Applications (PUA). The sixth [6] usage form allows you to activate or deactivate the PUA detection mode. To activate the PUA checks use the keyword \fBpua\fR followed by the keyword \fBon\fR. To deactivate the PUA checks use the keyword \fBpua\fR followed by the keyword \fBoff\fR. Detected PUA categories are as follows:
+
+\(bu Packed: This is a detection for files that use some kind of runtime packer. A runtime packer can be used to reduce the size of executable files without the need for an external unpacker. While this cannot be considered malicious in general, runtime packers are widely used with malicious files since they can prevent malware from detection by an antivirus product.
+
+\(bu PwTool: Password tools are all applications that can be used to recover or decrypt passwords for various applications like mail clients or system passwords. Such tools can be quite helpful if a password is lost, however, it can also be used to spy out passwords.
+
+\(bu NetTool: NetTools are applications that can be used to sniff, filter, manipulate or scan network traffic or networks. While a networkscanner can be an extremely helpful tool for admins, you may not want to see an average user playing around with it. Same goes for tools like netcat and the like.
+
+\(bu P2P: Peer to Peer clients can be used to generate a lot of unwanted traffic and sometimes it happens that copyrights are violated by downloading copyright protected content (music, movies),therefore we consider them unwanted.
+
+\(bu IRC: IRC Clients can be a productivity killer and depending on the client, can be a powerful platform for malicious scripts (take mIRC for example).
+
+\(bu RAT: Remote Access Trojans are used to remotely access systems, but can be used also by system admins, for example VNC or RAdmin.
+
+\(bu Tool: General system tools, like process killers/finders.
+
+\(bu Spy: Keyloggers, spying tools.
+
+\(bu Server: Server based badware like DistributedNet.
+
+\(bu Script: Known "problem" scripts written in Javascript, ActiveX or similar.
+
+.B Please note that PUA detection may be too aggressive and lead to false positive matches.
+
+The antivirus is mainly used by the integrated proxy to block malware in Web traffic. But it can also be used as a service offered to external systems such as an MTA (Mail Transfer Agent). Please refer to the commands \fBport\fR and \fBaccess\fR to configure the antivirus as a service for external systems. The seventh [7] usage form allows you to define the antivirus access topology. The antivirus access topology defines logical network interfaces to which external systems can connect to request the antivirus. To allow connections on an logical network internal interface use its name (\fBinternal\fR, \fBexternal\fR, \fBauxiliary\fR or \fBvpnipsec\fR) followed by the keyword \fBon\fR. To deny connections, use the keyword \fBoff\fR instead. Activating connections on the \fBvpnipsec\fR virtual network interface allows the connections on the internal network interface via an IPsec VPN tunnel.
+
+The antivirus used by the present system is ClamAV. Please refer to the documentation of your external systems to get help on how to connect them to the antivirus.
+
+The eighth [8] usage form allows you to perform an explicit \fBupdate\fR. To download and create the whole signature database use the keyword \fBcreate\fR. Updating and creating are asynchronous operations and are executed in background unless the \fBforce wait\fR keywords are used. Note that you have to wait for the termination of other asynchronous commands before running these commands. \fBCAUTION\fR: in order to avoid to flood update servers, explicit \fBupdate\fR and \fBcreate\fR operations should be used moderately. Otherwise your system may be banned by some antivirus update servers. When the update (or create) operation is invoked, the user is invited to confirm its execution. The optional argument \fBforce\fR, allows you to bypass this confirmation. To print a brief report on the \fBupdate\fR and \fBcreate\fR operations, use the keyword \fBreport\fR. This report may produce some errors in different contexts. Meaningful errors are as follows:
+
+\fB[ Antivirus signature base update (or create) context ]\fR:
+
+  \(bu Error 58: can't read databases from remote servers.
+
+  \(bu Error 59: Remote servers are not fully synchronized (try again later).
+
+  \(bu Error 101-109: can't resolve remote servers names.
+
+  \(bu Error 121: the Antivirus extended update program has been killed.
+
+  \(bu Error 122: a downloaded Antivirus extended DB is not authentic. Use the command \fBantivirus update\fR to retry a signature update and get error details.
+
+  \(bu Error 123: can't download the Antivirus extended index file.
+  
+  \(bu Error 124: error(s) during the AV extended DB file(s). Use the command \fBantivirus update\fR to retry a signature update and get error details.
+
+  \(bu Error > 124: multiple errors occurred. The error number is the sum of the above error numbers.
+
+\fB[ Antivirus extended signature index update context ]\fR:
+
+  \(bu Error 68: file not found on TFTP server.
+
+  \(bu Error 78: the resource referenced in the URL does not exist.
+
+  \(bu Error 101: the index file signature verification failed.
+
+Finally the ninth [9] usage form displays a report on the status of the automatic antivirus signature updates.
+
+.SH CAUTION
+
+  \(bu A Web Gateway as an antivirus is a network equipment that blocks malware coming from the Web and contributes to reinforce your security. Never deactivate local antivirus on your workstation or servers.
+
+  \(bu If for some reason the antivirus service could not start (because for instance the gateway is disconnected from the internet), the Web access is blocked (the antivirus checking can't be bypassed).
+
+.SH WAF
+The present system is a Web gateway that protects against threats coming from the Web. When configured in forwarding mode (\fBmode web on\fR) and when the antivirus is activated, it protects the Web browsing from virus infections (as long as it is implemented in your network as a proxy or a transparent web proxy). When the system is implemented as a reverse proxy (\fBmode rweb on\fR) and WAF (\fBmode waf on\fR) in front of your Web servers, activating the \fBantivirus\fR allows you to scan all attempts to upload files onto your Web servers and instantly blocks malware before they reach the Web servers. Note that the only supported method to upload a file is the POST method with an encryption type of "multipart/form-data".
+
+An HTML code that allows you to upload a file can be as follows:
+
+.I <form enctype="multipart/form-data" method="post" action="/upload-file.html">
+
+.I File name: <input type="file" /> <input type="submit" value="Upload" />
+
+.I </form>
+
+.SH ANTIVIRUS UPDATES, QOS AND FIREWALL
+1- If your system is placed behind a third party firewall, you should allow the following traffic in order to allow the antivirus signature updates:
+
+\(bu HTTPS (TCP 443) traffic form the system to the internet.
+
+\(bu Passive FTP (TCP 21) traffic form the system to \fIftp.cacheguard.net\fR (commercial edition only).
+
+2- If you plan to use the antivirus as a service for external systems and a third party firewall is implemented between those systems and the antivirus, you must allow the following traffic:
+  \(bu TCP traffic from external systems to the system on its antivirus port (defined by the command \fBport\fR).
+
+  \(bu TCP traffic from external systems to the antivirus on ports 61440 to 65535.
+
+3- The QoS applied to signature update traffic that use HTTPS is the same as the QoS defined by "\fBqos shape web external\fR". The QoS applied to signature update traffic that use FTP is the same as the QoS defined by "\fBqos shape file\fR". See the command \fBqos\fR for further information.
+
+.SH EXTENDED ANTIVIRUS INDEX FILE
+CacheGuard Technologies provides extended antivirus signatures available as a subscription service. However you can maintain your own antivirus signatures DB files on a file server and configure the system to automagically load them. To do so you must follow instructions below:
+
+\(bu Signatures DB files should be in gzip format and named with the \fB.gz\fR extension. They should be compatible with ClamAV.
+
+\(bu For each signatures DB file, and MD5 fingerprint file should be present on the file server and named with the \fB.md5\fR extension. For instance the MD5 file for the signatures DB file named \fImy-virus.gz\fR should be named \fImy-virus.gz.md5\fR. The MD5 file should contain the MD5 fingerprint (in lowercase) of the signatures DB file in a single line (and nothing else).
+
+\(bu An index file file named \fBindex\fR, should be maintained and present on the file server. Each line in the index file must contain the following: \fI<signatures-db-file>\fR.gz <size-in-bytes> <md5-fingerprint>. For instance a line in the index file could be:  my-virus.gz 86080 648c95f4c2f3f5b8730eea0a735300b7
+
+\(bu An archive compressed file in \fItar.gz\fR format and named \fBpack.tar.gz\fR should be present on the file server. This archive file should include all previously listed files in a directory specified by the configuration command \fBantivirus extended url\fR \fI<URL>\fR (see above).
+
+.SH SEE ALSO
+.B access
+(1)
+.B countrylist
+(1)
+.B file
+(1)
+.B manager
+(1)
+.B mode
+(1)
+.B port
+(1)
+.B qos
+(1)
+.B rweb
+(1)
+.B waf
+(1)

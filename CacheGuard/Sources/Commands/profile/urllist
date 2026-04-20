@@ -1,0 +1,514 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       Commands
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+__complete-urllist-type()
+{
+    case ${COMP_WORDS[${COMP_CWORD}]} in
+	d|'do'|dom|doma|domai|domain|domains)
+		COMPREPLY=(domains)
+		;;
+		u|ur|url|urls)
+		    COMPREPLY=(urls)
+		    ;;
+		e|ex|exp|expr|expre|expres|express|expressi|expressio|expression|expressions)
+		    COMPREPLY=(expressions)
+		    ;;
+		*)
+		    COMPREPLY=('' '<RET>' domains urls expressions)
+		    ;;
+    esac    
+}
+
+__complete-urllist()
+{
+    test -n "${COMP_CWORD-1}" || return 1
+
+    case ${COMP_CWORD} in
+	1)
+	    case ${COMP_WORDS[1]} in
+		a)
+		    COMPREPLY=('' add auto)
+		    ;;
+		ad|add)
+		    COMPREPLY=(add)
+		    ;;
+		au|aut|auto)
+		    COMPREPLY=(auto)
+		    ;;
+		c|cl|cle|clea|clear)
+		    COMPREPLY=(clear)
+		    ;;
+		d|de|del)
+		    COMPREPLY=(del)
+		    ;;
+		r|ra|raz)
+		    COMPREPLY=(raz)
+		    ;;
+		l|lo|loa|load)
+		    COMPREPLY=(load)
+		    ;;
+		v|vl|vlo|vloa|vload)
+		    COMPREPLY=(vload)
+		    ;;
+		r|re|rep|repo|report)
+		    COMPREPLY=(report)
+		    ;;
+		u|up|upd|upda|updat|update)
+		    COMPREPLY=(update)
+		    ;;
+		'')
+		    COMPREPLY=('' '<RET>' add clear del raz report update load vload auto)
+		    ;;
+		*)
+		    COMPREPLY=()
+		    ;;
+	    esac
+	    ;;
+	2)
+	    case ${COMP_WORDS[1]} in
+		load|vload)
+		    case ${COMP_WORDS[2]} in
+			c|cr|cre|crea|creat|create)
+			    COMPREPLY=(create)
+			    ;;
+			u|up|upd|upda|updat|update)
+			    COMPREPLY=(update)
+			    ;;
+			a|au|aut|auto)
+			    COMPREPLY=(auto)
+			    ;;
+			'')
+			    COMPREPLY=('' '<RET>' create update auto)
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		add|clear|del)
+		    COMPREPLY=('' '<urllist-name>')
+		    ;;
+		raz)
+		    COMPREPLY=()
+		    ;;
+		auto)
+		    COMPREPLY=('' '<RET>' '<urllist-name>')
+		    ;;
+		report|update)
+		    COMPREPLY=()
+		    ;;
+		*)
+		    COMPREPLY=()
+		    ;;
+	    esac
+	    ;;
+	3)
+	    case ${COMP_WORDS[1]} in
+		load|vload)
+		    case ${COMP_WORDS[2]} in
+			create|update|auto)
+			    COMPREPLY=('' '<urllist-name>')
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		auto)
+		    case ${COMP_WORDS[3]} in
+			o)
+			    COMPREPLY=('' on off)
+			    ;;
+			of|off)
+			    COMPREPLY=(off)
+			    ;;
+			on)
+			    COMPREPLY=(on)
+			    ;;
+			'')
+			    COMPREPLY=('' '<RET>' on off)
+			    ;;
+		    esac
+		    ;;
+		clear)
+		    __complete-urllist-type
+		    ;;
+		*)
+		    COMPREPLY=()
+		    ;;
+	    esac
+	    ;;
+	4)
+	    case ${COMP_WORDS[1]} in
+		load|vload)
+		    case ${COMP_WORDS[2]} in
+			create|update|auto)
+			    case ${COMP_WORDS[4]} in
+				f|ft|ftp)
+				    COMPREPLY=(ftp)
+				    ;;
+				s|sf|sft|sftp)
+				    COMPREPLY=(sftp)
+				    ;;
+				t|tf|tft|tftp)
+				    COMPREPLY=(tftp)
+				    ;;
+				'')
+				    COMPREPLY=('' ftp sftp tftp)
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		auto)
+		    case ${COMP_WORDS[3]} in
+			on)
+			    case ${COMP_WORDS[4]} in
+				l|lo|loa|load)
+				    COMPREPLY=(load)
+				    ;;
+				v|vl|vlo|vloa|vload)
+				    COMPREPLY=(vload)
+				    ;;
+				'')
+				    COMPREPLY=('' load vload)
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		clear)
+		    __complete-urllist-type
+		    ;;
+
+		*)
+		    COMPREPLY=()
+		    ;;
+	    esac
+	    ;;
+	5)
+	    case ${COMP_WORDS[1]} in
+		load|vload)
+		    case ${COMP_WORDS[2]} in
+			create|update|auto)
+			    case ${COMP_WORDS[4]} in
+				ftp|sftp|tftp)
+				    COMPREPLY=('' '<file-server>')
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		auto)
+		    case ${COMP_WORDS[3]} in
+			on)
+			    case ${COMP_WORDS[4]} in
+				load|vload)
+				    case ${COMP_WORDS[5]} in
+					c|cr|cre|crea|creat|create)
+					    COMPREPLY=(create)
+					    ;;
+					u|up|upd|upda|updat|update)
+					    COMPREPLY=(update)
+					    ;;
+					'')
+					    COMPREPLY=('' create update)
+					    ;;
+					*)
+					    COMPREPLY=()
+					    ;;
+				    esac
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		clear)
+		    __complete-urllist-type
+		    ;;
+		*)
+		    COMPREPLY=()
+		    ;;
+	    esac
+	    ;;
+	6)
+	    case ${COMP_WORDS[1]} in
+		load|vload)
+		    case ${COMP_WORDS[2]} in
+			create|update|auto)
+			    case ${COMP_WORDS[4]} in
+				ftp|sftp|tftp)
+				    COMPREPLY=('' '<base-file-name>')
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		auto)
+		    case ${COMP_WORDS[3]} in
+			on)
+			    case ${COMP_WORDS[4]} in
+				load|vload)
+				    case ${COMP_WORDS[5]} in
+					create|update)
+					    case ${COMP_WORDS[6]} in
+						d|da|dai|dail|dail|daily)
+						    COMPREPLY=(daily)
+						    ;;
+						w|we|wee|week|weekl|weekly)
+						    COMPREPLY=(weekly)
+						    ;;
+						'')
+						    COMPREPLY=('' daily weekly)
+						    ;;
+						*)
+						    COMPREPLY=()
+						    ;;
+					    esac
+					    ;;
+					*)
+					    COMPREPLY=()
+					    ;;
+				    esac
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		*)
+		    COMPREPLY=()
+		    ;;
+	    esac
+	    ;;
+	7|8|9)
+	    case ${COMP_WORDS[1]} in
+		load|vload)
+		    case ${COMP_WORDS[4]} in
+			ftp|sftp|tftp)
+			    case ${COMP_WORDS[2]} in
+				create)
+				    __complete-urllist-type
+				    ;;
+				update|auto)
+				    case ${COMP_WORDS[${COMP_CWORD}]} in
+					d|'do'|dom|doma|domai|domain|domains)
+					    COMPREPLY=(domains)
+					    ;;
+					u|ur|url|urls)
+					    COMPREPLY=(urls)
+					    ;;
+					*)
+					    COMPREPLY=('' '<RET>' domains urls)
+					    ;;
+				    esac
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		auto)
+		    case ${COMP_CWORD} in
+			7)
+			    case ${COMP_WORDS[3]} in
+				on)
+				    case ${COMP_WORDS[4]} in
+					load|vload)
+					    case ${COMP_WORDS[5]} in
+						create|update)
+						    case ${COMP_WORDS[6]} in
+							daily|weekly)
+							    case ${COMP_WORDS[7]} in
+								f|ft|ftp)
+								    COMPREPLY=(ftp)
+								    ;;
+								s|sf|sft|sftp)
+								    COMPREPLY=(sftp)
+								    ;;
+								t|tf|tft|tftp)
+								    COMPREPLY=(tftp)
+								    ;;
+								p|pu|pus|push)
+								    COMPREPLY=(push)
+								    ;;
+								'')
+								    COMPREPLY=('' ftp sftp tftp push)
+								    ;;
+								*)
+								    COMPREPLY=()
+								    ;;
+							    esac
+							    ;;
+							*)
+							    COMPREPLY=()
+							    ;;
+						    esac
+						    ;;
+						*)
+						    COMPREPLY=()
+						    ;;
+					    esac
+					    ;;
+					*)
+					    COMPREPLY=()
+					    ;;
+				    esac
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			8)
+			    case ${COMP_WORDS[3]} in
+				on)
+				    case ${COMP_WORDS[4]} in
+					load|vload)
+					    case ${COMP_WORDS[5]} in
+						create|update)
+						    case ${COMP_WORDS[6]} in
+							daily|weekly)
+							    case ${COMP_WORDS[7]} in
+								ftp|sftp|tftp)
+								    COMPREPLY=('' '<file-server>')
+								    ;;
+								*)
+								    COMPREPLY=()
+								    ;;
+							    esac
+							    ;;
+							*)
+							    COMPREPLY=()
+							    ;;
+						    esac
+						    ;;
+						*)
+						    COMPREPLY=()
+						    ;;
+					    esac
+					    ;;
+					*)
+					    COMPREPLY=()
+					    ;;
+				    esac
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			9)
+			    case ${COMP_WORDS[3]} in
+				on)
+				    case ${COMP_WORDS[4]} in
+					load|vload)
+					    case ${COMP_WORDS[5]} in
+						create|update)
+						    case ${COMP_WORDS[6]} in
+							daily|weekly)
+							    case ${COMP_WORDS[7]} in
+								ftp|sftp|tftp)
+								    COMPREPLY=('' '<RET>' '<base-file-name>')
+								    ;;
+								*)
+								    COMPREPLY=()
+								    ;;
+							    esac
+							    ;;
+							*)
+							    COMPREPLY=()
+							    ;;
+						    esac
+						    ;;
+						*)
+						    COMPREPLY=()
+						    ;;
+					    esac
+					    ;;
+					*)
+					    COMPREPLY=()
+					    ;;
+				    esac
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		*)
+		    COMPREPLY=()
+		    ;;
+	    esac
+	    ;;
+	*)
+	    COMPREPLY=()
+	    ;;
+    esac
+}

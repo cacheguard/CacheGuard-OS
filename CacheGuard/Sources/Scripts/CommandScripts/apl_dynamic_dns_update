@@ -1,0 +1,149 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       Scripts
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+CACHEGUARD_DIR=/etc/sysconfig/cacheguard
+source ${CACHEGUARD_DIR}/constant
+source ${ABASE_DIR}/${ENV_RDIR}/${ENV_CURRENT_NAME}
+
+source /usr/local/lib/apl_functions
+
+dyndns-update()
+{
+    local env=${1}
+    local ip=${2}
+    test -n "${env}" || env='cur'
+
+    local state provider hostname username password
+
+    case ${env} in
+	cur)
+	    state=${CURRENT_DYNAMIC_DNS_STATE}
+	    provider=${CURRENT_DYNAMIC_DNS_PROVIDER}
+	    hostname=${CURRENT_DYNAMIC_DNS_HOSTNAME}
+	    username=${CURRENT_DYNAMIC_DNS_USERNAME}
+	    password=${CURRENT_DYNAMIC_DNS_PASSWORD}
+	    ;;
+	new)
+	    state=${DYNAMIC_DNS_STATE}
+	    provider=${DYNAMIC_DNS_PROVIDER}
+	    hostname=${DYNAMIC_DNS_HOSTNAME}
+	    username=${DYNAMIC_DNS_USERNAME}
+	    password=${DYNAMIC_DNS_PASSWORD}
+	    ;;
+	*)
+	    return 11
+	    ;;
+    esac
+
+    if test ${state} == False ; then
+	rm -f ${RUN_DIR}/${DYNAMIC_DNS_STATE_FILENAME}
+	return 0
+    fi
+
+    case ${provider} in
+	dnshome)
+	    local credentials="${hostname}:${password}"
+	    ;;
+	*)
+	    local credentials="${username}:${password}"
+	    ;;
+    esac
+    
+    local timeout=5 maxtime=10
+    local curl_args="--no-show-error --silent --location --connect-timeout ${timeout} --max-time ${maxtime}"
+    local curl_command=$(get-curl-command)
+    local url report ret
+
+    case ${provider} in
+	changeip|myonlineportal)
+	    credentials=$(echo -n "${credentials}" | base64 2> /dev/null)
+	    curl_args="${curl_args} --header 'Authorization:Basic ${credentials}'"
+	    ;;
+	dnshome|noip)
+	    curl_args="${curl_args} --user '${credentials}'"
+	    ;;
+	freemyip)
+	    ;;
+	*)
+	   ;;
+    esac
+
+    case ${provider} in
+	changeip)
+	    url="https://nic.changeip.com/nic/update?hostname=${hostname}"
+	    ;;
+	dnshome)
+	    url="https://www.dnshome.de/dyndns.php"
+	    ;;
+	freemyip)
+	    url="https://freemyip.com/update?token=${password}&domain=${hostname}"
+	    ;;
+	myonlineportal)
+	    url="https://myonlineportal.net/updateddns?hostname=${hostname}"
+	    ;;
+	noip)
+	    url="https://dynupdate.no-ip.com/nic/update?hostname=${hostname}"
+	    ;;
+	*)
+	    return 11
+	   ;;
+    esac
+
+    if test -n "${ip}" ; then
+
+	local ip_arg
+
+	case ${provider} in
+	    changeip|myonlineportal)
+		url="${url}&ip=${ip}"
+		;;
+	    dnshome)
+		url="${url}?ip=${ip}"
+		;;
+	    freemyip|noip)
+		url="${url}&myip=${ip}"
+		;;
+	    *)
+		return 13
+		;;
+	esac
+    fi
+
+    curl_args=( ${curl_args} )
+
+    report=$(eval "${curl_command} ${curl_args[@]} --url '${url}'" 2> /dev/null)
+    ret=${?}
+
+    if test ${ret} -ne 0 ; then
+	echo "${ret}:"
+    else
+	echo "${ret}:${report}"
+    fi > ${RUN_DIR}/${DYNAMIC_DNS_STATE_FILENAME}
+
+    return ${ret}
+}
+
+# Main()
+
+dyndns-update "${@}"

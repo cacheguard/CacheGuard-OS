@@ -1,0 +1,198 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       Commands
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+__complete-cache()
+{
+    test -n "${COMP_CWORD-1}" || return 1
+
+    case ${COMP_CWORD} in
+	1)
+	    case ${COMP_WORDS[1]} in
+		l|lo|loa|load|loadu|loadur|loadurl)
+		    COMPREPLY=(loadurl)
+		    ;;
+		o|ob|obj|obje|objec|object)
+		    COMPREPLY=(object)
+		    ;;
+		b|bi|big|bigo|bigob|bigobj|bigobje|bigobjec|bigobject)
+		    COMPREPLY=(bigobject)
+		    ;;
+		c|cl|cle|clea|clear)
+		    COMPREPLY=(clear)
+		    ;;
+		r|re|rep|repo|repor|report)
+		    COMPREPLY=(report)
+		    ;;
+		'')
+		    COMPREPLY=('' clear loadurl bigobject object report '<RET>')
+		    ;;
+		*)
+		    COMPREPLY=()
+		    ;;
+	    esac
+	    ;;
+	2)
+	    case ${COMP_WORDS[1]} in
+		object)
+		    COMPREPLY=('' '<RET>' '<min-size>')
+		    ;;
+		loadurl)
+		    COMPREPLY=('' '<URL>')
+		    ;;
+		bigobject)
+		    case ${COMP_WORDS[2]} in
+			o)
+			    COMPREPLY=('' on off)
+			    ;;
+			of|off)
+			    COMPREPLY=(off)
+			    ;;
+			on)
+			    COMPREPLY=(on)
+			    ;;
+			'')
+			    COMPREPLY=('' '<RET>' on off)
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		clear)
+		    case ${COMP_WORDS[2]} in
+			r|re|rep|repo|repor|report)
+			    COMPREPLY=(report)
+			    ;;
+			f|fo|"for"|forc|force)
+			    COMPREPLY=(force)
+			    ;;
+			'')
+			    COMPREPLY=('' '<RET>' force report)
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		report)
+		    case ${COMP_WORDS[2]} in
+			s|si|siz|size)
+			    COMPREPLY=(size)
+			    ;;
+			b|bi|big|bigs|bigsi|bigsiz|bigsize)
+			    COMPREPLY=(bigsize)
+			    ;;
+			h|hi|hit)
+			    COMPREPLY=(hit)
+			    ;;
+			m|me|mea|mean|meano|meanob|meanobj|meanobje|meanobjec|meanobject)
+			    COMPREPLY=(meanobject)
+			    ;;
+			u|us|use|used)
+			    COMPREPLY=(used)
+			    ;;
+			r)
+			    COMPREPLY=('' rused rsize)
+			    ;;
+			rs|rsi|rsiz|rsize)
+			    COMPREPLY=(rsize)
+			    ;;
+			ru|rus|ruse|rused)
+			    COMPREPLY=(rused)
+			    ;;
+			'')
+			    COMPREPLY=('' '<RET>' size bigsize hit meanobject used rused rsize)
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		*)
+		    COMPREPLY=()
+		    ;;
+	    esac
+	    ;;
+	3)
+	    case ${COMP_WORDS[1]} in
+		object)
+		    COMPREPLY=('' '<max-size>')
+		    ;;
+		bigobject)
+		    case ${COMP_WORDS[2]} in
+			on)
+			    COMPREPLY=('' '<min-size>')
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		clear)
+		    case ${COMP_WORDS[2]} in
+			force)
+			    case ${COMP_WORDS[3]} in
+				w|wa|wai|wait)
+				    COMPREPLY=(wait)
+				    ;;
+				'')
+				    COMPREPLY=('' '<RET>' wait)
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		*)
+		    COMPREPLY=()
+		    ;;
+	    esac
+	    ;;
+	4)
+	    case ${COMP_WORDS[1]} in
+		bigobject)
+		    case ${COMP_WORDS[2]} in
+			on)
+			    COMPREPLY=('' '<max-size>')
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		*)
+		    COMPREPLY=()
+		    ;;
+	    esac
+	    ;;
+	*)
+	    COMPREPLY=()
+	    ;;
+    esac
+}

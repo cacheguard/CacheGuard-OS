@@ -1,0 +1,476 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       Commands
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+get-urllist-serial()
+{
+    test -n "${1}" || return 1
+    local base_name=${1}
+
+    local serial_file=${TMP_DIR}/.${USER}.guard.load.serial
+    local serial=0
+
+    ls ${TMP_DIR}/${base_name}.*.*.gz > /dev/null 2>&1
+
+    if test ${?} -eq 0 ; then
+	test ! -f ${serial_file} || read serial < ${serial_file}
+    fi
+
+    ((serial++))
+    echo ${serial} > ${serial_file}
+
+    local len=${#serial} ; len=$[5-${len}]
+    local i
+
+    for ((i=0;i<$len;i++))
+    do
+	serial="0${serial}"
+    done
+    echo ${serial}
+}
+
+get-urllist-filename()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 1
+    test -n "${3}" || return 1
+    test -n "${4}" || return 1
+    local op=${1}
+    local days=${2}
+    local prefix=${3}
+    local ul=${4}
+
+    case ${op} in
+	create)
+	    local ftype=${URLLIST_CREATE}
+	    local base_file=${prefix}.${ftype}.${ul}
+	    local serial=00000
+	    ;;
+	update|auto)
+	    local ftype=${URLLIST_UPDATE}
+	    local base_file=${prefix}.${ftype}.${ul}
+	    local serial=$(get-urllist-serial ${base_file})
+	    ;;
+	*)
+	    return 1
+	    ;;
+    esac
+
+    local tmp_file=${base_file}.SER+${serial}+RES.DAY+${days}+YAD
+
+    echo ${tmp_file}
+}
+
+urllist-load()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 1
+    test -n "${3}" || return 1
+    test -n "${4}" || return 1
+    test -n "${5}" || return 1
+    test -n "${6}" || return 1
+    test -n "${7}" || return 1
+    test -n "${8}" || return 1
+    test -n "${9}" || return 1
+    test -n "${10}" || return 1
+    test -n "${11}" || return 1
+    local days=${1}
+    local act=${2}
+    local ul=${3}
+    local protocol=${4}
+    local ip=${5}
+    local fn=${6}
+    local op=${7}
+    local prefix=${8}
+    local domains=${9}
+    local urls=${10}
+    local expressions=${11}
+
+    local ul_filename=$(get-urllist-filename ${op} ${days} ${prefix} ${ul})
+    local tmp_ul_file=${TMP_DIR}/${ul_filename}
+
+    local ret files list
+    local urllist_sz
+
+    fuser --silent \
+	  ${tmp_ul_file}.{domains,urls,expressions}.gz.work \
+	  ${tmp_ul_file}.{domains,urls,expressions}.gz.${SIGNATURE}.work \
+	  2> /dev/null
+    test ${?} -ne 0 || return 96
+
+    test ${domains} -eq 0 || files="${files} ${fn}.domains.gz ${tmp_ul_file}.domains.gz.work"
+    test ${urls} -eq 0 || files="${files} ${fn}.urls.gz ${tmp_ul_file}.urls.gz.work"
+    test ${expressions} -eq 0 || files="${files} ${fn}.expressions.gz ${tmp_ul_file}.expressions.gz.work"
+
+    if test ${act} == vload ; then
+	test ${domains} -eq 0 || files="${files} ${fn}.domains.gz.${SIGNATURE} ${tmp_ul_file}.domains.gz.${SIGNATURE}.work"
+	test ${urls} -eq 0 || files="${files} ${fn}.urls.gz.${SIGNATURE} ${tmp_ul_file}.urls.gz.${SIGNATURE}.work"
+	test ${expressions} -eq 0 || files="${files} ${fn}.expressions.gz.${SIGNATURE} ${tmp_ul_file}.expressions.gz.${SIGNATURE}.work"
+    fi
+
+    files=${files:1}
+
+    local progress_file
+
+    if test ${prefix} == ${LOADED} ; then
+	progress_file=${TMP_DIR}/${LOADED}.${URLLIST}.${ul}.${PROGRESS}
+	rm -f ${progress_file}
+    fi
+
+    load-files ${protocol} ${ip} "${files}" "${progress_file}" binary urllist
+    ret=${?}
+
+    if test ${ret} -ne 0 ; then
+	test -z "${progress_file}" || rm -f ${progress_file}
+	return ${ret}
+    fi
+
+    ret=0
+    for list in domains urls expressions
+    do
+	case ${list} in
+	    domains)
+		test ${domains} -eq 1 || continue
+		;;
+	    urls)
+		test ${urls} -eq 1 || continue
+		;;
+	    expressions)
+		test ${expressions} -eq 1 || continue
+		;;
+	    *)
+		return 255
+		;;
+	esac
+
+	if test -f ${tmp_ul_file}.${list}.gz.work ; then
+
+	    urllist_sz=$(get-files-size ${tmp_ul_file}.${list}.gz.work)
+
+	    if test ${urllist_sz} -gt ${MAX_URLLIST_GZ_SZ} ; then
+		rm -f ${tmp_ul_file}.${list}.gz.work
+		test ${act} != vload || rm -f ${tmp_ul_file}.${list}.gz.${SIGNATURE}.work
+		return 252
+	    else
+
+		if test ${act} == vload ; then
+		    if test -f ${tmp_ul_file}.${list}.gz.${SIGNATURE}.work ; then
+			mv -f ${tmp_ul_file}.${list}.gz.${SIGNATURE}.work ${tmp_ul_file}.${list}.gz.${SIGNATURE}
+			mv -f ${tmp_ul_file}.${list}.gz.work ${tmp_ul_file}.${list}.gz
+		    else
+			((ret++))
+			rm -f ${tmp_ul_file}.${list}.gz.work
+		    fi
+		else
+		    mv -f ${tmp_ul_file}.${list}.gz.work ${tmp_ul_file}.${list}.gz
+		fi
+	    fi
+	else
+	    ((ret++))
+	    test ${act} != vload || rm -f ${tmp_ul_file}.${list}.gz.${SIGNATURE}.work
+	fi
+    done
+
+    if test ${ret} -ne 0 ; then
+	test -z "${progress_file}" || rm -f ${progress_file}
+	return 96
+    fi
+
+    NEWENV=1
+    return 0
+}
+
+urllist-get-suffixes()
+{
+    test -n "${1}" || return 1
+    local suffix=${1}
+
+    local suffixes
+
+    case ${suffix} in
+	domains)
+	    suffixes="1 0 0"
+	    ;;
+	urls)
+	    suffixes="0 1 0"
+	    ;;
+	*)
+	    suffixes="0 0 0"
+	    ;;
+    esac
+
+    echo ${suffixes}
+}
+
+log-urllist-commit()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    test -n "${3}" || return 3
+    local actor=${1}
+    local urllist=${2}
+    local mode=${3}
+
+    test ${actor} == system || return 0
+    local message
+    test ${mode} == create || message=" ${mode^}s"
+
+    log "Committing the pushed '${urllist}' URL list${message}"
+}
+
+log-urllist-commit-result()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    local actor=${1}
+    local code=${2}
+
+    test ${actor} == system || return 0
+    log-result ${code}
+}
+
+commit-mpushed-urllists()
+{
+    test -n "${1}" || return 1
+    local actor=${1}
+
+    case ${actor} in
+	user)
+	    local prefix=${LOADED}
+	    ;;
+	system)
+	    local prefix=${ILOADED}
+	    ;;
+	*)
+	    return 1
+	    ;;
+    esac
+
+    local files file base name
+    local last_days_file
+    local urllists urllist commit ret
+    local last_days days
+
+    files=$(ls -1 ${TMP_DIR}/${MPUSHED}.${URLLIST_CREATE}.* 2> /dev/null)
+    for file in ${files}
+    do
+	base=$(file-basename ${file})
+	base=${base/${MPUSHED}\.${URLLIST_CREATE}\.}
+	urllist=${base/\.*}
+	member "${urllists}" "${urllist}" || urllists="${urllists} ${urllist}"
+    done
+    urllists=${urllists:1}
+
+    for urllist in ${urllists}
+    do
+	ret=0
+	log-urllist-commit ${actor} ${urllist} create
+	files=$(ls -1 ${TMP_DIR}/${MPUSHED}.${URLLIST_CREATE}.${urllist}.* 2> /dev/null)
+	for file in ${files}
+	do
+	    base=$(file-basename ${file})
+	    base=${base/${MPUSHED}\./${prefix}\.}
+	    mv -f ${file} ${TMP_DIR}/${base} || ((ret++))
+	done
+	log-urllist-commit-result ${actor} ${ret}
+    done
+
+    unset urllists
+    files=$(ls -1 ${TMP_DIR}/${MPUSHED}.${URLLIST_UPDATE}.*.gz 2> /dev/null)
+    for file in ${files}
+    do
+	base=$(file-basename ${file})
+	base=${base/${MPUSHED}\.${URLLIST_UPDATE}\.}
+	urllist=${base/\.*}
+	member "${urllists}" "${urllist}" || urllists="${urllists} ${urllist}"
+    done
+    urllists=${urllists:1}
+
+    for urllist in ${urllists}
+    do
+	for suffix in domains urls
+	do
+	    last_days_file=${URLLIST_VAR_DIR}/${urllist}.${suffix}.${URLLIST_UPDATE}
+
+	    files=$(ls -1 ${TMP_DIR}/${MPUSHED}.${URLLIST_UPDATE}.${urllist}.*.${suffix}.gz 2> /dev/null)
+
+	    for file in ${files}
+	    do
+		if test -f ${last_days_file} ; then
+		    days=$(get-urllist-serial-days ${file} ${MPUSHED} ${URLLIST_UPDATE} ${urllist} ${suffix})
+		    read last_days < ${last_days_file}
+		    if test ${days} -gt ${last_days} ; then
+			commit=yes
+		    else
+			unset commit
+		    fi
+		else
+		    commit=yes
+		fi
+
+		if test -n "${commit}" ; then
+		    ret=0
+		    log-urllist-commit ${actor} ${urllist} update
+		    base=$(file-basename ${file})
+		    base=${base/${MPUSHED}\./${prefix}\.}
+		    mv -f ${file} ${TMP_DIR}/${base} || ((ret++))
+		    test ! -f ${file}.${SIGNATURE} || mv -f ${file}.${SIGNATURE} ${TMP_DIR}/${base}.${SIGNATURE} || ((ret++))
+		    log-urllist-commit-result ${actor} ${ret}
+		else
+		    rm -f ${file}*
+		fi
+	    done
+	done
+    done
+}
+
+urllist-auto-load()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 1
+    test -n "${3}" || return 1
+    test -n "${4}" || return 1
+    test -n "${5}" || return 1
+    test -n "${6}" || return 1
+    test -n "${7}" || return 1
+    test -n "${8}" || return 1
+    local act=${1}
+    local ul=${2}
+    local protocol=${3}
+    local ip=${4}
+    local fn=${5}
+    local op=${6}
+    local prefix=${7}
+    local suffix=${8}
+
+    local suffixes=$(urllist-get-suffixes ${suffix})
+    local last_days_file=${URLLIST_VAR_DIR}/${ul}.${suffix}.${URLLIST_UPDATE}
+
+    if test ! -f ${last_days_file} ; then
+	local seconds=$(date +"%s")
+	local days=$[${seconds} / 86400]
+	urllist-load ${days} ${act} ${ul} ${protocol} ${ip} ${fn} create ${prefix} ${suffixes}
+	return ${?}
+    fi
+
+    local last_days ; read last_days < ${last_days_file}
+    local today_seconds=$(date +"%s")
+    local today_days=$[${today_seconds} / 86400]
+    local days date
+
+    ((last_days++))
+
+    local ret usleep
+
+    if test $[${days}+1] -le ${today_days} ; then usleep=250000 ; else usleep=0 ; fi
+
+    for ((days=last_days ; days<=today_days ; days++))
+    do
+	date=$(date --date="1970-01-01 00:00:00 UTC +${days} days" +"%Y%m%d")
+	urllist-load ${days} ${act} ${ul} ${protocol} ${ip} ${fn}.${date} ${op} ${prefix} ${suffixes}
+	ret=${?}
+	test ${ret} -eq 0 || break
+	usleep ${usleep}
+    done
+
+    return ${ret}
+}
+
+urllist-auto-reset-new()
+{
+    rm -f ${URLLIST_DIR}/*.${URLLIST_AUTO}
+}
+
+urllist-auto-reset-current()
+{
+    local files=$(ls -1 ${URLLIST_DIR}/*.${URLLIST_AUTO}.current 2> /dev/null)
+    local current_file new_file
+
+    for current_file in ${files}
+    do
+	new_file=${current_file/\.current}
+	echo "off" > ${new_file}
+    done
+}
+
+get-loaded-urllists()
+{
+    cd ${TMP_DIR}
+
+    local guard_file guard_files=$(ls -1 ${LOADED}.${URLLIST}.*.{domains,urls,expressions}.gz 2>/dev/null)
+
+    if test -z "${guard_files}" ; then
+	cd ${HOME}
+	return 0
+    fi
+
+    local urllist_suffix urllist_suffixes
+    local urllist urllists
+
+    local urllist_suffixes=${guard_files//${LOADED}.${URLLIST_CREATE}.}
+    urllist_suffixes=${urllist_suffixes//${LOADED}.${URLLIST_UPDATE}.}
+
+    for urllist_suffix in ${urllist_suffixes}
+    do
+	urllist=${urllist_suffix/.SER+*}
+	member "${urllists}" ${urllist} || urllists="${urllists} ${urllist}"
+    done
+    urllists=${urllists:1}
+
+    cd ${HOME}
+
+    echo ${urllists}
+}
+
+clean-urllist-tmp-files()
+{
+    local urllists=${1}
+    test -n "${urllists}" || urllists=$(get-loaded-urllists)
+    test -n "${urllists}" || return 0
+
+    local guard_file guard_files
+    local urllist
+
+    cd ${TMP_DIR}
+
+    for urllist in ${urllists}
+    do
+	guard_files=$(ls -1 ${LOADED}.${URLLIST_CREATE}.${urllist}.*.{domains,urls,expressions}.gz ${LOADED}.${URLLIST_UPDATE}.${urllist}.*.{domains,urls,expressions}.gz 2>/dev/null)
+
+	for guard_file in ${guard_files}
+	do
+	    test ! -f ${guard_file}.work || continue
+	    fuser --silent ${guard_file} 2> /dev/null
+	    if test ${?} -ne 0 ; then
+		rm -f \
+		    ${LOADED}.${URLLIST}.${urllist}.${PROGRESS} \
+		    ${guard_file} \
+		    ${guard_file}.${SIGNATURE} \
+		    2> /dev/null
+	    fi
+	done
+	rm -f ${URLLIST_CLEAR}.${urllist}.*
+    done
+    NEWENV=1
+    cd ${HOME}
+}

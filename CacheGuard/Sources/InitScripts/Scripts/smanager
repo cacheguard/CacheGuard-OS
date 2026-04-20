@@ -1,0 +1,100 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       InitScript
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+source /lib/lsb/init-functions
+
+RETVAL=0
+SERV="Manager Synchroniser"
+PROG="smanager"
+FPROG=/usr/local/bin/apl_smanagerd
+
+[ -x ${FPROG} ] || exit 1
+[ ! -f /etc/sysconfig/${PROG} ] || source /etc/sysconfig/${PROG}
+[ "${PEER_IP}" != 0.0.0.0 ] || exit 11
+
+start-smanager()
+{
+    test ! -f /var/run/${PROG}.pid || return 3
+    ${FPROG} ${PEER_IP} > /var/run/${PROG}.pid 2> /dev/null
+    [ ${?} -eq 0 ] && touch /var/lock/${PROG}
+}
+
+stop-smanager()
+{
+    test -f /var/run/${PROG}.pid || return 1
+
+    local ppids=$(cat /var/run/${PROG}.pid 2> /dev/null) ppid pid
+    local ret retval=0
+
+    for ppid in ${ppids}
+    do
+	ps -p ${ppid} > /dev/null 2> /dev/null
+	ret=${?}
+	[ ${ret} -eq 0 ] || continue
+
+	pid=$(ps -o pid= --ppid ${ppid} 2> /dev/null)
+
+	kill -KILL ${ppid} ${pid} 2> /dev/null
+	ret=${?}
+	((retval += ret))
+    done
+
+    rm -f /var/lock/${PROG}
+    rm -f /var/run/${PROG}.pid
+
+    return ${retval}
+}
+
+case "${1}" in
+    start)
+	log_info_msg "Starting ${SERV}..."
+	start-smanager
+	RETVAL=${?}
+	[ ${RETVAL} -eq 0 ]
+	evaluate_retval
+	exit ${RETVAL}
+	;;
+    stop)
+	log_info_msg "Stopping ${SERV}... "
+	stop-smanager
+	RETVAL=${?}
+	[ ${RETVAL} -eq 0 ]
+	evaluate_retval
+	exit ${RETVAL}
+	;;
+    
+    restart)
+	${0} stop
+	${0} start
+	;;
+    
+    status)
+	statusproc ${PROG}
+	;;
+    
+    *)
+	echo "Usage: ${0} {start|stop|restart|status}"
+	exit 1
+	;;
+esac

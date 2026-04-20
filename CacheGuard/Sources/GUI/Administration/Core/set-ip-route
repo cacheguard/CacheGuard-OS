@@ -1,0 +1,170 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       GUI
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+set-routes()
+{
+    local pos=0 entry_pos del_pos
+    local network_pos netmask_pos gateway_pos weight_pos pinged_pos
+    local entry_type network netmask gateway weight pinged
+    local route_id old_route_id prev_route_id
+    local rest location position new_list
+    local del_array insert_array add_array move_array
+    declare -a del_array insert_array add_array move_array
+    local del_nb=0 insert_nb=0 add_nb=0 move_nb=0 i
+
+    local transaction=/tmp/${TRANSACTION_FILE}.wadmin.${REMOTE_USER}.${$}
+    rm -f ${transaction}
+
+    while test ${pos} -lt ${ATTRIBUTE_NB}
+    do
+	entry_pos=${pos}
+	network_pos=$[${pos} + 1]
+	netmask_pos=$[${pos} + 2]
+	gateway_pos=$[${pos} + 3]
+	weight_pos=$[${pos} + 4]
+	pinged_pos=$[${pos} + 5]
+	del_pos=$[${pos} + 6]
+
+	entry_type=${VALUES[${entry_pos}]}
+	network=${VALUES[${network_pos}]}
+	netmask=${VALUES[${netmask_pos}]}
+	gateway=${VALUES[${gateway_pos}]}
+	weight=${VALUES[${weight_pos}]}
+	pinged=${VALUES[${pinged_pos}]}
+
+	route_id=${network}/${netmask}_${gateway}
+
+	if test -z "${weight}" ; then
+	    if test -n "${pinged}" ; then
+		weight=50
+	    fi
+	fi
+	
+	if [[ "${ATTRIBUTES[${del_pos}]}" =~ ^del_[0-9]+$ ]] ; then
+	    del_array[${del_nb}]="${network}/${netmask}_${gateway}"
+	    ((del_nb++))
+	    pos=$[${pos} + 7]
+	else
+	    if test "${entry_type}" == anew -o "${entry_type}" == inew ; then
+		if test -z "${gateway}" ; then
+		    pos=$[${pos} + 6]
+		    continue
+		fi
+
+		test -n "${network}" || network="0.0.0.0"
+
+		new_list="${new_list} ${network}/${netmask}_${gateway}"
+
+		case "${entry_type}" in
+		    anew)
+			add_array[${add_nb}]="${network} ${netmask} ${gateway} ${weight} ${pinged}"
+			((add_nb++))
+			;;
+		    inew)
+			insert_array[${insert_nb}]="${network} ${netmask} ${gateway} ${weight} ${pinged}"
+			((insert_nb++))
+			;;
+		    *)
+			;;
+		esac
+	    elif test "${entry_type:0:4}" == move ; then
+		position=${entry_type:4}
+		move_array[${move_nb}]="${route_id}:${position}:${prev_route_id}"
+		((move_nb++))
+		
+	    elif test "${entry_type}" == old ; then
+		old_route_id=${network}/${netmask}:${gateway}
+
+		for ((i=0 ; i<insert_nb ; i++))
+		do
+		    echo "ip route 'insert:${network}/${netmask}:${gateway}' '${insert_array[${i}]}'" >> ${transaction}
+		done
+		unset insert_array
+		insert_nb=0
+	    fi
+	    pos=$[${pos} + 6]
+	fi
+	prev_route_id=${route_id}
+    done
+
+    new_list=${new_list:1}
+    
+    for ((i=0 ; i<insert_nb ; i++))
+    do
+	echo "ip route 'insert:${network}/${netmask}:${gateway}' '${insert_array[${i}]}'" >> ${transaction}
+    done
+
+    if test -n "${old_route_id}" ; then
+	route_id="${old_route_id}"
+	for ((i=0 ; i<add_nb ; i++))
+	do
+	    echo "ip route 'add:${route_id}' '${add_array[${i}]}'" >> ${transaction}
+	    network=${add_array[${i}]/ *}
+	    rest=${add_array[${i}]#* }
+	    netmask=${rest/ *}
+	    rest=${rest#* }
+	    gateway=${rest/ *}
+	    route_id=${network}/${netmask}:${gateway}
+	done
+    else
+	for ((i=0 ; i<add_nb ; i++))
+	do
+	    echo "ip route add '${add_array[${i}]}'" >> ${transaction}
+	done
+    fi
+
+    for ((i=0 ; i < move_nb ; i++))
+    do
+	location=${move_array[${i}]}
+	route_id=${location/:*}
+	prev_route_id=${location/*:}
+
+	route_id=${route_id/\// }
+	route_id=${route_id/_/ }
+
+	if test -z "${prev_route_id}" ; then
+	    position=${location#*:}
+	    position=${position/:*}
+	    echo "ip route 'move:${position}' '${route_id}'" >> ${transaction}
+	else
+	    echo "ip route 'move:+${prev_route_id/_/:}' '${route_id}'" >> ${transaction}
+	fi
+    done
+
+    for ((i=0 ; i < del_nb ; i++))
+    do
+	! member "${new_list}" ${del_array[${i}]} || continue
+	route_id=${del_array[${i}]}
+	network_netmask=${route_id/_*}
+	gateway=${route_id/*_}
+	network_netmask=${network_netmask//\// }
+	echo "ip route del '${network_netmask}' '${gateway}'" >> ${transaction}
+    done
+    
+    execute-transaction ${transaction}
+}
+
+# Main()
+
+set-routes

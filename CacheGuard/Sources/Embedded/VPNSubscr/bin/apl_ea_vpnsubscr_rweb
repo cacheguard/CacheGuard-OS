@@ -1,0 +1,80 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       VPN Subscription
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+CACHEGUARD_DIR=/etc/sysconfig/cacheguard
+source ${CACHEGUARD_DIR}/constant
+source ${LOCAL_DIR}/lib/apl_ea_vpnsubscr.env
+source ${LOCAL_DIR}/lib/apl_common
+source ${LOCAL_DIR}/lib/apl_ea_vpnsubscr_functions
+
+embedded-vpnsubscr-conf-rweb()
+{
+    test -n "${1}" || return 1
+    local website_name=${1}
+    local sign=${2}
+    test -z "${sign}" || sign=' sign'
+
+    local waf_mode
+    local tls_conf_file="vpnsubscr-tls-vpn-server.conf.${$}"
+
+    if test ${VPNSUBSCR_TEST_MODE} == yes ; then
+	waf_mode=off
+    else
+	waf_mode=on
+    fi
+
+    cat << EOT > ${TMP_DIR}/${tls_conf_file}
+${website_name}
+${VPNSUBSCR_PRIVATE_KEY_LENGTH}
+${VPNSUBSCR_CERTIFICATE_DAYS}
+${VPNSUBSCR_CERTIFICATE_COUNTRY}
+${VPNSUBSCR_CERTIFICATE_PROVINCE}
+${VPNSUBSCR_CERTIFICATE_LOCALITY}
+${VPNSUBSCR_CERTIFICATE_ORGANISATION}
+${VPNSUBSCR_CERTIFICATE_UNIT}
+EOT
+    su - ${ADMIN_NAME} -c \
+       "
+tls server add ${VPNSUBSCR_RWEB_TLS_ID}
+__BATCH_MODE=no tls server generate ${VPNSUBSCR_RWEB_TLS_ID}${sign} < /tmp/${tls_conf_file}
+
+mode rweb on
+mode waf ${waf_mode}
+embedded ${EMBEDDED_VPNSUBSCR_CLI_NAME} on ${website_name} ${VPNSUBSCR_RWEB_TLS_ID}
+admin tls ${VPNSUBSCR_RWEB_TLS_ID}
+apply force wait
+" \
+       > /dev/null
+
+    ! check-expr-ip ${website_name} || set-setup-ip ${website_name}
+}
+
+main()
+{
+    embedded-vpnsubscr-conf-rweb "${@}"
+}
+
+# Main()
+
+main "${@}"

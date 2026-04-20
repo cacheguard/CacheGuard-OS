@@ -1,0 +1,5 @@
+interface ignore wildcard
+interface listen 127.0.0.1
+restrict default ignore
+restrict 127.0.0.1
+driftfile /etc/ntp/drift

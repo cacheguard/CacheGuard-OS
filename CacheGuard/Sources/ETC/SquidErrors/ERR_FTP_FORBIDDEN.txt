@@ -1,0 +1,2 @@
+FTP authentication problem
+Your Web Gateway sent the FTP command <code><strong>%f</strong></code> and then received the reply <code><strong>%F</strong></code>

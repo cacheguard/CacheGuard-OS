@@ -1,0 +1,100 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       GUI
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+set-snmp-trap()
+{
+    local port
+    local pos=0 shift_pos=0 entry_pos del_pos
+    local version_pos server_pos port_pos user_pos hash_pos passwd_pos enc_pos privacy_pos
+
+    local transaction=/tmp/${TRANSACTION_FILE}.wadmin.${REMOTE_USER}.${$}
+    rm -f ${transaction}
+
+    while test ${pos} -lt ${ATTRIBUTE_NB}
+    do
+	entry_pos=${pos}
+	del_pos=$[${pos} + 1]
+
+	if [[ "${ATTRIBUTES[${del_pos}]}" =~ ^del_[0-9]+$ ]] ; then
+	    shift_pos=0
+	else
+	    shift_pos=1
+	fi
+
+	version_pos=$[${pos} - ${shift_pos} + 2]
+	server_pos=$[${pos} - ${shift_pos} + 3]
+	port_pos=$[${pos} - ${shift_pos} + 4]
+	user_pos=$[${pos} - ${shift_pos} + 5]
+	hash_pos=$[${pos} - ${shift_pos} + 6]
+	enc_pos=$[${pos} - ${shift_pos} + 7]
+	passwd_pos=$[${pos} - ${shift_pos} + 8]
+	privacy_pos=$[${pos} - ${shift_pos} + 9]
+
+	case "${VALUES[${version_pos}]}" in
+	    v3)
+		if test ${shift_pos} -eq 0 ; then
+		    echo "admin snmp trap del '${VALUES[${version_pos}]}' '${VALUES[${server_pos}]}' '${VALUES[${port_pos}]}' '${VALUES[${user_pos}]}'" >> ${transaction}
+		    ((pos+=10))
+		else
+		    if test "${VALUES[${entry_pos}]}" == anew ; then
+			if test -n "${VALUES[${port_pos}]}" ; then
+			    port=${VALUES[${port_pos}]}
+			else
+			    port=162
+			fi
+			echo "admin snmp trap add '${VALUES[${version_pos}]}' '${VALUES[${server_pos}]}' '${port}' '${VALUES[${user_pos}]}' '${VALUES[${hash_pos}]}' '${VALUES[${enc_pos}]}' '${VALUES[${passwd_pos}]}' '${VALUES[${privacy_pos}]}'" >> ${transaction}
+		    fi
+		    ((pos+=9))
+		fi
+		;;
+
+	    v1|v2c)
+		if test ${shift_pos} -eq 0 ; then
+		    echo "admin snmp trap del '${VALUES[${version_pos}]}' '${VALUES[${server_pos}]}' '${VALUES[${port_pos}]}'" >> ${transaction}
+		    ((pos+=10))
+		else
+		    if test "${VALUES[${entry_pos}]}" == anew ; then
+			if test -n "${VALUES[${port_pos}]}" ; then
+			    port=${VALUES[${port_pos}]}
+			else
+			    port=162
+			fi
+			echo "admin snmp trap add '${VALUES[${version_pos}]}' '${VALUES[${server_pos}]}' '${port}' '${VALUES[${passwd_pos}]}'" >> ${transaction}
+		    fi
+		    ((pos+=9))
+		fi
+		
+		;;
+	    *)
+		break
+		;;
+	esac
+    done
+    
+    execute-transaction ${transaction}
+}
+
+# Main()
+
+set-snmp-trap

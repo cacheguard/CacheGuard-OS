@@ -1,0 +1,5 @@
++TLS_CLIENT_DAYS='730'
++OCSP_MODE='False'
++OCSP_PORT='8084'
++OCSP_HOST='ocsp.example.com'
++OCSP_DAYS='7'

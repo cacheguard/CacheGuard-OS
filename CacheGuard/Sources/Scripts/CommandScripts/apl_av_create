@@ -1,0 +1,213 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       Scripts
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+source /usr/local/lib/apl_functions
+source ${ABASE_DIR}/${ENV_RDIR}/${ENV_CURRENT_NAME}
+
+reset-av-create-log()
+{
+    echo -n > ${AV_CREATE_LOG}
+    chmod 640 ${AV_CREATE_LOG}
+    chown ${ADMIN_NAME}:${GROUP_NAME} ${AV_CREATE_LOG}
+}
+
+av-create-log()
+{
+    test -n "${1}" || return 1
+    local message=${1}
+    local tag=${2}
+    test -n "${tag}" || tag=0
+    
+    local date=$(date +"%Y/%m/%d-%T")
+    echo -n "${tag} ${date} ${message}" >> ${AV_CREATE_LOG}
+}
+
+av-create-log-abort()
+{
+    echo >> ${AV_CREATE_LOG}
+}
+
+av-create-log-ret()
+{
+    test -n "${1}" || return 1
+    local err_code=${1}
+
+    if test ${err_code} -eq 0 ; then
+	echo "[OK]" >> ${AV_CREATE_LOG}
+    else
+	echo " (${err_code})[KO]" >> ${AV_CREATE_LOG}
+    fi
+}
+
+apl-av-create()
+{
+    local av_extended_mode extended log_tag
+
+    reset-av-create-log
+    av-create-log "Beginig the Antivirus signatures DB creation"
+    av-create-log-ret ${?}
+
+    if test ${APL_ROLE} == 'gateway' ; then
+	av-create-log "Stopping the Health Check service"
+	/etc/rc.d/init.d/health stop > /dev/null 2>&1
+	av-create-log-ret ${?}
+
+	getpids freshclam > /dev/null
+	local freshclam_state=${?}
+
+	getpids clamd > /dev/null
+	local clamd_state=${?}
+
+	if test ${clamd_state} -eq 0 ; then
+	    av-create-log "Stopping the Antivirus service"
+	    /etc/rc.d/init.d/clamd stop > /dev/null 2>&1
+	    av-create-log-ret ${?}
+	fi
+
+	if test ${freshclam_state} -eq 0 ; then
+	    av-create-log "Stopping the Antivirus Updater service"
+	    /etc/rc.d/init.d/freshclam stop > /dev/null 2>&1
+	    av-create-log-ret ${?}
+	fi
+    fi
+
+    set-av-parameters cur
+
+    case ${APL_ROLE} in
+	gateway)
+	    refresh-av-regular-db-sz remote remote
+	    ;;
+	manager)
+	    refresh-av-regular-db-sz local local
+	    ;;
+	*)
+	    ;;
+    esac
+
+    reset-av-extended-db-sz
+
+    if test ${APL_ROLE} == 'gateway' ; then
+	av-create-log "Regular AV signatures DB creation" ${LOG_TAG_AV_REGULAR}
+	av-create-log-ret ${?}
+    fi
+
+    local operation_title
+    if test "${CURRENT_AV_EXTENDED_MODE}" == True ; then
+	case ${APL_ROLE} in
+	    manager)
+		operation_title="Downloading"
+		;;
+	    gateway)
+		if test ${CURRENT_AV_EXTENDED_METHOD} == push ; then
+		    operation_title="Committing"
+		else
+		    operation_title="Downloading"
+		fi
+		;;
+	    *)
+		;;
+	esac
+	av-create-log "${operation_title} AV extended signatures" ${LOG_TAG_AV_EXTENDED_CREATE}
+	av-create-log-ret 0
+	av-create-log "Installing AV extended signatures" ${LOG_TAG_AV_EXTENDED_UPDATE}
+	av-create-log-ret 0
+    fi
+
+    local pid ret1 ret2 ret
+
+    case ${APL_ROLE} in
+	gateway)
+	    /etc/rc.d/init.d/freshclam create > /dev/null 2>&1 & pid=${!}
+	    ;;
+	manager)
+	    ;;
+	*)
+	    ;;
+    esac
+
+    if test "${CURRENT_AV_EXTENDED_MODE}" == True ; then
+	NO_RELOAD_AV=yes apl_av_extended_update cur create index
+	ret2=${?}
+    fi
+
+    if test -n "${pid}" ; then
+	wait ${pid} 2> /dev/null
+	ret1=${?}
+	test ${ret1} -ne 127 || ret1=0
+    else
+	ret1=0
+    fi
+
+    av-create-log "Terminating all signatures DB creations"
+    ((ret = ret1 + ret2))
+    av-create-log-ret ${ret}
+
+    if test ${APL_ROLE} == 'gateway' ; then
+	if test ${freshclam_state} -eq 0 ; then
+	    av-create-log "Starting the Antivirus Updater service"
+	    /etc/rc.d/init.d/freshclam start > /dev/null 2>&1
+	    av-create-log-ret ${?}
+	fi
+
+	if test ${clamd_state} -eq 0 ; then
+	    av-create-log "Starting the Antivirus service"
+	    /etc/rc.d/init.d/clamd start > /dev/null 2>&1
+	    av-create-log-ret ${?}
+	fi
+    
+	av-create-log "Starting the Health Check service"
+	/etc/rc.d/init.d/health start > /dev/null 2>&1
+	av-create-log-ret ${?}
+    fi
+    
+    av-create-log "Ending Antivirus signatures DB creation"
+    av-create-log-ret ${?}
+}
+
+clean-exit()
+{
+    trap "" USR1 INT QUIT TERM
+
+    local code=${1}
+    wait 2> /dev/null
+    manage-appliance-unlock
+    av-create-log-abort
+    av-create-log "Aborting the Antivirus Create operation"
+    av-create-log-ret ${?}
+
+    exit ${code}
+}
+
+main()
+{
+    trap "clean-exit 100" USR1 INT QUIT TERM
+    manage-appliance-lock
+    set-av-extended-parameters cur
+    apl-av-create
+    manage-appliance-unlock
+}
+
+# Main()
+
+main "${@}"

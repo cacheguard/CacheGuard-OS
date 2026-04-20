@@ -1,0 +1,68 @@
+define( 'CANCELLED_FACTOR', 100 );
+
+define( 'NOT_AVAILABLE', "<i>NA</i>" );
+define( 'PURGED', "<i>Purged</i>" );
+define( 'NOT_SET', "<i>&lt;not set&gt;</i>" );
+define( 'HIDDEN', "<i>&lt;hidden&gt;</i>" );
+
+define( 'DEFAULT_PRIVATE_DOMAIN_NAME', 'privacy.matters' );
+define( 'DEFAULT_TIMEZONE', 'Europe/Paris' );
+define( 'DEFAULT_EMAIL_PORT', 587 );
+
+define( 'WRITE_NONE', 0 );
+define( 'WRITE_UPDATE', 1 );
+define( 'WRITE_INSERT', 2 );
+
+define( 'OPERATION_NEW', 0 );
+define( 'OPERATION_EDIT', 1 );
+
+define( 'METHOD', 'method' );
+define( 'DATA', 'data' );
+define( 'ERRORS', 'errors' );
+define( 'CONTROLS', 'controls' );
+define( 'OPERATION', 'operation' );
+define( 'USERNAME', 'username' );
+define( 'PHONE', 'phone' );
+define( 'DEVICE', 'device' );
+define( 'CREATE_DATE', 'create_date' );
+define( 'ALIVE_DATE', 'alive_date' );
+define( 'TLS_PASSWORD', 'tls_password' );
+define( 'OPERATION_STATUS', 'operation_status' );
+define( 'SERVICE', 'service' );
+define( 'REQUESTED_STATUS', 'requested_status' );
+
+define( 'SERVICE_NAME', 'service_name' );
+define( 'PRIVATE_DOMAIN_NAME', 'domain_name' );
+define( 'CONFIRM_RESET', 'confirm_reset' );
+define( 'TIMEZONE', 'timezone' );
+define( 'VPN_ADDRESS', 'vpn_address' );
+define( 'FIRST_NAME', 'first_name' );
+define( 'LAST_NAME', 'last_name' );
+define( 'EMAIL_ADDRESS', 'email_address' );
+define( 'SERVER', 'server' );
+define( 'PORT', 'port' );
+define( 'ACCOUNT', 'account' );
+define( 'PASSWORD', 'password' );
+define( 'SERVICE_STATE', 'service' );
+define( 'CONFIRM_CANCEL', 'confirm_cancel' );
+define( 'CHECK_EMAIL', 'check_email' );
+define( 'LICENSE_ACCEPTANCE', 'license_acceptance' );
+
+define( 'MFA_STATE', 'mfa_state' );
+define( 'MFA_DB_STATE', 'mfa_db_state' );
+define( 'MFA_SECRET', 'mfa_secret' );
+define( 'MFA_EMERGENCIES', 'mfa_emergencies' );
+
+define( 'LOGIN_PASSWORD_MIN_LEN', 16 );
+define( 'LOGIN_PASSWORD_MAX_LEN', 32 );
+define( 'LOGIN_PASSWORD', 'password' );
+define( 'LOGIN_PASSWORD1', 'password1' );
+define( 'LOGIN_PASSWORD2', 'password2' );
+
+define( 'STATUS_NONE', 0 );
+define( 'STATUS_SUSPEND', 1 );
+define( 'STATUS_ACTIVATE', 2 );
+define( 'STATUS_CANCEL', 3 );
+
+define( 'LICENSE_URL', 'https://www.cacheguard.net/doc/command/license.html' );
+define( 'WHATSAPP_URL', 'https://wa.me/' );

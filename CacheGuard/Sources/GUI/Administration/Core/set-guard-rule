@@ -1,0 +1,129 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       GUI
+# AUTHOR(S):    CacheGuard Development Team
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+set-guard-rule()
+{
+    local pos=0 entry_pos del_pos
+    local name_pos action_pos
+
+    local entry_type name action
+    local old_name prev_name location position new_list
+    local del_array insert_array add_array move_array
+    declare -a del_array insert_array add_array move_array
+    local del_nb=0 insert_nb=0 add_nb=0 move_nb=0 i
+
+    local transaction=/tmp/${TRANSACTION_FILE}.wadmin.${REMOTE_USER}.${$}
+    rm -f ${transaction}
+
+    while test ${pos} -lt ${ATTRIBUTE_NB}
+    do
+	entry_pos=${pos}
+	name_pos=$[${pos} + 1]
+	action_pos=$[${pos} + 2]
+	del_pos=$[${pos} + 3]
+
+	entry_type=${VALUES[${entry_pos}]}
+	name=${VALUES[${name_pos}]}
+	action=${VALUES[${action_pos}]}
+
+	if [[ "${ATTRIBUTES[${del_pos}]}" =~ ^del_[0-9]+$ ]] ; then
+	    del_array[${del_nb}]="'${name}'"
+	    ((del_nb++))
+	    pos=$[${pos} + 4]
+	else
+	    if test -n "${name}" -a -n "${action}" ; then
+		if test "${entry_type}" == anew  ; then
+		    new_list="${new_list} ${name}"
+		    add_array[${add_nb}]="'${name}' '${action}'"
+		    ((add_nb++))
+		elif test "${entry_type}" == inew  ; then
+		    new_list="${new_list} ${name}"
+		    insert_array[${insert_nb}]="'${name}' '${action}'"
+		    ((insert_nb++))
+		elif test "${entry_type:0:4}" == move ; then
+		    position=${entry_type:4}
+		    move_array[${move_nb}]="${name}:${position}:${prev_name}"
+		    ((move_nb++))
+		elif test "${entry_type}" == old  ; then
+		    old_name=${name}
+		    for ((i=0 ; i<insert_nb ; i++))
+		    do
+			echo "guard rule 'insert:${name}' ${insert_array[${i}]}" >> ${transaction}
+		    done
+		    unset insert_array
+		    insert_nb=0
+		fi
+	    fi
+	    pos=$[${pos} + 3]
+	fi
+	prev_name=${name}
+    done
+
+    new_list=${new_list:1}
+
+    for ((i=0 ; i<insert_nb ; i++))
+    do
+	echo "guard rule 'insert:${name}' ${insert_array[${i}]}" >> ${transaction}
+    done
+
+    if test -n "${old_name}" ; then
+	name=${old_name}
+	for ((i=0 ; i<add_nb ; i++))
+	do
+	    echo "guard rule 'add:${name}' ${add_array[${i}]}" >> ${transaction}
+	    name=${add_array[${i}]/ *}
+	done
+    else
+	for ((i=0 ; i<add_nb ; i++))
+	do
+	    echo "guard rule add ${add_array[${i}]}" >> ${transaction}
+	done
+    fi
+
+    for ((i=0 ; i<move_nb ; i++))
+    do
+	location=${move_array[${i}]}
+	name=${location/:*}
+	prev_name=${location/*:}
+
+	if test -z "${prev_name}" ; then
+	    position=${location#*:}
+	    position=${position/:*}
+	    echo "guard rule move:${position} '${name}'" >> ${transaction}
+	else
+	    
+	    echo "guard rule 'move:+${prev_name}' '${name}'" >> ${transaction}
+	fi
+    done
+
+    for ((i=0 ; i<del_nb ; i++))
+    do
+	! member "${new_list}" ${del_array[${i}]} || continue
+	echo "guard rule del ${del_array[${i}]}" >> ${transaction}
+    done
+
+    execute-transaction ${transaction}
+}
+
+set-guard-rule

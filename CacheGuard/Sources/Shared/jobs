@@ -1,0 +1,14 @@
+apl_apply apply apply Applying New Configuration
+apl_apply_cancel apply apply Cancelling the Apply Operation
+apl_reboot reboot power Rebooting the System
+apl_halt halt power Powering Off the System
+apl_rollback apply apply Roll-backing the Apply Operation
+apl_configure apply apply Configuring the System
+apl_cache_clear cache_clear cache-clear Clearing the Web Cache
+apl_av_create antivirus_create antivirus-create Downloading AV Signatures
+apl_av_update antivirus_update antivirus-update Updating AV Signatures
+apl_verify_usage
+apl_backup system_backup_create system-backup Backing Up the System
+apl_logrotate log_rotate log-rotate Rotating Logs
+apl_urllist_update urllist urllist-update Updating URL Lists
+apl_ha

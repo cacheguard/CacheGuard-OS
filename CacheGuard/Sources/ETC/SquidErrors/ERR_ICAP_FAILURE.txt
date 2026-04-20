@@ -1,0 +1,2 @@
+ICAP protocol error
+Some aspect of the ICAP communication failed

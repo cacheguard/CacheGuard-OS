@@ -1,0 +1,13 @@
+1) To create the bootable USB stick:
+------------------------------------
+cd ~/Data/CacheGuard/OS/
+
+# sudo fdisk /dev/sdX
+- Delete all partitions
+
+# sudo dd if=CacheGuard-UF-2.3.6-X64.iso of=/dev/sdX conv=fdatasync status=progress
+
+2) To install on the mini Appliance:
+------------------------------------
+
+- Modify the BIOS boot priority to boot on the USB disk
