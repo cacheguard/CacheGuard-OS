@@ -1,0 +1,21 @@
+Download the listed packages and place them in the current directory on your build machine.
+
+- busybox-1.35.0.tar.bz2
+- busybox.config.bz2
+- cmake-3.22.0.tar.bz2
+- curl-8.18.0.tar.bz2
+- gnupg-2.2.34.tar.bz2
+- json-c-0.15.tar.gz
+- libassuan-2.5.5.tar.bz2
+- libestr-0.1.11.tar.gz
+- libfastjson-1.2304.0.tar.gz
+- libgcrypt-1.8.9.tar.bz2
+- libgpg-error-1.44.tar.bz2
+- libksba-1.6.0.tar.bz2
+- liblogging-1.0.6.tar.gz
+- libssh2-1.10.0.tar.bz2
+- npth-1.6.tar.bz2
+- pinentry-1.2.0.tar.bz2
+- protobuf-34.1.tar.gz
+- protobuf-c-1.5.2.tar.gz
+- rsyslog-8.2602.0.tar.gz

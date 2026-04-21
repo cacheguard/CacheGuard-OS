@@ -1,0 +1,1231 @@
+<a name='main' class='doc-title'></a>
+<h1>Change Logs</h1>
+
+<a name='2.5.2' class='doc-title'></a><h3>Version UF-2.5.2 (10 April 2026)</h3>
+<ul>
+  <li>OS upgrading on the Manager has been corrected to ensure that the OS version is also updated on managed gateways.</li>
+  <li>Connections and disconnections to the IPsec VPN server are now logged in a separate log file called <strong>vpnipsec</strong> and are no longer included in the system logs.</li>
+  <li>The Windows PowerShell IPsec VPN access configuration has been corrected to call the setupVPN function with @() instead of @('') when split tunnelling is not used (see the <strong>vpnipsec access conf windows</strong>... command).</li>
+  <li>The Windows PowerShell IPsec VPN access configuration has been corrected to properly delete existing certificates before installing new ones (see the <strong>vpnipsec access conf windows</strong> command).</li>
+  <li>Logs can now be sent to syslog servers using TCP or UDP over SSL (the affected command is the <strong>log</strong> command).</li>
+  <li>Gateway unavailability detection in static IP routes has been improved.</li>
+  <li>In a routing table where different pinged servers are specified for the same gateway, gateway unavailability detection has been fixed.</li>
+  <li>Minor bug fixes have been applied.</li>
+</ul>
+
+<a name='2.5.1' class='doc-title'></a><h3>Version UF-2.5.1 (20 February 2026)</h3>
+<ul>
+  <li>The <strong>system report load</strong> command has been fixed to display the correct CPU and I/O load values, expressed as relative percentages over time.</li>
+  <li>The <strong>system report cpu</strong> command has been added to the system to display CPU usage as a percentage of total capacity.</li>
+  <li>The <strong>vpnipsec access conf</strong>... command has been corrected to generate valid local identifiers, thereby resolving the bug introduced in the previous version.</li>
+  <li>Dynamic DNS updating capability has been incorporated into the OS. The new <strong>dynamicdns</strong> command enables the configuration of the Dynamic DNS service in use.</li>
+  <li>Minor bug fixes have been applied.</li>
+</ul>
+
+<a name='2.4.2' class='doc-title'></a><h3>Version UF-2.4.2 (5 February 2026)</h3>
+<ul>
+  <li>OpenSSL&reg; has been upgraded to its latest stable version (3.6.0).</li>
+  <li>OpenSSH&reg; has been upgraded to its latest stable version (10.2).</li>
+  <li>OpenLDAP&reg; has been upgraded to its latest stable version (2.6.10).</li>
+  <li>Apache&reg; Web Server has been upgraded to its latest stable version (2.4.66).</li>
+  <li>Squid&reg; has been upgraded to its latest version (7.3).</li>
+  <li>StrongSwan&reg; has been upgraded to its latest version 6.0.4).</li>
+  <li>CURL&reg; has been upgraded to its latest stable version (8.18.0).</li>
+  <li>FTP-based file transfers have been corrected to ensure that TLS is enforced during the authentication phase when the target FTP server supports TLS authentication.</li>
+  <li>The use of DSA keys with SSH has been permanently disabled.</li>
+  <li>The <strong>apply</strong> command has been corrected so that it no longer erroneously reports that the appliance does not have sufficient RAM to activate the new configuration in certain cases.</li>
+  <li>The <strong>admin ssh fingerprint</strong> command on the Manager has been corrected to display the contextual RSA key fingerprint.</li>
+  <li>In the WAF, the processing order has been changed so that custom WAF rules are evaluated before WAF filters.</li>
+  <li>Minor bug fixes have been applied.</li>
+</ul>
+
+<a name='2.4.1' class='doc-title'></a><h3>Version UF-2.4.1 (5 January 2026)</h3>
+<ul>
+  <li>The licensing model has been revised to make the use of CacheGuard-OS completely free, regardless of the number of users supported by the Gateway or the number of Gateways managed by the Manager.</li>
+  <li>The <strong>vpnipsec access conf android</strong> <i>client-tls-id</i> <strong>show</strong> command has been enhanced to generate a VPN profile that includes a proxy section.</li>
+  <li>The <strong>vpnipsec access conf apple</strong> <i>client-tls-id</i> <strong>show</strong> command has been fixed to generate a VPN profile that uses the currently configured proxy port, as set by the <strong>port proxy</strong> command, instead of the fixed value of 8080.</li>
+  <li>Minor bug fixes have been applied.</li>
+</ul>
+
+<a name='2.3.6' class='doc-title'></a><h3>Version UF-2.3.6 (2 December 2025)</h3>
+<ul>
+  <li>The bug introduced in the previous version that prevented the deployment of the generated system CA certificate has been fixed.</li>
+  <li>The import (loading) of previously imported third-party CA certificates has been fixed to function correctly.</li>
+  <li>Integrity checking has been fixed so that configurations containing HTTPS reverse websites referring to a non-existent intermediate certificate can no longer be applied.</li>
+  <li>Minor bug fixes have been applied.</li>
+</ul>
+
+<a name='2.3.5' class='doc-title'></a><h3>Version UF-2.3.5 (18 October 2025)</h3>
+<ul>
+  <li>The ClamAV antivirus has been upgraded to its latest stable version (1.4.3).</li>
+  <li>The antivirus updater script has been improved to prevent it from running more than once per hour.</li>
+  <li>The bug introduced in the previous version that prevented OS installation on a Microsoft&reg; Hyper-V&reg; virtual machine has been fixed.</li>
+  <li>The entire documentation (User’s Guide and Command Line Interface documentation) has been reviewed.</li>
+  <li>Minor bug fixes have been applied.</li>
+</ul>
+
+<a name='2.3.4' class='doc-title'></a><h3>Version UF-2.3.4 (2 October 2025)</h3>
+<ul>
+  <li>The Linux&reg; kernel has been upgraded to the version 6.6.100.</li>
+  <li>The Manager bug that was preventing to properly pull a Gateway configuration after a certain period of time since its registration on the Manager, has been fixed.</li>
+  <li>A 2FA (2 Factor Authentication) mode for remote administrator logins (SSH and Web Administration GUI) has been added to the OS.</li>
+  <li>The OS behaviour has been modified to do not allow the Auditing Web GUI activation in case where the Administration Web GUI is deactivated.</li>
+  <li>The embedded BeVyPN application has been improved to support 2FA (Two Factor Authentication).</li>
+  <li>Minor bug fixes have been applied.</li>
+</ul>
+
+<a name='2.3.3' class='doc-title'></a><h3>Version UF-2.3.3 (12 June 2025)</h3>
+<ul>
+  <li>The Administration Web GUI has been fixed to hide the new OS availability icon after a successful OS upgrade to the latest version.</li>
+  <li>The <strong>vpnipsec access conf windows</strong> command has been fixed to correctly generate the PowerShell&reg; script in case where the IPsec VPN server in access mode is in a split tunnelling mode (only some selected local networks are configured to be accessible via the IPsec VPN).</li>
+  <li>Maximum values for score thresholds in the WAF have been increased to 25 (instead of 9). This makes it possible to detect false positive matches in a staging environment with the help of the Auditing Web GUI.</li>
+  <li>ModSecurity&reg; has been upgraded to its latest version (2.9.8).</li>
+  <li>OWASP&reg; CoreRuleSet has been upgraded to its latest stable version (3.3.7).</li>
+  <li>The <strong>conf factoryreset</strong> command bug generating a 104 error (input/output issue) has been fixed. This bug is introduced when upgrading the OS version from UF-2.1.3 to UF-2.2.1 by applying a patch.</li>
+  <li>The bug in the <strong>rweb</strong> command that let the logical configuration in an inconsistent state after the deletion of a unique host has been fixed.</li>
+  <li>Minor bug fixes have been applied.</li>
+</ul>
+
+<a name='2.3.2' class='doc-title'></a><h3>Version UF-2.3.2 (25 March 2025)</h3>
+<ul>
+  <li>The <strong>cache report</strong> command has been fixed to display the correct Web cache report.</li>
+  <li>The installation program has been fixed to exclude USB disks from the list of available disks when installing the OS from a USB stick.</li>
+  <li>The software defined network has been modified to always activate the path checker even in a single gateway mode.</li>
+  <li>The configuration file upload via the Administration Web GUI has been improved to support large files and all kinds of Web browsers.</li>
+  <li>Minor bug fixes have been applied.</li>
+</ul>
+
+<a name='2.3.1' class='doc-title'></a><h3>Version UF-2.3.1 (13 March 2025)</h3>
+<ul>
+  <li>The OS has been upgraded to support the 255.255.255.254 network mask (prefix 31).</li>
+  <li>The guard filter deletion has been fixed to properly remove the deleted filter from guarding policies.</li>
+  <li>A new usage form has been added to the <strong>vpnipsec</strong> command to generate IPsec VPN profile (or script) file to use on remote client systems when the IPsec VPN is configured in access mode.</li>
+  <li>The system can now send some information (such as IPsec VPN client configurations) by email. To this end, the <strong>email</strong> command has been enhanced to configure the email server and credentials to use to send emails.</li>
+  <li>The keyword <strong>wait</strong> has been added to commands that normally run in background to specify that the command should be executed in blocking mode (e.g. <strong>apply</strong> command).</li>
+  <li>The <strong>file</strong> command has been enriched to allow to delete a file on a remote file server.</li>
+  <li>Minor bug fixes have been applied.</li>
+</ul>
+
+<a name='2.2.2' class='doc-title'></a><h3>Version UF-2.2.2 (31 July 2024)</h3>
+<ul>
+  <li>OpenSSH&reg; has been upgraded to its latest stable version (9.8p1).</li>
+  <li>Apache&reg; Web Server has been upgraded to its latest stable version (2.4.62).</li>
+  <li>Squid&reg; has been upgraded to its latest version (6.10).</li>
+  <li>StrongSwan&reg; has been upgraded to its latest version (5.9.14).</li>
+  <li>Duplicated lease end time errors and records in the DHCP report have been fixed.</li>
+  <li>The IPsec VPN report has been fixed to properly display certificate based authenticated connections.</li>
+  <li>The Kerberos&reg; initialisation issue has been fixed.</li>
+  <li>Minor bug fixes have been applied.</li>
+</ul>
+
+<a name='2.2.1' class='doc-title'></a><h3>Version UF-2.2.1 (6 April 2024)</h3>
+<ul>
+  <li>The Linux&reg; kernel has been upgraded to the version 6.6.14 and all drivers have been upgraded to support the latest hardware in the market.</li>
+  <li>The installation program has been fixed to allow an installation from a USB memory stick.</li>
+  <li>The firewall has been improved to support the SIP protocol.</li>
+  <li>The bug which prevented the restore operation since the UF-2.0.1 OS version has been fixed.</li>
+  <li>The reverse Web mode has been enhanced to allow configurations in which backend Web servers (real hosts) are accessed via the external network interface or via site to site IPsec VPN tunnels established with the system. In addition, the reverse Web proxy can now communicates with real hosts. As a consequence, the syntax of the <strong>rweb</strong> command has been changed (see the <strong>rweb host</strong> usage form). In case where the appliance is upgraded using a patch, the <strong>rweb</strong> interface and the <strong>http</strong> protocol are used for existing configurations.</li>
+  <li>The installation program has been enhanced to support an installation on a machine with only 512 MB of RAM.</li>
+  <li>The size of the installation CDROM image has been reduced.</li>
+  <li>The PXE installation program has been enhanced to support UEFI based machines (64 bits only).</li>
+  <li>Minor bug fixes have been applied.</li>
+</ul>
+
+<a name='2.1.3' class='doc-title'></a><h3>Version UF-2.1.3 (25 January 2024)</h3>
+<ul>
+  <li>The Web access module has been fixed to allow clients that are connected via the 802.1q pseudo interfaces (in VLAN mode) to use the embedded Web proxy.</li>
+  <li>The <strong>firewall</strong> command has been improved to allow the modification of default limits for DoS (Denial of Service) attack. See the <strong>firewall dos</strong> command for further information.</li>
+  <li>The default maximum number of TCP new connections (SYN) per source IP address has been raised. New default values can be obtained using the <strong>firewall dos</strong> command.</li>
+  <li>The access command has been improved to allow the specification of 802.1q pseudo interfaces in Web access rules (see the <strong>access web</strong> command).</li>
+  <li>In absence of any other specifications, a blank manager template is now initialised with a default system CA certificate and a default server certificate.</li>
+  <li>Minor bug fixes have been applied.</li>
+</ul>
+
+<a name='2.1.2' class='doc-title'></a><h3>Version UF-2.1.2 (11 December 2023)</h3>
+<ul>
+  <li>The proxy, the name server and the antivirus have been upgraded to their latest stable versions.</li>
+  <li>The IPsec VPN server has been enhanced to allow remote VPN servers having a non fixed IP address to establish a site to site IPsec VPN tunnel.</li>
+  <li>Minor bug fixes have been applied.</li>
+</ul>
+
+<a name='2.1.1' class='doc-title'></a><h3>Version UF-2.1.1 (1 December 2023)</h3>
+<ul>
+  <li>The OS has been adapted to suit Microsoft&reg; Azure&reg; and Amazon&reg; AWS&reg; clouds requirements.</li>
+  <li>The installation program has been improved to detect NVMe&reg; and virtual block based disks.</li>
+  <li>Default associations between physical and logical network interfaces  have been changed on a gateway system. Now by default, the external interface is associated to eth0 and the internal interface is associated to eth1.</li>
+  <li>The generated system CA certificate during the first appliance start-up, is now properly installed.</li>
+  <li>Admin access management has been fixed to properly allow newly added IPs.</li>
+  <li>The <strong>password</strong> command has been enhanced with the possibility to modify both the console and Web administration passwords in a single operation. </li>
+  <li>The CDROM installation program has been enhanced to support UEFI based machines (64 bits only).</li>
+  <li>The Linux&reg; kernel has been upgraded to the version 4.19.288.</li>
+  <li>The ssh password authentication can now be disabled (see the <strong>admin ssh password</strong> command).</li>
+  <li>The bug that was blocking explicit log rotations in case where the  <strong>web </strong> (or  <strong>tweb </strong>) mode is deactivated, has been fixed.</li>.
+  <li>Minor bug fixes have been applied.</li>
+</ul>
+
+<a name='2.0.2' class='doc-title'></a><h3>Version UF-2.0.2 (11 April 2023)</h3>
+<ul>
+  <li>The <strong>waf</strong> command has been fixed to do not erase the bypass application set for a website in case where the bypass rule list is erased for that website.</li>
+  <li>The WAF Auditing Web GUI has been fixed to properly decode HTML encoded data in POST requests.</li>
+  <li>The <strong>system report service</strong> command has been fixed to display the DNS server state.</li>
+  <li>Now the DNS server can be queried even if the <strong>web</strong> and <strong>tweb</strong> are both disabled.</li>
+  <li>The appliance access manager has been fixed to take into consideration override names setup with the <strong>ip name</strong> command. In addition, in case of any modification in override names, the Firewall and QoS are restarted.</li>
+  <li>The <strong>rweb site del</strong>... command has been fixed to do not remove back end Web servers associated to a website in case where the deleted website name will remain present for another protocol (http or https). The fix has been also applied to other configuration related to reverse websites (<strong>rweb via</strong>..., <strong>waf rweb</strong>...).</li>
+  <li>The Administration Web GUI automatic logout has been fixed.</li>
+  <li>Now the <strong>apply check</strong> command displays possible warnings.</li>
+  <li>The routing issue via the auxiliary network interface has been fixed.</li>
+  <li>The firewall rules management module has been fixed to do not apply the default policy to new connections incoming from the internal zone in case where the VLAN mode is deactivated and rule sets other than the <strong>web</strong> rule set are not empty.</li>
+  <li>The firewall has been fixed to allow fragmented IP packets in IPsec traffic.</li>
+  <li>The SSL mediation mode has been fixed to automatically download intermediate certificates even in case where the Web access has been restricted by the <strong>access web</strong>command.</li>
+  <li>The <strong>tls</strong> command has been enhanced to allow for setting the size of generated RSA private keys.</li>
+  <li>The bug that was preventing to install the OS without the Web caching feature has been fixed.</li>
+  <li>Minor bug fixes have been applied.</li>
+</ul>
+
+<a name='2.0.1' class='doc-title'></a><h3>Version UF-2.0.1 (3 February 2023)</h3>
+<ul>
+  <li>A new command called <strong>manager</strong> have been added to the system to manage remote gateways. To use this command, the OS should be installed as a <i>manager</i> system (as opposed to a system installed as a <i>gateway</i> system).</li>
+  <li>The Linux&reg; kernel has been upgraded to the version 4.19.231.</li>
+  <li>All open source packages have been upgraded to their latest versions and have been rebuild from scratch using latest GNU C library (glibc-2.35) and GNU C compiler (gcc-11.2.0).</li>
+  <li>The new usage form <strong>system report connection</strong> has been added to the <strong>system</strong> command to display the number of active connections with the appliance.</li>
+  <li>The new usage form <strong>system report antivirus</strong> has been added to the <strong>system</strong> command to display the status of the last automatic antivirus signatures update.</li>
+  <li>The apply reporting has been fixed to report 100% (instead of 99%) when the antivirus update is fully completed.</li>
+  <li>Trusted CA certificates have been updated from Mozilla as of: Thu Sep 30 21:39:27 2021 GMT. The OS has been enhanced to automatically update trusted CA certificates once a month.</li>
+  <li>The system has been upgraded to support TLS 1.3.</li>
+  <li>The maximum period for log retentions has been modified from 365 to 366 days (available during installation only).</li>
+  <li>Some basic open source software have been upgrade to their latest stable versions.</li>
+  <li>The <strong>tls</strong> command has been enhanced to allow the generation of certificates that do not use OCSP.</li>
+  <li>The <strong>tls server</strong> and <strong>tls ca</strong> command usage forms of the  <strong>tls</strong> command have been changed to be uniform with the <strong>tls client</strong> usage form.</li>
+  <li>The syntax of <strong>tls</strong> command has been changed. Now to manage server certificate the <strong>server</strong> keyword should be systematically used as the first argument. To manage the system CA components (certificate and key) the <strong>system</strong> keyword should be specified after the <strong>ca</strong> keyword. To manage third-party CA certificate the <strong>third</strong> keyword should be specified after the <strong>ca</strong> keyword. To import third-party CA certificate, the <strong>load</strong> keyword replaces the <strong>import</strong> keyword.</li>
+  <li>The <strong>apply</strong> command has been modified to automatically generate new TLS objects in case where explicit TLS generations or loadings are note invoked.</li>
+  <li>Restricted administrator users can now be deleted properly without generating an error during the apply operation.</li>
+  <li>The syntax of the <strong>admin</strong> command has been changed for SSH key management. Now an identifier should be associated to an SSH key first. Then, its content can be loaded from a trusted file server.</li>
+  <li>Now, the first time a new restricted administrator is logged in, she/he is invited to modify her/his password.</li>
+  <li>The <strong>cancel</strong> command can now be invoked by restricted administrator users without generating any errors.</li>
+  <li>OWASP&reg; Core Rule Set (CRS)  has been upgraded to its latest version (3.3.2). This involves the renaming and renumbering of generic filters.</li>
+  <li>CAUTION: the syntax of the <strong>waf</strong> has been modified as follows: "waf rweb bypass" becomes "waf rweb bypass <strong>rule</strong>". Also generic WAF filters has been renamed and renumbered. If your configuration includes the bypass of some generic rules in order to avoid false positive matches, you are invited to review your configuartion. Please refer to the documentation for further details.</li>
+  <li>Now the blocking of Web requests/responses by the WAF is based on an anomaly scoring principal. Please refer to the documentation for further details.</li>
+  <li>The WAF module has been enhanced to offer the following functionality: blocking of DoS (Denial of Service) attacks, blocking of requests based on IP reputation, blocking of requests coming from a particular country, bypass of generic filters based on the type of the application (WordPress&reg;, Drupal&reg;...). Please refer to the documentation for further details.</li>
+  <li>The logging has been enhanced to allow the activation or deactivation of logging on remote syslog servers as per the type of traffic (see the command <strong>log</strong>).</li>
+  <li>The syntax of the <strong>authenticate</strong>... command has been slightly changed. Please refer to the documentation for details.</li>
+  <li>The <strong>ip</strong>, <strong>access</strong> and <strong>vpnipsec</strong> commands have been improved to accept IP addresses in CIDR notation (in the form &lt;<i>ip/prefix</i>&gt; instead of &lt;<i>ip</i>&gt; &lt;<i>netmask</i>&gt).</li>
+  <li>The limitation associated to the IPsec VPN usage in a multi WAN configuration has been removed. Now it is possible to route IPsec traffic via a master gateway and automatically switch the routing via a backup gateway in case of a failure on the master gateway. See the <strong>vpnipsec</strong> command manual for further information.</li>
+  <li>A new command called <strong>file</strong> has been added to the system to load or save all files related to the configuration in a single operation.</li>
+  <li>The rights of restricted administrator users have been changed. Now restricted administrator users can only read (consult) the system configuration. Restricted administrator users are now called unprivileged administrator users (refer to the <strong>admin</strong> command for further information).</li>
+  <li>The <strong>traceroute</strong> command has been added to the system.</li>
+  <li>The association of multiple client SSL certificates to the SVMP-v3 user name has been removed from the system (now only one client SSL certificate can be associated to the SVMP-v3 user name). See the <strong>admin</strong> command for further information.</li>
+  <li>The management of TLS chain certificates has been modified. Now when defining an HTTPS reverse website, you have the possibility to specify an intermediate CA certificates. Please refer to the <strong>tls</strong> and  <strong>rweb</strong> commands for further information.</li>
+  <li>The system integrity checking has been modified to allow the deactivation of <strong>web</strong>, <strong>tweb</strong> and <strong>rweb</strong> modes at the same time.</li>
+  <li>The CacheGuard-OS License Agreement has been upgraded to version 2.5 to include OS installation as a <i>manager</i> system.</li>
+  <li>Lots of minor bugs have been fixed.</li>
+</ul>
+
+<a name='1.5.5' class='doc-title'></a><h3>Version EH-1.5.5 (20 April 2021)</h3>
+<ul>
+  <li>The QoS controller has been fixed to properly shape the traffic on the external and auxiliary interfaces when the VLAN mode is activated.</li>
+  <li>The system has been improved to avoid any latency in web browsing during the antivirus update process. This requires about 1280 KB of additional RAM so a RAM upgrade may be needed on the target machine.</li>
+  <li>Minor bug fixes have been applied.</li>
+</ul>
+
+<a name='1.5.4' class='doc-title'></a><h3>Version EH-1.5.4 (16 March 2021)</h3>
+<ul>
+  <li>The issue that was slowing down the AV signatures downloads has been fixed.</li>
+  <li>TCP communications have been tuned to get better performances.</li>
+  <li>The proxy, the VPN and the antivirus have been upgraded to their latest stable versions.</li>
+  <li>Minor bug fixes have been applied.</li>
+</ul>
+
+<a name='1.5.3' class='doc-title'></a><h3>Version EH-1.5.3 (11 February 2021)</h3>
+<ul>
+  <li>The installation program has been fixed to include all required SCSI drivers in the boot loader initial RAM disk.</li>
+  <li>The access  control module has been fixed to properly allow administration accesses when the VLAN mode is activated.</li>
+  <li>The installation module has been fixed to detect VirtIO devices.</li>
+  <li>In order to comply with the RFC 5280, the "OCSP Signing" Extended Key Usage has been removed from generated X509v3 certificates (only the "TLS Web Server Authentication" Extended Key Usage is kept).</li>
+  <li>Minor bug fixes have been applied.</li>
+</ul>
+
+<a name='1.5.2' class='doc-title'></a><h3>Version EH-1.5.2 (2 December 2020)</h3>
+<ul>
+  <li>The network name resolution module has been enhanced to resolve the embedded OCSP responder host name to the system's external IP address (external VRRP IP in HA mode). This helps to avoid asymmetric routing when the <strong>ocsp</strong> mode is activated.</li>
+  <li>Minor bug fixes have been applied.</li>
+</ul>
+
+<a name='1.5.1' class='doc-title'></a><h3>Version EH-1.5.1 (31 October 2020)</h3>
+<ul>
+  <li>The IPsec VPN support has been added to the system and a new command called <strong>vpnipsec</strong> has been added to manage IPsec VPNs. Both site to site (<strong>site</strong>) and remote <strong>access</strong> VPN configurations are supported. The embedded forwarding Web proxy and resources behind the embedded firewall can securely communicate via the IPsec VPN.</li>
+  <li>The Linux&reg; kernel has been upgraded to the version 4.9.230 and all drivers have been upgraded to support the latest hardware in the market.</li>
+  <li>The reporting in the Administration Web GUI dashboard has been fixed to properly refresh all reports (including reports on NICs and disks).</li>
+  <li>The <strong>system report cpu</strong> usage form of the <strong>system</strong> command has been replaced by <strong>system report load</strong>.
+  <li>The <strong>tls</strong> command has been enhanced to allow the loading of a CSR file in order to generate signed certificate by the system's CA certificate. With this enhancement the system can now act as a mini PKI.</li>
+  <li>When a CA certificate is added to the system it is automatically considered as a trusted CA for Web browsing. Now it is possible to do not trust a CA certificate for browsing by specifying the optional <strong>off</strong> argument when adding the CA certificate with the <strong>tls</strong> command. In this case the CA certificate can only be for other purposes (such as the VPN server).</li>
+  <li>The <strong>authenticate ldap certificate</strong> usage form of the <strong>authenticate</strong> command has been removed. If an LDAP<u>S</u> server SSL certificate has to be verified against a CA certificate, the CA certificate should be imported first using the <strong>tls</strong> command and then the CA certificate verification can be activated using the <strong>authenticate ldaps ca ...</strong> command. In case where the system is upgraded using a patch, an existing LDAPS CA certificate is purged and then it should be configured again manually.</li>
+  <li>The authentication type for SNMP-v3 user has been changed from SHA-1 to SHA-256.</li>
+  <li>The <strong>md5</strong> and <strong>sha</strong> (for SHA-1) authentication hash functions are no longer allowed for SNMP-v3 traps. Allowed authentication hash functions are now: <strong>sha256</strong>,  <strong>sha384</strong> and <strong>sha512</strong>.</li>
+  <li>Access policies to (from) the appliance from (to) remote networks/hosts have been reinforced by the specification of the involved network interface. Therefore, the syntax of the  <strong>access</strong> command has been changed. In case where the system is upgraded using a patch, an access entry for every interface is added to the system and access policies should probably be reviewed after having patched the system.</li>
+  <li>When defining a transparent network with the <strong>transparent</strong> command, the network interface from which traffic are transparently caught should be specified now. In case where the system is upgraded using a patch, the same transparent network is added for every interface and transparent networks should probably be reviewed after having patched the system.</li>
+  <li>Minor bug fixes have been applied.</li>
+</ul>
+
+<a name='1.4.2' class='doc-title'></a><h3>Version EH-1.4.2 (29 June 2020)</h3>
+<ul>
+  <li>The ICAP service not restarted with the previous patch is restarted to properly handle the brotli compression format.</li>
+  <li>The <strong>tls</strong> command has been enhanced to allow you to create client certificates signed by the system's CA certificate. Client certificates can be used to authenticate VPN clients (VPN features are coming soon).</li>
+  <li>The <strong>tls ca</strong> command can now be used to add and import an intermediate CA as well as a root CA.</li>
+  <li>Self signed SAN certificates generation has been fixed to properly generate a self signed certificate and not a CA certificate.</li>
+  <li>Certificates can now be revoked with the <strong>tls</strong> command.</li>
+  <li>An OCSP (Online Certificate Status Protocol) responder has been added to the system. You can use the <strong>tls</strong> and <strong>port</strong> commands to configure it. Use the <strong>mode</strong> command to activate it.</li>
+  <li>Minor bug fixes have been applied.</li>
+</ul>
+
+<a name='1.4.1' class='doc-title'></a><h3>Version EH-1.4.1 (11 June 2020)</h3>
+<ul>
+  <li>A new mode called <strong>tnat</strong> (for transparent NAT) has been added to the system. When the <strong>tnat</strong> mode is deactivated,Web traffic in transparent mode go to the internet with their real IP addresses (and are not source NAT with the appliance's external IP address).</li>
+  <li>The transparent mode activation has been moved from the "[GENERAL]/[Main Settings]/[Main Features]" page to the "[NETWORK]/[Main Settings]/[Network Services]" page in the Administration Web GUI.</li>
+  <li>The transparent command has been enhanced to take into account the QoS for traffic exchanged via the auxiliary interface.</li>
+  <li>The DNS has been fixed to properly listen on VRRP IP addresses.</li>
+  <li>The proxy configuration has been fixed to add the X-Forwarded-For header to all HTTP(S) requests if at lease one next peer is configured.</li>
+  <li>The maximum period for log retentions has been modified from 31 to 365 days (available during installation only).</li>
+  <li>Internal access policies have been modified to allow the connect method to ports 1024-49151 (in addition to the port 443) from the forwarding proxy</li>
+  <li>The CSR and signed certificate generation programs has been fixed to properly handle Certificate Signing Requests and CA signed certificates for SAN certificates.</li>
+  <li>Failed login via the Administration Web GUI are now logged and reported with SNMP traps and syslog alerts.</li>
+  <li>Some additional ciphers has been added to the SSH server. This command prints a report on the current running operation in background. The Administration Web GUI has also been enhanced with an animated icon to show the current running operation.</li>
+  <li>A new command called <strong>job</strong> has been added to the system.</li>
+  <li>Now the antivirus uses HTTPS instead of HTTP to download virus signatures.</li>
+  <li>Reports displayed in the Administration Web GUI dashboard are now automatically updated.</li>
+  <li>The option <strong>report</strong> has been added to the <strong>qos</strong> to print a report on the traffic managed by the QoS controller.</li>
+  <li>Minor bug fixes have been applied.</li>
+</ul>
+
+<a name='1.3.7' class='doc-title'></a><h3>Version EH-1.3.7 (29 May 2018)</h3>
+<ul>
+  <li>The CacheGuard-OS License Agreement has been upgraded to version 2.4.</li>
+  <li>The bug making the main proxy to crash while the web mode is deactivated has been fixed.</li>
+  <li>The <strong>system end</strong> command has improved to display the <i>scheduled</i> state when the subscription renewal is scheduled for the next day.</li>
+  <li>A new command named <strong>keyboard</strong> has been added to the system. This command allows you to set the console key map.</li>
+  <li>The installation module has been improved to allow the creation of partitions larger than 2TB.</li>
+  <li>The SNMP agent has been enhanced to give SSDs lifetime.</li>
+  <li>The <strong>ip</strong> command has been fixed to do not allow names for pinged servers in static routes.</li>
+  <li>Minor bug fixes have been applied.</li>
+</ul>
+
+<a name='1.3.6' class='doc-title'></a><h3>Version EH-1.3.6 (9 March 2018)</h3>
+<ul>
+  <li>The Web proxy default access rights have been modified to allow the "PATCH" method in both forwarding and reverse modes.</li>
+  <li>The <strong>waf</strong> command has been enhanced to offer the possibility to globally allow or deny the "PATCH" method as an insecure HTTP method.</li>
+  <li>Custom WAF rules has been extended to support the "PATCH" HTTP method.</li>
+  <li>The <strong>apply</strong> command has been fixed to properly check the integrity of destination NAT rules and do not erroneously produce the error 212.</li>
+  <li>The internal firewall rules have been fixed to properly allow DHCP request broadcasts and lease renewals.</li>
+  <li>The <strong>dhcp report</strong> command has been fixed to display DHCP lease end times in local time instead of UTC time.</li>
+  <li>Minor bug fixes have been applied.</li>
+</ul>
+
+<a name='1.3.5' class='doc-title'></a><h3>Version EH-1.3.5 (8 January 2018)</h3>
+<ul>
+  <li>The antivirus module has been enhanced to bypass a white list of domain names. Therefore the <strong>antivirus whitelist</strong> usage form of the <strong>antivirus</strong> command has been modified to allow you to define a white list of domain names as well as a white list of virus signatures.</li>
+  <li>The Web proxy default access rights have been modified to allow the "PUT", "DELETE" and "TRACE" methods in both forwarding and reverse modes.</li>
+  <li>The <strong>setup</strong> command has been enhanced to use dialogues boxes.</li>
+  <li>The dialogue box version of the <strong>setup</strong> command has been enhanced to allow you to set the timezone in the virtual edition.</li>
+  <li>The virtual edition has been enhanced to set the console keyboard layout during the first startup.</li>
+  <li>The bug making the guarding module to crash with some malformed URLs has been fixed.</li>
+  <li>The textual configuration view in the Administration Web GUI has been improved to have a more user-friendly representation of the whole configuration.</li>
+  <li>Minor bug fixes have been applied.</li>
+</ul>
+
+<a name='1.3.4' class='doc-title'></a><h3>Version EH-1.3.4 (17 September 2017)</h3>
+<ul>
+  <li>Communication between the appliance and the patch download service has been switched from HTTP to HTTPS.</li>
+  <li>Communication between the appliance and the subscription/registration service has been enhanced to support HTTPS.</li>
+  <li>Custom WAF rules have been enhanced to allow the specification of more than one HTTP method separated by the pipe character.</li>
+  <li>The <strong>waf</strong> command has been enhanced to offer the possibility to globally allow or deny insecure HTTP methods such as "PUT", "DELETE", "CONNECT" and "TRACE".</li>
+  <li>Minor bug fixes have been applied.</li>
+</ul>
+
+<a name='1.3.3' class='doc-title'></a><h3>Version EH-1.3.3 (4 September 2017)</h3>
+<ul>
+  <li>The bug that was preventing big objects caching has been fixed.</li>
+  <li>ICP (RFC 2187) has been replaced by HTCP (RFC 2756) for communications between cache peers.</li>
+  <li>The <strong>dns</strong> command has been enhanced to allow the explicit resolution of all names to IPs.</li>
+  <li>Custom WAF rules has been extended to support the "PUT", "DELETE", "CONNECT", "OPTIONS" and "TRACE" HTTP methods.</li>
+  <li>Minor bug fixes have been applied.</li>
+</ul>
+
+<a name='1.3.2' class='doc-title'></a><h3>Version EH-1.3.2 (20 July 2017)</h3>
+<ul>
+  <li>The Web cache is no longer cleared after the antivirus activation.</li>
+  <li>The RAM vs HDD capacities tuning has been improved to have better performance for the caching.</li>
+  <li>The memory consumption for the caching has been improved and the usage of the available persistent cache has been reviewed accordingly.</li>
+  <li>Due to the instability of the compress mode while combined with the antivirus mode, the compress mode is automatically disabled for forwarding web traffic when the antivirus mode is activated. This fix should be considered as a workaround before the complete resolution of the issue in future releases.</li>
+  <li>The bug that was preventing to save logs has been fixed.</li>
+  <li>The bug that was preventing to activate the DHCP server has been fixed.</li>
+  <li>Due to a high number of InvalidState and IllegalSyn rejected TCP packets on networks, rejected InvalidState and IllegalSyn TCP packets are no longer logged.</li>
+  <li>Minor bug fixes have been applied.</li>
+</ul>
+
+<a name='1.3.1' class='doc-title'></a><h3>Version EH-1.3.1 (29 June 2017)</h3>
+<ul>
+  <li>The antivirus module can now be used as a service by external systems such as an MTA (Mail Transfer Agent).</li>
+  <li>The antivirus module has been enhanced with the possibility to integrate a white list of virus names to eliminate false positive matches.</li>
+  <li>The authentication mode has been upgraded to support the Kerberos&reg; protocol.</li>
+  <li>The <strong>system report</strong> usage form of the <strong>system</strong> command has been enhanced to print the total number of blocked or allowed contents.
+  <li>The WAF has been enhanced to offer the possibility to expose original HTTP error messages generated by backend Web servers.</li>
+  <li>The time format in all logs has been changed to be compliant with the RFC3339 (with the caveat that the time offset format may not be respected for some logs).</li>
+  <li>The compression module has been fixed to properly compress javascript files.</li>
+  <li>The embedded firewall has been enhanced to protect against UDP flood attacks.</li>
+  <li>The CA certificate bundle has been updated to its latest version.</li>
+  <li>The subscription system has been fixed so the renewal of an expired subscription takes into account the date of purchase as the start date. In this case, the renewal is done for the given period rounded to the nearest whole day.</li>
+  <li>The subscription system has been fixed so the reactivation of a suspended appliance is completed without errors.</li>
+  <li>The dashboard layout has been enhanced.</li>
+  <li>A <strong>Donate</strong> button has been added to the Administration Web GUI of the free edition in order help us to maintain CacheGuard-OS and and develop new features</li>
+  <li>The trial period has been extended from 15 to 21 days.</li>
+  <li>Minor bug fixes have been applied.</li>
+</ul>
+
+<a name='1.2.6' class='doc-title'></a><h3>Version NG-1.2.6 (29 December 2016)</h3>
+
+<ul>
+  <li>The upgrade from v1.2.4 to v1.2.5 by applying a patch has the side effect that some processes swap on disk. This issue has been fixed by applying a patch to upgrade to the present version. Please note that for the v1.2.5, CacheGuard-OS requires a minimum of 1 GB of RAM to activate the antivirus mode. Therefore if the antivirus mode is activated on an appliance running under the v1.2.5, the applying of the patch may require upgrading the RAM on the target machine. Otherwise the appliance may stop working properly.</li>
+</ul>
+
+<a name='1.2.5' class='doc-title'></a><h3>Version NG-1.2.5 (21 December 2016)</h3>
+<ul>
+  <li>A workaround has been added to the system to resolve the inability of some Microsoft&reg; OS's to download updates while the compress mode is activated.</li>
+  <li>The upload of a local configuration file from the Administration Web GUI has been fixed to support Web browsers other than Firefox&reg;.</li>
+  <li>The Administration Web GUI has been upgraded to support Microsoft&reg; IE11&reg;.</li>
+  <li>The antivirus basic module has been upgraded to its latest version.</li>
+  <li>Minor bug fixes have been applied.</li>
+</ul>
+
+<a name='1.2.4' class='doc-title'></a><h3>Version NG-1.2.4 (20 October 2016)</h3>
+<ul>
+  <li>The firewall and access control modules have been fixed to support the active FTP protocol with a data port other than 20 (in EPRT and PORT mode).</li>
+  <li>The forwarding proxy has been modified to allow the HTTP method OPTIONS. However the method OPTIONS remains denied for reverse websites.</li>
+  <li>The CacheGuard logo has been slightly modified.</li>
+  <li>The <strong>conf</strong> command has been fixed to properly save authentication modes.</li>
+  <li>Network diagrams in the User's Guide have been enhanced.</li>
+  <li>The dashboard in the Administration Web GUI has been enhanced to display the available OS updates and the end of the system subscription.</li>
+  <li>Minor bug fixes have been applied.</li>
+</ul>
+
+<a name='1.2.3' class='doc-title'></a><h3>Version NG-1.2.3 (11 September 2016)</h3>
+<ul>
+  <li>The free edition has been limited to 5 users in forwarding mode and 3 users in reverse mode.</li>
+  <li>The syntax of the <strong>register</strong> command has been modified according to the new licensing terms.</li>
+  <li>The SSL mediation has been modified to allow the usage of 3DES algorithm to encrypt data between the system and target HTTPS servers.</li>
+  <li>The <strong>authenticate mode</strong> usage form of the <strong>authenticate</strong>command has been changed.</li>
+  <li>The automatic loading of a URL list has been improved so in the case where a URL list has never been loaded, it is entirely loaded from scratch.</li>
+  <li>The bug in the Administration Web GUI that prevented adding new SNMP traps has been fixed.</li>
+  <li>The installation program has been fixed to properly generate the default and CA certificates.</li>
+</ul>
+
+<a name='1.2.2' class='doc-title'></a><h3>Version NG-1.2.2 (2 June 2016)</h3>
+<ul>
+  <li>A critical bug fix related to the basic forwarding proxy module has been integrated into the system. The bug made the appliance totally unstable.</li>
+  <li>The bug that was preventing to start the integrated DHCP server has been fixed.</li>
+  <li>Minor bug fixes have been applied.</li>
+</ul>
+
+<a name='1.2.1' class='doc-title'></a><h3>Version NG-1.2.1 (2 May 2016)</h3>
+<ul>
+  <li>The <strong>guard</strong> command has been enhanced with the possibility to update an existing rule without changing its order in the guard list.</li>
+  <li>The CLI has beed enhanced with the possibility to move an element in an ordered list. Commands in question are: <strong>ip</strong>, <strong>guard</strong>, <strong>qos</strong> and <strong>firewall</strong>.</li>
+  <li>The Administration Web GUI has been fixed to not change the order of a guard rule in the guard rule list when its associated URL lists are updated.</li>
+  <li>The Administration Web GUI has been fixed to not erase the list of URL lists associated to a guard rule when the order of that rule is modified in the guard rule list.</li>
+  <li>The redirection to an error page has been fixed in the guarding module to work properly in conjunction with the SSL mediation module.</li>
+  <li>Minor bug fixes have been applied.</li>
+</ul>
+
+<a name='1.2.0' class='doc-title'></a><h3>Version NG-1.2.0 (6 April 2016)</h3>
+<ul>
+  <li>An SSL mediation (sometimes called inspection) mode has been added to the system. This mode allows you to cache HTTPS traffic and/or block unwanted contents in HTTPS traffic. The <strong>mode</strong> command has been updated to allow you to activate this new feature (<strong>mode sslmediate on</strong>) and the new command <strong>sslmediate</strong> has been added to the system in order to configure the SSL mediation module.
+  <li>A new command named <strong>urllist</strong> has been added to the system. This command replaces the <strong>guard category</strong> usage form of the <strong>guard</strong> command. URL lists can be used by the <strong>guard</strong> command but also the new command <strong>sslmediate</strong>.</li>
+  <li>The IP routing has been enhanced to support the usage of multiple gateways to route the traffic to the same network.</li>
+  <li>The Linux&reg; kernel has been upgraded to the latest stable version.</li>
+  <li>Concurrent accesses to loaded files have been improved to avoid any file overwriting.</li>
+  <li>The system patching has been improved to load patches directly from official CacheGuard servers.</li>
+  <li>A download progress bar has been added to backup management and patching pages in the Administration Web GUI.</li>
+  <li>The installation program has been enhanced to detect USB Ethernet adapters.</li>
+  <li>All major basic modules have been upgraded to their latest versions.</li>
+  <li>The <strong>access</strong> command documentation has been fixed (removal of <strong>rweb</strong> access).</li>
+  <li>Some network activity reporting has been added to the system.</li>
+  <li>A dashboard has been added to the Administration Web GUI.</li>
+  <li>The udpeer and tcpeer ports have been respectively renamed to icppeer and httppeer.</li>
+  <li>The SFTP is now supported to load/save files.</li>
+  <li>Some default port numbers have been changed.</li>
+  <li>Some minor errors have been fixed in the documentation.</li>
+  <li>Minor bug fixes have been applied.</li>
+</ul>
+
+<a name='1.1.5' class='doc-title'></a><h3>Version NG-1.1.5 (3 December 2015)</h3>
+<ul>
+  <li>The value of the "X-Forwarded-Proto" header which is added to requests sent to backend Web servers (in reverse mode) has been fixed as follows: the value "http" or "https" is set depending on whether the client used HTTP or HTTPS to connect to cloaked Web servers.</li>
+  <li>The <strong>system</strong> command has been enhanced to display the CPU architecture (32 or 64 bits).</li>
+  <li>The patching system has been fixed in order to avoid the applying of the same patch more than once.</li>
+  <li>The patching system has been fixed in order to create new empty directories.</li>
+  <li>The guard management module has been fixed to update guard rules when a guard policy is deleted.</li>
+  <li>The bug in the HA module that blocks the AH protocol used to authenticate HA nodes has been fixed.</li>
+  <li>The firewall module has been fixed to not block IGMP snooping when the HA mode is activated.</li>
+  <li>The bug that was producing erroneous ARP announcements in HA mode has been fixed.</li>
+  <li>Internal firewall rules have been reinforced.</li>
+  <li>The logging of denied IP packets has been enhanced to report information about the rejection reason.</li>
+  <li>The antivirus basic module has been upgraded to its latest version.</li>
+  <li>The firewall basic module has been upgraded to its latest version.</li>
+  <li>Some minor enhancements have been done.</li>
+  <li>Minor bug fixes have been applied.</li>
+</ul>
+
+<a name='1.1.4' class='doc-title'></a><h3>Version NG-1.1.4 (10 October 2015)</h3>
+<ul>
+  <li>The bug introduced in version 1.1.3 that prevented to automatically update guard categories has been fixed.</li>
+  <li>The security of the VRRP has been enhanced.</li>
+</ul>
+
+<a name='1.1.3' class='doc-title'></a><h3>Version NG-1.1.3 (5 October 2015)</h3>
+<ul>
+  <li>The reverse Web mode has been enhanced to allow the specification of a port number and QoS for backend Web servers. After having applied a patch the default port and QoS will respectively be 80 and 100. Therefore the syntax of the <strong>rweb</strong> command has been modified for the usage form <strong>rweb host</strong>.</li>
+  <li>The usage form <strong>access rweb</strong> of the <strong>access</strong> command has been suppressed.</li>
+  <li>The reverse Web load balancing has has been enhanced to allow the specification of a session cookie generated by Web applications running on backend Web servers. Therefore the syntax of the <strong>rweb</strong> command has been modified for the usage form <strong>rweb balancer</strong>.</li>
+  <li>The bug making the guarding policy inconsistent when one of its guard filters has been deleted has been fixed.</li>
+  <li>The bug making the configuration of patched system inconsistent after a factory reset has been fixed.</li>
+  <li>The HA basic module has been upgraded to its latest version.</li>
+  <li>The authentication module has been expanded with a test option.</li>
+  <li>Minor bug fixes have been applied.</li>
+</ul>
+
+<a name='1.1.2' class='doc-title'></a><h3>Version NG-1.1.2 (2 September 2015)</h3>
+<ul>
+  <li>The CacheGuard OS License Agreement has been upgraded to version 2.1</li>
+  <li>IPV6 has been disabled in the Linux&reg; kernel.</li>
+  <li>The issue to access via the HTTPS proxy to the https://outlook.office365.com website (and similar websites that preferably use IPV6 IP addresses) has been resolved.</li>
+  <li>The LDAP authentication module has been optimised so all communications with LDAP servers are forced to use IPV4 only.</li>
+  <li>The authentication module has been enhanced to allow LDAP binding during the basic authentication phase instead of comparing the entered password to a predefined password attribute.</li>
+  <li>The authentication module has been fixed to allow distinguished names containing white spaces. In the case where the OS is upgraded using a patch the authentication LDAP request should be redefined (see the <strong>authenticate ldap request</strong> command).</li>
+  <li>Minor bug fixes have been applied.</li>
+</ul>
+
+<a name='1.1.1' class='doc-title'></a><h3>Version NG-1.1.1 (1 August 2015)</h3>
+<ul>
+  <li>The firewall has been fixed to properly manage other protocols than TCP and UDP.</li>
+  <li>The IPv6 has been added to the list of supported protocols by the firewall.</li>
+  <li>The TLS component management module has been optimised in order to avoid restarting some services when it's useless.</li>
+  <li>The bug making a custom WAF rule inconsistent when it contains a star has been fixed.</li>
+  <li>Several minor bugs have been fixed in the Administration Web GUI.</li>
+</ul>
+
+<a name='1.1.0' class='doc-title'></a><h3>Version NG-1.1.0 (13 July 2015)</h3>
+<ul>
+  <li><strong>Note</strong>: Please note that to upgrade from version NG-1.0.15 to version NG-1.1.0 you should first apply a patch to upgrade to the version NG-1.0.16. Therefore you would be able to upgrade from version NG-1.0.16 to version NG-1.1.0. Patche files are available at <a href='http://www.cacheguard.net/cacheguard-patch.html'>www.cacheguard.net/cacheguard-patch.html</a>.</li>
+  <li>The installation program has been fixed to report warnings in respect to setup configurations.</li>
+  <li>The reverse mode has been enhanced for HTTPS websites to add an "X-Forwarded-Proto http" header to HTTP requests sent to backend Web servers (useful for some known applications)</li>
+  <li>The <strong>apply</strong> command manual has been completed to give additional information in respect to errors reported during the process of checking the RAM capacity.</li>
+  <li>A RAM upgrade is now automatically applied after a reboot.</li>
+  <li>The <strong>system</strong> command has been enhanced to check for new updates.</li>
+  <li>The bug in the <strong>conf</strong> command which  caused the saving of wrong values for the QoS attached to "tweb internal" queue been fixed.</li>
+  <li>All commands that use a network name parameter (such as access or rweb) have been enhanced to check if the given name is a FDN (Full Distinguished Name).</li>
+  <li>The syntax of WAF rules defined in a flat file has been changed. The keyword <strong>regexp</strong> has been replaced by <strong>uri</strong> and <strong>body</strong>. A new feature has been added to WAF rules to allow filtering based on source IP addresses. The keyword <strong>ip</strong> holds this position.</li>
+  <li>The DHCP server has been modified to configure DHCP clients with a Web proxy based on the proxy PAC file (ha.pac) delivered by the system.</li>
+  <li>A new feature has been added to the WAF to allow you to bypass false positive matches.</li>
+  <li>OWASP&reg; rule set for the WAF has been upgraded to its latest version.</li>
+  <li>The CacheGuard logo has been modified.</li>
+  <li>Minor bug fixes have been applied.</li>
+</ul>
+
+<a name='1.0.16' class='doc-title'></a><h3>Version NG-1.0.16 (13 July 2015)</h3>
+<ul>
+  <li><strong>Note</strong>: Please note that no OS has been released for this version but only patch files. Patch files are available at <a href='http://www.cacheguard.net/cacheguard-patch.html'>www.cacheguard.net/cacheguard-patch.html</a>.</li>
+  <li>The patching program has been fixed in order to properly patch the configuration DB.</li>
+</ul>
+
+<a name='1.0.15' class='doc-title'></a><h3>Version NG-1.0.15 (9 May 2015)</h3>
+<ul>
+  <li>The SNI (Server Name indication) support has been added to generated SSL certificates. Therefore more of the same IP address can be shared by multiple HTTPS websites.</li>
+  <li>The TLS/SSL support has been hardened to ensure a higher security level.</li>
+  <li>Minor bug fixes have been applied.</li>
+</ul>
+
+<a name='1.0.14' class='doc-title'></a><h3>Version NG-1.0.14 (28 January 2015)</h3>
+<ul>
+  <li>The bug that was causing incorrect dimensioning of the antivirus capacity has been fixed. To fix this issue you should reinstall the appliance as there is no available patch to address this issue (unless you have a support contract).</li>
+  <li>Minor bug fixes have been applied.</li>
+</ul>
+
+<a name='1.0.13' class='doc-title'></a><h3>Version NG-1.0.13 (22 January 2015)</h3>
+<ul>
+  <li>The high availability management module has been enhanced to not change the state (<strong>failover</strong> or <strong>active</strong>) of a system in HA mode after an apply operation.</li>
+  <li>The installation program has been enhanced to report paying configurations.</li>
+  <li>The <strong>conf</strong> command has been fixed to properly manage the transparent port configuration (<strong>port thttp</strong>).</li>
+  <li>Minor bug fixes have been applied.</li>
+</ul>
+
+<a name='1.0.12' class='doc-title'></a><h3>Version NG-1.0.12 (29 December 2014)</h3>
+<ul>
+  <li>The bug making the guards auto update to crash in case of a communication problem with a file server has been fixed.</li>
+  <li>The antivirus basic module has been upgraded to its latest version.</li>
+  <li>The automatic logout problem in Administration Web GUI has been fixed.</li>
+  <li>Minor bug fixes have been applied.</li>
+</ul>
+
+<a name='1.0.11' class='doc-title'></a><h3>Version NG-1.0.11 (24 November 2014)</h3>
+<ul>
+  <li>The bug introduced in version 1.0.10 that prevented having more than one reverse website associated to the same IP address has been fixed.</li>
+  <li>The bug introduced in version 1.0.10 that prevented activation of the web server when the reverse website list contains HTTPS websites has been fixed.</li>
+  <li>Generic WAF rules associated to a reverse website are reset when a reverse website is deleted.</li>
+  <li>The <strong>rweb</strong> mode has been enhanced to redirect HTTP to HTTPS for HTTPS reverse websites (if the IP address associated to HTTPS website is used for an HTTP website).</li>
+  <li>The bug that was making the reverse website list unsorted after deleting and adding a new website has been fixed.</li>
+</ul>
+
+<a name='1.0.10' class='doc-title'></a><h3>Version NG-1.0.10 (17 November 2014)</h3>
+<ul>
+  <li>The reverse website module has been enhanced to deny attempts to access to website names that are not explicitly defined in the system.</li>
+  <li>The configuration saving module has been fixed to properly save all generic WAF rules.</li>
+  <li>The bug preventing the main proxy to start when the transparent mode is deactivated has been fixed.</li>
+  <li>SSH keys management has been improved.</li>
+  <li>Some minor display issues have been fixed in the Administration Web GUI.</li>
+</ul>
+
+<a name='1.0.9' class='doc-title'></a><h3>Version NG-1.0.9 (31 October 2014)</h3>
+<ul>
+  <li>The apply operation has been improved to ensure that in a High Availability configuration, master IP addresses are owned by an appliance once all functional services have been started on that appliance.</li>
+  <li>The Administration Web GUI has been fixed to properly insert, add and remove elements in lists in the same submitted operation (for firewall rules for instance).</li>
+  <li>The Administration Web GUI has been fixed to allow you to enter a six digit value for the maximum cached object size (<i>cache-maxobject.apl</i> page).</li>
+  <li>The bug that was preventing the activation of the firewall in the following two conditions has been fixed: a non empty auxiliary firewall rule set and the auxiliary network interface not bound to a physical NIC.</li>
+  <li>The bug producing an "illegal instruction" error in some virtualization systems has been fixed.</li>
+  <li>The console port attached to a serial port is no longer activated if the target machine doesn't have a serial port during the installation.</li>
+  <li>The Web proxy accessibility has been modified to allow web traffic incoming from all network interface devices but the external interface.</li>
+  <li>The transparent feature has been changed to transparently catch Web traffic incoming from all network interface devices but the external interface. In previous versions, only Web traffic incoming from the internal interface (<strong>web</strong> interface in <strong>vlan</strong> mode) were caught.</li>
+  <li>The configuration saving process has been fixed to properly save new guard auto update configurations.</li>
+  <li>The traffic shaper module has been improved to allow Web traffic shaping exchanged with the auxiliary network interface.</li>
+  <li>Administration Web GUI pages to save or load the configuration have been regrouped in the same page and improved to allow saving/uploading the configuration to/from the local machine.</li>
+  <li>The bug in the <i>gui/transparent.apl</i> page that blocks post and reload content operations has been fixed.</li>
+  <li>The Administration Web GUI for the page <i>gui/qos-shape-gateway.apl</i> has been enhanced with tabs.</li>
+  <li>In the Administration Web GUI, font sizes have been reduced and all icons in the top bar have been grouped to the left.</li>
+  <li>The caching system has been enhanced to allow the caching of objects greater than the configured max object size for a limited part of the persistent cache.</li>
+  <li>The syntax of the <strong>cache</strong> command has been changed to configure a lower and upper size limit for cached objects.</li>
+  <li>A new MIB definition has been released for the SNMP agent to include the size of the reserved area on the persistent cache for very big objects.</li>
+  <li>The bug that was preventing the OS installation on a Microsoft&reg; Hyper-V&reg; VM has been fixed.</li>
+  <li>The bug that was dropping default traffic in case of an empty shaping rule set for routed traffic has been fixed.</li>
+  <li>The QoS rule compilation for reverse websites has been optimised.</li>
+  <li>The bash shellshock vulnerability has been fixed.</li>
+  <li>Some other minor bugs have been fixed.</li>
+</ul>
+
+<a name='1.0.8' class='doc-title'></a><h3>Version NG-1.0.8 (24 September 2014)</h3>
+<ul>
+  <li>The Auditing Web GUI has been fixed to properly display post arguments without evaluating html tags.</li>
+  <li>The cache size and memory usage tuning has been reviewed according to recent statistics.</li>
+  <li>The installation program has been enhanced to allow the deactivation of some features that require lots of storage space on disk. This allows you to install the system on machines with low storage capacity.</li>
+  <li>The bug related to the premature display of the termination message of some system operations has been fixed.</li>
+</ul>
+
+<a name='1.0.7' class='doc-title'></a><h3>Version NG-1.0.7 (11 September 2014)</h3>
+<ul>
+  <li>The Administration Web GUI has been improved to allow the displaying of long list in different pages.</li>
+  <li>The bug that was preventing to apply custom WAF rules has been fixed.</li>
+  <li>The configuration saving has been modified to save restricted administrator users. The saving is limited to login names only (passwords and configurations related to each restricted administrator are not saved).</li>
+  <li>In order to ensure command syntax coherency the keyword <strong>raz</strong> has been replaced by <strong>clear</strong> in the <strong>waf rweb custom</strong> command usage form.</li>
+  <li>Some other minor improvements have been added to the system to manage the configuration.</li>
+  <li>Some other minor bugs have been fixed.</li>
+</ul>
+
+<a name='1.0.6' class='doc-title'></a><h3>Version NG-1.0.6 (1 September 2014)</h3>
+<ul>
+  <li>The High Availability module has been improved to ensure that master IP addresses are owned by an appliance once all functional services have been started on that appliance.</li>
+  <li>The email syntax checking has been fixed to allow the usage of dash in an email address.</li>
+  <li>The reporting of the antivirus last update date has been fixed to display the actual date.</li>
+  <li>The configuration settings present in the form of a list have been modified in two ways: lists are kept sorted if the order of elements in the list is not significant. TLS objects and guard categories are some examples of those lists. For ordered lists like firewall rules and shaping rules for routed traffic, the keyword <strong>insert:</strong> has been added to the related management commands to allow the insertion of and element before another one. This avoids to have to save, edit and load the configuration settings.</li>
+  <li>The Administration Web GUI has been improved to allow the insertion of elements in lists subject to insertion. The look and feel of pages managing those list has also been improved.</li>
+  <li>The <strong>firewall</strong> command has been change to allow the definition of rules with <strong>any</strong> as the output network interface.</li>
+  <li>In order to avoid a false positive rule matching by the configured WAF for the Administration Web GUI, <strong>tftp</strong> has been renamed to <strong>ftp_trivial</strong> in the <strong>firewall</strong> command.</li>
+</ul>
+
+<a name='1.0.5' class='doc-title'></a><h3>Version NG-1.0.5 (7 August 2014)</h3>
+<ul>
+  <li>A major bug preventing the main proxy to start in some circumstances has been fixed. These circumstances were as follows: transparent mode is off, the transparent list contains at list one network and at least one share or HA peer is configured.</li>
+  <li>Backup and restore operations have been fixed to restore properly restricted administrators.</li>
+  <li>The patching operation has been optimised but remains manual until a possible next version.</li>
+  <li>A new command named <strong>ha</strong> (High Availability) has been added to the system. Combined with the argument <strong>master</strong>, this command allows you to make an attempt to reactivate a master appliance which has been marked faulty without needing to reboot the appliance.</li>
+  <li>The Administration Web GUI has been improved to log administrators logins.</li>
+  <li>The panel board menu has been improved to allow access to menu items without sub menus.</li>
+</ul>
+
+<a name='1.0.4' class='doc-title'></a><h3>Version NG-1.0.4 (29 July 2014)</h3>
+<ul>
+  <li>A critical bug regarding the activation of VLANs and bonding interfaces making the appliance inconsistent and out of service has been fixed (bug introduced in error in the precedent version).</li>
+  <li>The timezone setting during the installation has been taken again into account (bug introduced in error in the precedent version).</li>
+  <li>The firewall configuration has been modified to give higher priority to NAT rules than the SNAT (Source NAT) mode.</li>
+  <li>The IP routing configuration has been fixed so route to a single host can operate properly.</li>
+  <li>The installation program has been enhanced to set a default value for the WAF limit files which is less than or equal to the maximum size for uploaded file given during the installation.</li>
+  <li>The Administration Web GUI bug that was preventing the activation of administration services has been fixed.</li>
+  <li>IP routing has been fixed to allow routing via a gateway connected to the auxiliary interface.</li>
+  <li>The bug that was preventing to have an IP route without having a default route has been fixed.</li>
+  <li>The textual configuration displaying has been enhanced.</li>
+  <li>The auto logout for the Administration Web GUI has been fixed.</li>
+</ul>
+
+<a name='1.0.3' class='doc-title'></a><h3>Version NG-1.0.3 (21 July 2014)</h3>
+<ul>
+  <li>The Administration Web GUI bug that was preventing to change the Administration Web GUI password with a password containing the characters '$' or '!' has been fixed.</li>
+  <li>The verification of input values for online commands and the Administration Web GUI has been enhanced.</li>
+  <li>The firewall module has been fixed to allow traffic with <strong>any</strong> as the protocol.</li>
+  <li>The Web authentication module has been fixed to allow authentication for reverse websites.</li>
+  <li>The Administration Web GUI has been improved to avoid false positive matches by generic WAF rules.</li>
+  <li>The FTP proxy over HTTP has been fixed to display properly directory contents.</li>
+  <li>The bug that was preventing to have more than one HTTP reverse websites configured with the same IP address has been fixed.</li>
+  <li>Some other minor bugs have been fixed.</li>
+</ul>
+
+<a name='1.0.2' class='doc-title'></a><h3>Version NG-1.0.2 (14 July 2014)</h3>
+<ul>
+  <li>The bug that was preventing HTTPS reverse websites deleting has been fixed.</li>
+  <li>The apply operation integrity check has been fixed to prevent error messages when the VLAN mode is activated.</li>
+  <li>When a reverse website present in several forms (HTTP, HTTPS, with multiple IP addresses) is deleted, all its configurations (backend Web servers, load balancing, standby mode...) are preserved until the deletion of its last occurrence.</li>
+  <li>The total arguments length limit for the Administration Web GUI has been fixed so the firewall can be configured properly using the Administration Web GUI.</li>
+</ul>
+
+<a name='1.0.1' class='doc-title'></a><h3>Version NG-1.0.1 (12 July 2014)</h3>
+<ul>
+  <li>A minor bug related to the synflood tuning has been fixed</li>
+  <li>A minor bug related to the URL blacklist message page has been fixed.</li>
+</ul>
+
+<a name='1.0.0' class='doc-title'></a><h3>Version NG-1.0.0 (CacheGuard OS Version 6) (30 June 2014)</h3>
+<ul>
+  <li>The QoS management has been enhanced and the syntax of the <strong>qos</strong> command has also been changed. Now the keyword <strong>bandwidth</strong> should be specified to define bandwidth limits and the borrowing of the excess bandwidth can be activated or deactivated using the keyword <strong>borrow</strong>. Also the traffic shaping could be specified as a percentage or as a fixed value in Kbps. Other traffic than the traffic destined to the appliance itself (the gateway) could also be shaped in this version.</li>
+  <li>Keywords "intern" and "extern" have been respectively renamed to <strong>internal</strong> and <strong>external</strong>.</li>
+  <li>The CacheGuard License Agreement has been upgraded to version 2.0. In this version all CacheGuard Software components are subject to the GNU General Public License v3 while the aggregation of those components and other Open Source Software (as OSI definition) forming the "CacheGuard OS" is licensed under the "CacheGuard OS License Agreement version 2.0".</li>
+  <li>An SNMP agent and trap sender has been added to the system to monitor the appliance. Please use the <strong>admin snmp</strong> command to configure the SNMP monitoring.</li>
+  <li>Keywords related to SSL/TLS have been changed in the <strong>admin</strong> and <strong>authenticate</strong> commands for coherency purposes.</li>
+  <li>A new feature has been added to the system so the system can be backed up and restored (see the <strong>system backup</strong> command)</li>
+  <li>A contact email address may be specified with the <strong>register</strong> command.</li>
+  <li>The Linux&reg; kernel has been upgraded to a latest stable version.</li>
+  <li>The access list management for file and monitoring servers has been improved to allow the adding of host names in addition to host IPs.</li>
+  <li>The ntp server management has been improved to allow the adding of ntp server names in addition to ntp server IPs.</li>
+  <li>The keyword <strong>https</strong> in the <strong>admin</strong> command has been renamed to <strong>tls</strong> as the generated certificate is used by both the Administration Web GUI and the SNMP agent.</li>
+  <li>A new logical network interface named <strong>auxiliary</strong> has been added to the system. You can use it for your specific needs (for instance to implement a DMZ or a Back Office zone).</li>
+  <li>The syntax of the <strong>firewall</strong> command has been changed.</li>
+  <li>Software RAID support has been added to the system.</li>
+  <li>The OS is now available in two versions: 32 bits and 64 bits.</li>
+  <li>New filter types based on time, authentication and IP ranges have been added to URL guarding module. Therefore the syntax of the command has been completely reviewed. Please refer to the <strong>guard</strong> command documentation for further information.</li>
+  <li>In the <strong>authenticate</strong> command, the argument "attribute" has been renamed to <strong>request</strong>.</li>
+  <li>Transparent traffic is clearly distinguished from forwarding traffic. A dedicated port is used for the transparent mode and a new command named <strong>transparent</strong> can manage the transparency for selected networks. Also the QoS module manages forwarding and transparent traffic separately.</li>
+  <li>The syntax of the <strong>rweb</strong> command has been changed so the management of SAN and wildcard certificates became easier.</li>
+  <li>The load balancing policy may be configured for reverse websites. This new feature includes the possibility to have sticky connections.</li>
+  <li>The installation program has been improved.</li>
+  <li>In order to ensure command syntax coherency the "access" and "virus" logs have been renamed respectively to to <strong>web</strong> and the <strong>antivirus</strong>.</li>
+  <li>The logging module has been enhanced to allow the logging of denied packets by the IP firewall.</li>
+  <li>In logging mode (mode log is activated) each log type (firewall, web, rweb, guard, virus, waf) can selectively be activated or deactivated.</li>
+  <li>Many minor bugs have been fixed.</li>
+</ul>
+
+<a class='doc-title'></a><h3>Version 5.7.7 (4 July 2013)</h3>
+<ul>
+  <li>The <strong>system</strong> command has been improved to display the subscription end date.</li>
+  <li>A new feature has been added to the health panel to report the status of the antivirus and URL guard updates.</li>
+  <li>The Administration Web GUI look and feel has been enhanced.</li>
+  <li>Minor bug fixes have been applied.</li>
+</ul>
+
+<a class='doc-title'></a><h3>Version 5.7.6 (28 February 2012)</h3>
+<ul>
+  <li>A new subscription verification module has been added to the system.</li>
+</ul>
+
+<a class='doc-title'></a><h3>Version 5.7.5 (20 October 2011)</h3>
+<ul>
+  <li>Several minor bugs have been fixed in the Administration Web GUI.</li>
+  <li>The log rotation system has been fixed to properly rotate the WAF log.</li>
+</ul>
+
+<a class='doc-title'></a><h3>Version 5.7.4 (12 October 2011)</h3>
+<ul>
+  <li>The OS has been improved to support a better crash recovery.</li>
+</ul>
+
+<a class='doc-title'></a><h3>Version 5.7.3 (15 August 2011)</h3>
+<ul>
+  <li>Installation in test mode has been improved to allow choosing the OS to load at bootup.</li>
+  <li>The mgt (for management) vlan has been renamed to mon (for monitoring).</li>
+  <li>The keyword mgt (for management) in the <strong>access</strong> command has been renamed to mon (for monitoring).</li>
+</ul>
+
+<a class='doc-title'></a><h3>Version 5.7.2 (11 July 2011)</h3>
+<ul>
+  <li>The command "factoryreset" has been removed and replaced by the argument <strong>factoryreset</strong> added to the <strong>conf</strong> command.</li>
+  <li>Reporting capabilities has been added to the proxy cache module (see the <strong>cache report</strong> command).</li>
+  <li>Reporting and health checking capabilities has been added to the system (see the <strong>system report</strong> command).</li>
+</ul>
+
+<a class='doc-title'></a><h3>Version 5.7.1 (20 June 2011)</h3>
+<ul>
+  <li>The proxy cache module has been upgraded to its latest version.</li>
+  <li>The bug that was preventing to download small video files while the cache and antivirus mode are both enabled has been fixed.</li>
+  <li>The command "filter" was renamed to <strong>waf</strong> (for Web Application Firewall).</li>
+  <li>In the <strong>mode</strong> command, the keyword "filter" was renamed to <strong>waf</strong>.</li>
+  <li>In the command "log", the keyword "filter" was renamed to <strong>waf</strong>.</li>
+  <li>In the <strong>antivirus</strong> command, the keyword "clear" was renamed to <strong>create</strong>.</li>
+</ul>
+
+<a class='doc-title'></a><h3>Version 5.6.10 (27 May 2011)</h3>
+<ul>
+  <li>The antivirus no longer checks images and textual contents.</li>
+</ul>
+
+<a class='doc-title'></a><h3>Version 5.6.9 (20 May 2011)</h3>
+<ul>
+  <li>The minor bug related to the PUA mode activation has been fixed in the Administration Web GUI.</li>
+  <li>All diagrams in the documentation has been enhanced with new icons.</li>
+</ul>
+
+<a class='doc-title'></a><h3>Version 5.6.8 (16 May 2011)</h3>
+<ul>
+  <li>The persistent caching module has been enhanced for better disk caching performance.</li>
+  <li>The antivirus module has been upgraded to its latest version to fix several internal bugs.</li>
+  <li>The antivirus no longer checks video contents.</li>
+  <li>The syntax of the <strong>antivirus maxobject</strong> command has been changed.</li>
+  <li>Now files larger than the limit configured with the <strong>antivirus maxobject</strong> command won't be scanned by the antivirus.</li>
+  <li>A new command named <strong>setup</strong> has been added to the system. This command is automatically executed when you first connect to the system.</li>
+</ul>
+
+<a class='doc-title'></a><h3>Version 5.6.7 (25 April 2011)</h3>
+<ul>
+  <li>The Administration Web GUI look and feel has been enhanced.</li>
+  <li>The Auditing Web GUI has been fixed to display properly all virus and guard logs.</li>
+  <li>Now the <strong>antivirus update report</strong> command also displays the last automatic AV update.</li>
+</ul>
+
+<a class='doc-title'></a><h3>Version 5.6.6 (20 April 2011)</h3>
+<ul>
+  <li>The minor bug related to the trial version initial date has been fixed.</li>
+</ul>
+
+<a class='doc-title'></a><h3>Version 5.6.5 (14 April 2011)</h3>
+<ul>
+  <li>Now the proxy is allowed to connect to ports between 1024 and 49151.</li>
+  <li>The bug that was preventing clients connecting to the internal DNS when the appliance doesn't use itself as a DNS has been fixed.</li>
+</ul>
+
+<a class='doc-title'></a><h3>Version 5.6.4 (4 April 2011)</h3>
+<ul>
+  <li>The CacheGuard Logo has been changed.</li>
+  <li>The licensing key system has been revised.</li>
+  <li>The Administration Web GUI look has been revised.</li>
+</ul>
+
+<a class='doc-title'></a><h3>Version 5.6.3 (2 February 2011)</h3>
+<ul>
+  <li>The integrated AntiMalware software has been upgraded to its highest version.</li>
+  <li>The Auditing Web GUI has been improved to show denied URLs and attempts to access Malware.</li>
+  <li>Accessing Web sites that use NTLM / SSPI authentication works now with latest IIS Web servers when the compress or filter mode are activated.</li>
+</ul>
+
+<a class='doc-title'></a><h3>Version 5.6.2 (28 January 2011)</h3>
+<ul>
+  <li>Setting auto update for blacklists has been fixed in the Administration Web GUI.</li>
+  <li>The whole documentation has been reviewed.</li>
+  <li>Some other minor bugs have been fixed.</li>
+</ul>
+
+<a class='doc-title'></a><h3>Version 5.6.1 (17 June 2010)</h3>
+<ul>
+  <li>The installation program has been enhanced to allow the booting and installing of the OS from a USB memory stick.</li>
+  <li>The Linux&reg; kernel has been upgraded to the version 2.6.34 and all required drivers have been integrated to support the latest hardware.</li>
+  <li>Several minor bugs have been fixed in the Administration Web GUI.</li>
+  <li>The default serial speed has been changed to 115200.</li>
+  <li>Some optimisation has been made to reduce the CDROM image size.</li>
+</ul>
+
+<a class='doc-title'></a><h3>Version 5.6.0 (18 March 2010)</h3>
+<ul>
+  <li>An AntiMalware (Virus, Trojan, Worm) has been added to the appliance.
+</ul>
+
+<a class='doc-title'></a><h3>Version 5.5.5 (28 February 2010)</h3>
+<ul>
+  <li>The Administration Web GUI has been enhanced to allow direct accesses to menu boards from the main bar menu.</li>
+</ul>
+
+<a class='doc-title'></a><h3>Version 5.5.4 (16 February 2010)</h3>
+<ul>
+  <li>The tuner module has been enhanced to manage parallel Web requests more adequately.</li>
+  <li>The guarding module has been enhanced to allow or deny the usage of direct IP addresses instead of domain names.</li>
+  <li>The Auditing Administration Web GUI has been fixed to print messages properly.</li>
+  <li>An anti-malware has been added to the appliance in beta test mode.</li>
+  <li>The backup retention policy for logs has been changed so the system backs up logs for a period of 30 days.</li>
+  <li>A new feature has been added to the system so unwanted Web access and rejected requests to protected Web servers are all logged in separated files.</li>
+</ul>
+
+<a class='doc-title'></a><h3>Version 5.5.3 (15 December 2009)</h3>
+<ul>
+  <li>The Administration Web GUI has been fixed to properly refresh logs when an explicit refresh is invoked.</li>
+  <li>A new option has been added to the Administration Web GUI to clear the persistent Web cache.</li>
+</ul>
+
+<a class='doc-title'></a><h3>Version 5.5.2 (30 November 2009)</h3>
+<ul>
+  <li>The Administration Web GUI has been fixed to properly display the top main menu in ie8.</li>
+</ul>
+
+<a class='doc-title'></a><h3>Version 5.5.1 (16 November 2009)</h3>
+<ul>
+  <li>The guarding feature has been reinforced so that Web users are no longer allowed to directly use IP addresses instead of domain names to bypass URL filters.</li>
+  <li>In the Administration Web GUI, clear passwords has been removed from displayed reports.</li>
+  <li>The Administration Web GUI has been enhanced to support IE8.</li>
+</ul>
+
+<a class='doc-title'></a><h3>Version 5.5.0 (13 October 2009)</h3>
+<ul>
+  <li>The <strong>user</strong> command has been removed and replaced by the argument <strong>user</strong> added to the <strong>admin</strong> command.</li>
+  <li>A new command named <strong>cache</strong> has been added to the system. This command allows management of some cache parameters.</li>
+  <li>The <strong>forceloadurl</strong> command has been removed and replaced by the argument <strong>loadurl</strong> added to the new <strong>cache</strong> command.</li>
+  <li>The argument "denyurl" has been added to the <strong>filter</strong> command. This argument allows you to set a specific URL to redirect to when an HTTP request is blocked.</li>
+  <li>The filter and compress modules have been improved to support accessing Web sites that use NTLM / SSPI authentication (even if NTLM/SSPI is not compliant with HTTP).</li>
+  <li>The URL blacklist auto updating module has been enhanced to properly download all remaining files since the last update process.</li>
+  <li>The file transfer module has been improved to manage errors during file transfer.</li>
+  <li>The Administration Web GUI has been modernized and improved.</li>
+  <li>The User's Guide has been enhanced.</li>
+  <li>USB keyboards are now supported.</li>
+  <li>Some internal minor bugs have been fixed.</li>
+</ul>
+
+<a class='doc-title'></a><h3>Version 5.4.2 (15 March 2009)</h3>
+<ul>
+  <li>An option to manage SSL CA chain has been added to the <strong>rweb</strong> command.</li>
+</ul>
+
+<a class='doc-title'></a><h3>Version 5.4.1 (22 February 2009)</h3>
+<ul>
+  <li>The syntax of the <strong>guard</strong> command has been changed and new guard management features have been added to the appliance. An option allows you to update an existing blacklist category from a diff file.  A second option allows you to automatically update a blacklist category since the last update/create date until today. It is also possible to program automatic blacklist category updates. Also the blacklist category save option has been removed.</li>
+</ul>
+
+<a class='doc-title'></a><h3>Version 5.4.0 (2 January 2009)</h3>
+<ul>
+  <li>An LDAP authentication mode has been added to the appliance.</li>
+  <li>The bug that was preventing the connection to internal NTP servers has been fixed.</li>
+</ul>
+
+<a class='doc-title'></a><h3>Version 5.3.7 (25 Nov 2008)</h3>
+<ul>
+  <li>Now the multi CPU mode is activated during the installation if there is more than one installed CPU.</li>
+  <li>A Huge Memory management mode (RAM > 4GB) is now available on the standard CDROM and can be chosen during the installation.</li>
+</ul>
+
+<a class='doc-title'></a><h3>Version 5.3.6 (20 Nov 2008)</h3>
+<ul>
+  <li>The crash management module has been enhanced.</li>
+  <li>The bug in the Health Checking module that inadvertently restarted services has been fixed.</li>
+  <li>Now the <strong>rweb</strong> mode is turned off by default.</li>
+  <li>An option to cancel the running <strong>apply</strong> operation has been added.</li>
+  <li>The patching module has been completely reviewed.</li>
+  <li>The Auditing Administration Web GUI has been enhanced.</li>
+  <li>Generic content filtering rules have been updated.</li>
+  <li>The Auditing Administration Web GUI has been fixed to properly displays all warning messages.</li>
+  <li>The reverse web mode has been fixed to properly work even if there is only one declared HTTP Web site name.</li>
+  <li>The reverse web mode has been fixed to properly work even if there is no DNS declared.</li>
+</ul>
+
+<a class='doc-title'></a><h3>Version 5.3.5 (16 Sept 2008)</h3>
+<ul>
+  <li>Some internal minor bugs have been fixed.</li>
+  <li>The CacheGuard License has been upgraded to the version 1.2. Now you can edit and modify the proprietary part of CacheGuard for your exclusive personal use. You still may not, except as permitted by applicable law, loan or create derivative works from the proprietary part of CacheGuard (see the new license).</li>
+</ul>
+
+<a class='doc-title'></a><h3>Version 5.3.4 (28 Aug 2008)</h3>
+<ul>
+  <li>A CSS (Cascading Style Sheets) was added to the Administration Web GUI.</li>
+  <li>SSL v2 is no longer supported when the appliance acts as a reverse Web proxy (only SSL v3 and TLS v1.0 are supported now).</li>
+</ul>
+
+<a class='doc-title'></a><h3>Version 5.3.3 (29 May 2008)</h3>
+<ul>
+  <li>In the Administration Web GUI, the <strong>logout</strong> screen properly displays all images.</li>
+</ul>
+
+<a class='doc-title'></a><h3>Version 5.3.2 (8 May 2008)</h3>
+<ul>
+  <li>The connection to the Auditing Web GUI works properly when the Guarding mode is deactivated (concerns only appliances installed for less than 20 users).</li>
+</ul>
+
+<a class='doc-title'></a><h3>Version 5.3.1 (20 March 2008)</h3>
+<ul>
+  <li>The HTTP Transparent and HTTP Compress combination mode problem that produces some inconsistent HTTP requests has been fixed.</li>
+  <li>Synflood rules are less aggressive so overloaded Web browsing works properly without faulty rejects.</li>
+  <li>Textual output has been formatted to comply vt100 terminals.</li>
+  <li>The power-off button on SPC appliances works now and shuts down the system properly.</li>
+  <li>The LCD display on SPC appliances works properly.</li>
+  <li>The <strong>conf diff</strong> command has been optimised.</li>
+  <li>A "Show Configuration" option has been added to the Administration Web GUI.</li>
+</ul>
+
+<a class='doc-title'></a><h3>Version 5.3.0 (14 March 2008)</h3>
+<ul>
+  <li>The furtive error while adding a list item in the Administration Web GUI has been corrected.</li>
+  <li>Connections to next peers work properly.</li>
+  <li>Object sharing between cache peers has been optimised.</li>
+  <li>All source codes are rebuilt using gcc v4.1.2.</li>
+  <li>All basic packages have been upgraded.</li>
+  <li>The <strong>halt</strong> command can power off the system even if the administrator is remotely logged in.</li>
+  <li>The support of old Pentium Pro CPU has been added to the Linux&reg; kernel.</li>
+</ul>
+
+<a class='doc-title'></a><h3>Version 5.2.8 (23 December 2007)</h3>
+<ul>
+  <li>The memory usage has been optimised.</li>
+</ul>
+
+<a class='doc-title'></a><h3>Version 5.2.7 (1 December 2007)</h3>
+<ul>
+  <li>The number of parallel connections from peers is not restricted. Peers are considered as trusted parties that do not generate flooding traffic.</li>
+  <li>The free trial version for more than 10 users has been limited to 15 days. When the trial period is about to end, the <strong>apply</strong> command no longer applies a new configuration unless a valid license key is installed.</li>
+</ul>
+
+<a class='doc-title'></a><h3>Version 5.2.6 (24 November 2007)</h3>
+<ul>
+  <li>In Anonymous mode, the "WWW-Authenticate" header is no longer hidden.</li>
+</ul>
+
+<a class='doc-title'></a><h3>Version 5.2.5 (5 November 2007)</h3>
+<ul>
+  <li>A Synflood guarding has been added for traffic labeled <strong>other</strong>.</li>
+  <li>The number of parallel connections per client IP address has been restricted, which allows this release to stop flooding.</li>
+  <li>Bug fix: The log rotation process has been fixed to save logs with the correct date and time.</li>
+  <li>Bug fix: The IP address configuration has been fixed when the HA mode is deactivated.</li>
+  <li>This is the first stable version.</li>
+</ul>
+
+<a class='doc-title'></a><h3>Version 5.2.4b (1 November 2007)</h3>
+<ul>
+  <li>The Synflood guarding module has been enhanced for Web traffic.</li>
+  <li>The Linux&reg; kernel has been upgraded to 2.6.23.1.</li>
+</ul>
+
+<a class='doc-title'></a><h3>Version 5.2.3b (26 October 2007)</h3>
+<ul>
+  <li>Multiple reversed HTTP Web sites may be associated to the same public IP address.</li>
+  <li>The brute force attack guarding module has been enhanced for Web traffic.</li>
+</ul>
+
+<a class='doc-title'></a><h3>Version 5.2.2b (21 October 2007)</h3>
+<ul>
+  <li>The Auditing Administration Web GUI is activated even if the <strong>filter</strong> and <strong>rweb</strong> modes are not activated.</li>
+  <li>In the <strong>rweb</strong> command, when adding a reversed Web site name, a mandatory IP address must be given for a HTTP Web site as well as for a HTTPS Web site.</li>
+  <li>The QoS policy for a reversed Web site has been changed to be based on its public IP address.</li>
+  <li>Several minor bugs have been fixed in the QoS module.
+</ul>
+
+<a class='doc-title'></a><h3>Version 5.2.1b (12 October 2007)</h3>
+<ul>
+  <li>The Administration Web GUI has been optimised.</li>
+  <li>Bug fix: The configuration loading works properly even if the file to load does not exist.</li>
+  <li>The reverse Auditing Web GUI documentation has been enhanced.</li>
+  <li>Passwords having a length of 9 or greater are supported.</li>
+  <li>FTP and TFTP protocols are supported by the Firewall.</li>
+  <li>In High Availability mode all services are activated properly after configuration changes.</li>
+</ul>
+
+<a class='doc-title'></a><h3>Version 5.2.0b (5 October 2007)</h3>
+<ul>
+  <li>X-Forwarded-Host, X-Forwarded-Server are removed from HTTP headers requests - X-Forwarded-For is also removed if no Next Peer is declared when the anonymous mode is activated.</li>
+  <li>Port numbers for Next Peers can range from 0 to 65535 (see the <strong>peer</strong> command).</li>
+  <li>An Auditing Web GUI has be added to the OS to audit the Web content filtering module. Auditing allows the inspection of HTTP request content and facilitates the filtering rule design process (see <strong>admin</strong>, <strong>filter</strong> and <strong>port</strong> commands).</li>
+  <li>A "Logout" link has been added to the Administration Web GUI.</li>
+  <li>Deleting an administrator user works properly.</li>
+</ul>
+
+<a class='doc-title'></a><h3>Version 5.1.2b (1 October 2007)</h3>
+<ul>
+  <li>The Via header is removed from all requests even if the anonymous mode is not activated.</li>
+  <li>In the command <strong>port</strong>, the keyword "webadmin" was renamed to <strong>wadmin</strong>.</li>
+  <li>In the command <strong>password</strong>, the keyword "webadmin" was renamed to <strong>wadmin</strong>.</li>
+  <li>In the <strong>rweb</strong> and <strong>transaction</strong> commands, the keyword "print" has been renamed to <strong>show</strong>.</li>
+  <li>Bug fix: The ftp passive mode can now be activated properly.</li>
+  <li>The administration access topology can now be configured with the <strong>admin</strong> command.</li>
+</ul>
+
+<a class='doc-title'></a><h3>Version 5.1.1b (22 September 2007)</h3>
+<ul>
+  <li>Bug fix: the website deleting with the <strong>rweb</strong> command works properly and all related custom filters are removed.</li>
+  <li>Bug fix: custom filter rules are properly applied to the running configuration and appropriate services restart.</li>
+</ul>
+
+<a class='doc-title'></a><h3>Version 5.1.0b (20 September 2007)</h3>
+<ul>
+  <li>TRACK and TRACE methods are denied for the embedded Web server and all hosted Web servers even if the filtering mode is not activated.</li>
+  <li>Content filtering is only applicable in reverse Web sites and does not affect the forwarding proxy.</li>
+  <li>Custom content filtering based on regular expressions is operational.</li>
+  <li>The syntax of the <strong>guard</strong> command has been changed.</li>
+  <li>The <strong>conf</strong> command is optimised to run faster.</li>
+</ul>
+
+<a class='doc-title'></a><h3>Version 5.0.0b (9 September 2007)</h3>
+<ul>
+  <li>The content filtering mode (<strong>filter</strong> mode) for reversed Web sites is operational. When the <strong>filter</strong> and <strong>rweb</strong> mode are activated, requests on protected Web sites are filtered for generic attacks (xss, sql injection...), protocol violations and other anomalies.</li>
+  <li>The content filtering is hardened for the Administration Web GUI.</li>
+  <li>The configuration is properly saved for backend servers associated to a Web site.</li>
+  <li>Guard categories are created even if the <strong>guard</strong> mode is deactivated.</li>
+  <li>Guard black and white lists are loaded properly (the given file name must not include ".domains", nor ".expressions" nor ".urls" nor the ".gz" extensions).</li>
+  <li>Setting VRRP in the Administration Web GUI works correctly (a wrong content filtering rule was previously set in error).</li>
+</ul>
+
+<a class='doc-title'></a><h3>Version 4.1.6b (2 September 2007)</h3>
+<ul>
+  <li>By default Route Tracing (traceroute) is allowed from the internal zone to the external zone.</li>
+  <li>Bug fix: The Administration Web GUI for the firewall configuration (Menu items "Security/External Firewall" and "Security/Internal Firewall") was fixed to work properly for long content.</li>
+  <li>The content filtering for the Administration Web GUI is more permissive for punctuation characters.</li>
+  <li>Some other minor bugs were corrected.</li>
+</ul>
+
+<a class='doc-title'></a><h3>Version 4.1.5b (28 August 2007)</h3>
+<ul>
+  <li>The licensing is also based on the number of Web Sites to reverse.</li>
+  <li>The "Hard Factory Reset" procedure resets properly the "admin", "superadmin" and the root passwords.</li>
+  <li>Images in the User's Guide available from the Administration Web GUI are shown properly.</li>
+</ul>
+
+<a class='doc-title'></a><h3>Version 4.1.4b (22 August 2007)</h3>
+<ul>
+  <li>The network installation and its documentation are improved (Mainly: the TFTP IP Address is guessed and if the installation fails, the installation environment is properly reset to give the ability to relaunch the installation).</li>
+</ul>
+
+<a class='doc-title'></a><h3>Version 4.1.3b (17 August 2007)</h3>
+<ul>
+  <li>Bug fix: The port forwarding integrity is properly checked during the <strong>apply</strong> operation (Cannot NAT the destination IP to the appliance itself).</li>
+  <li>Bug fix: When adding firewall rules using Administration Web GUI, an empty entry does not add an "any to any" rule. To specify an "any to any" rule the keyword <strong>any</strong> must be specified for the Source IP, the Destination IP or the Ports field.</li>
+  <li>Bug fix: The QoS/Incoming Flows menu item works properly in the Administration Web GUI (Bug due to contenting filtering in the Administration Web GUI).</li>
+  <li>Bug fix: Web Site adding works properly in the Administration Web GUI (Bug due to contenting filtering in the Administration Web GUI).</li>
+</ul>
+
+<a class='doc-title'></a><h3>Version 4.1.2b (13 August 2007)</h3>
+<ul>
+  <li>Bug fix: Network traffic other than Proxy traffic (HTTP, HTTPS and FTP) are shaped properly without abnormal slowdown.</li>
+</ul>
+
+<a class='doc-title'></a><h3>Version 4.1.1b (10 July 2007)</h3>
+<ul>
+  <li>The Appliance could be installed properly using a PXE network device. The TFTP server IP address is configurable during installation.</li>
+</ul>
+
+<a class='doc-title'></a><h3>Version 4.1.0b (9 July 2007)</h3>
+<ul>
+  <li>The Administration Web GUI security has been improved.</li>
+  <li>Bug fix: Native IP addresses could be setup properly in the Administration Web GUI.</li>
+  <li>The <strong>rweb</strong> VLAN is configurable using the Administration Web GUI.</li>
+  <li>The reverse mode is configurable using the Administration Web GUI.</li>
+  <li>The keyword "confcert" was renamed to <strong>genssl</strong> (related commands: <strong>rweb</strong> and <strong>admin</strong>).</li>
+  <li>When an HTTPS reverse Web site is deleted, the associated host list is erased only if no other external IP address is associated with this HTTPS Web site.</li>
+</ul>
+
+<a class='doc-title'></a><h3>Version 4.0.0b (24 June 2007)</h3>
+<ul>
+  <li>A <strong>reverse</strong> mode is at last available in this version. This mode allows you to implement the appliance as a reverse proxy in front of Web servers to secure, accelerate and shape Web traffic. (see the <strong>mode</strong> and <strong>rweb</strong> commands).</li>
+  <li>SSH key loading works properly.</li>
+  <li>SATA storage controller are supported again in this version (support was accidentally removed from the previous version).</li>
+  <li>The keyword "gencert" is renamed <strong>confcert</strong> in the <strong>admin</strong> command.</li>
+</ul>
+
+<a class='doc-title'></a><h3>Version 3.5.0b (4 June 2007)</h3>
+<ul>
+  <li>The QoS bandwidth shaping works properly for all types of traffic.</li>
+  <li>The syntax of the <strong>qos</strong> command has changed.</li>
+  <li>The QoS management can be deactivated using the <strong>mode</strong> command.</li>
+  <li>The "fw" command has been renamed to <strong>firewall</strong>.</li>
+  <li>This is an intermediate version before a main one supporting the <strong>reverse</strong> mode.</li>
+  <li>The reverse mode is named <strong>rweb</strong> and some related commands are already integrated in the present version (but the <strong>rweb</strong> mode is not yet operational):</li>
+  <ul>
+    <li>The reverse mode could be activated using the command: <strong>mode rweb on</strong>.</li>
+    <li>The forward mode could be deactivated using the command: <strong>mode web off</strong>.</li>
+    <li>A new vlan named <strong>rweb</strong> is available for Web servers.</li>
+    <li>A Filtering mode is integrated to inspect inside Web requests (see the <strong>mode filter</strong> command ).</li>
+    <li>Allowed Web servers can be restricted to those declared with the <strong>access rweb</strong>... command.</li>
+  </ul>
+</ul>
+
+<a class='doc-title'></a><h3>Version 3.4.0b (2 May 2007)</h3>
+<ul>
+  <li>The certificate generation procedure for the Administration Web GUI supports white spaces in entries.</li>
+  <li>The alter image mode is no longer supported - The core proxy module has changed.</li>
+  <li>Time & Date can be setup properly by using the Administration Web GUI.</li>
+  <li>The log rotation procedure properly deletes logs older than 10 days (or with a serial number greater than 10).</li>
+</ul>
+
+<a class='doc-title'></a><h3>Version 3.3.2b (12 April 2007)</h3>
+<ul>
+  <li>The documentation of the <strong>mode</strong> command has been fixed (gateway has been renamed to router).</li>
+  <li>The Administration Web GUI is enhanced for the General Feature and Network related modes.</li>
+  <li>The Administration Web GUI can show the last apply report even if the configuration is locked.</li>
+</ul>
+
+<a class='doc-title'></a><h3>Version 3.3.1b (10 April 2007)</h3>
+<ul>
+  <li>In the <strong>mode</strong> command, <strong>gateway</strong> has been renamed to <strong>router</strong>.</li>
+  <li>The integrated DHCP server may be activated via the CLI or Administration Web GUI.</li>
+  <li>The integrated DHCP server supports a failover mode.</li>
+  <li>Network PCMCIA cards are detected.</li>
+</ul>
+
+<a class='doc-title'></a><h3>Version 3.3.0b (28 Mar 2007)</h3>
+<ul>
+  <li>System and access logs are rotated together even if the access log is empty.</li>
+  <li>A VRRP IP address can be associated to the external network interface (Useful for incoming connections via the external network interface, crossing the embedded firewall and destined to internal networks).</li>
+  <li>The access to the embedded DNS is allowed.</li>
+  <li>In HA mode, the vrrp multicast is allowed for all IP in the local network (and not only for declared HA peers).</li>
+  <li>In HA mode, if the health checker cannot properly restart all vital service, a fail over is forced. The forced fail over is logged in the daemon.log log file.</li>
+  <li>When defining administrator access with the <strong>access</strong> command, an optional netmask could be specified.</li>
+  <li>Bug fix: The configuration difference is correctly displayed in the Administration Web GUI.</li>
+  <li>The Administration Web GUI is available via the embedded Proxy only when the VLAN mode is deactivated.</li>
+</ul>
+
+<a class='doc-title'></a><h3>Version 3.2.7b (21 Mar 2007)</h3>
+<ul>
+  <li>Now, the Health Checker is correctly launched and checks all activated services.</li>
+  <li>The Administration Web GUI is available via the embedded Proxy.</li>
+  <li>Minor enhancements and optimisation.</li>
+</ul>
+
+<a class='doc-title'></a><h3>Version 3.2.6b (14 Mar 2007)</h3>
+<ul>
+  <li>Bug fix: Now, the tftp command is found during the installation phase.</li>
+</ul>
+
+<a class='doc-title'></a><h3>Version 3.2.5b (10 Mar 2007)</h3>
+<ul>
+  <li>When loading/saving guard categories, the category type may be optionally specified.</li>
+  <li>Security was fixed so that, in VLAN mode, the embedded Firewall allows or denies only traffic to or from the <strong>web</strong> VLAN.</li>
+  <li>The syntax of the <strong>access</strong> and <strong>fw</strong> commands has been changed. The access type <strong>other</strong> in the <strong>access</strong> command has been replaced by the <strong>fw</strong> command followed by the keyword <strong>intern</strong>. In the <strong>fw</strong> command, the source IP address and optionally the network mask is specified.</li>
+  <li>Other minor bug corrections.</li>
+</ul>
+
+<a class='doc-title'></a><h3>Version 3.2.4b (21 February 2007)</h3>
+<ul>
+  <li>An optional port number may be defined when adding a Next Peer.</li>
+  <li>Support has been added for the SCSI Message Fusion Driver (required for VMware&reg; certified version: LSI Logic).</li>
+</ul>
+
+<a class='doc-title'></a><h3>Version 3.2.3b (13 February 2007)</h3>
+<ul>
+  <li>Support for TFTP to exchange Files with the appliance. To do that, the syntax of the following commands is changed: <strong>access</strong>, <strong>vlan</strong>, <strong>conf</strong>, <strong>system</strong>, <strong>log</strong>, <strong>guard</strong>.</li>
+  <li>The completion for the <strong>dns</strong> command supports the keyword <strong>localhost</strong>.</li>
+  <li>To respect the command syntax homogeneity, the keyword "snmp" is renamed to <strong>mgt</strong> for the following commands: <strong>access</strong>, <strong>vlan</strong>. The <strong>mgt</strong> keyword specifies "snmp" and other possible management protocols later (The snmp agent is still not integrated in this version).</li>
+  <li>The configuration cannot be applied if the internal and external IP addresses belong to overlapped networks (The text of the error number 203 is also modified).</li>
+  <li>The <strong>ip</strong> command checks if the given IP address is a valid host IP address (The network and broadcast  IP address cannot be given now).</li>
+  <li>Bug fix: Swapping between the VLAN mode and Native Mode (mode vlan on/off) restarts adequate services to bind to appropriate network interfaces.</li>
+  <li>Bug fix: The system patching (Menu item "File/System Patches") works correctly in the Administration Web GUI now (the "Do Operation" produce the awaited result).</li>
+  <li>Other minor bug corrections.</li>
+</ul>
+
+<a class='doc-title'></a><h3>Version 3.2.2b (2 February 2007)</h3>
+<ul>
+  <li>A shortcut "Apply" button was added to the Administration Web GUI's main menu.</li>
+  <li>The keyboard selection during installation was enhanced.</li>
+  <li>The <strong>access</strong> command documentation was enhanced.</li>
+  <li>The README.txt file in the VMware&reg; virtual machine version package was enhanced.</li>
+</ul>
+
+<a class='doc-title'></a><h3>Version 3.2.1b (23 Jan 2007)</h3>
+<ul>
+  <li>The <strong>apply</strong> command can be applied after a "factoryreset" without adding a DNS server.</li>
+  <li>The Administration Web GUI is now compliant with IE7 and FireFox&reg; 2.0.</li>
+</ul>
+
+<a class='doc-title'></a><h3>Version 3.2.0b (17 Jan 2007)</h3>
+<ul>
+  <li>Initial public announcement</li>
+</ul>
