@@ -49,7 +49,7 @@ The CacheGuard-OS source code is organized into the following directories:
 - **Sources/Tuner** — programs that configure the appliance during installation, based mainly on its available resources
 - **Logo** — logo images in different formats
 - **OS** — scripts used to create an archive of all programs for copying onto the installation CD-ROM
-- **RunTimeLFS** — all programs used to build a runtime operating system; only the components required by the appliance are retained, all others are removed from the runtime version
+- **RunTimeLFS** — all programs used to build a runtime operating system; only the components required by the appliance are retained, all others are removed from the runtime version (**CAUTION: Dangerous Scripts**)
 - **Install** — programs used to install the OS on bare metal or virtual machines
 - **Patch** — programs for building patches to upgrade an already installed OS
 
