@@ -12,9 +12,9 @@
 
 ## What Is CacheGuard?
 
-CacheGuard-OS is not an application you install on top of an existing operating system. It IS the operating system — a fully custom, network appliance oriented Linux distribution built entirely from scratch since 2002, representing over 5,000 man days of research and development, now completely open source.
+CacheGuard-OS is not an application you install on top of an existing OS — it IS the OS. A fully custom, network appliance oriented Linux distribution built from scratch since 2002, representing over 5,000 man days of research and development, now completely open source.
 
-Install it on any x86/x64 bare-metal machine or virtual machine and you get a complete, production-ready network security gateway in under an hour. No plugins, no compatibility issues, no surprises. Everything is designed to work together from day one because it was built that way from the ground up.
+One ISO. Any x86/x64 machine or VM. Production-ready security gateway in under an hour.
 
 ---
 
@@ -32,9 +32,9 @@ CacheGuard-OS turns any x86/x64 machine or VM into a full network security appli
 - **Load balancer** — distribute traffic across multiple backends
 - **Multi-WAN QoS** — traffic shaping, bandwidth prioritization and WAN failover
 - **Web caching** — reduce bandwidth usage and speed up browsing
-- **CacheGuard Manager** — centralized management of multiple appliances from a single dashboard
+- **CacheGuard Manager** — install as a dedicated appliance to centrally manage multiple CacheGuard gateways from a single dashboard
 
-All features run simultaneously on the same machine. No plugins, no add-ons, no surprises.
+All gateway features run simultaneously on the same machine. No plugins, no add-ons, no surprises. CacheGuard Manager is installed separately as a dedicated management appliance.
 
 ---
 
