@@ -4,7 +4,7 @@
 
 > Firewall · IPsec VPN · WAF · Antivirus · URL Filtering · SSL Inspection · QoS · Reverse Proxy · Load Balancer — in a single ISO you install in under an hour.
 
-[![License](https://img.shields.io/badge/license-CacheGuard%20Open%20Source-blue)](./LICENSE)
+[![License](https://img.shields.io/badge/license-CacheGuard%20Open%20Source-blue)](./Documentation/CacheGuard-OS-License-Agreement.pdf)
 [![Latest Release](https://img.shields.io/github/v/release/cacheguard/CacheGuard-OS)](https://github.com/cacheguard/CacheGuard-OS/releases)
 [![SourceForge Downloads](https://img.shields.io/sourceforge/dw/webgateway.svg)](https://sourceforge.net/projects/webgateway/)
 
@@ -47,19 +47,13 @@ All features run simultaneously on the same machine. No plugins, no add-ons, no 
 
 ### Install in 3 steps
 
-```bash
-# 1. Download the latest ISO
-https://github.com/cacheguard/CacheGuard-OS/releases/latest
-
-# 2. Boot your machine from the ISO and follow the installer
-
-# 3. Access the Web GUI at:
-https://<your-cacheguard-ip>:8090
-```
+1. Download the latest ISO from the [Releases page](https://github.com/cacheguard/CacheGuard-OS/releases/latest)
+2. Boot your machine from the ISO and follow the installer
+3. Access the Web GUI at `https://<your-cacheguard-ip>:8090`
 
 The installer configures everything automatically based on your hardware. After first boot, the appliance is ready to configure via CLI or Web GUI.
 
-Full installation guide: [CacheGuard Documentation](https://www.cacheguard.com/cacheguard-documentation/)
+Full installation guide: [CacheGuard User's Guide](https://www.cacheguard.net/doc/guide/index.html)
 
 ---
 
@@ -99,7 +93,7 @@ Born in 2002 and built over 5,000 man days of research and development, CacheGua
 
 ## Licensing & Support
 
-CacheGuard-OS is **free and open source** (since v2.4.1). You can use it with any number of users, on any number of machines, at no cost. The license allows you to study, modify and contribute to the code — however it does not permit building and distributing a competing network appliance derived from CacheGuard-OS. Please refer to the [LICENSE](./LICENSE) file for full details.
+CacheGuard-OS is **free and open source** (since v2.4.1). You can use it with any number of users, on any number of machines, at no cost. The license allows you to study, modify and contribute to the code — however it does not permit building and distributing a competing network appliance derived from CacheGuard-OS. Please refer to the [LICENSE](./Documentation/CacheGuard-OS-License-Agreement.pdf) file for full details.
 
 **Need professional support?** We offer paid support plans for businesses that need guaranteed response times and expert assistance:
 
