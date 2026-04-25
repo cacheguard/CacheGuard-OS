@@ -41,7 +41,7 @@ A datasheet is available providing a concise overview of all CacheGuard capabili
 
 Screenshots of the CacheGuard web interface are available in the [Screenshots](./Screenshots/) folder:
 
-- [CacheGuard Gateway Dashboard](./Screenshots/CacheGuard-Gateway-Dashboard.png)
+- [Gateway Dashboard](./Screenshots/CacheGuard-Gateway-Dashboard.png)
 - [WAF Auditing](./Screenshots/CacheGuard-Screenshot-WAF-Auditing.png)
 - [VPN Script](./Screenshots/CacheGuard-Gateway-VPN-Script.png)
 
