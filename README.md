@@ -77,7 +77,7 @@ Full installation guide: [CacheGuard User's Guide](https://www.cacheguard.net/do
 ![CacheGuard VPN Script](./Documentation/Screenshots/CacheGuard-Gateway-VPN-Script.png)
 *IPsec VPN configuration — secure remote access setup*
 
-![CacheGuard WAF Auditing](./Documentation/Screenshots/CacheGuard-Screenshot-WAF-Auditing.png)
+![CacheGuard WAF Auditing](./Documentation/Screenshots/CacheGuard-Website-Auditing.png)
 *WAF auditing — monitoring and blocking malicious web requests*
 
 ---
