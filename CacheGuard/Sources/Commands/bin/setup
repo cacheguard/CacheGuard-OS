@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       Commands
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -79,7 +78,7 @@ exec-setup-conf()
     transaction close
     test ! -s ${SETUP_FILE} || transaction open < ${SETUP_FILE}
 
-    transaction commit log 2>&1 | dialog ${SETUP_DIALOG_OPTIONS} --backtitle "${SETUP_BACK_TITLE}" --title "${message}" --programbox "List of commands to execute:" 22 65
+    transaction commit log 2>&1 | dialog ${SETUP_DIALOG_OPTIONS} --backtitle "${SETUP_BACK_TITLE}" --title "${message}" --programbox "List of commands to execute:" 21 65
 
     ret=${PIPESTATUS[0]}
 
@@ -283,7 +282,9 @@ read-network-conf()
 
 		if test -n "${ip_default_route_ip}" ; then
 		    check-ip ${ip_default_route_ip} || gw_errors="${gw_errors} 12"
-		    check-gw-connected ${ip_default_route_ip} ${ip_external_ip} ${ip_external_mk} || gw_errors="${gw_errors} 110"
+		    check-gw-connected ${ip_default_route_ip} ${ip_external_ip} ${ip_external_mk} || \
+			check-gw-connected ${ip_default_route_ip} ${ip_internal_ip} ${ip_internal_mk} || \
+			gw_errors="${gw_errors} 110"
 		fi
 
 		in_errors=${in_errors:1}
@@ -446,12 +447,6 @@ read-network-conf()
 
 	    echo dns raz      								>> ${SETUP_FILE}
 	    echo dns add ${dns_ip}      						>> ${SETUP_FILE}
-
-	    if test -z "${CLOUD_NAME}" ; then
-		echo access file add internal ${ip_file_ip}	      			>> ${SETUP_FILE}
-		echo access mon add internal ${ip_file_ip}	      			>> ${SETUP_FILE}
-	    fi
-
 	    echo port wadmin ${port_wadmin_port} 					>> ${SETUP_FILE}
     	    echo admin ssh on 								>> ${SETUP_FILE}
 	    echo admin wadmin on 							>> ${SETUP_FILE}
@@ -474,12 +469,6 @@ read-network-conf()
 
 	    echo dns raz      								>> ${SETUP_FILE}
 	    test -z "${dns_ip}" || echo dns add ${dns_ip}      				>> ${SETUP_FILE}
-
-	    if test -z "${CLOUD_NAME}" ; then
-		echo access file add internal ${ip_file_ip}	      			>> ${SETUP_FILE}
-		echo access mon add internal ${ip_file_ip}	      			>> ${SETUP_FILE}
-	    fi
-
 	    echo port wadmin ${port_wadmin_port} 					>> ${SETUP_FILE}
 	    echo admin ssh on 								>> ${SETUP_FILE}
 	    echo admin wadmin on 							>> ${SETUP_FILE}

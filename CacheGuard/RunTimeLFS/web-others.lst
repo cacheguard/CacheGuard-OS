@@ -22,7 +22,7 @@ libexec/mod_deflate.so
 libexec/mod_env.so
 libexec/mod_filter.so
 libexec/mod_headers.so
-libexec/mod_headers.so
+libexec/mod_http2.so
 libexec/mod_lbmethod_bybusyness.so
 libexec/mod_lbmethod_byrequests.so
 libexec/mod_lbmethod_bytraffic.so

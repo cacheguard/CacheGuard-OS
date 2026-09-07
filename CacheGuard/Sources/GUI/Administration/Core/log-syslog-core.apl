@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -63,14 +62,13 @@ show-syslog-form()
     shortcutMenuTitle[0]="Log Settings"
 
     if test -n "${CURRENT_SYSLOG_SERVER_LIST}" ; then
-	shortcutMenuItem[1]="network-utilities"
+	shortcutMenuItem[1]="diagnostic-tools"
 	shortcutMenuTitle[1]="Test SysLog"
     fi
 
     listContent=${SYSLOG_SERVER_LIST}
     test -n "${listContent}" || state=disabled
     show-title "SysLog Servers" "${state}" "log"
-    show-shortcuts-menu
     show-list-form ${MAX_SYSLOG_NB} "${width}" "${page_ref}"
 }
 

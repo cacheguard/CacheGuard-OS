@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       Build
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -30,11 +29,12 @@ source WorkFunctions
 
 install-javascript()
 {
-    local file
+    local file name
 
     for file in JS/*.js ; do
-	sudo install -m 440 -o ${ADMIN_UID} -g ${USERS_GID} ${file} ${APL}${GUI_DJS_DIR}
-	sudo install -m 644 -o root -g root ${file} ${NET_DJS_DIR}
+	name=$(file-basename ${file} .js)
+	sudo install -m 440 -o ${ADMIN_UID} -g ${USERS_GID} ${file} ${APL}${GUI_DJS_DIR}/${name}-${GUI_FE_VERSION}.js
+	sudo install -m 644 -o root -g root ${file} ${NET_DJS_DIR}/${name}-${GUI_FE_VERSION}.js
     done
 }
 
@@ -85,7 +85,7 @@ install-users-guide()
 
 gen-copyright()
 {
-    sed -e "s/@YEARS@/${YEARS}/g" copyright 
+    sed -e "s/@YEARS@/${YEARS}/g" -e "s/@COMPANY_NAME@/${COMPANY_NAME}/g" copyright 
 }
 
 make-web-dirs()
@@ -98,14 +98,13 @@ make-web-dirs()
 
 install-files()
 {
-    local file
+    local file name
 
-    for file in apl.css \
-		jquery_treeview.css \
-		favicon.ico
+    for file in CSS/*.css
     do
-	sudo install -m 644 -o root -g root ${file} ${APL}${GUI_DOC_DIR}
-	sudo install -m 644 -o root -g root ${file} ${NET_DOC_DIR}
+	name=$(file-basename ${file} .css)
+	sudo install -m 644 -o root -g root ${file} ${APL}${GUI_DOC_DIR}/${name}-${GUI_FE_VERSION}.css
+	sudo install -m 644 -o root -g root ${file} ${NET_DOC_DIR}/${name}-${GUI_FE_VERSION}.css
     done
     
     sudo install -m 644 -o root -g root Image/CacheGuardLogo.png ${APL}${GUI_DOC_IMAGE_DIR}

@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -24,17 +23,15 @@
 
 show-system-report-disk()
 {
+    test -n "${1}" || return 1
     local display_time=${1}
-    local table_width=${2}
-    test -n "${table_width}" || table_width="405"
+    local compact=${2}
 
-    local col1=180
-    local col2=100
+    test -z "${compact}" || compact=' compact'
 
-    echo "<div class='core-form'>"
-    echo "<table class='highlight-form' width='${table_width}'>"
+    echo "<table class='highlight-form${compact}'>"
 
-    test -z "${display_time}" || display-appliance-time-row
+    test ${display_time} != time || display-appliance-time-row left
 
     if test -s ${RUN_DIR}/${DISKS_HEALTH_FILENAME} ; then
 
@@ -43,9 +40,9 @@ show-system-report-disk()
 	while read disk state lifetime
 	do
 	    echo "<tr>"
-	    echo "<td width='${col1}'>Disk SMART (${disk/\/dev\//})</td>"
+	    echo "<td>Disk SMART (${disk/\/dev\//})</td>"
 
-	    echo "<td width='${col2}'>"
+	    echo "<td>"
 
 	    if test "${state}" -eq 0 ; then
                 echo -n "<img src='/image/ok.png' alt='[OK]' title='OK' />"
@@ -78,10 +75,10 @@ show-system-report-disk()
 	fi
 
 	echo "<tr>"
-	echo "<td width='${col1}'>"
+	echo "<td>"
 	echo "Disk(s) average i/o time"
 	echo "</td>"
-	echo "<td width='${col2}'>"
+	echo "<td>"
 	echo "${avg} millisecond"
 	echo "</td>"
 	echo "</tr>"
@@ -111,5 +108,4 @@ show-system-report-disk()
     fi
 
     echo "</table>"
-    echo "</div>"
 }

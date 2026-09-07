@@ -1,0 +1,23 @@
+var AJAX_UNSENT = 0;
+var AJAX_OPENED = 1;
+var AJAX_HEADERS_RECEIVED = 2;
+var AJAX_LOADING = 3;
+var AJAX_DONE = 4;
+var LOGOUT_CHECK_INTERVAL = 10000;
+var LOGOUT_URI = GUI_DIR + "login" + GUI_EXTENSION + "?logout";
+var SHORTCUTS_UPDATE_INTERVAL = 2000;
+var POWER_PAGE_LOGOUT_TIMEOUT = SHORTCUTS_UPDATE_INTERVAL + 1000;
+var CONF_LOG_UPDATE_INTERVAL = 2000;
+var AUDIT_LOG_UPDATE_INTERVAL = 3000;
+var UNUSED_COLOR = "WhiteSmoke";
+var SUBMIT_ID = "submit";
+var RESET_ID = "reset";
+var CORE_ID = 'core';
+var AUOTO_UPDATE_ID = 'auto-update-log';
+var RESPONSE_UPDATE_ARRIVED = 1;
+var AJAX_HTTP_REQUEST = false;
+var UPDATE_TIMER = null;
+var REFRESH_SHORTCUTS_TIMER = null;
+var BLINK_DIV_TIMER = null;
+var BLINK_ICON_TIMERS = [];
+var UNAVAILABLE = "<center><div class='box-unavailable'><img src='" + GUI_IMAGE_DIR + "loading.gif' width='340' /></div></center>"

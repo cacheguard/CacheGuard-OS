@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -98,7 +97,7 @@ set-routes()
 
 		for ((i=0 ; i<insert_nb ; i++))
 		do
-		    echo "ip route 'insert:${network}/${netmask}:${gateway}' '${insert_array[${i}]}'" >> ${transaction}
+		    echo "ip route insert:${network}/${netmask}:${gateway} ${insert_array[${i}]}" >> ${transaction}
 		done
 		unset insert_array
 		insert_nb=0
@@ -112,14 +111,14 @@ set-routes()
     
     for ((i=0 ; i<insert_nb ; i++))
     do
-	echo "ip route 'insert:${network}/${netmask}:${gateway}' '${insert_array[${i}]}'" >> ${transaction}
+	echo "ip route insert:${network}/${netmask}:${gateway} ${insert_array[${i}]}" >> ${transaction}
     done
 
     if test -n "${old_route_id}" ; then
 	route_id="${old_route_id}"
 	for ((i=0 ; i<add_nb ; i++))
 	do
-	    echo "ip route 'add:${route_id}' '${add_array[${i}]}'" >> ${transaction}
+	    echo "ip route add:${route_id} ${add_array[${i}]}" >> ${transaction}
 	    network=${add_array[${i}]/ *}
 	    rest=${add_array[${i}]#* }
 	    netmask=${rest/ *}
@@ -130,7 +129,7 @@ set-routes()
     else
 	for ((i=0 ; i<add_nb ; i++))
 	do
-	    echo "ip route add '${add_array[${i}]}'" >> ${transaction}
+	    echo "ip route add ${add_array[${i}]}" >> ${transaction}
 	done
     fi
 
@@ -146,9 +145,9 @@ set-routes()
 	if test -z "${prev_route_id}" ; then
 	    position=${location#*:}
 	    position=${position/:*}
-	    echo "ip route 'move:${position}' '${route_id}'" >> ${transaction}
+	    echo "ip route move:${position} ${route_id}" >> ${transaction}
 	else
-	    echo "ip route 'move:+${prev_route_id/_/:}' '${route_id}'" >> ${transaction}
+	    echo "ip route move:+${prev_route_id/_/:} ${route_id}" >> ${transaction}
 	fi
     done
 
@@ -159,7 +158,7 @@ set-routes()
 	network_netmask=${route_id/_*}
 	gateway=${route_id/*_}
 	network_netmask=${network_netmask//\// }
-	echo "ip route del '${network_netmask}' '${gateway}'" >> ${transaction}
+	echo "ip route del ${network_netmask} ${gateway}" >> ${transaction}
     done
     
     execute-transaction ${transaction}

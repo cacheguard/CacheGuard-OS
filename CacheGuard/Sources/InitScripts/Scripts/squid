@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       InitScript
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -214,7 +213,7 @@ squid-init-is-locked()
 
 clear-cache()
 {
-    local elt i=0 range
+    local elt range i=0
     local dir
 
     for elt in ${CACHE_SWAPS}
@@ -286,7 +285,7 @@ build-ssl-cache()
 
     if squid-init-is-locked ; then
 	log_failure_msg2
-	return 11
+	return 21
     fi
 
     local ret
@@ -299,7 +298,7 @@ build-ssl-cache()
     if [ ${?} -eq 0 ] ; then
 	ret=0
     else
-	ret=13
+	ret=23
     fi
 
     test ! -d ${PROXY_DB_SSL_DIR} || chown -R cache:cache ${PROXY_DB_SSL_DIR}
@@ -408,7 +407,7 @@ build-cache()
 
     if squid-init-is-locked ; then
 	log_failure_msg2
-	return 11
+	return 31
     fi
 
     local ret
@@ -421,11 +420,11 @@ build-cache()
 	    create-witness
 	    ret=0
 	else
-	    ret=13
+	    ret=33
 	fi
     else
 	delete-witness
-	ret=15
+	ret=35
     fi
 
     squid-init-unlock
@@ -446,11 +445,11 @@ case "${1}" in
     start)
 	if [ -n "$(pidof ${PROG})" ]; then
 	    echo $"${PROG}: already running"
-	    exit 31
+	    exit 11
 	fi
 	
-	is-ssl-cache-built || build-ssl-cache || exit 33
-	is-cache-built || build-cache || exit 35
+	is-ssl-cache-built || build-ssl-cache || exit ${?}
+	is-cache-built || build-cache || exit ${?}
 	log_info_msg "Starting ${SERV}..."
 	squid-start
 	RETVAL=${?}
@@ -462,7 +461,7 @@ case "${1}" in
     build)
 	if [ -n "$(pidof ${PROG})" ]; then
 	    echo $"${PROG}: already running"
-	    exit 41
+	    exit 11
 	fi
 	is-cache-built || build-cache
 	;;
@@ -498,7 +497,7 @@ case "${1}" in
     clear)
 	if squid-init-is-locked ; then
 	    log_failure_msg2
-	    exit 51
+	    exit 11
 	fi
 
 	RETVAL1=$(pidof ${PROG})
@@ -518,7 +517,7 @@ case "${1}" in
     clearssl)
 	if squid-init-is-locked ; then
 	    log_failure_msg2
-	    exit 61
+	    exit 11
 	fi
 
 	RETVAL1=$(pidof ${PROG})

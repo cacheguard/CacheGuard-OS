@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -51,12 +50,9 @@ print-operation()
 
 show-system-backup-log()
 {
-    echo "<div class='core-form' style='margin-top:0;'>"
-    refresh-buttons "update_system_backup( 1 )"
-    echo "<div style='clear:left;'></div><br />"
-    echo "<span class='table-title'>Last system backup report&nbsp;</span>"
+    refresh-buttons
+    echo "<div class='table-title'>Last system backup report</div>"
     echo "<div id='${AUTO_REPORT_ID}' class='log-report'></div>"
-    echo "</div>"
 }
 
 show-system-backup-form()
@@ -137,7 +133,7 @@ show-system-backup-form()
     itemForm[3]="select"
     itemForm[4]="select"
 
-    itemFormSelectCB[2]="backupOperationSelectCB( '${operation_id}', '${protocol_id}', '${server_id}', '${filename_id}' );"
+    itemData[2]="data-action='backup-operation' data-operation-id='${operation_id}' data-protocol-id='${protocol_id}' data-server-id='${server_id}' data-filename-id='${filename_id}'"
 
     shortcutMenuItem[0]="access-file"
     shortcutMenuItem[1]="password-file"
@@ -145,12 +141,8 @@ show-system-backup-form()
     shortcutMenuTitle[1]="Accounts"
 
     show-title "Backup Restore" enabled "system"
-    show-shortcuts-menu
-
     local progression=$(echo-backup-exchanged-percent ${operation})	
-
     show-form "${width}" enabled show-system-backup-log
-
     init-refresh-exchnage-file-progress-bar ${operation_id} ${progress_id} ${progression} "backup-exchanged-percentage"
 }
 

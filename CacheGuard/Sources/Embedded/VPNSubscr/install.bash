@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       Build
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -25,6 +24,7 @@
 test -n "${LFS}" || exit 1
 
 source CacheGuard.env
+source WorkFunctions
 
 DEVICE_ANDROID=0
 DEVICE_APPLE=1
@@ -63,22 +63,6 @@ FAILED_OPERATION=1
 
 EMBEDDED_VPNSUBSCR_DIR=${WEB_SERVER_DIR}/${EMBEDDED_APPLICATIONS_NAME}/${EMBEDDED_VPNSUBSCR_NAME}
 VPNSUBSCR_PROFILE_DIR=${EMBEDDED_VPNSUBSCR_DIR}/${EMBEDDED_VPNSUBSCR_PROFILE_DIR_NAME}
-
-generate-menu()
-{
-    local line
-
-    echo "function printmenu( )"
-    echo "{"
-
-    while read -r line
-    do
-	test -n "${line}" || continue;
-        echo -e "\tdocument.write( '${line}' );"
-    done < menu.html
-
-    echo "}"
-}
 
 gen-apl_ea_vpnsubscr-env()
 {
@@ -165,8 +149,8 @@ gen-constant-php-constant()
 ###########################################################################
 #
 # MODULE:       VPN Subscription
-# AUTHOR(S):    CacheGuard Development Team
-# COPYRIGHT:    (C) ${YEARS} by CacheGuard Technologies Ltd
+# COPYRIGHT:    (C) ${YEARS} by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) ${YEARS} by CacheGuard Technologies SAS (FR)
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -233,18 +217,46 @@ define( 'TWO_FACTOR_AUTHENTICATION_WINDOW_SIZE', ${TWO_FACTOR_AUTHENTICATION_WIN
 EOT
 }
 
+gen-html-from-template()
+{
+    local files file base
+
+    files=$(ls -1 html/*.html.template doc/*.html.template 2> /dev/null)
+    for file in ${files}
+    do
+	base=$(file-basename ${file} .html.template)
+	sed -e "s/@VERSION@/${GUI_FE_VERSION}/g" ${file} > ${GENERATED_DIR}/${base}.html
+    done
+}
+
 pack-site()
 {
     local local_dir=$(pwd)
     local name=${EMBEDDED_VPNSUBSCR_NAME}
+    local files file base
 
     rm -rf ${GENERATED_DIR}/${name} &&
 	mkdir -p ${GENERATED_DIR}/${name} &&
-	cp -rfL {html/*.html,php/*.php,*.css,js,doc/*.html} ${GENERATED_DIR}/${name} &&
+	cp -rfL {html/*.html,php/*.php} ${GENERATED_DIR}/${name} &&
 	mkdir -p ${GENERATED_DIR}/${name}/image &&
 	cp -f doc/image/* ${GENERATED_DIR}/${name}/image &&
 	find image -type f -exec cp -f {} ${GENERATED_DIR}/${name}/image \; &&
-	cp -fL ${GENERATED_DIR}/*.js ${GENERATED_DIR}/${name}/js || return 11
+	cp -fL ${GENERATED_DIR}/*.html ${GENERATED_DIR}/${name} || return 11
+
+    mkdir -p ${GENERATED_DIR}/${name}/js
+    files=$(ls -1 js/*.js 2> /dev/null)
+    for file in ${files}
+    do
+	base=$(file-basename ${file} .js)
+	cp ${file} ${GENERATED_DIR}/${name}/js/${base}-${GUI_FE_VERSION}.js
+    done
+
+    files=$(ls -1 css/*.css 2> /dev/null)
+    for file in ${files}
+    do
+	base=$(file-basename ${file} .css)
+	cp ${file} ${GENERATED_DIR}/${name}/${base}-${GUI_FE_VERSION}.css
+    done
 
     cd ${GENERATED_DIR} &&
 	tar --owner=0 --group=0 -cf ${name}.tar ${name} &&
@@ -253,12 +265,12 @@ pack-site()
 	cd ${local_dir}
 }
 
-install-doc()
+install-website-doc()
 {
     sudo mkdir -p ${EMBEDDED_VPNSUBSCR_NET_DOC_DIR}/image
 
-    sudo install -m 644 -o root -g root style.css ${EMBEDDED_VPNSUBSCR_NET_DOC_DIR}
-    sudo install -m 644 -o root -g root doc/*.html ${EMBEDDED_VPNSUBSCR_NET_DOC_DIR}
+    sudo install -m 644 -o root -g root css/style.css ${EMBEDDED_VPNSUBSCR_NET_DOC_DIR}/style-${GUI_FE_VERSION}.css
+    sudo install -m 644 -o root -g root ${GENERATED_DIR}/help.html ${EMBEDDED_VPNSUBSCR_NET_DOC_DIR}
     sudo install -m 644 -o root -g root doc/image/* ${EMBEDDED_VPNSUBSCR_NET_DOC_DIR}/image
 }
 
@@ -305,11 +317,11 @@ local-install()
 
 main()
 {
-    generate-menu "${@}" > ${GENERATED_DIR}/printmenu.js
     gen-apl_ea_vpnsubscr-env "${@}" > ${GENERATED_DIR}/apl_ea_vpnsubscr.env
     gen-constant-php-constant "${@}" > ${GENERATED_DIR}/constant.php-constant
+    gen-html-from-template
     pack-site
-    install-doc
+    install-website-doc
     local-install
     install-files
 }

@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -30,13 +29,7 @@ set-peers()
     local peers
 
     case ${ptype} in
-	share)
-	    ;;
-	ha)
-	    ;;
-	next)
-	    ;;
-	previous)
+	share|ha|previous)
 	    ;;
 	*)
 	    return 1
@@ -59,12 +52,11 @@ set-peers()
 	[[ "${ATTRIBUTES[${del_pos}]}" =~ ^del_[0-9]+$ ]]
 	if test ${?} -ne 0 ; then
 	    if test "${VALUES[${entry_pos}]}" == anew -a -n "${VALUES[${ip_pos}]}" ; then
-		echo "peer ${ptype} add '${VALUES[${ip_pos}]}' '${VALUES[${qos_pos}]}'" >> ${transaction}
+		echo "peer ${ptype} add ${VALUES[${ip_pos}]} ${VALUES[${qos_pos}]}" >> ${transaction}
 	    fi
-	    
 	    pos=$[${pos} + 3]
 	else
-	    echo "peer ${ptype} del '${VALUES[${ip_pos}]}'" >> ${transaction}
+	    echo "peer ${ptype} del ${VALUES[${ip_pos}]}" >> ${transaction}
 	    pos=$[${pos} + 4]
 	fi
     done

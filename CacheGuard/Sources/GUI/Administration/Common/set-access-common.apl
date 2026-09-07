@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -46,12 +45,12 @@ set-access2()
 	if test ${?} -ne 0 ; then
 	    if test "${VALUES[${entry_pos}]}" == anew ; then
 		if test -n "${VALUES[${network_pos}]}" ; then
-		    echo "access '${at}' add '${VALUES[${interface_pos}]}' '${VALUES[${network_pos}]}'" >> ${transaction}
+		    echo "access ${at} add ${VALUES[${interface_pos}]} ${VALUES[${network_pos}]}" >> ${transaction}
 		fi
 	    fi
 	    pos=$[${pos} + 3]
 	else
-	    echo "access '${at}' del '${VALUES[${interface_pos}]}' '${VALUES[${network_pos}]}'" >> ${transaction}
+	    echo "access ${at} del ${VALUES[${interface_pos}]} ${VALUES[${network_pos}]}" >> ${transaction}
 	    pos=$[${pos} + 4]
 	fi
     done
@@ -85,15 +84,15 @@ set-access3()
 	    if test "${VALUES[${entry_pos}]}" == anew ; then
 		if test -n "${VALUES[${network_pos}]}" ; then
 		    if test -n "${VALUES[${netmask_pos}]}" ; then
-			echo "access '${at}' add '${VALUES[${interface_pos}]}' '${VALUES[${network_pos}]}' '${VALUES[${netmask_pos}]}'" >> ${transaction}
+			echo "access ${at} add ${VALUES[${interface_pos}]} ${VALUES[${network_pos}]} ${VALUES[${netmask_pos}]}" >> ${transaction}
 		    else
-			echo "access '${at}' add '${VALUES[${interface_pos}]}' '${VALUES[${network_pos}]}'" >> ${transaction}
+			echo "access ${at} add ${VALUES[${interface_pos}]} ${VALUES[${network_pos}]}" >> ${transaction}
 		    fi
 		fi
 	    fi
 	    pos=$[${pos} + 4]
 	else
-	    echo "access '${at}' del '${VALUES[${interface_pos}]}' '${VALUES[${network_pos}]}' '${VALUES[${netmask_pos}]}'" >> ${transaction}
+	    echo "access ${at} del ${VALUES[${interface_pos}]} ${VALUES[${network_pos}]} ${VALUES[${netmask_pos}]}" >> ${transaction}
 	    pos=$[${pos} + 5]
 	fi
     done
@@ -136,10 +135,10 @@ set-access4()
 		    fi
 		    case ${at} in
 			web|antivirus)
-			    echo "access '${at}' add '${VALUES[${interface_pos}]}' '${net}' ${mk} '${VALUES[${qos_pos}]}'" >> ${transaction}
+			    echo "access ${at} add ${VALUES[${interface_pos}]} ${net} ${mk} ${VALUES[${qos_pos}]}" >> ${transaction}
 			    ;;
 			tweb)
-			    echo "transparent add '${VALUES[${interface_pos}]}' '${net}' ${mk} '${VALUES[${qos_pos}]}'" >> ${transaction}
+			    echo "transparent add ${VALUES[${interface_pos}]} ${net} ${mk} ${VALUES[${qos_pos}]}" >> ${transaction}
 			    ;;
 			*)
 			    ;;
@@ -150,10 +149,10 @@ set-access4()
 	else
 	    case ${at} in
 		web)
-		    echo "access '${at}' del '${VALUES[${interface_pos}]}' '${net}' '${mk}'" >> ${transaction}
+		    echo "access ${at} del ${VALUES[${interface_pos}]} ${net} ${mk}" >> ${transaction}
 		    ;;
 		tweb)
-		    echo "transparent del '${VALUES[${interface_pos}]}' '${net}' '${mk}'" >> ${transaction}
+		    echo "transparent del ${VALUES[${interface_pos}]} ${net} ${mk}" >> ${transaction}
 		    ;;
 		*)
 		    ;;

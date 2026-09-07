@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -78,39 +77,44 @@ show-log()
     local log=/var/log/${VPN_IPSEC_LOG}
 
     if test ! -s "${log}" ; then
-	echo "<div style='font-style:italic;'>&lt;The IPsec VPN log is empty&gt;</div>"
+	echo-unavailable-message "the IPsec VPN log is empty."
 	return 0
     fi
 
-    local time machine process ike key rest
+    local rfc3339_time machine process ike key rest
+    local date_time date time
     local remote_public_ip remote_private_ip vpn_id remote_id state title
     local vpn_id_bgcolor ike_bgcolor remote_id_bgcolor remote_public_ip_bgcolor remote_private_ip_bgcolor
     local i=0
 
-    local style_margin="style='margin:0; margin-right:10px;'"
     local na_bgcolor=" bgcolor='${EMPTY_COLOR}'"
 
-    echo "<table class='highlight-list' width:100%;'>"
+    echo "<table class='highlight-log'>"
     echo "<thead>"
     echo "<tr>"
-    echo "<td class='table-header'><strong>Date</strong></td>"
-    echo "<td class='table-header'><strong>VPN Id</strong></td>"
-    echo "<td class='table-header'><strong>Tracking</strong></td>"
-    echo "<td class='table-header'><strong>Remote Id</strong></td>"
-    echo "<td class='table-header'><strong>Remote<br />Public IP</strong></td>"
-    echo "<td class='table-header'><strong>Remote<br />Private IP</strong></td>"
-    echo "<td class='table-header'><strong>State</strong></td>"
+    echo "<th class='table-header'><strong>Date</strong></th>"
+    echo "<th class='table-header'><strong>Time</strong></th>"
+    echo "<th class='table-header'><strong>VPN Id</strong></th>"
+    echo "<th class='table-header'><strong>Tracking</strong></th>"
+    echo "<th class='table-header'><strong>Remote Id</strong></th>"
+    echo "<th class='table-header'><strong>Remote<br />Public IP</strong></th>"
+    echo "<th class='table-header'><strong>Remote<br />Private IP</strong></th>"
+    echo "<th class='table-header'><strong>State</strong></th>"
     echo "</tr>"
     echo "</thead>"
 
     echo "<tbody>"
 
-    tac ${log} | while read time machine process ike key rest
+    tac ${log} | while read rfc3339_time machine process ike key rest
     do
 	test ${i} -lt ${number} || break
 
 	unset vpn_id remote_id remote_public_ip remote_private_ip
 	unset vpn_id_bgcolor remote_id_bgcolor remote_public_ip_bgcolor remote_private_ip_bgcolor
+
+	date_time=$(gui-get-date-time "${rfc3339_time}")
+	date=${date_time/@*}
+	time=${date_time/*@}
 
 	case ${key} in
 	    IKE_SA)
@@ -161,27 +165,28 @@ show-log()
 	case ${state} in
 	    0)
 		title="Initiating"
-		state="<img alt='${title}' title='${title}' src='${IMAGE_DIR}/refresh.png' />"
+		state="<img class='small' alt='${title}' title='${title}' src='${IMAGE_DIR}/refresh.png' />"
 		;;
 	    1)
 		title="Established"
-		state="<img alt='${title}' title='${title}' src='${IMAGE_DIR}/ok.png' />"
+		state="<img class='small' alt='${title}' title='${title}' src='${IMAGE_DIR}/ok.png' />"
 		;;
 	    2)
 		title="Deleting"
-		state="<img alt='${title}' title='${title}' src='${IMAGE_DIR}/delete.png' />"
+		state="<img class='small' alt='${title}' title='${title}' src='${IMAGE_DIR}/delete.png' />"
 		;;
 	    *)
 		;;
 	esac
 
 	echo "<tr>"
-	echo "<td><span ${style_margin}>${time}</span></td>"
-	echo "<td${vpn_id_bgcolor}><span ${style_margin}>${vpn_id}</span></td>"
+	echo "<td><span>${date}</span></td>"
+	echo "<td><span>${time}</span></td>"
+	echo "<td${vpn_id_bgcolor}><span>${vpn_id}</span></td>"
 	echo "<td${ike_bgcolor}><span>${ike}</span></td>"
-	echo "<td${remote_id_bgcolor}><span ${style_margin}>${remote_id}</span></td>"
-	echo "<td${remote_public_ip_bgcolor}><span ${style_margin}>${remote_public_ip}</span></td>"
-	echo "<td${remote_private_ip_bgcolor}><span ${style_margin}>${remote_private_ip}</span></td>"
+	echo "<td${remote_id_bgcolor}><span>${remote_id}</span></td>"
+	echo "<td${remote_public_ip_bgcolor}><span>${remote_public_ip}</span></td>"
+	echo "<td${remote_private_ip_bgcolor}><span>${remote_private_ip}</span></td>"
 	echo "<td><center>${state}</center></td>"
 	echo "</tr>"
 	((i++))

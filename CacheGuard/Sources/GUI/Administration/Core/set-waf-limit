@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -27,13 +26,13 @@ set-waf-limits()
     local transaction=/tmp/${TRANSACTION_FILE}.wadmin.${REMOTE_USER}.${$}
     rm -f ${transaction}
 
-    echo "waf limit response '${VALUES[0]}'" >> ${transaction}
-    echo "waf limit request '${VALUES[1]}'" >> ${transaction}
-    echo "waf limit assertions '${VALUES[2]}'" >> ${transaction}
-    echo "waf limit name '${VALUES[3]}'" >> ${transaction}
-    echo "waf limit value '${VALUES[4]}'" >> ${transaction}
-    echo "waf limit arguments '${VALUES[5]}'" >> ${transaction}
-    echo "waf limit files '${VALUES[6]}'" >> ${transaction}
+    echo "waf limit response ${VALUES[0]}" >> ${transaction}
+    echo "waf limit request ${VALUES[1]}" >> ${transaction}
+    echo "waf limit assertions ${VALUES[2]}" >> ${transaction}
+    echo "waf limit name ${VALUES[3]}" >> ${transaction}
+    echo "waf limit value ${VALUES[4]}" >> ${transaction}
+    echo "waf limit arguments ${VALUES[5]}" >> ${transaction}
+    echo "waf limit files ${VALUES[6]}" >> ${transaction}
 
     execute-transaction ${transaction}
 }

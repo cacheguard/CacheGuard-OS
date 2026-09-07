@@ -47,6 +47,7 @@ usr/bin/du
 usr/bin/echo
 usr/bin/efivar
 usr/bin/egrep
+usr/bin/eject
 usr/bin/env
 usr/bin/eqn
 usr/bin/expand
@@ -79,6 +80,7 @@ usr/bin/iostat
 usr/bin/ipcalc
 usr/bin/ipcrm
 usr/bin/ipcs
+usr/bin/kadmin
 usr/bin/kbd_mode
 usr/bin/kdestroy
 usr/bin/kill
@@ -86,6 +88,7 @@ usr/bin/killall
 usr/bin/kinit
 usr/bin/klist
 usr/bin/kmod
+usr/bin/kvno
 usr/bin/lcd4linux
 usr/bin/ldapsearch
 usr/bin/less
@@ -122,6 +125,7 @@ usr/bin/openssl
 usr/bin/openvt
 usr/bin/passwd
 usr/bin/pcretest
+usr/bin/pgrep
 usr/bin/pic
 usr/bin/pidof
 usr/bin/pidstat
@@ -170,6 +174,7 @@ usr/bin/tbl
 usr/bin/tcpdump
 usr/bin/tee
 usr/bin/telnet
+usr/bin/timeout
 usr/bin/top
 usr/bin/touch
 usr/bin/tr
@@ -190,6 +195,7 @@ usr/bin/wc
 usr/bin/who
 usr/bin/xargs
 usr/bin/xz
+usr/bin/zcat
 usr/doc
 usr/etc/keepalived/keepalived.conf
 usr/etc/openldap/ldap.conf
@@ -221,6 +227,7 @@ usr/local/bin/phpize
 usr/local/bin/sigtool
 usr/local/bin/sqlite3
 usr/local/etc/bind.keys
+usr/local/etc/certs/clamav.crt
 usr/local/etc/c-icap.conf
 usr/local/etc/c-icap.magic
 usr/local/etc/ipsec.d
@@ -580,6 +587,7 @@ usr/share/man/man1/echo.1
 usr/share/man/man1/ecparam.1ssl
 usr/share/man/man1/efivar.1
 usr/share/man/man1/egrep.1
+usr/share/man/man1/eject.1
 usr/share/man/man1/enc.1ssl
 usr/share/man/man1/engine.1ssl
 usr/share/man/man1/env.1
@@ -614,12 +622,14 @@ usr/share/man/man1/iostat.1.xz
 usr/share/man/man1/ipcalc.1
 usr/share/man/man1/ipcrm.1
 usr/share/man/man1/ipcs.1
+usr/share/man/man1/kadmin.1
 usr/share/man/man1/kbd_mode.1
 usr/share/man/man1/kdestroy.1
 usr/share/man/man1/kill.1
 usr/share/man/man1/killall.1
 usr/share/man/man1/kinit.1
 usr/share/man/man1/klist.1
+usr/share/man/man1/kvno.1
 usr/share/man/man1/ldapsearch.1
 usr/share/man/man1/less.1
 usr/share/man/man1/ln.1
@@ -697,6 +707,7 @@ usr/share/man/man1/openssl-x509.1ssl
 usr/share/man/man1/openvt.1
 usr/share/man/man1/passwd.1
 usr/share/man/man1/passwd.1ssl
+usr/share/man/man1/pgrep.1
 usr/share/man/man1/pic.1
 usr/share/man/man1/pidof.1
 usr/share/man/man1/pidstat.1.xz
@@ -758,6 +769,7 @@ usr/share/man/man1/tcpdump.1
 usr/share/man/man1/tee.1
 usr/share/man/man1/telnet.1
 usr/share/man/man1/test.1
+usr/share/man/man1/timeout.1
 usr/share/man/man1/top.1
 usr/share/man/man1/touch.1
 usr/share/man/man1/tr.1
@@ -778,6 +790,7 @@ usr/share/man/man1/who.1
 usr/share/man/man1/x509.1ssl
 usr/share/man/man1/xargs.1
 usr/share/man/man1/xz.1
+usr/share/man/man1/zcat.1
 usr/share/man/man5/config.5ssl
 usr/share/man/man5/crontab.5
 usr/share/man/man5/dhclient.conf.5
@@ -959,6 +972,8 @@ usr/share/man/man8/swapoff.8
 usr/share/man/man8/swapon.8
 usr/share/man/man8/sysctl.8
 usr/share/man/man8/tc.8
+usr/share/man/man8/tc-flow.8
+usr/share/man/man8/tc-flower.8
 usr/share/man/man8/tc-htb.8
 usr/share/man/man8/tc-mirred.8
 usr/share/man/man8/tc-prio.8

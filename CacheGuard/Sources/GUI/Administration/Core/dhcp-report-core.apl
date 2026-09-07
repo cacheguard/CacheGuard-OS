@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -30,58 +29,64 @@ show-dhcp-report-form()
     local records_ppage=${page_2show_ref/ *}
     local page_2show=${page_2show_ref/* }
     local tmp_leases_file=/tmp/gui.dhcpd.leases.${$}
-    local leases=0
+
+    local page_nb i=0
     local state hostname mac ip lease_time
-
-    local page_nb
-
-    show-title "DHCP Leases report" disabled "dhcp"
-
-    echo "<div class='core-form'>"
-
-    local users_nb=$(gui-get-contextual-users-nb)
-    show-table-form-controls $[${users_nb} * 2] ${records_ppage} list none
-
-    echo "<table class='highlight-list'>"
-    echo "<thead>"
-    echo "<tr>"
-    echo "<td class='table-header'><u>Range</u></td>"
-    echo "<td class='table-header'><u>Hostname</u></td>"
-    echo "<td class='table-header'><u>MAC Address</u></td>"
-    echo "<td class='table-header'><u>IP Address</u></td>"
-    echo "<td class='table-header'><u>Lease End Time</u></td>"
-    echo "</tr>"
-    echo "</thead>"
-
-    echo "<tbody>"
+    local hostname_t mac_t ip_t lease_time_t
+    declare -a hostname_t mac_t ip_t lease_time_t
 
     show-dhcp-leases > ${tmp_leases_file}
 
     while read state hostname mac ip lease_time
     do
-	page_nb=$[${leases} / ${records_ppage}]
-
-	if test ${page_nb} -ne ${page_2show} ; then
-	    ((leases++))
-	    continue
-	fi
-
-	echo "<tr>"
-	echo "<td>R${leases}</td>"
-	echo "<td>${hostname}</td>"
-	echo "<td>${mac}</td>"
-	echo "<td>${ip}</td>"
-	echo "<td>${lease_time}</td>"
-	echo "</tr>"
-	((leases++))
+	hostname_t[${i}]=${hostname}
+	mac_t[${i}]=${mac}
+	ip_t[${i}]=${ip}
+	lease_time_t[${i}]=${lease_time}
+	((i++))
     done < ${tmp_leases_file}
 
     rm -f ${tmp_leases_file}
-    js-init-table-form ${leases} ${records_ppage} ${page_2show}
+
+    local users_nb=$(gui-get-contextual-users-nb)
+    local leases_nb=${i}
+    show-title "DHCP Leases report" disabled "dhcp"
+
+    echo "<div class='core-form'>"
+
+    show-table-form-controls ${leases_nb} $[${users_nb} * 2] ${records_ppage} ${page_2show} list none
+
+    echo "<table class='highlight-list noselect'>"
+    echo "<thead>"
+    echo "<tr>"
+    echo "<th class='table-header'><u>Range</u></th>"
+    echo "<th class='table-header'><u>Hostname</u></th>"
+    echo "<th class='table-header'><u>MAC Address</u></th>"
+    echo "<th class='table-header'><u>IP Address</u></th>"
+    echo "<th class='table-header'><u>Lease End Time</u></th>"
+    echo "</tr>"
+    echo "</thead>"
+
+    echo "<tbody>"
+
+    for ((i=0 ; i<leases_nb ; i++))
+    do
+	page_nb=$[${i} / ${records_ppage}]
+	test ${page_nb} -eq ${page_2show} || continue
+
+	echo "<tr>"
+	echo "<td>R${i}</td>"
+	echo "<td>${hostname_t[${i}]}</td>"
+	echo "<td>${mac_t[${i}]}</td>"
+	echo "<td>${ip_t[${i}]}</td>"
+	echo "<td>${lease_time_t[${i}]}</td>"
+	echo "</tr>"
+    done
 
     echo "</tbody>"
     echo "</table>"
 
+    data-init-table-form ${leases_nb} ${records_ppage} ${page_2show}
 
     echo "</div>"
 }

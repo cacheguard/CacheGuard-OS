@@ -1,0 +1,118 @@
+.chromestyle {
+    font-size:inherit;
+    color:var(--color-text);
+    margin:3px 3px 5px 3px;
+    cursor:pointer;
+}
+
+.chromestyle ul {
+    display:flex;
+    align-items:center;
+
+    width:100%;
+    margin:0;
+    padding:3px;
+
+    list-style:none;
+
+    background-color:var(--color-highlight);
+    border:1px solid var(--color-highlight-border);
+    border-radius:8px;
+
+    text-align:left;
+}
+
+.chromestyle ul li {
+    display:block;
+    margin:0;
+    padding:0;
+}
+
+.chromestyle ul li a {
+    display:block;
+
+    margin:0;
+    padding:7px 13px;
+
+    color:var(--color-text);
+    font-size:inherit;
+    line-height:1.4;
+
+    text-decoration:none;
+    border-radius:6px;
+
+    transition:
+        background-color 0.15s ease,
+        color 0.15s ease;
+}
+
+.chromestyle ul li a:hover,
+.chromestyle ul li a.selected {
+    background-color:var(--color-highlight-hover);
+    color:var(--color-text);
+    text-decoration:none;
+}
+
+.chromestyle ul li a:visited {
+    color:var(--color-text);
+    text-decoration:none;
+}
+
+.chromestyle ul li a:focus-visible {
+    outline:2px solid var(--color-highlight-border);
+    outline-offset:-2px;
+}
+
+
+/* Drop-down menu */
+
+.dropmenudiv {
+    position:absolute;
+    z-index:10000;
+
+    width:170px;
+    margin-top:3px;
+    padding:3px;
+
+    background-color:var(--color-highlight);
+    border:1px solid var(--color-highlight-border);
+    border-radius:7px;
+
+    box-shadow:0 3px 10px rgba(0,0,0,0.12);
+
+    visibility:hidden;
+
+    font-size:inherit;
+    line-height:1.4;
+}
+
+.dropmenudiv a {
+    display:block;
+
+    width:auto;
+    margin:0;
+    padding:7px 10px;
+
+    color:var(--color-text);
+    font-size:inherit;
+
+    text-decoration:none;
+    border-radius:5px;
+}
+
+.dropmenudiv a:hover {
+    background-color:var(--color-highlight-hover);
+    color:var(--color-text);
+    text-decoration:none;
+}
+
+.dropmenudiv a:link,
+.dropmenudiv a:visited {
+    color:var(--color-text);
+    text-decoration:none;
+}
+
+.dropmenudiv a:focus-visible {
+    outline:2px solid var(--color-highlight-border);
+    outline-offset:-2px;
+}

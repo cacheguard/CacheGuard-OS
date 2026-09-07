@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -42,10 +41,10 @@ show-password-snmp-form()
     itemID[4]="privacy2"
     
     blankItemContent[0]="${SNMP_USER}"
-    blankItemContent[1]="type=password size=12 maxlength=32"
-    blankItemContent[2]="type=password size=12 maxlength=32"
-    blankItemContent[3]="type=password size=12 maxlength=32"
-    blankItemContent[4]="type=password size=12 maxlength=32"
+    blankItemContent[1]="type=password size=24 maxlength=32"
+    blankItemContent[2]="type=password size=24 maxlength=32"
+    blankItemContent[3]="type=password size=24 maxlength=32"
+    blankItemContent[4]="type=password size=24 maxlength=32"
 
     checkItem[1]=printable
     checkItem[2]=printable
@@ -58,7 +57,6 @@ show-password-snmp-form()
     shortcutMenuTitle[0]="SNMP Settings"
 
     show-title "SNMP Agent Password" "enabled" "admin password"
-    show-shortcuts-menu
     show-form "${width}"
 }
 

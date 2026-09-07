@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -26,9 +25,8 @@ manager-sync-report()
 {
     show-title "Manager Peers Synchronisation Report" disabled "manager" '' enable
 
-    echo "<div class='core-form' style='margin-top:0;'>"
-    refresh-buttons "update_manager_sync_report( 1 )"
-    echo "<div style='clear:left;'></div>"
+    echo "<div class='core-form'>"
+    refresh-buttons
     echo "<div id='${AUTO_REPORT_ID}'></div>"
     echo "</div>"
 }

@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -43,11 +42,11 @@ show-about()
 	show-shortcuts-menu
     fi
 
-    echo "<table class='highlight-list' width='${width}' style='margin-top:5px;'>"
+    echo "<table class='highlight-form' width='${width}'>"
 
     echo "<tr>"
     echo "<td width='${left}%'>Operating System Version</td>"
-    echo "<td width='${right}%'><strong>$(get-system-soft)</strong></td>"
+    echo "<td width='${right}%'>$(get-system-soft)</td>"
     echo "</tr>"
 
     if gui-is-in-template-context ${role} ; then
@@ -57,9 +56,10 @@ show-about()
     fi
 
     if ! gui-is-in-contextual-role ; then
+	local upgrade_title="Check OS Upgrade"
 	echo "<tr>"
-	echo "<td><a href='#' onClick='getLatestVersion( \"/${GUI_DIR_NAME}/system-soft-check.${GUI_EXT_NAME}\", \"new-os\" )'>Check for Updates</a></td>"
-	echo "<td><div id='new-os' class='iconbar-item'><i>&lt;not yet checked&gt;</i></div></td>"
+	echo "<td><a href='#' data-action='get-latest-version' data-url='/${GUI_DIR_NAME}/system-soft-check.${GUI_EXT_NAME}' data-target-id='new-os'>${upgrade_title}</a></td>"
+	echo "<td class='information-notice'><div id='new-os'><a href='#' data-action='get-latest-version' data-url='/${GUI_DIR_NAME}/system-soft-check.${GUI_EXT_NAME}' data-target-id='new-os'><img src='${IMAGE_DIR}/system-patch.png' alt='${upgrade_title}' title='${upgrade_title}' /></a></div></td>"
 	echo "</tr>"
     fi
 
@@ -95,12 +95,12 @@ show-about()
 
     echo "<tr>"
     echo "<td width='${left}%'>Appliance Role</td>"
-    echo "<td width='${right}%'><strong>${role^}</strong></td>"
+    echo "<td width='${right}%'>${role^}</td>"
     echo "</tr>"
 
     echo "<tr>"
     echo "<td width='${left}%'>Appliance Model Reference</td>"
-    echo "<td width='${right}%' onMouseOver='ddrivetip( \"${hardware}\", 450 );' onMouseOut='hideddrivetip( );'><strong>$(get-system-hard long)</strong></td>"
+    echo "<td width='${right}%' data-action='show-tooltip' data-tip='${hardware}'>$(get-system-hard long)</td>"
     echo "</tr>"
 
     local title value i=0 hards=$(get-system-hard raw)
@@ -169,7 +169,7 @@ show-about()
 			    title="Supported Reverse Websites"
 			    ;;
 			5)
-			    title="Reverse Websites Cache Size"
+			    title="Cache Size per Reverse Website"
 			    value="${value} MB"
 			    ;;
 			6)
@@ -240,17 +240,17 @@ show-about()
 
     echo "<tr>"
     echo "<td width='${left}%'>Machine</td>"
-    echo "<td width='${right}%'><strong>$(get-system-machine)</strong></td>"
+    echo "<td width='${right}%'>$(get-system-machine)</td>"
     echo "</tr>"
 
     echo "<tr>"
     echo "<td width='${left}%'>Architecture</td>"
-    echo "<td width='${right}%'><strong>${CPU_ARCHITECTURE}</strong></td>"
+    echo "<td width='${right}%'>${CPU_ARCHITECTURE}</td>"
     echo "</tr>"
 
     echo "<tr>"
     echo "<td width='${left}%'>CPU</td>"
-    echo "<td width='${right}%'><strong>$(get-system-cpu)</strong></td>"
+    echo "<td width='${right}%'>$(get-system-cpu)</td>"
     echo "</tr>"
 
     echo "<tr>"
@@ -259,27 +259,27 @@ show-about()
     local ram=$(get-installed-memory-sz)
     ((ram /= 1024))
 
-    echo "<td width='${right}%'><strong>${ram} MB</strong></td>"
+    echo "<td width='${right}%'>${ram} MB</td>"
     echo "</tr>"
 
     echo "<tr>"
     echo "<td width='${left}%'>Disk(s)</td>"
-    echo "<td width='${right}%'><strong>$(get-system-disk)</strong></td>"
+    echo "<td width='${right}%'>$(get-system-disk)</td>"
     echo "</tr>"
 
     echo "<tr>"
     echo "<td width='${left}%'>RAID</td>"
-    echo "<td width='${right}%'><strong>$(get-system-raid)</strong></td>"
+    echo "<td width='${right}%'>$(get-system-raid)</td>"
     echo "</tr>"
 
     echo "<tr>"
     echo "<td width='${left}%'>Serial Number</td>"
-    echo "<td width='${right}%'><strong>$(get-system-id)</strong></td>"
+    echo "<td width='${right}%'>$(get-system-id)</td>"
     echo "</tr>"
 
     echo "<tr>"
     echo "<td width='${left}%'>UUID (Universally Unique IDentifier)</td>"
-    echo "<td width='${right}%'><strong>$(get-system-uuid)</strong></td>"
+    echo "<td width='${right}%'>$(get-system-uuid)</td>"
     echo "</tr>"
 
     license_state=$(get-highlight-license-state ${license_state})
@@ -288,10 +288,10 @@ show-about()
     echo "<td width='${left}%'>License End</td>"
     case ${license_state} in
 	never)
-	    echo "<td width='${right}%'><strong>never</strong></td>"
+	    echo "<td width='${right}%'>never</td>"
 	    ;;
 	*)
-	    echo "<td width='${right}%'><strong>${license_date} (${license_state})</strong></td>"
+	    echo "<td width='${right}%'>${license_date} (${license_state})</td>"
 	    ;;
     esac
     echo "</tr>"

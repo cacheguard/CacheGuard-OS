@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -32,7 +31,7 @@ select-vpnipsec-authenticate()
     local tls_id_id=${4}
     local used_id_id=${5}
 
-    call-js-function "VPNIPsecAuthenticateSelectCB( '${method_id}', '${auto_psk_id}', '${psk_id}', '${tls_id_id}', '${used_id_id}' )"
+    echo "<div data-init-vpn-ipsec-authenticate-select data-method-id='${method_id}' data-auto-psk-id='${auto_psk_id}' data-psk-id='${psk_id}' data-tls-id-id='${tls_id_id}' data-used-id-id='${used_id_id}' hidden></div>"
 }
 
 show-used-identifier()
@@ -100,14 +99,13 @@ show-vpnipsec-authenticate()
     i=0
     blankItemContent[${i}]=$(show-vpnipsec-authenticates ${method}) ; ((i++))
     blankItemContent[${i}]=$(show-vpnipsec-auto-psk) ; ((i++))
-    blankItemContent[${i}]="type='text' size='64' maxlength='64' value='${secret}'" ; ((i++))
+    blankItemContent[${i}]="type='text' size='48' maxlength='64' value='${secret}'" ; ((i++))
     blankItemContent[${i}]=$(show-vpnipsec-tls ${tls_id}) ; ((i++))
     blankItemContent[${i}]=$(show-used-identifier ${used_id}) ; ((i++))
-    blankItemContent[${i}]="type='text' size='47' maxlength='127' value='${VPN_IPSEC_BEHIND_NAT_IP_LIST// /,}' onMouseOver='ddrivetip( \\\"${nat_ip_tip}\\\", ${nat_ip_tip_width} );' onMouseOut='hideddrivetip( );'" ; ((i++))
+    blankItemContent[${i}]="type='text' size='48' maxlength='127' value='${VPN_IPSEC_BEHIND_NAT_IP_LIST// /,}' data-action='show-tooltip' data-tip='${nat_ip_tip}'" ; ((i++))
 
-    local cb="VPNIPsecAuthenticateSelectCB( '${method_id}', '${auto_psk_id}', '${psk_id}', '${tls_id_id}', '${used_id_id}' );"
-    itemFormSelectCB[0]=${cb}
-    itemFormSelectCB[1]=${cb}
+    itemData[0]="data-action='vpn-ipsec-authenticate' data-method-id='${method_id}' data-auto-psk-id='${auto_psk_id}' data-psk-id='${psk_id}' data-tls-id-id='${tls_id_id}' data-used-id-id='${used_id_id}'"
+    itemData[1]=${itemData[0]}
 
     local after_function="select-vpnipsec-authenticate ${method_id} ${auto_psk_id} ${psk_id} ${tls_id_id} ${used_id_id}"
 
@@ -115,7 +113,6 @@ show-vpnipsec-authenticate()
     shortcutMenuTitle[0]="Manage TLS"
 
     show-title "IPsec VPN Authentication Settings" enabled "tls vpnipsec"
-    show-shortcuts-menu
     show-form "${width}" enabled "${after_function}"
 }
 

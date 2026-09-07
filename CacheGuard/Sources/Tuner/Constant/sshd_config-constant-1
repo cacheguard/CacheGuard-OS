@@ -1,6 +1,4 @@
 ChallengeResponseAuthentication no
-PermitEmptyPasswords no
-PermitRootLogin no
 StrictModes yes
 
 Protocol 2

@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       Scripts
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -34,16 +33,19 @@ set-environment()
 	CALLER_PID=${$}
     fi
 
-    TMP_TC_STATUS=/tmp/tc.status.${$}
+    TMP_TC_STATUS=/tmp/tc.statistics.${$}
     TMP_QOS_REPORT_PREFIX=/tmp/qos.report.${$}
+    TMP_WAITING_PROCESS=/tmp/${WAITING_PROCESS}.${CALLER_PID}
+
     trap "clean-exit 1" INT QUIT TERM
-    touch ${RUN_DIR}/${WAITING_PROCESS}.${CALLER_PID}    
 }
 
 clean-environment()
 {
-    rm -f ${RUN_DIR}/${WAITING_PROCESS}.${CALLER_PID}
-    rm -f ${TMP_TC_STATUS} ${TMP_QOS_REPORT_PREFIX}.*
+    rm -f \
+       ${TMP_TC_STATUS} \
+       ${TMP_QOS_REPORT_PREFIX}.* \
+       ${TMP_WAITING_PROCESS}
 }
 
 clean-exit()
@@ -55,25 +57,64 @@ clean-exit()
     exit ${code}
 }
 
+signal-process-termination()
+{
+    touch ${TMP_WAITING_PROCESS}
+    install -m 664 -o ${ADMIN_NAME} -g ${GROUP_NAME} ${TMP_WAITING_PROCESS} \
+	    ${RUN_DIR}/${SUPERVISOR_CALLER}/${WAITING_PROCESS}.${CALLER_PID}
+    rm -f ${TMP_WAITING_PROCESS}
+}
+
+member()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 1
+    local list=${1}
+    local elt=${2}
+
+    local exp="^${elt}$|[ ]${elt}$|^${elt}[ ]|[ ]${elt}[ ]"
+    [[ "${list}" =~ ${exp} ]]
+}
+
 get-gos-bytes()
 {
     test -n "${1}" || return 1
     test -n "${2}" || return 2
     local in_handle=${1}
-    local in_dev=${2}
+    local in_devs=${2}
 
     local dummy value handle dev rest
-    local found=0
+    local found=0 total=0 multidev=0
+    local in_dev devs=${in_devs//:/ }
+
+    if test ${in_devs} == "${devs}" ; then
+	in_dev=${in_devs}
+    else
+	multidev=1
+    fi
 
     while read dummy value handle dummy dev rest
     do
-	if test ${handle} == ${in_handle} -a ${dev} == ${in_dev} ; then
-	    found=1
-	elif test ${found} -eq 1 ; then
-	    echo ${value}
-	    break
+	if test ${handle} == ${in_handle} ; then
+	    if test ${multidev} -eq 1 ; then
+		! member "${devs}" ${dev} || found=1
+	    else
+		test ${dev} != ${in_dev} || found=1
+	    fi
+	else
+	    if test ${found} -eq 1 ; then
+		if test ${multidev} -eq 0 ; then
+		    echo ${value}
+		    return 0
+		else
+		    ((total += value))
+		    found=0
+		fi
+	    fi
 	fi
     done < ${TMP_TC_STATUS}
+
+    echo ${total}
 }
 
 main()
@@ -81,10 +122,11 @@ main()
     set-environment "${@}"
 
     test -f ${RUN_DIR}/${QOS_INDEX_FILENAME} || clean-exit 11
-    tc -s -d qdisc show > ${TMP_TC_STATUS} 2> /dev/null || clean-exit 13
+    tc -statistics -details qdisc show > ${TMP_TC_STATUS} 2> /dev/null || clean-exit 13
 
-    local flow qdisc interface idev odev handle
+    local flow qdisc interface idev odevs handle
     local flow_type ibytes obytes
+    local admin_ibytes admin_obytes=0 part='head' admin_index=0
 
     local      trafficFlow trafficInterface trafficIngress trafficEgress trafficIngressOld trafficEgressOld
     declare -a trafficFlow trafficInterface trafficIngress trafficEgress trafficIngressOld trafficEgressOld
@@ -99,23 +141,59 @@ main()
 	done < ${RUN_DIR}/${QOS_TRAFFIC_FILENAME}.old
     fi
 
+    echo -n > ${TMP_QOS_REPORT_PREFIX}.new.head
+    echo -n > ${TMP_QOS_REPORT_PREFIX}.new.tail
+
     i=0
-    while read flow qdisc interface idev odev handle
+    while read flow qdisc interface idev odevs handle
     do
 	test ${flow} != nonadmin: || continue
+	test ${flow} != steered: || continue
+
 	ibytes=$(get-gos-bytes ${handle} ${idev})
-	obytes=$(get-gos-bytes ${handle} ${odev})
+	obytes=$(get-gos-bytes ${handle} ${odevs})
 
 	test -n "${ibytes}" -a -n "${obytes}" || continue
+
+	if test ${interface} == 'internal' ; then
+	    case ${flow} in
+		'admin:')
+		    admin_ibytes=${ibytes}
+		    ((admin_obytes += obytes))
+		    admin_index=${i}
+		    part=tail
+		    ((i++))
+		    continue
+		    ;;
+		'mon:')
+		    ((admin_obytes += obytes))
+		    continue
+		    ;;
+		*)
+		    ;;
+	    esac
+	fi
 
 	trafficFlow[${i}]=${flow}
 	trafficInterface[${i}]=${interface}
 	trafficIngress[${i}]=${ibytes}
 	trafficEgress[${i}]=${obytes}
-	echo "${flow} ${interface} ${ibytes} ${obytes}"
+
+	echo "${flow} ${interface} ${ibytes} ${obytes}" >> ${TMP_QOS_REPORT_PREFIX}.new.${part}
 	((i++))
-    done < ${RUN_DIR}/${QOS_INDEX_FILENAME} > ${TMP_QOS_REPORT_PREFIX}.new
+
+    done < ${RUN_DIR}/${QOS_INDEX_FILENAME}
     n=${i}
+
+    trafficFlow[${admin_index}]='admin:'
+    trafficInterface[${admin_index}]='internal'
+    trafficIngress[${admin_index}]=${admin_ibytes}
+    trafficEgress[${admin_index}]=${admin_obytes}
+
+    cat ${TMP_QOS_REPORT_PREFIX}.new.head > ${TMP_QOS_REPORT_PREFIX}.new
+    echo "admin: internal ${admin_ibytes} ${admin_obytes}" >> ${TMP_QOS_REPORT_PREFIX}.new
+    cat ${TMP_QOS_REPORT_PREFIX}.new.tail >> ${TMP_QOS_REPORT_PREFIX}.new
+    rm -f ${TMP_QOS_REPORT_PREFIX}.new.{head,tail}
 
     if test ! -f ${RUN_DIR}/${QOS_TRAFFIC_FILENAME}.old ; then
 	for ((i=0 ; i<n ; i++))
@@ -135,7 +213,9 @@ main()
     test ! -f ${RUN_DIR}/${QOS_TRAFFIC_FILENAME} || mv -f ${RUN_DIR}/${QOS_TRAFFIC_FILENAME} ${RUN_DIR}/${QOS_TRAFFIC_FILENAME}.old
     mv -f ${TMP_QOS_REPORT_PREFIX}.new ${RUN_DIR}/${QOS_TRAFFIC_FILENAME}
     mv -f ${TMP_QOS_REPORT_PREFIX}.diff ${RUN_DIR}/${QOS_DIFF_TRAFFIC_FILENAME}
-    clean-exit ${?}
+
+    signal-process-termination
+    clean-exit 0
 }
 
 # Main()

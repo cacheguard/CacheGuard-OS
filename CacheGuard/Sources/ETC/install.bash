@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       Build
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -44,21 +43,35 @@ gen-message-item()
 {
     local item=${1}
 
-    echo -n "${item}.<p />"
+    echo -n "${item}.<p>"
 }
 
 gen-message-top()
 {
     local left_title=${1}
     local right_title=${2}
+    local target=${3}
 
     echo -n "<!DOCTYPE html>"
     echo -n "<html>"
     echo -n "<head>"
+
+    case ${target} in
+	apache)
+	    echo -n "<link rel='stylesheet' type='text/css' href='/${ERROR_LOCATION}/styles.css' />"
+	    ;;
+	squid|c-icap)
+	    local line styles
+	    while read line
+	    do
+		styles="${styles}${line}"
+	    done < styles.css
+	    echo -n "<style>${styles}</style>"
+	    ;;
+	*)
+    esac
+
     echo -n "<title>${right_title}</title>"
-    echo -n "<style type='text/css'>"
-    echo -n "${STYLES_CSS}"
-    echo -n "</style>"
     echo -n "</head>"
 
     echo -n "<body>"
@@ -105,7 +118,7 @@ gen-squid-html-error()
 	    ;;
     esac
 
-    gen-message-top "${left_title_message}" "${err_title}"
+    gen-message-top "${left_title_message}" "${err_title}" squid
     
     echo -n "<tr>"
     echo -n "<td>Message</td>"
@@ -114,10 +127,12 @@ gen-squid-html-error()
     gen-message-item "${err_text1}"
     test -z "${err_text2}" || gen-message-item "${err_text2}"
     test -z "${err_text3}" || gen-message-item "${err_text3}"
-    test ${err_type} == "INF_" || gen-message-item "You can reach your Gateway administrator at <a href='mailto:%w?subject=Gateway Error ${err_code}@%h'>%w</a>"
+    test ${err_type} == "INF_" || gen-message-item "You can reach your Gateway administrator at: <a href='mailto:%L?subject=Gateway Error ${err_code}@%h'>%L</a>"
 
     echo -n "</td>"
     echo -n "</tr>"
+
+    echo -n "<tr><td>Requested URL</td><td>%R</td></tr>"
 
     gen-message-bottom
 }
@@ -140,7 +155,7 @@ gen-httpd-html-error()
 	local title="Server error ${err_code}"
     fi
 
-    gen-message-top "${title}" "${err_title}"
+    gen-message-top "${title}" "${err_title}" apache
 
     echo -n "<tr>"
     echo -n "<td>Message</td>"
@@ -150,7 +165,7 @@ gen-httpd-html-error()
     test -z "${err_text2}" || gen-message-item "${err_text2}"
     test -z "${err_text3}" || gen-message-item "${err_text3}"
 
-    gen-message-item "The request for this URL could not be served at this moment"
+    gen-message-item "Your request for this URL could not be served at this moment"
 
     echo -n "</td>"
     echo -n "</tr>"
@@ -181,7 +196,7 @@ gen-squid-directory-listing()
     echo -n "</table>"
 
     echo -n "<table class='directory'>"
-    echo -n "<tr><td></td><td>Name</td><td>Last Modified</td><td width='60'>Size</td><td></td></tr>"
+    echo -n "<tr><td></td><td>Name</td><td>Last Modified</td><td>Size</td><td></td></tr>"
     echo -n "<tr><td><a href='/'><img border='0' src='/squid-internal-static/icons/silk/arrow_up.png' alt='' /><img border='0' src='/squid-internal-static/icons/silk/arrow_up.png' alt='/' /></a></td><td><a href='/'>Root Directory</a></td><td></td><td></td><td></td></tr>"
     echo -n "<tr><td><a href='../'><img border='0' src='/squid-internal-static/icons/silk/arrow_up.png' alt='..' /></a></td><td><a href='../'>Parent Directory</a></td><td></td><td></td><td></td></tr>"
     echo -n "%g"
@@ -242,7 +257,7 @@ gen-virus-scan-message()
 
     local message=$(cat ${virus_scan_msg_file})
 
-    gen-message-top "Malware detected" "This content has been blocked"
+    gen-message-top "Malware detected" "This content has been blocked" c-icap
 
     echo -n "<tr><td>Message</td><td>${message}</td></tr>"
     echo -n "<tr><td>Requested URL</td><td>%huo</td></tr>"
@@ -326,9 +341,12 @@ gen-sysconfig-clamav()
 {
     cat sysconfig.freshclam-1
 
-    echo "AV_USER=${AV_USER}"
-    echo "AV_GROUP=${AV_GROUP}"
-    echo "AV_DB_DIR=${AV_DB_DIR}"
+    cat << EOF
+AV_USER=${AV_USER}
+AV_GROUP=${AV_GROUP}
+AV_DB_DIR=${AV_DB_DIR}
+AV_CERTS_DIR=${LOCAL_DIR}/etc/certs
+EOF
 }
 
 gen-sysconfig-named()
@@ -378,18 +396,21 @@ gen-webserver-rules()
     cat webserver.rules-1
     echo
     echo "SecRule REQUEST_METHOD \"^GET$\" id:400,log,auditlog,severity:6,allow,chain"
-    echo "SecRule REQUEST_URI \"^/${AV_DENIED_URI//\./\\.}\?url=.{0,2048}\&source=[[:print:]]{0,255}\&user=[[:print:]]{0,255}\&virus=[[:print:]]{0,255}$\""
+    echo "SecRule REQUEST_URI \"^/${ERROR_LOCATION}/styles\.css$\""
     echo
     echo "SecRule REQUEST_METHOD \"^GET$\" id:402,log,auditlog,severity:6,allow,chain"
-    echo "SecRule REQUEST_URI \"^/${URL_DENIED_BASE_URI//\./\\.}\?email=[[:print:]]{3,${email_len}}\&url=.{0,2048}\&bl=[[:print:]]{1,32}\&ip=[[:print:]]{1,15}\&user=[[:print:]]{0,255}\&dummy=[[:print:]]{0,255}$\""
+    echo "SecRule REQUEST_URI \"^/${AV_DENIED_URI//\./\\.}\?url=.{0,2048}\&source=[[:print:]]{0,255}\&user=[[:print:]]{0,255}\&virus=[[:print:]]{0,255}$\""
     echo
     echo "SecRule REQUEST_METHOD \"^GET$\" id:404,log,auditlog,severity:6,allow,chain"
-    echo "SecRule REQUEST_URI \"^/${ACCESS_WARNING_URI//\./\\.}\?email=[[:print:]]{3,${email_len}}$\""
+    echo "SecRule REQUEST_URI \"^/${URL_DENIED_BASE_URI//\./\\.}\?email=[[:print:]]{3,${email_len}}\&url=.{0,2048}\&bl=[[:print:]]{0,32}\&ip=[[:print:]]{1,15}\&user=[[:print:]]{0,255}\&dummy=[[:print:]]{0,255}$\""
     echo
     echo "SecRule REQUEST_METHOD \"^GET$\" id:406,log,auditlog,severity:6,allow,chain"
-    echo "SecRule REQUEST_URI \"^/${WEB_GATEWAY_URI//\./\\.}\?email=[[:print:]]{3,${email_len}}$\""
+    echo "SecRule REQUEST_URI \"^/${ACCESS_WARNING_URI//\./\\.}\?email=[[:print:]]{3,${email_len}}$\""
     echo
     echo "SecRule REQUEST_METHOD \"^GET$\" id:408,log,auditlog,severity:6,allow,chain"
+    echo "SecRule REQUEST_URI \"^/${WEB_GATEWAY_URI//\./\\.}\?email=[[:print:]]{3,${email_len}}$\""
+    echo
+    echo "SecRule REQUEST_METHOD \"^GET$\" id:410,log,auditlog,severity:6,allow,chain"
     echo "SecRule REQUEST_URI \"^/${CA_DIR_NAME}/ca\.(der|crt)(\.sha1)?$\""
     echo
     echo "SecAction id:416,status:403,severity:2,deny"
@@ -623,10 +644,12 @@ install-all-etc()
     sudo install -m 644 -o root -g root admin.more.help ${APL}${MISC_DIR}/more.help
     sudo install -m 444 -o root -g root countries ${APL}${ADMIN_DIR}${APPLIANCE_DIR}/etc/countries
     sudo install -m 400 -o root -g root boot.banner ${APL}/boot/grub/banner
-    sudo install -m 644 -o root -g root styles.css ${APL}${WEB_WWW_DIR}/styles.css
     sudo install -m 644 -o root -g root favicon.ico ${APL}${WEB_WWW_DIR}/favicon.ico
     sudo install -m 644 -o root -g root backup-files ${APL}${LOCAL_DIR}/${TECHNICAL_NAME}/etc/backup-files
     sudo install -m 644 -o root -g root ldap.conf ${APL}${ADMIN_DIR}${LDAP_DIR}/ldap.conf
+
+    sudo install -m 644 -o root -g root styles.css ${APL}${WEB_WWW_DIR}/styles.css
+    sudo ln -sf ../../${WWW_DIR_NAME}/styles.css ${APL}${WEB_ERR_DIR}/styles.css
 
     sudo install -d -m 755 -o root -g root ${APL}${GUI_MIB_DIR}
     sudo install -m 644 -o root -g root ${MAIN_MIB_NAME} ${APL}${GUI_MIB_DIR}/${MAIN_MIB_NAME}
@@ -636,7 +659,7 @@ install-all-etc()
 			 ${APPLIANCE_PASSWD} \
 			 ${IPSEC_PASSWD} \
 			 ${FILE_PASSWD} \
-			 ${KERBEROS_SHARED_PASSWD} \
+			 ${AD_WEBGATEWAY_PASSWD} \
 			 ${LDAP_PASSWD} \
 			 ${EMAIL_PASSWD} \
 			 ${SNMP_PASSWD} \
@@ -653,7 +676,7 @@ install-all-etc()
 
     for password_file in ${APPLIANCE_PASSWD} \
 			 ${FILE_PASSWD} \
-			 ${KERBEROS_SHARED_PASSWD} \
+			 ${AD_WEBGATEWAY_PASSWD} \
 			 ${LDAP_PASSWD} \
 			 ${EMAIL_PASSWD} \
 			 ${SNMP_PASSWD} \
@@ -881,7 +904,6 @@ main()
 SQUID_ERR_TEXT_DIR=SquidErrors
 HTTPD_ERR_TEXT_DIR=ApacheErrors
 VIRUS_SCAN_TEXT_DIR=VirusScanMessages
-STYLES_CSS=$(remove-newline styles.css)
 
 mkdir -p ${FULL_GENERATED_DIR}
 ln -sf ${FULL_GENERATED_DIR}

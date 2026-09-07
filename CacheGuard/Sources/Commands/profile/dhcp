@@ -29,7 +29,7 @@ __complete-dhcp()
     case ${COMP_CWORD} in
 	1)
 	    case ${COMP_WORDS[1]} in
-		f|"fi"|fix|fixe|fixed)
+		f|'fi'|fix|fixe|fixed)
 		    COMPREPLY=(fixed)
 		    ;;
 		r)
@@ -83,10 +83,20 @@ __complete-dhcp()
 		range)
 		    case ${COMP_WORDS[2]} in
 			add|del)
-			    COMPREPLY=('' '<lowest-ip>')
-			    ;;
-			raz)
-			    COMPREPLY=()
+			    case ${COMP_WORDS[3]} in
+				a|au|aux|auxi|auxil|auxili|auxilia|auxiliar|auxiliary)
+				    COMPREPLY=(auxiliary)
+				    ;;
+				i|'in'|int|inte|inter|intern|interna|internal)
+				    COMPREPLY=(internal)
+				    ;;
+				'')
+				    COMPREPLY=('' '<RET>' auxiliary internal)
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
 			    ;;
 			*)
 			    COMPREPLY=()
@@ -97,9 +107,6 @@ __complete-dhcp()
 		    case ${COMP_WORDS[2]} in
 			add|del)
 			    COMPREPLY=('' '<hostname>')
-			    ;;
-			raz)
-			    COMPREPLY=()
 			    ;;
 			*)
 			    COMPREPLY=()
@@ -124,9 +131,6 @@ __complete-dhcp()
 				    ;;
 			    esac
 			    ;;
-			raz)
-			    COMPREPLY=()
-			    ;;
 			*)
 			    COMPREPLY=()
 			    ;;
@@ -142,7 +146,14 @@ __complete-dhcp()
 		range)
 		    case ${COMP_WORDS[2]} in
 			add|del)
-			    COMPREPLY=('' '<highest-ip>')
+			    case ${COMP_WORDS[3]} in
+				auxiliary|internal)
+				    COMPREPLY=('' '<lowest-ip>')
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
 			    ;;
 			*)
 			    COMPREPLY=()
@@ -152,7 +163,20 @@ __complete-dhcp()
 		fixed)
 		    case ${COMP_WORDS[2]} in
 			add)
-			    COMPREPLY=('' '<mac-address>')
+			    case ${COMP_WORDS[4]} in
+				a|au|aux|auxi|auxil|auxili|auxilia|auxiliar|auxiliary)
+				    COMPREPLY=(auxiliary)
+				    ;;
+				i|'in'|int|inte|inter|intern|interna|internal)
+				    COMPREPLY=(internal)
+				    ;;
+				'')
+				    COMPREPLY=('' '<RET>' auxiliary internal)
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
 			    ;;
 			*)
 			    COMPREPLY=()
@@ -176,10 +200,58 @@ __complete-dhcp()
 	    ;;
 	5)
 	    case ${COMP_WORDS[1]} in
+		range)
+		    case ${COMP_WORDS[2]} in
+			add|del)
+			    case ${COMP_WORDS[3]} in
+				auxiliary|internal)
+				    COMPREPLY=('' '<highest-ip>')
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
 		fixed)
 		    case ${COMP_WORDS[2]} in
 			add)
-			    COMPREPLY=('' '<ip>')
+			    case ${COMP_WORDS[4]} in
+				auxiliary|internal)
+				    COMPREPLY=('' '<mac-address>')
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		*)
+		    COMPREPLY=()
+		    ;;
+	    esac
+	    ;;
+	6)
+	    case ${COMP_WORDS[1]} in
+		fixed)
+		    case ${COMP_WORDS[2]} in
+			add)
+			    case ${COMP_WORDS[4]} in
+				auxiliary|internal)
+				    COMPREPLY=('' '<ip>')
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
 			    ;;
 			*)
 			    COMPREPLY=()

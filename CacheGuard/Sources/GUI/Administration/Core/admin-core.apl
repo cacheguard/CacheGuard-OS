@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -24,12 +23,12 @@
 
 is-ssh-generate-armed()
 {
-    test ! -f ${TMP_DIR}/${SSH_HOST_ARM_NEW} || echo -n checked
+    test ! -f ${TMP_DIR}/${SSH_HOST_ARM_NEW} || echo -n ' checked'
 }
 
 show-admin-form()
 {
-    local width=770
+    local width=720
     local never="&lt;never generated&gt;"
     local role=$(gui-get-contextual-role)
     local i=0
@@ -68,11 +67,23 @@ show-admin-form()
     i=0
     blankItemContent[${i}]="value='on'" ; ((i++))
     blankItemContent[${i}]="type=checkbox$(checked ${ADMIN_SSH})" ; ((i++))
-    blankItemContent[${i}]="<span style='font-family:monospace;'>SHA256 (RSA): ${rsa_fp/*:}</span>" ; ((i++))
-    blankItemContent[${i}]="type='checkbox' $(is-ssh-generate-armed)" ; ((i++))
-    blankItemContent[${i}]="type=checkbox$(checked ${ADMIN_SSH_PASSWORD})" ; ((i++))
-    blankItemContent[${i}]="type=checkbox$(checked ${ADMIN_WADMIN})" ; ((i++))
-    blankItemContent[${i}]="type=checkbox$(checked ${ADMIN_SNMP})" ; ((i++))
+    blankItemContent[${i}]="SHA256 (RSA): ${rsa_fp/*:}" ; ((i++))
+
+    blankItemContent[${i}]="$(is-ssh-generate-armed)"
+    itemForm[${i}]="check"
+    ((i++))
+
+    blankItemContent[${i}]="$(checked ${ADMIN_SSH_PASSWORD})"
+    itemForm[${i}]="check"
+    ((i++))
+
+    blankItemContent[${i}]="$(checked ${ADMIN_WADMIN})"
+    itemForm[${i}]="check"
+    ((i++))
+
+    blankItemContent[${i}]="$(checked ${ADMIN_SNMP})"
+    itemForm[${i}]="check"
+    ((i++))
 
     if gui-contextual-is-allowed ; then
 	local web_auditing_title
@@ -83,9 +94,10 @@ show-admin-form()
 	    web_auditing_title="Web Auditing"
 	fi
 
-	itemTitle[${i}]=${web_auditing_title}
-	blankItemContent[${i}]="type=checkbox$(checked ${ADMIN_WAUDIT})"
 	itemID[${i}]="waudit"
+	itemTitle[${i}]=${web_auditing_title}
+	blankItemContent[${i}]="$(checked ${ADMIN_WAUDIT})"
+	itemForm[${i}]="check"
 	((i++))
     fi
 
@@ -124,9 +136,10 @@ show-admin-form()
 	    mfa_init_url="otpauth://totp/${organisation}:${USER}@${SHOSTNAME}.${DOMAIN_NAME}?secret=${secret}&issuer=${COMMERCIAL_NAME}"
 	fi
 
-	itemTitle[${i}]="2FA (Two Factor Authentication)"
-	blankItemContent[${i}]="type=checkbox$(checked ${new_2fa})"
 	itemID[${i}]="login_2fa"
+	itemTitle[${i}]="2FA (Two Factor Authentication)"
+	blankItemContent[${i}]="$(checked ${new_2fa})"
+	itemForm[${i}]="check"
 	((i++))
 
 	if test -n "${mfa_init_url}" ; then
@@ -135,9 +148,10 @@ show-admin-form()
 	    local qrcode_size=95
 
 	    itemForm[${i}]='text'
-	    itemTitle[${i}]="2FA Authenticator QR Code<br />[<strong>To Scan Before Apply Operation</strong>]"
+	    itemTitle[${i}]="2FA Authenticator QR Code<br />[<strong>To scan before the Apply</strong>]"
 	    itemID[${i}]="${qrcode_id}"
-	    blankItemContent[${i}]=''
+	    blankItemContent[${i}]=""
+	    itemTdClass[${i}]="qrcode"
 	    ((i++))
 	fi
 
@@ -149,7 +163,7 @@ show-admin-form()
 	    html_ecodes=${html_ecodes:6}
 
 	    itemForm[${i}]='text'
-	    itemTitle[${i}]="2FA Authenticator Emergency Codes<br />[<strong>To Save in a Safe Place</strong>]"
+	    itemTitle[${i}]="2FA Authenticator Emergency Codes<br />[<strong>To save in a safe place</strong>]"
 	    itemID[${i}]="ecodes"
 	    blankItemContent[${i}]="${html_ecodes}"
 	    ((i++))
@@ -163,23 +177,10 @@ show-admin-form()
     fi
 
     show-title "Administration Services" "enabled" "admin"
-    form-error-message ${width} "${qrcode_message}"
+    test -z "${qrcode_message}" || echo "<div class='box-help-inner'>${qrcode_message}</div>"
     show-form "${width}"
 
-    if test -n "${mfa_init_url}" ; then
-	cat <<EOF
-<script type='text/javascript'>
-var qrcode = new QRCode( document.getElementById( '${qrcode_id}' ), {
-text: '${mfa_init_url}',
-width: ${qrcode_size},
-height: ${qrcode_size},
-colorDark: 'FireBrick',
-colorLight: 'White',
-correctLevel: QRCode.CorrectLevel.M
-} );
-</script>
-EOF
-    fi
+    test -z "${mfa_init_url}" || echo "<div data-init-qrcode data-target-id='${qrcode_id}' data-text='${mfa_init_url}' hidden></div>"
 }
 
 # Main()

@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -24,25 +23,24 @@
 
 show-antivirus-report-av-update()
 {
+    test -n "${1}" || return 1
     local display_type=${1}
-    local table_width=${2}
-    test -n "${table_width}" || table_width="100%"
 
     case ${APL_ROLE} in
 	gateway)
-	    if test ${CURRENT_AV_MODE} == False ; then
-		echo-content-unavailable ${table_width} "<i>The AV is not active.</i>"
+	    if test ! -s ${AV_UPDATE_LOG} ; then
+		echo-unavailable-message "the AV update report is not yet available."
 		return 0
 	    fi
 	    ;;
 	manager)
 	    if ! is-av-extended-enabled cur ; then
-		echo-content-unavailable ${table_width} "<i>The Extended AV is not active.</i>"
+		echo-unavailable-message "the Extended AV is not active."
 		return 0
 	    fi
 
 	    if test ! -s ${AV_UPDATE_LOG} ; then
-		echo-content-unavailable ${table_width} "<i>The Extended AV report is not yet available.</i>"
+		echo-unavailable-message "the Extended AV report is not yet available."
 		return 0
 	    fi
 	    ;;
@@ -54,29 +52,29 @@ show-antivirus-report-av-update()
     local date_h=$(get-date-from-epoch-seconds ${date_s})
     local status date_update
 
-    echo "<table class='report' width='${table_width}'>"
-
-    case ${APL_ROLE} in
-	gateway)
-	    if test -s ${AV_AUTO_UPDATE_FILE} ; then
-		status=OK
-		execute-command-nolog "antivirus report"
-		date_update=$(cat ${AV_AUTO_UPDATE_FILE} 2> /dev/null)
-		date_update=$(get-date-from-epoch-seconds ${date_update})
-		show-log-line 0 ${date_h} Antivirus updated at ${date_update}[${status}]
-	    else
-		status=KO
-		show-log-line 0 ${date_h} Antivirus updating[${status}]
-	    fi
-	    ;;
-	manager)
-	    ;;
-	*)
-	    ;;
-    esac
+    echo "<table class='report'>"
 
     case ${display_type} in
 	summary)
+	    case ${APL_ROLE} in
+		gateway)
+		    if test -s ${AV_AUTO_UPDATE_FILE} ; then
+			status=OK
+			execute-command-nolog "antivirus report"
+			date_update=$(cat ${AV_AUTO_UPDATE_FILE} 2> /dev/null)
+		date_update=$(get-date-from-epoch-seconds ${date_update})
+		show-log-line 0 ${date_h} antivirus updated at ${date_update}[${status}]
+		    else
+			status=KO
+			show-log-line 0 ${date_h} antivirus updating[${status}]
+		    fi
+		    ;;
+		manager)
+		    ;;
+		*)
+		    ;;
+	    esac
+
 	    if is-av-extended-enabled cur ; then
 		if test -s ${AV_VAR_DIR}/${AV_EXTENDED_LAST_UPDATE_FILENAME} ; then
 
@@ -88,7 +86,7 @@ show-antivirus-report-av-update()
 		    fi
 		    date_update=$(get-date-from-epoch-seconds ${date_update})
 
-		    show-log-line 0 ${date_h} Extended Antivirus updated at ${date_update}[${status}]
+		    show-log-line 0 ${date_h} Extended antivirus updated at ${date_update}[${status}]
 
 		    if test ${APL_ROLE} == manager ; then
 			if test -s ${HOME}/${MANAGER_GATEWAY_INDEX} ; then
@@ -110,13 +108,13 @@ show-antivirus-report-av-update()
 				    status=KO
 				    error_txt=" (${push_status})"
 				fi
-				show-log-line 0 ${date_h} "Pushing Extended Antivirus to '${id}' at ${push_date}${error_txt}[${status}]"
+				show-log-line 0 ${date_h} "Pushing Extended antivirus to '${id}' at ${push_date}${error_txt}[${status}]"
 			    done < ${HOME}/${MANAGER_GATEWAY_INDEX}
 			fi
 		    fi
 		else
 		    status=KO
-		    show-log-line 0 ${date_h} Extended Antivirus updating[${status}]
+		    show-log-line 0 ${date_h} Extended antivirus updating[${status}]
 		fi
 	    fi
 	    ;;
@@ -132,18 +130,11 @@ show-antivirus-report-av-update()
 
 show-urllist-report-guard-auto()
 {
-    local table_width=${1}
-    show-log ${URLLIST_AUTO_LOG} ${table_width}
+    show-log ${URLLIST_AUTO_LOG}
 }
 
 show-urllist-antivirus-report()
 {
-    local table_width=${1}
-
-    echo "<div class='core-form'>"
-
-    show-antivirus-report-av-update summary ${table_width}
-    show-urllist-report-guard-auto ${table_width}
-
-    echo "</div>"
+    show-antivirus-report-av-update summary
+    show-urllist-report-guard-auto
 }

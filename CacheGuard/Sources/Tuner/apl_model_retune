@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       Tuner
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -243,28 +242,26 @@ main()
 
     case ${APL_ROLE} in
 	gateway)
-	    RETUNE=yes \
-		  apl_model_configure \
-		  "${memory_type}" \
-		  "${CPU_NB}" \
-		  "${memory_sz}" \
-		  "${DISK_INFOS}" \
-		  "${NETWORK_DEVICES}" \
-		  "${keyboard}" \
-		  "${APL_ROLE}:${USERS_NB},${URLLIST_RECORDS_NB},${RUSERS_NB},${RWEB_NB},${LOGROTATE_NB},$[${RWEB_CACHE_SZ} * 1024],${MAX_UPLOAD_FILE_SZ},${cache},${web_log},${rweb_log}" \
-		  > ${TUNNER_REPORT} 2>&1
+	    RETUNE=yes apl_model_configure \
+		       "${memory_type}" \
+		       "${CPU_NB}" \
+		       "${memory_sz}" \
+		       "${DISK_INFOS}" \
+		       "${NETWORK_DEVICES}" \
+		       "${keyboard}" \
+		       "${APL_ROLE}:${USERS_NB},${URLLIST_RECORDS_NB},${RUSERS_NB},${RWEB_NB},${LOGROTATE_NB},$[${RWEB_CACHE_SZ} * 1024],${MAX_UPLOAD_FILE_SZ},${cache},${web_log},${rweb_log}" \
+		       > ${TUNNER_REPORT} 2>&1
 	    ;;
 	manager)
-	    RETUNE=yes \
-		  apl_model_configure \
-		  "${memory_type}" \
-		  "${CPU_NB}" \
-		  "${memory_sz}" \
-		  "${DISK_INFOS}" \
-		  "${NETWORK_DEVICES}" \
-		  "${keyboard}" \
-		  "${APL_ROLE}:${MANAGER_GATEWAY_NB},${MANAGER_TEMPLATE_NB},${MANAGER_TOTAL_USERS_NB},${MANAGER_TOTAL_RWEB_NB},${URLLIST_RECORDS_NB}" \
-		  > ${TUNNER_REPORT} 2>&1
+	    RETUNE=yes apl_model_configure \
+		       "${memory_type}" \
+		       "${CPU_NB}" \
+		       "${memory_sz}" \
+		       "${DISK_INFOS}" \
+		       "${NETWORK_DEVICES}" \
+		       "${keyboard}" \
+		       "${APL_ROLE}:${MANAGER_GATEWAY_NB},${MANAGER_TEMPLATE_NB},${MANAGER_TOTAL_USERS_NB},${MANAGER_TOTAL_RWEB_NB},${URLLIST_RECORDS_NB}" \
+		       > ${TUNNER_REPORT} 2>&1
 	    ;;
 	*)
 	    ;;

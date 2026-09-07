@@ -1,146 +1,149 @@
-.ddsmoothmenu{
-font: normal 14px Arial;
-background: var(--itembg);
-background-position: center center;
-width: 100%;
-visibility:visible;
+/*
+###########################################################################
+#
+# MODULE:       GUI
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+*/
+
+.ddsmoothmenu {
+    margin:0;
+    padding:0;
+    font:inherit;
+    font-weight:normal;
+    background:var(--panel-bg);
 }
 
-.ddsmoothmenu ul{
-z-index:100;
-margin: 0;
-padding: 0;
-list-style-type: none;
+.ddsmoothmenu ul {
+    margin:0;
+    padding:0;
+    list-style-type:none;
 }
 
-/*Top level list items*/
-.ddsmoothmenu ul li{
-position: relative;
-display: inline;
-float: left;
+.ddsmoothmenu ul li {
+    margin:0 0 2px 2px;
+    position:relative;
+    display:inline;
+    float:left;
+    width:calc(var(--left-menu-width) / 1.5);
 }
 
-/*Top level menu link items style*/
-.ddsmoothmenu ul li a{
-display: block;
-background: var(--itembg);
-background-position: center center;
-color: white;
-padding: 7px 20px 8px 20px;
-border-right: 1px solid #cccccc;
-color: #2d2b2b;
-text-decoration: none;
+.ddsmoothmenu ul li a {
+    display:block;
+    background:var(--role-bg);
+    color:black;
+    padding:11px 20px 11px 20px;
+    border-radius:5px;
+    position:relative;
+    text-decoration:none;
 }
 
-* html .ddsmoothmenu ul li a{ /*IE6 hack to get sub menu links to behave correctly*/
-display: inline-block;
+.ddsmoothmenu ul li a.selected {
+    background:var(--role-active-bg);
+    color:var(--panel-bg);
 }
 
-.ddsmoothmenu ul li a:link, .ddsmoothmenu ul li a:visited{
-color: white;
+.ddsmoothmenu ul li a:hover {
+    background:var(--role-active-bg);
+    color:var(--panel-bg);
 }
 
-.ddsmoothmenu ul li a.selected { /*CSS class that's dynamically added to the currently active menu items' LI A element*/
-background: var(--itemactivebg);
-color: white;
+.ddsmoothmenu ul li ul {
+    position:absolute;
+    left:-3000px;
+    display:none;
+    visibility:hidden;
+    box-shadow: 0 8px 20px #555555;
 }
 
-.ddsmoothmenu ul li a:hover{
-background: var(--itemactivebg);
-color: white;
+.ddsmoothmenu ul li ul li {
+    display:list-item;
+    margin:0;
+    float:none;
+    width:calc(var(--left-menu-width) + 2px);
+    color:var(--role-bg);
 }
 
-/* sub menus */
-.ddsmoothmenu ul li ul{
-position: absolute;
-left: -3000px;
-display: none; /*collapse all sub menus to begin with*/
-visibility: hidden;
+.ddsmoothmenu ul li ul li a {
+    background:var(--panel-bg);
+    color:var(--role-bg);
+    padding:12px 20px 12px 20px;
+    margin:0;
+    border-bottom-width:0;
+    border-top:1px solid #cccccc;
 }
 
-/*Sub level menu list items (alters style from Top level List Items)*/
-.ddsmoothmenu ul li ul li{
-display: list-item;
-float: none;
-color: var(-);
-}
-
-/*All subsequent sub menu levels vertical offset after 1st level sub menu */
-.ddsmoothmenu ul li ul li ul{
-top: 0;
-}
-
-/* Sub level menu links style */
-.ddsmoothmenu ul li ul li a{
-background: white;
-color: var(-);
-font: normal 14px Arial;
-width: 206px; /*width of sub menus*/
-padding: 8px;
-margin: 0;
-border-bottom-width: 0;
-border-top: 1px solid #cccccc;
+.ddsmoothmenu ul li ul li:last-child a {
+    border-bottom:1px solid #cccccc;
 }
 
 .ddsmoothmenu ul li ul li a:hover {
-background: #cccccc;
-color: var(-);
+    background:#cccccc;
+    color:var(--role-active-bg);
 }
 
-.ddsmoothmenu ul li ul li a:link, .ddsmoothmenu ul li ul li a:visited {
-color: var(--itemcolor);
-}
-
-.ddsmoothmenu ul li ul li a.selected {
-background: var(--itemactivebg);
-color: white;
+.ddsmoothmenu ul li ul li a:link,
+.ddsmoothmenu ul li ul li a:visited {
+    color:var(--role-color);
 }
 
 .ddsmoothmenu ul li ul li a.selected {
-color: white;
+    background:var(--role-active-bg);
+    color:var(--panel-bg);
 }
 
-/* Holly Hack for IE \*/
-* html .ddsmoothmenu{height: 1%;} /*Holly Hack for IE7 and below*/
-
-/* ######### CSS classes applied to down and right arrow images  ######### */
-
-.downarrowclass{
-position: absolute;
-top: 12px;
-right: 7px;
+.downarrowclass {
+    position:absolute;
+    bottom:16px;
+    right:5px;
+    background-image:url("/image/down.gif");
 }
 
 .rightarrowclass{
-position: absolute;
-top: 6px;
-right: 5px;
+    position:absolute;
+    bottom:20px;
+    right:5px;
+    background-image:url("/image/arrowbullet-right.png");
 }
 
-/* ######### CSS for shadow added to sub menus  ######### */
-
-.ddshadow{
-position: absolute;
-left: 0;
-top: 0;
-width: 0;
-height: 0;
-background-color: #ccc; /* generally should be just a little lighter than the box-shadow color for CSS3 capable browsers */
+.ddshadow {
+    position:absolute;
+    left:0;
+    top:0;
+    width:0;
+    height:0;
+    background:transparent;
+    box-shadow:5px 5px 5px #aaa;
 }
 
-.toplevelshadow{
-margin: 5px 0 0 5px; /* in NON CSS3 capable browsers gives the offset of the shadow */
-opacity: 0.8; /* shadow opacity mostly for NON CSS3 capable browsers. Doesn't work in IE */
+.ddsmoothmenushadowsnone {
+    display:none !important;
 }
 
-.ddcss3support .ddshadow.toplevelshadow {
-margin: 0; /* in CSS3 capable browsers overrides offset from NON CSS3 capable browsers, allowing the box-shadow values in the next selector to govern that */
-/* opacity: 1; */ /* optionally uncomment this to remove partial opacity for browsers supporting a box-shadow property which has its own slight gradient opacity */
+.ddsm-has-arrow {
+    padding-right:23px;
 }
 
-.ddcss3support .ddshadow {
-background-color: transparent;
-box-shadow: 5px 5px 5px #aaa; /* box-shadow color generally should be a little darker than that for the NON CSS3 capable browsers background-color */
--moz-box-shadow: 5px 5px 5px #aaa;
--webkit-box-shadow: 5px 5px 5px #aaa;
+.ddsm-arrow {
+    position:absolute;
+    display:block;
+    width:12px;
+    height:12px;
+    background-repeat:no-repeat;
+    background-position:center center;
 }

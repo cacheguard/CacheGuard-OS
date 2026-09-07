@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       Commands
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -1993,7 +1992,6 @@ run()
 	    ;;
 
 	client)
-	    contextual-command-is-allowed gateway || return 239
 	    shift-args
 	    cd ${SSL_CLIENT_DIR}
 	    manage-client ${ALLARGS}

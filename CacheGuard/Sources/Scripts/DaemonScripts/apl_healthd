@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       Scripts
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -27,12 +26,14 @@ start-loop()
     local interval=${1}
     test -n "${interval}" || interval=30000000
 
-    apl_health_check ${$}
+    local pid=${$}
+
+    apl_health_check ${pid}
 
     while true
     do
 	usleep ${interval}
-	nice --adjustment=-16 apl_health_check ${$} link:service:vpnipsec:supervisor active
+	nice --adjustment=-16 apl_health_check ${pid} link:service:vpnipsec:supervisor active
     done
 }
 

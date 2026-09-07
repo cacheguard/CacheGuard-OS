@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -29,12 +28,12 @@ set-vpnipsec-authenticate()
 
     if test "${VALUES[0]}" == psk ; then
 	if test "${VALUES[1]}" == no ; then
-	    echo "vpnipsec authenticate '${VALUES[0]}' '${VALUES[2]}'" > ${transaction}
+	    echo "vpnipsec authenticate ${VALUES[0]} '${VALUES[2]}'" > ${transaction}
 	else
-	    echo "vpnipsec authenticate '${VALUES[0]}' 'auto'" > ${transaction}
+	    echo "vpnipsec authenticate ${VALUES[0]} auto" > ${transaction}
 	fi
     elif test -n "${VALUES[3]}" ; then
-	echo "vpnipsec authenticate '${VALUES[0]}' '${VALUES[3]}' '${VALUES[4]}'" > ${transaction}
+	echo "vpnipsec authenticate ${VALUES[0]} ${VALUES[3]} ${VALUES[4]}" > ${transaction}
     fi
 
     ips=${VALUES[5]}

@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -22,44 +21,35 @@
 #
 ###########################################################################
 
-get-country-option-style()
-{
-    test -n "${1}" || return 1
-    local code=${1}
-
-    echo "text-indent: 26px; background:no-repeat url( ${IMAGE_DIR}/country-flag-${code}.png ); background-size:26px 17px;"
-}
-
 waf-reputation-country()
 {
-    local select_size=16
-    local arrow_sz=25px
-    local length=2
+    local country_code country_name countries
 
-    local country_code country_name countries style
+    local availale_countries_array
+    local selected_countries_array
+    local select1_id='available-countries'
+    local select2_id='selected-countries'
 
-    local from_countries_array
-    local to_countries_array
     local tmp_file=/tmp/reputation.${$}
 
     show-title "WAF Country Reputation" enabled "waf"
 
     echo "<div class='core-form'>"
 
-    echo "<table class='highlight-list'>"
+    echo "<table class='bi-select-list'>"
     echo "<thead>"
     echo "<tr>"
-    echo "<td class='table-header' width='47%'>Available Countries</td>"
-    echo "<td class='table-header' width='6%' style='background:none; background-color:White; border:none'></td>"
-    echo "<td class='table-header' width='47%'>Blocked Countries</td>"
+    echo "<th class='table-header'>Available Countries</th>"
+    echo "<th></th>"
+    echo "<th class='table-header'>Blocked Countries</th>"
     echo "</tr>"
     echo "</thead>"
     
     echo "<tbody>"
     echo "<tr>"
 
-    echo "<td style='background-color:White;padding:0;margin:0;padding-top:5px;padding-bottom:5px;'>"
-    echo "<select name='country_from' id='country_from' multiple size='${select_size}' style='width:100%;'>"
+    echo "<td>"
+    echo "<select name='${select1_id}' id='${select1_id}' multiple>"
 
     sqlite3 -separator ' ' \
 	    ${USERENV_DIR}/${CONFIGURATION_DB_NAME} \
@@ -68,25 +58,21 @@ waf-reputation-country()
     while read country_code country_name
     do
 	test -n "${country_name}" || continue
-	style=$(get-country-option-style ${country_code})
-	from_countries_array="${from_countries_array},['${country_code^^}','${country_name//\'/\\\'}','${style}']"
-	echo -n "<option value='${country_code}' id='${country_code}' style='${style}'>${country_name} [${country_code^^}]</option>"
+	availale_countries_array="${availale_countries_array},[\"${country_code^^}\",\"${country_name//\'/d&#39;} [${country_code^^}]\"]"
+	echo -n "<option value='${country_code}' id='${country_code}'>${country_name} [${country_code^^}]</option>"
     done < ${tmp_file}
+    rm -f ${tmp_file}
 
     echo "</select>"
     echo "</td>"
 
-    from_countries_array="[${from_countries_array:1}]"
+    availale_countries_array="[${availale_countries_array:1}]"
 
-    echo "<td style='background-color:White;padding:0;margin:0;'>"
-    echo "<center><a href='JavaScript:void( 0 );' id='add_button'><img src='/image/right-arrow.png' alt='Add Selected Countries' title='Add Selected Countries' align='top' style='height:${arrow_sz}; width:${arrow_sz};' /></a></center>"
+    echo-add-remove-selected-row ${select1_id} ${select2_id} "Countries"
 
-    echo "<center><a href='JavaScript:void( 0 );' id='del_button'><img src='/image/left-arrow.png' alt='Remove Selected Countries' title='Remove Selected Countries' align='top' border='0' style='height:${arrow_sz}; width:${arrow_sz};' /></a></center>"
-    echo "</td>"
+    echo "<td>"
 
-    echo "<td style='background-color:White;padding:0;margin:0;padding-top:5px;padding-bottom:5px;'>"
-
-    echo "<select name='country' id='country' multiple size='${select_size}' style='width:100%;'>"
+    echo "<select name='${select2_id}' id='${select2_id}' multiple>"
 
     sqlite3 -separator ' ' \
 	    ${USERENV_DIR}/${CONFIGURATION_DB_NAME} \
@@ -95,12 +81,12 @@ waf-reputation-country()
     while read country_code country_name
     do
 	test -n "${country_name}" || continue
-	style=$(get-country-option-style ${country_code})
-	to_countries_array="${to_countries_array},['${country_code^^}','${country_name//\'/\\\'}','${style}']"
-	echo -n "<option value='${country_code}' id='${country_code}' style='${style}'>${country_name} [${country_code^^}]</option>"
+	selected_countries_array="${selected_countries_array},[\"${country_code^^}\",\"${country_name//\'/d&#39;} [${country_code^^}]\"]"
+	echo -n "<option value='${country_code}' id='${country_code}'>${country_name} [${country_code^^}]</option>"
     done < ${tmp_file}
+    rm -f ${tmp_file}
 
-    to_countries_array="[${to_countries_array:1}]"
+    selected_countries_array="[${selected_countries_array:1}]"
 
     echo "</select>"
     echo "</td>"
@@ -109,13 +95,13 @@ waf-reputation-country()
     echo "</tbody>"
     echo "</table>"
 
-    show-form-begin ${length}
+    show-form-begin
     echo "<input name='dummy' type='hidden' value='on' />"
-    show-do enabled enabled "addHiddenInputFromSelectionItem( 'mainform', 'country' )" "setSelectOptions( 'country_from', ${from_countries_array} ); setSelectOptions( 'country', ${to_countries_array} )"
+
+    show-do-apply enabled 'add-hidden-input-from-selection-item' "[\"${select2_id}\"]" before
+    show-do-reset enabled 'set-select-country-options' "[\"${select1_id}\",${availale_countries_array},\"${select2_id}\",${selected_countries_array}]"
+
     show-form-end
-    echo "<script type='text/javascript'>"
-    echo "initSelectionList( 'country_from', 'country', 'add_button', 'del_button' );"
-    echo "</script>"
 
     echo "</div>"
 }

@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -24,10 +23,13 @@
 
 show-waf-rules()
 {
-    echo "<div style='clear:left;'></div>"
-    echo "<br />"
+    test -n "${1}" || return 1
+    local div_id=${1}
+
+    echo "<div class='core-form'>"
     echo "<div class='table-title'>Last valid loaded rules</div>"
-    echo "<div id='filter'></div>"
+    echo "<div id='${div_id}'></div>"
+    echo "</div>"
 }
 
 print-operation()
@@ -46,7 +48,8 @@ print-operation()
 show-filter-rweb-custom-form()
 {
     local width=600
-    local state field_state checked
+    local target_div_id='waf-custom-rules'
+    local state new_state field_state checked
 
     itemWidth[0]=35
     itemWidth[1]=65
@@ -67,12 +70,16 @@ show-filter-rweb-custom-form()
 
     local file_servers=$(show-file-servers 'cur' ${VALUES[3]})
     test -n "${RWEB_SITE_LIST}" -a -n "${file_servers}" || state=disabled
-    test "${ATTRIBUTES[5]}" != new || checked=checked
+    test "${ATTRIBUTES[5]}" != new || checked=' checked'
 
     local operation=${VALUES[1]}
     case ${operation} in
 	clear)
 	    field_state="disabled"
+	    new_state="disabled"
+	    ;;
+	load|'')
+	    new_state="disabled"
 	    ;;
 	*)
 	    ;;
@@ -80,14 +87,14 @@ show-filter-rweb-custom-form()
     itemState[2]=${field_state}
     itemState[3]=${field_state}
     itemState[4]=${field_state}
-    itemState[5]=${field_state}
+    itemState[5]=${new_state}
 
     blankItemContent[0]="$(show-site-select1 '' ${VALUES[0]})"
     blankItemContent[1]="$(print-operation ${operation})"
     blankItemContent[2]="$(show-file-protocol1 ${VALUES[2]:1})"
     blankItemContent[3]=${file_servers}
-    blankItemContent[4]="type='text' size='48' maxlength='128' value='${VALUES[4]}'"
-    blankItemContent[5]="type=checkbox ${checked}"
+    blankItemContent[4]="type='text' size='32' maxlength='128' value='${VALUES[4]}'"
+    blankItemContent[5]="${checked}"
 
     checkItem[4]=printable
 
@@ -95,9 +102,10 @@ show-filter-rweb-custom-form()
     itemForm[1]="select"
     itemForm[2]="select"
     itemForm[3]="select"
+    itemForm[5]="check"
 
-    itemFormSelectCB[0]="showWAFRules( '/${GUI_DIR_NAME}/waf-rweb-custom-print.${GUI_EXT_NAME}', 'filter' );"
-    itemFormSelectCB[1]="customWAFActionSelectCB( 'operation', 'protocol', 'server', 'filename', 'new' );"
+    itemData[0]="data-action='waf-rweb-custom-show-rules' data-page='/${GUI_DIR_NAME}/waf-rweb-custom-print.${GUI_EXT_NAME}' data-target-id='${target_div_id}'>"
+    itemData[1]="data-action='waf-rweb-custom-operation-select' data-operation-id='operation' data-protocol-id='protocol' data-server-id='server' data-filename-id='filename' data-mode='new'"
 
     shortcutMenuItem[0]="access-file"
     shortcutMenuTitle[0]="File Servers"
@@ -106,10 +114,9 @@ show-filter-rweb-custom-form()
     shortcutMenuTitle[1]="Add rWeb"
 
     show-title "WAF Custom Rules" "${state}" "access waf password"
-    show-shortcuts-menu
-    show-form "${width}" "${state}" show-waf-rules
+    show-form "${width}" "${state}" show-waf-rules ${target_div_id}
 
-    call-js-function "showWAFRules( '/${GUI_DIR_NAME}/waf-rweb-custom-print.${GUI_EXT_NAME}', 'filter' )"
+    echo "<div data-init-show-waf-rules data-page='/${GUI_DIR_NAME}/waf-rweb-custom-print.${GUI_EXT_NAME}' data-target-id='${target_div_id}' hidden></div>"
 }
 
 # Main()

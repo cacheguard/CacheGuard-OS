@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -26,12 +25,9 @@ source functions
 
 test-snmp-trap()
 {
-    test -n "${1}" || return 1
-    local width=${1}
-
     execute-command "admin snmp trap test"
 
-    echo "<div class='with-border' style='font-size:90%; font-style:italic; width:${width}px; margin-bottom:5px;'>A testing SNMP trap has been sent to all configured SNMP receivers. Please check your SNMP receivers to acknowledge the receipt.</div>"
+    echo "<div class='diagnostic-tools-msg'>A testing SNMP trap has been sent to all configured SNMP receivers. Please check your SNMP receivers to acknowledge the receipt.</div>"
 }
 
 LOG=/dev/null

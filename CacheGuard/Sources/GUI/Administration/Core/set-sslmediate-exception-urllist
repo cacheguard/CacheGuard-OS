@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -41,11 +40,11 @@ set-ssl-mediate-exception-urllist()
 	[[ "${ATTRIBUTES[${del_pos}]}" =~ ^del_[0-9]+$ ]]
 	if test ${?} -ne 0 ; then
 	    if test "${VALUES[${entry_pos}]}" == anew -a -n "${name}" ; then
-		echo "sslmediate exception urllist add '${name}'" >> ${transaction}
+		echo "sslmediate exception urllist add ${name}" >> ${transaction}
 	    fi
 	    pos=$[${pos} + 2]
 	else
-	    test -z "${name}" || echo "sslmediate exception urllist del '${name}'" >> ${transaction}
+	    test -z "${name}" || echo "sslmediate exception urllist del ${name}" >> ${transaction}
 	    pos=$[${pos} + 3]
 	fi  
     done

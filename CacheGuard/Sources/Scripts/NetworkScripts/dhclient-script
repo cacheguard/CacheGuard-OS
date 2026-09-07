@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       Scripts
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -31,7 +30,7 @@
 # Andrew Pollock, February 2005
 # Modified to work on point-to-point links. Andrew Pollock, June 2005
 # Modified to support passing the parameters called with to the hooks. Andrew Pollock, November 2005
-# Modified by CacheGuard Development Team to save the resolv.conf file on a directory location than /etc
+# Modified by CacheGuard Technologies to save the resolv.conf file on a directory location than /etc
 
 # The alias handling in here probably still sucks. -mdz
 

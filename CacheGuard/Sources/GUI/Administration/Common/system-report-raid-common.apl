@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -24,23 +23,21 @@
 
 show-system-report-raid()
 {
+    test -n "${1}" || return 1
     local display_time=${1}
-    local table_width=${2}
-    test -n "${table_width}" || table_width="405"
+    local compact=${2}
 
     if test ! -s ${RUN_DIR}/${RAID_HEALTH_FILENAME} ; then
-        echo "<div class='core-form'>"
-	echo-content-unavailable ${table_width} "This system has been installed without RAID support."
-        echo "</div>"
+	test -n "${compact}" || echo-unavailable-message "this system has been installed without RAID."
         return 0
     fi
 
     local key value
 
-    echo "<div class='core-form'>"
-    echo "<table class='highlight-form' width='${table_width}'>"
+    test -z "${compact}" || compact=' compact'
 
-    test -z "${display_time}" || display-appliance-time-row
+    echo "<table class='highlight-form${compact}'>"
+    test ${display_time} != time || display-appliance-time-row left
 
     while read key value
     do
@@ -48,27 +45,26 @@ show-system-report-raid()
 	    Raid_State)
 		case "${value}" in
 		    clean|active)
-			value="<img src='/image/ok.png' title='OK' alt='[OK]' /> [${value}]"
+			value="<img class='small' src='/image/ok.png' title='OK' alt='[OK]' />[${value}]"
 			;;
 		    *)
-			value="<img src='/image/ko.png' title='KO' alt='[KO]' /> [${value}]"
+			value="<img class='small' src='/image/ko.png' title='KO' alt='[KO]' />[${value}]"
 			;;
 		esac
 		;;
 	    Build_Status)
-		value="<div id='status'></div><script type='text/javascript'>drawPercentBar( 'status', ${PERCENT_BAR_WIDTH}, ${value} );</script>"
+		value=$(draw-progress-bar ${value})
 		;;
 	    *)
 		;;
 	esac
 
 	echo "<tr>"
-	echo "<td width='35%'>${key//_/ }</td>"
-	echo "<td width='65%'>${value}</td>"
+	echo "<td width='50%'>${key//_/ }</td>"
+	echo "<td width='50%'>${value}</td>"
 	echo "</tr>"
 
     done < ${RUN_DIR}/${RAID_HEALTH_FILENAME}
 
     echo "</table>"
-    echo "</div>"
 }

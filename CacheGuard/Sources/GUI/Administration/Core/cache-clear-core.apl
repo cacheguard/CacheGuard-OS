@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -24,13 +23,9 @@
 
 show-cache-clear-log()
 {
-    echo "<div class='core-form'>"
-    refresh-buttons "update_cache_clear( 1 )"
-    echo "<div style='clear:left;'></div><br />"
-    echo "<span class='table-title'>Last cache clearing report</span>"
-    echo "<div style='clear:left;'></div>"
+    refresh-buttons
+    echo "<div class='table-title'>Last cache clearing report</div>"
     echo "<div id='${AUTO_REPORT_ID}' class='log-report'></div>"
-    echo "</div>"
 }
 
 show-cache-clear-form()
@@ -46,7 +41,6 @@ show-cache-clear-form()
     shortcutMenuTitle[1]="Configure the caching"
 
     show-title "Clear Web Cache" "${state}" "cache"
-    show-shortcuts-menu
     show-form "${width}" "${state}" show-cache-clear-log
 }
 

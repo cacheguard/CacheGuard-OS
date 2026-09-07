@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -29,7 +28,7 @@ set-vlans()
 
     for ((i=0 ; i<7 ; i++))
     do
-	echo "vlan '${ATTRIBUTES[${i}]}' '${VALUES[${i}]}'"
+	echo "vlan ${ATTRIBUTES[${i}]} ${VALUES[${i}]}"
     done > ${transaction}
 
     execute-transaction ${transaction}

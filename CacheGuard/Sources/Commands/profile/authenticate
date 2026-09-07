@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       Commands
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -62,11 +61,23 @@ __complete-authenticate()
 	    case ${COMP_WORDS[1]} in
 		ad)
 		    case ${COMP_WORDS[2]} in
+			o)
+			    COMPREPLY=('' on off)
+			    ;;
+			of|off)
+			    COMPREPLY=(off)
+			    ;;
+			on)
+			    COMPREPLY=(on)
+			    ;;
 			r|rd|rdn)
 			    COMPREPLY=(rdn)
 			    ;;
+			a|ac|acc|acco|accou|accoun|account)
+			    COMPREPLY=(account)
+			    ;;
 			'')
-			    COMPREPLY=('' '<RET>' rdn)
+			    COMPREPLY=('' '<RET>' on off rdn account)
 			    ;;
 			*)
 			    COMPREPLY=()
@@ -148,12 +159,6 @@ __complete-authenticate()
 			c|cr|cre|crea|creat|create)
 			    COMPREPLY=(create)
 			    ;;
-			e|en|enc|encr|encry|encryp|encrypt)
-			    COMPREPLY=(encrypt)
-			    ;;
-			h|ha|hap|hapa|hapas|hapass|hapassw|hapasswo|hapasswor|hapassword)
-			    COMPREPLY=(hapassword)
-			    ;;
 			w|we|web)
 			    COMPREPLY=(web)
 			    ;;
@@ -170,7 +175,7 @@ __complete-authenticate()
 			    COMPREPLY=(server)
 			    ;;
 			'')
-			    COMPREPLY=('' '<RET>' create encrypt hapassword report rweb server web)
+			    COMPREPLY=('' '<RET>' create report rweb server web)
 			    ;;
 			*)
 			    COMPREPLY=()
@@ -188,6 +193,9 @@ __complete-authenticate()
 		    case ${COMP_WORDS[2]} in
 			rdn)
 			    COMPREPLY=('' '<RET>' "'<relative-dn>'")
+			    ;;
+			account)
+			    COMPREPLY=('' '<RET>' '<login-name>')
 			    ;;
 			*)
 			    COMPREPLY=()
@@ -283,25 +291,6 @@ __complete-authenticate()
 			create)
 			    COMPREPLY=('' '<admin-user>')
 			    ;;
-			encrypt)
-			    case ${COMP_WORDS[3]} in
-				a|ae|aes)
-				    COMPREPLY=(aes)
-				    ;;
-				d|de|des)
-				    COMPREPLY=(des)
-				    ;;
-				'')
-				    COMPREPLY=('' '<RET>' aes des)
-				    ;;
-				*)
-				    COMPREPLY=()
-				    ;;
-			    esac
-			    ;;
-			hapassword)
-			    COMPREPLY=('' '<RET>' '<shared-password>')
-			    ;;
 			web)
 			    COMPREPLY=('' '<RET>' '<canonical-name>')
 			    ;;
@@ -324,6 +313,22 @@ __complete-authenticate()
 				    ;;
 			    esac
 			    ;;
+			report)
+			    case ${COMP_WORDS[3]} in
+				c|cr|cre|crea|creat|create)
+				    COMPREPLY=(create)
+				    ;;
+				k|ke|key|keyt|keyta|keytab)
+				    COMPREPLY=(keytab)
+				    ;;
+				'')
+				    COMPREPLY=('' '<RET>' create keytab)
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
 			*)
 			    COMPREPLY=()
 			    ;;
@@ -336,6 +341,17 @@ __complete-authenticate()
 	    ;;
 	4)
 	    case ${COMP_WORDS[1]} in
+		ad)
+		    case ${COMP_WORDS[2]} in
+			account)
+			    COMPREPLY=('' '<RET>' '<password>')
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+
 		kerberos)
 		    case ${COMP_WORDS[2]} in
 			create)
@@ -527,7 +543,7 @@ __complete-authenticate()
 				add|del)
 				    case ${COMP_WORDS[4]} in
 					ldap|ldaps|sldap)
-					    COMPREPLY=('' '<ip>')
+					    COMPREPLY=('' '<port-number>')
 					    ;;
 					*)
 					    COMPREPLY=()
@@ -556,23 +572,6 @@ __complete-authenticate()
 	    case ${COMP_WORDS[1]} in
 		ldap)
 		    case ${COMP_WORDS[2]} in
-			server)
-			    case ${COMP_WORDS[3]} in
-				add|del)
-				    case ${COMP_WORDS[4]} in
-					ldap|ldaps|sldap)
-					    COMPREPLY=('' '<RET>' '<port-number>')
-					    ;;
-					*)
-					    COMPREPLY=()
-					    ;;
-				    esac
-				    ;;
-				*)
-				    COMPREPLY=()
-				    ;;
-			    esac
-			    ;;
 			request)
 			    COMPREPLY=('' '<RET>' "'<group-dn>'")
 			    ;;

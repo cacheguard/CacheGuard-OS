@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -26,27 +25,20 @@ show-system-report-connection()
 {
     test -s ${RUN_DIR}/${CONNECTION_FILENAME} || return 0
     test -s ${RUN_DIR}/${CONNECTION_SUMMARY_FILENAME} || return 0
-    
+
+    test -n "${1}" || return 1
     local display_time=${1}
-    local table_width=${2}
-    test -n "${table_width}" || table_width="405"
+
     local dev connection
     local ip
 
-    echo "<div class='core-form'>"
+    test ${display_time} != time || display-appliance-time-table
 
-    if test -n "${display_time}" ; then
-	echo "<table class='highlight-form' style='margin-bottom:5px;' width='${table_width}'>"
-	display-appliance-time-row right
-	echo "</table>"
-    fi
-
-    echo "<table class='highlight-list' width='${table_width}'>"
-
+    echo "<table class='highlight-list'>"
     echo "<thead>"
     echo "<tr>"
-    echo "<td class='table-header indicator-table-header' width='50%' align='center'>Interface</td>"
-    echo "<td class='table-header' width='50%' align='center'>Active TCP Connections</td>"
+    echo "<th class='table-header' align='center'>Interface</th>"
+    echo "<th class='table-header' align='center'>Active TCP Connections</th>"
     echo "</tr>"
     echo "</thead>"
 
@@ -77,11 +69,11 @@ show-system-report-connection()
 	all=0
     fi
 
-    echo "<table class='highlight-list' style='margin-top:1px;' width='${table_width}'>"
+    echo "<table class='highlight-list'>"
     echo "<thead>"
     echo "<tr>"
-    echo "<td class='table-header indicator-table-header' width='50%' align='center'>Interface</td>"
-    echo "<td class='table-header' width='50%' align='center'>All TCP Connections</td>"
+    echo "<td class='table-header' align='center'>Interface</td>"
+    echo "<td class='table-header' align='center'>All TCP Connections</td>"
     echo "</tr>"
     echo "</thead>"
 
@@ -90,5 +82,4 @@ show-system-report-connection()
     echo "<tr><td align='center'><i>all interfaces</i></td><td align='center'>${all}</td></tr>"
     echo "</tbody>"
     echo "</table>"
-    echo "</div>"
 }

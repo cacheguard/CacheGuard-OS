@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       Tuner
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -65,21 +64,25 @@ Errors[254]="Usage error."
 Errors[255]="An unknown error has occurred."
 
 # Warnings Table
-Warnings[1]="Insufficient memory to activate the cache mode."
-Warnings[2]="Insufficient memory to activate the SSL mediation mode."
-Warnings[3]="Insufficient memory to activate the built-in name server."
-Warnings[4]="Insufficient memory to activate the guard mode."
-Warnings[5]="Insufficient memory to activate the WAF mode."
-Warnings[6]="Insufficient memory to activate the DHCP mode."
-Warnings[7]="Insufficient memory to activate the antivirus mode."
-Warnings[8]="Insufficient memory to activate the rCache volume space."
-Warnings[9]="Insufficient memory to activate the OCSP mode."
+
+Warnings[1]="Insufficient memory to activate caching for the proxy."
+Warnings[2]="Insufficient memory to activate SSL mediation/inspection."
+Warnings[3]="Insufficient memory to activate the DNS server."
+Warnings[4]="Insufficient memory to activate URL guarding/filtering."
+Warnings[5]="Insufficient memory to activate WAF."
+Warnings[6]="Insufficient memory to activate the DHCP server."
+Warnings[7]="Insufficient memory to activate the antivirus."
+Warnings[8]="Insufficient memory to activate caching for the reverse proxy."
+Warnings[9]="Insufficient memory to activate the OCSP server."
 Warnings[10]="Insufficient memory to activate all services simultaneously."
 Warnings[11]="Cannot manage more than @VALUE@ KB of RAM."
 Warnings[12]="Cannot manage more than ${MAX_CPU_NB} CPUs."
-Warnings[13]="Disks may not be fully utilised for caching."
-Warnings[14]="Insufficient memory to activate the web, tweb, or rweb modes."
+Warnings[13]="Disks may not be fully utilised for web caching."
+Warnings[14]="Insufficient memory to activate the proxy."
 Warnings[15]="Insufficient memory to activate the SNMP agent."
+Warnings[16]="Insufficient memory to activate the IPsec VPN server in access mode."
+Warnings[17]="Insufficient memory to activate QoS traffic shaping."
+Warnings[18]="Insufficient memory to activate the reverse proxy."
 
 usage()
 {
@@ -151,6 +154,84 @@ warning()
 {
     if test -z "${1}" ; then local warn_code=255 ; else local warn_code=$1 ; fi
     display-warning ${warn_code} ${2}
+}
+
+min-value()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    local val1=${1}
+    local val2=${2}
+
+    echo $((val1 < val2 ? val1 : val2))
+}
+
+max-value()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    local val1=${1}
+    local val2=${2}
+
+    echo $((val1 > val2 ? val1 : val2))
+}
+
+ceil-value()
+{
+    test -n "${1}" || return 1
+    local float=${1}
+
+    local int=${float/.*}
+    local dec=${float/*.}
+
+    test -n "${int}" || int=0
+    test ${int} == ${dec} || test ${dec} -eq 0 || ((int++))
+
+    echo ${int}
+}
+
+round-1024()
+{
+    test -n "${1}" || return 1
+    local value=${1}
+
+    value=$[${value} / 1024 * 1024]
+    test ${value} -gt 0 || value=1
+
+    echo ${value}
+    return 0
+}
+
+round-devide()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 1
+
+    local precision=1000000
+
+    local quotient=$[${1} / ${2}]
+    local remainder=$[${1} % ${2}]
+
+    test $[${remainder} * 2 * ${precision}] -lt $[${2} * ${precision}] || quotient=$[${quotient} + 1]
+
+    echo ${quotient}
+}
+
+# Take a decimal number and output it's octal
+octal()
+{
+    test -n "${1}" || return 1
+    local quotient=${1}
+
+    local remainder octal
+
+    while [ ${quotient} -ne 0 ]
+      do
+      remainder=$[$quotient % 8]
+      octal=${remainder}${octal}
+      quotient=$[${quotient} / 8]
+    done
+    echo ${octal}
 }
 
 check-nb()
@@ -345,48 +426,177 @@ tuner-check-template-nb()
     test ${MANAGER_TEMPLATE_NB} -le ${MAX_MANAGER_TEMPLATE_NB} || error 29
 }
 
-round-1024()
+set-cpu-architecture-parameters()
 {
-    test -n "${1}" || return 1
-    local value=${1}
+    if test ${CPU_ARCHITECTURE} == "x86_64" ; then
+	HTTPD_HTTP2_OVERHEAD_CONNECTION_MEMORY_SZ=${HTTPD_64_HTTP2_OVERHEAD_CONNECTION_MEMORY_SZ}
+	HTTPD_HTTP2_OVERHEAD_STREAM_MEMORY_SZ=${HTTPD_64_HTTP2_OVERHEAD_STREAM_MEMORY_SZ}
+	HTTPD_HTTP2_WORKER_STREAM_MEMORY_SZ=${HTTPD_64_HTTP2_WORKER_STREAM_MEMORY_SZ}
+	FW_CONNECTION_MEMORY_SZ=${FW_64_CONNECTION_MEMORY_SZ}
+	WADMIND_MAIN_PROCESS_SZ=${WADMIND_64_MAIN_PROCESS_SZ}
+	WADMIND_CHILD_PROCESS_SZ=${WADMIND_64_CHILD_PROCESS_SZ}
+	HTTP2_MAX_SESSION_STREAMS=${HTTP2_64_MAX_SESSION_STREAMS}
+	HTTP2_MIN_WORKERS_DIVIDER=${HTTP2_64_MIN_WORKERS_DIVIDER}
+	HTTP2_MAX_WORKERS_FACTOR=${HTTP2_64_MAX_WORKERS_FACTOR}
+    else
+	HTTPD_HTTP2_OVERHEAD_CONNECTION_MEMORY_SZ=${HTTPD_32_HTTP2_OVERHEAD_CONNECTION_MEMORY_SZ}
+	HTTPD_HTTP2_OVERHEAD_STREAM_MEMORY_SZ=${HTTPD_32_HTTP2_OVERHEAD_STREAM_MEMORY_SZ}
+	HTTPD_HTTP2_WORKER_STREAM_MEMORY_SZ=${HTTPD_32_HTTP2_WORKER_STREAM_MEMORY_SZ}
+	FW_CONNECTION_MEMORY_SZ=${FW_32_CONNECTION_MEMORY_SZ}
+	WADMIND_MAIN_PROCESS_SZ=${WADMIND_32_MAIN_PROCESS_SZ}
+	WADMIND_CHILD_PROCESS_SZ=${WADMIND_32_CHILD_PROCESS_SZ}
+	HTTP2_MAX_SESSION_STREAMS=${HTTP2_32_MAX_SESSION_STREAMS}
+	HTTP2_MIN_WORKERS_DIVIDER=${HTTP2_32_MIN_WORKERS_DIVIDER}
+	HTTP2_MAX_WORKERS_FACTOR=${HTTP2_32_MAX_WORKERS_FACTOR}
+    fi
 
-    value=$[${value} / 1024 * 1024]
-    test ${value} -gt 0 || value=1
+    case ${APL_ROLE} in
+	gateway)
+	    local httpd_rproxy_main_base_process_sz
+	    local httpd_rproxy_child_base_process_sz
+	    local httpd_rproxy_main_rweb_process_sz
+	    local httpd_rproxy_child_rweb_process_sz
+	    local httpd_waf_main_base_process_sz
+	    local httpd_waf_child_base_process_sz
+	    local httpd_waf_main_rweb_process_sz
+	    local httpd_waf_child_rweb_process_sz
 
-    echo ${value}
-    return 0
-}
+	    if test ${CPU_ARCHITECTURE} == "x86_64" ; then
+		FW_MANGLE_RULE_MEMORY_SZ=${FW_64_MANGLE_RULE_MEMORY_SZ}
+		QOS_SFQ_QDISC_OVERHEAD_MEMORY_SZ_PCT=${QOS_64_SFQ_QDISC_OVERHEAD_MEMORY_SZ_PCT}
+		QOS_HTB_QDISC_MEMORY_SZ=${QOS_64_HTB_QDISC_MEMORY_SZ}
+		QOS_HTB_CLASS_MEMORY_SZ=${QOS_64_HTB_CLASS_MEMORY_SZ}
+		QOS_SFQ_QDISC_BASE_MEMORY_SZ=${QOS_64_SFQ_QDISC_BASE_MEMORY_SZ}
+		QOS_SFQ_QDISC_SLOT_MEMORY_SZ=${QOS_64_SFQ_QDISC_SLOT_MEMORY_SZ}
+		QOS_SFQ_QDISC_BUCKET_MEMORY_SZ=${QOS_64_SFQ_QDISC_BUCKET_MEMORY_SZ}
+		QOS_FILTER_MEMORY_SZ=${QOS_64_FILTER_MEMORY_SZ}
 
-round-devide()
-{
-    test -n "${1}" || return 1
-    test -n "${2}" || return 1
+		IPSEC_BASE_PROCESS_SZ=${IPSEC_64_BASE_PROCESS_SZ}
+		IPSEC_SITE_TUNNEL_MEMORY_SZ=${IPSEC_64_SITE_TUNNEL_MEMORY_SZ}
+		IPSEC_SITE_TRAFFIC_MEMORY_SZ=${IPSEC_64_SITE_TRAFFIC_MEMORY_SZ}
+		IPSEC_ACCESS_TUNNEL_MEMORY_SZ=${IPSEC_64_ACCESS_TUNNEL_MEMORY_SZ}
+		IPSEC_ACCESS_TRAFFIC_MEMORY_SZ=${IPSEC_64_ACCESS_TRAFFIC_MEMORY_SZ}
+		DNS_BASE_PROCESS_SZ=${DNS_64_BASE_PROCESS_SZ}
+		DNS_MEMORY_PER_DN_SZ=${DNS_64_MEMORY_PER_DN_SZ}
+		DHCPD_PROCESS_SZ=${DHCPD_64_PROCESS_SZ}
+		SQUID_MD_MEMORY_SZ=${SQUID_MD_64_MEMORY_SZ}
+		SQUID_BASE_PROCESS_SZ=${SQUID_64_BASE_PROCESS_SZ}
+		SQUID_DISKD_PROCESS_SZ=${SQUID_64_DISKD_PROCESS_SZ}
+		SQUID_TCP_CONNECTION_MEMORY_SZ=${SQUID_64_TCP_CONNECTION_MEMORY_SZ}
+		SQUID_SSLM_CONNECTION_MEMORY_SZ=${SQUID_64_SSLM_CONNECTION_MEMORY_SZ}
+		SQUID_SSL_CERTIFICATE_PROCESS_SZ=${SQUID_64_SSL_CERTIFICATE_PROCESS_SZ}
+		SQUID_DNS_ENTRY_CACHE_SZ=${SQUID_64_DNS_ENTRY_CACHE_SZ}
+		GUARD_PROCESS_SZ=${GUARD_64_PROCESS_SZ}
+		HTTPD_WEB_MAIN_PROCESS_SZ=${HTTPD_WEB_64_MAIN_PROCESS_SZ}
+		HTTPD_WEB_CHILD_PROCESS_SZ=${HTTPD_WEB_64_CHILD_PROCESS_SZ}
 
-    local precision=1000000
+		httpd_rproxy_main_base_process_sz=${HTTPD_RPROXY_64_MAIN_BASE_PROCESS_SZ}
+		httpd_rproxy_child_base_process_sz=${HTTPD_RPROXY_64_CHILD_BASE_PROCESS_SZ}
+		httpd_rproxy_main_rweb_process_sz=${HTTPD_RPROXY_64_MAIN_RWEB_PROCESS_SZ}
+		httpd_rproxy_child_rweb_process_sz=${HTTPD_RPROXY_64_CHILD_RWEB_PROCESS_SZ}
+		httpd_waf_main_base_process_sz=${HTTPD_WAF_64_MAIN_BASE_PROCESS_SZ}
+		httpd_waf_child_base_process_sz=${HTTPD_WAF_64_CHILD_BASE_PROCESS_SZ}
+		httpd_waf_main_rweb_process_sz=${HTTPD_WAF_64_MAIN_RWEB_PROCESS_SZ}
+		httpd_waf_child_rweb_process_sz=${HTTPD_WAF_64_CHILD_RWEB_PROCESS_SZ}
 
-    local quotient=$[${1} / ${2}]
-    local remainder=$[${1} % ${2}]
+		HTTPD_SERVER_THREADS_PCT8_RPROXY_REQUEST_MEMORY_SZ=${HTTPD_SERVER_THREADS_PCT8_RPROXY_REQUEST_64_MEMORY_SZ}
+		HTTPD_SERVER_THREADS_PCT8_WAF_REQUEST_MEMORY_SZ=${HTTPD_SERVER_THREADS_PCT8_WAF_REQUEST_64_MEMORY_SZ}
 
-    test $[${remainder} * 2 * ${precision}] -lt $[${2} * ${precision}] || quotient=$[${quotient} + 1]
+		CLAMAV_PROCESS_SZ=${CLAMAV_64_PROCESS_SZ}
+		FRESHCLAM_PROCESS_SZ=${FRESHCLAM_64_PROCESS_SZ}
+	    else
+		FW_MANGLE_RULE_MEMORY_SZ=${FW_32_MANGLE_RULE_MEMORY_SZ}
+		QOS_SFQ_QDISC_OVERHEAD_MEMORY_SZ_PCT=${QOS_32_SFQ_QDISC_OVERHEAD_MEMORY_SZ_PCT}
+		QOS_HTB_QDISC_MEMORY_SZ=${QOS_32_HTB_QDISC_MEMORY_SZ}
+		QOS_HTB_CLASS_MEMORY_SZ=${QOS_32_HTB_CLASS_MEMORY_SZ}
+		QOS_SFQ_QDISC_BASE_MEMORY_SZ=${QOS_32_SFQ_QDISC_BASE_MEMORY_SZ}
+		QOS_SFQ_QDISC_SLOT_MEMORY_SZ=${QOS_32_SFQ_QDISC_SLOT_MEMORY_SZ}
+		QOS_SFQ_QDISC_BUCKET_MEMORY_SZ=${QOS_32_SFQ_QDISC_BUCKET_MEMORY_SZ}
+		QOS_FILTER_MEMORY_SZ=${QOS_32_FILTER_MEMORY_SZ}
 
-    echo ${quotient}
-}
+		IPSEC_BASE_PROCESS_SZ=${IPSEC_32_BASE_PROCESS_SZ}
+		IPSEC_SITE_TUNNEL_MEMORY_SZ=${IPSEC_32_SITE_TUNNEL_MEMORY_SZ}
+		IPSEC_SITE_TRAFFIC_MEMORY_SZ=${IPSEC_32_SITE_TRAFFIC_MEMORY_SZ}
+		IPSEC_ACCESS_TUNNEL_MEMORY_SZ=${IPSEC_32_ACCESS_TUNNEL_MEMORY_SZ}
+		IPSEC_ACCESS_TRAFFIC_MEMORY_SZ=${IPSEC_32_ACCESS_TRAFFIC_MEMORY_SZ}
+		DNS_BASE_PROCESS_SZ=${DNS_32_BASE_PROCESS_SZ}
+		DNS_MEMORY_PER_DN_SZ=${DNS_32_MEMORY_PER_DN_SZ}
+		DHCPD_PROCESS_SZ=${DHCPD_32_PROCESS_SZ}
+		SQUID_MD_MEMORY_SZ=${SQUID_MD_32_MEMORY_SZ}
+		SQUID_BASE_PROCESS_SZ=${SQUID_32_BASE_PROCESS_SZ}
+		SQUID_DISKD_PROCESS_SZ=${SQUID_32_DISKD_PROCESS_SZ}
+		SQUID_TCP_CONNECTION_MEMORY_SZ=${SQUID_32_TCP_CONNECTION_MEMORY_SZ}
+		SQUID_SSLM_CONNECTION_MEMORY_SZ=${SQUID_32_SSLM_CONNECTION_MEMORY_SZ}
+		SQUID_SSL_CERTIFICATE_PROCESS_SZ=${SQUID_32_SSL_CERTIFICATE_PROCESS_SZ}
+		SQUID_DNS_ENTRY_CACHE_SZ=${SQUID_32_DNS_ENTRY_CACHE_SZ}
+		GUARD_PROCESS_SZ=${GUARD_32_PROCESS_SZ}
+		HTTPD_WEB_MAIN_PROCESS_SZ=${HTTPD_WEB_32_MAIN_PROCESS_SZ}
+		HTTPD_WEB_CHILD_PROCESS_SZ=${HTTPD_WEB_32_CHILD_PROCESS_SZ}
 
-# Take a decimal number and output it's octal
-octal()
-{
-    test -n "${1}" || return 1
-    local quotient=${1}
+		httpd_rproxy_main_base_process_sz=${HTTPD_RPROXY_32_MAIN_BASE_PROCESS_SZ}
+		httpd_rproxy_child_base_process_sz=${HTTPD_RPROXY_32_CHILD_BASE_PROCESS_SZ}
+		httpd_rproxy_main_rweb_process_sz=${HTTPD_RPROXY_32_MAIN_RWEB_PROCESS_SZ}
+		httpd_rproxy_child_rweb_process_sz=${HTTPD_RPROXY_32_CHILD_RWEB_PROCESS_SZ}
+		httpd_waf_main_base_process_sz=${HTTPD_WAF_32_MAIN_BASE_PROCESS_SZ}
+		httpd_waf_child_base_process_sz=${HTTPD_WAF_32_CHILD_BASE_PROCESS_SZ}
+		httpd_waf_main_rweb_process_sz=${HTTPD_WAF_32_MAIN_RWEB_PROCESS_SZ}
+		httpd_waf_child_rweb_process_sz=${HTTPD_WAF_32_CHILD_RWEB_PROCESS_SZ}
 
-    local remainder octal
+		HTTPD_SERVER_THREADS_PCT8_RPROXY_REQUEST_MEMORY_SZ=${HTTPD_SERVER_THREADS_PCT8_RPROXY_REQUEST_32_MEMORY_SZ}
+		HTTPD_SERVER_THREADS_PCT8_WAF_REQUEST_MEMORY_SZ=${HTTPD_SERVER_THREADS_PCT8_WAF_REQUEST_32_MEMORY_SZ}
 
-    while [ ${quotient} -ne 0 ]
-      do
-      remainder=$[$quotient % 8]
-      octal=${remainder}${octal}
-      quotient=$[${quotient} / 8]
-    done
-    echo ${octal}
+		CLAMAV_PROCESS_SZ=${CLAMAV_32_PROCESS_SZ}
+		FRESHCLAM_PROCESS_SZ=${FRESHCLAM_32_PROCESS_SZ}
+	    fi
+
+	    HTTPD_RPROXY_MAIN_PROCESS_SZ=$[${httpd_rproxy_main_base_process_sz} + ${RWEB_NB} * ${httpd_rproxy_main_rweb_process_sz}]
+	    HTTPD_RPROXY_CHILD_PROCESS_SZ=$[${httpd_rproxy_child_base_process_sz} + ${RWEB_NB} * ${httpd_rproxy_child_rweb_process_sz}]
+	    HTTPD_WAF_MAIN_PROCESS_SZ=$[${httpd_waf_main_base_process_sz} + ${RWEB_NB} * ${httpd_waf_main_rweb_process_sz}]
+	    HTTPD_WAF_CHILD_PROCESS_SZ=$[${httpd_waf_child_base_process_sz} + ${RWEB_NB} * ${httpd_waf_child_rweb_process_sz}]
+	    ;;
+	manager)
+	    FW_MANGLE_RULE_MEMORY_SZ=0
+	    QOS_SFQ_QDISC_OVERHEAD_MEMORY_SZ_PCT=0
+	    QOS_HTB_QDISC_MEMORY_SZ=0
+	    QOS_HTB_CLASS_MEMORY_SZ=0
+	    QOS_SFQ_QDISC_BASE_MEMORY_SZ=0
+	    QOS_SFQ_QDISC_SLOT_MEMORY_SZ=0
+	    QOS_SFQ_QDISC_BUCKET_MEMORY_SZ=0
+	    QOS_FILTER_MEMORY_SZ=0
+
+	    IPSEC_BASE_PROCESS_SZ=0
+	    IPSEC_SITE_TUNNEL_MEMORY_SZ=0
+	    IPSEC_SITE_TRAFFIC_MEMORY_SZ=0
+	    IPSEC_ACCESS_TUNNEL_MEMORY_SZ=0
+	    IPSEC_ACCESS_TRAFFIC_MEMORY_SZ=0
+	    DNS_BASE_PROCESS_SZ=0
+	    DNS_MEMORY_PER_DN_SZ=0
+	    DHCPD_PROCESS_SZ=0
+	    SQUID_MD_MEMORY_SZ=0
+	    SQUID_BASE_PROCESS_SZ=0
+	    SQUID_DISKD_PROCESS_SZ=0
+	    SQUID_TCP_CONNECTION_MEMORY_SZ=0
+	    SQUID_SSLM_CONNECTION_MEMORY_SZ=0
+	    SQUID_SSL_CERTIFICATE_PROCESS_SZ=0
+	    SQUID_DNS_ENTRY_CACHE_SZ=0
+	    GUARD_PROCESS_SZ=0
+	    HTTPD_WEB_MAIN_PROCESS_SZ=0
+	    HTTPD_WEB_CHILD_PROCESS_SZ=0
+
+	    HTTPD_SERVER_THREADS_PCT8_RPROXY_REQUEST_MEMORY_SZ=0
+	    HTTPD_SERVER_THREADS_PCT8_WAF_REQUEST_MEMORY_SZ=0
+
+	    HTTPD_RPROXY_MAIN_PROCESS_SZ=0
+	    HTTPD_RPROXY_CHILD_PROCESS_SZ=0
+	    HTTPD_WAF_MAIN_PROCESS_SZ=0
+	    HTTPD_WAF_CHILD_PROCESS_SZ=0
+
+	    CLAMAV_PROCESS_SZ=0
+	    FRESHCLAM_PROCESS_SZ=0
+	    ;;
+	*)
+	    ;;
+    esac
 }
 
 apply-journal-size()
@@ -570,8 +780,9 @@ gen-dhcpd-conf-tuned()
 {
     test ${APL_ROLE} == 'gateway' || return 0
 
-    local max=$[${USERS_NB} * 2]
+    local max=$[${USERS_NB} * ${DHCP_INTERFACE_NB} * 2]
 
+    echo
     echo -e "class \"limited\" {"
     echo -e "\tmatch if 1 = 1;"
     echo -e "\tlease limit ${max};"
@@ -582,70 +793,111 @@ gen-dhcpd-conf-tuned()
     echo "option appliance.editor \"${COMMERCIAL_NAME}\";"
 }
 
+get-min-httpd-spare-threads()
+{
+    test -n "${1}" || return 1
+    local threads=${1}
+
+    min=$[${threads} / 10]
+    min=$(max-value 1 ${min})
+
+    echo ${min}
+}
+
+get-max-httpd-spare-threads()
+{
+    test -n "${1}" || return 1
+    local threads=${1}
+
+    max=$[${threads} / 4]
+    max=$(max-value 2 ${max})
+
+    echo ${max}
+}
+
 gen-wadmind-conf-tuned()
 {
-    local simultaneous_admin_nb=$[${SIMULTANEOUS_USERS_PCT} * ${MAX_ADMINISTRATORS_NB} / 100]
-    local max=$[${simultaneous_admin_nb} * ${WADMIND_REQUESTS_PER_PAGE}]
-    test ${max} -le 200000 || max=200000
-
-    local min_spare=${simultaneous_admin_nb}
-    local max_spare=$[${min_spare} * 2]
+    local min_spare=$(get-min-httpd-spare-threads ${WADMIND_THREADS_LIMIT})
+    local max_spare=$(get-max-httpd-spare-threads ${WADMIND_THREADS_LIMIT})
 
     echo "StartServers 1"
-    echo "MinSpareServers ${min_spare}"
-    echo "MaxSpareServers ${max_spare}"
-    echo "ServerLimit ${max}"
-    echo "MaxRequestWorkers ${max}"
-    echo "MaxMemFree ${HTTPD_MAIN_PROCESS_SZ}"
-    echo "MaxConnectionsPerChild 5000"
+    echo "MinSpareThreads ${min_spare}"
+    echo "MaxSpareThreads ${max_spare}"
+    echo "ThreadsPerChild ${WADMIND_THREADS_PER_SERVER}"
+    echo "ThreadLimit ${WADMIND_THREADS_PER_SERVER}"
+    echo "ServerLimit ${WADMIND_SERVER_LIMIT}"
+    echo "MaxRequestWorkers ${WADMIND_THREADS_LIMIT}"
+    echo "MaxMemFree 1024"
+    echo "MaxConnectionsPerChild 0"
+    echo "H2MaxSessionStreams ${HTTP2_MAX_SESSION_STREAMS}"
+    echo "H2MinWorkers ${WADMIND_HTTP2_MIN_WORKERS}"
+    echo "H2MaxWorkers ${WADMIND_HTTP2_MAX_WORKERS}"
 }
 
-gen-httpd-noproxy-conf-tuned()
+gen-httpd-simple-conf-tuned()
 {
     test ${APL_ROLE} == 'gateway' || return 0
 
-    local max=${HTTPD_GUARD_SERVER_LIMIT}
-    test ${max} -le 200000 || max=200000
-
-    local max_spare=$[${max} / 2]
-    local min_spare=$[${max_spare} / 2]
+    local min_spare=$(get-min-httpd-spare-threads ${HTTPD_SIMPLE_THREADS_LIMIT})
+    local max_spare=$(get-max-httpd-spare-threads ${HTTPD_SIMPLE_THREADS_LIMIT})
 
     echo "StartServers 1"
-    echo "MinSpareServers ${min_spare}"
-    echo "MaxSpareServers ${max_spare}"
-    echo "ServerLimit ${max}"
-    echo "MaxRequestWorkers ${max}"
-    echo "MaxMemFree ${HTTPD_MAIN_PROCESS_SZ}"
-    echo "MaxConnectionsPerChild 5000"
+    echo "MinSpareThreads ${min_spare}"
+    echo "MaxSpareThreads ${max_spare}"
+    echo "ThreadsPerChild ${HTTPD_SIMPLE_THREADS_PER_SERVER}"
+    echo "ThreadLimit ${HTTPD_SIMPLE_THREADS_PER_SERVER}"
+    echo "ServerLimit ${HTTPD_SIMPLE_SERVER_LIMIT}"
+    echo "MaxRequestWorkers ${HTTPD_SIMPLE_THREADS_LIMIT}"
+    echo "MaxMemFree 1024"
+    echo "MaxConnectionsPerChild 0"
+    echo "H2MaxSessionStreams ${HTTP2_MAX_SESSION_STREAMS}"
+    echo "H2MinWorkers ${HTTPD_SIMPLE_HTTP2_MIN_WORKERS}"
+    echo "H2MaxWorkers ${HTTPD_SIMPLE_HTTP2_MAX_WORKERS}"
 }
 
-gen-httpd-proxy-conf-tuned()
+gen-httpd-guard-conf-tuned()
 {
     test ${APL_ROLE} == 'gateway' || return 0
 
-    local max=${HTTPD_RPROXY_SERVER_LIMIT}
-    test ${max} -le 200000 || max=200000
-
-    local max_spare=$[${max} / 2]
-    local min_spare=$[${max_spare} / 2]
+    local min_spare=$(get-min-httpd-spare-threads ${HTTPD_GUARD_THREADS_LIMIT})
+    local max_spare=$(get-max-httpd-spare-threads ${HTTPD_GUARD_THREADS_LIMIT})
 
     echo "StartServers 1"
-    echo "MinSpareServers ${min_spare}"
-    echo "MaxSpareServers ${max_spare}"
-    echo "ServerLimit ${max}"
-    echo "MaxRequestWorkers ${max}"
-    echo "MaxMemFree ${HTTPD_MAIN_PROCESS_SZ}"
-    echo "MaxConnectionsPerChild 3000"
-
-    echo "ProxyMaxForwards 24"
-    echo "ProxyTimeout 300"
-    echo "ProxyVia Off"
-    echo "ProxyRequests Off"
-
-    echo "Header edit WWW-Authenticate ^[n|N][t|T][l|L][m|M]$ Dummy"
+    echo "MinSpareThreads ${min_spare}"
+    echo "MaxSpareThreads ${max_spare}"
+    echo "ThreadsPerChild ${HTTPD_GUARD_THREADS_PER_SERVER}"
+    echo "ThreadLimit ${HTTPD_GUARD_THREADS_PER_SERVER}"
+    echo "ServerLimit ${HTTPD_GUARD_SERVER_LIMIT}"
+    echo "MaxRequestWorkers ${HTTPD_GUARD_THREADS_LIMIT}"
+    echo "MaxMemFree 2048"
+    echo "MaxConnectionsPerChild 0"
+    echo "H2MaxSessionStreams ${HTTP2_MAX_SESSION_STREAMS}"
+    echo "H2MinWorkers ${HTTPD_GUARD_HTTP2_MIN_WORKERS}"
+    echo "H2MaxWorkers ${HTTPD_GUARD_HTTP2_MAX_WORKERS}"
 }
 
-gen-httpd-proxy-conf-cache-tuned()
+gen-httpd-rproxy-conf-tuned()
+{
+    test ${APL_ROLE} == 'gateway' || return 0
+
+    local min_spare=$(get-min-httpd-spare-threads ${HTTPD_RPROXY_THREADS_LIMIT})
+    local max_spare=$(get-max-httpd-spare-threads ${HTTPD_RPROXY_THREADS_LIMIT})
+
+    echo "StartServers 1"
+    echo "MinSpareThreads ${min_spare}"
+    echo "MaxSpareThreads ${max_spare}"
+    echo "ThreadsPerChild ${HTTPD_RPROXY_THREADS_PER_SERVER}"
+    echo "ThreadLimit ${HTTPD_RPROXY_THREADS_PER_SERVER}"
+    echo "ServerLimit ${HTTPD_RPROXY_SERVER_LIMIT}"
+    echo "MaxRequestWorkers ${HTTPD_RPROXY_THREADS_LIMIT}"
+    echo "MaxMemFree 2048"
+    echo "MaxConnectionsPerChild 0"
+    echo "H2MaxSessionStreams ${HTTP2_MAX_SESSION_STREAMS}"
+    echo "H2MinWorkers ${HTTPD_RPROXY_HTTP2_MIN_WORKERS}"
+    echo "H2MaxWorkers ${HTTPD_RPROXY_HTTP2_MAX_WORKERS}"
+}
+
+gen-httpd-rproxy-conf-cache-tuned()
 {
     test ${APL_ROLE} == 'gateway' || return 0
 
@@ -671,7 +923,8 @@ gen-squid-conf-tuned()
 {
     test ${APL_ROLE} == 'gateway' || return 0	
 
-    local records=${VISITED_SITE_ALL_USERS}
+    local domains=${VISITED_SITE_ALL_USERS}
+    local ips=$[${domains} / 10]
     local ssl_startup=$[${SSL_CERTIFICATE_CHILDREN} / 2 + 1]
     local ssl_idle=$[${ssl_startup} / 2 + 1]
 
@@ -684,13 +937,12 @@ gen-squid-conf-tuned()
     test ${guard_idle} -ne 0 || guard_idle=1
 
     echo "maximum_object_size_in_memory ${MAX_OBJECT_MEMORY_SZ} KB"
-    echo "ipcache_size ${records}"
-    echo "fqdncache_size ${records}"
+    echo "fqdncache_size ${domains}"
+    echo "ipcache_size ${ips}"
     echo "url_rewrite_children ${GUARD_CHILDREN} startup=${guard_startup} idle=${guard_idle}"
     echo "auth_param basic children ${AUTH_CHILDREN}"
     echo "auth_param negotiate children ${AUTH_CHILDREN}"
     echo "sslcrtd_children ${SSL_CERTIFICATE_CHILDREN} startup=${ssl_startup} idle=${ssl_idle}"
-    echo "sslproxy_session_cache_size $[${SSL_SESSION_CACHE_SZ} / 1024] MB"
 }
 
 gen-c-icap-conf-tuned()
@@ -747,7 +999,10 @@ gen-snmpd-conf-httpd-tuned()
 {
     test ${APL_ROLE} == 'gateway' || return 0
 
-    echo "proc httpd ${HTTPD_RPROXY_SERVER_LIMIT} 2"
+    local min=2
+    local max=$[${HTTPD_RPROXY_SERVER_LIMIT} + 1]
+
+    echo "proc httpd ${max} ${min}"
 }
 
 gen-snmpd-conf-c-icap-tuned()
@@ -1062,24 +1317,32 @@ gen-logrotate-system-hourly()
 
 gen-model-conf()
 {
-    local min_os_memory_size=$[${MIN_OS_MEMORY_SIZE} / 1024]
-    local cache_io_memory_sz=$[${CACHE_IO_MEMORY_SZ} / 1024]
-    local squid_initial_process_sz=$[${SQUID_INITIAL_PROCESS_SZ} / 1024]
-    local squid_ssl_mediate_memory_sz=$[${SQUID_SSL_MEDIATE_MEMORY_SZ} / 1024]
-    local ssl_mimic_certificate_cache_sz=$[${SSL_MIMIC_CERTIFICATE_CACHE_SZ} / 1024]
-    local ssl_mimic_certificate_cache_memory_sz=$[${SSL_MIMIC_CERTIFICATE_CACHE_MEMORY_SZ} / 1024]
-    local guard_memory_sz=$[${TOTAL_GUARD_PROCESS_SZ} / 1024]
-    local httpd_guard_memory_sz=$[${HTTPD_GUARD_MEMORY_SZ} / 1024]
-    local proxy_memory_sz=$[${PROXY_MEMORY_SZ} / 1024]
-    local httpd_proxy_memory_sz=$[${HTTPD_PROXY_MEMORY_SZ} / 1024]
-    local cache_clean_memory_sz=$[${CACHE_CLEAN_PROCESS_SZ} / 1024]
-    local dhcpd_memory_sz=$[${DHCPD_MEMORY_SZ} / 1024]
-    local clamav_memory_sz=$[${CLAMAV_MEMORY_SZ} / 1024]
-    local named_memory_sz=$[${NAMED_PROCESS_SZ} / 1024]
     local proxy_cache_sz=$[${PROXY_CACHE_SZ} / 1024]
+    local ssl_mimic_certificate_cache_sz=$[${SSL_MIMIC_CERTIFICATE_CACHE_SZ} / 1024]
     local web_cache_sz=$[${RWEB_CACHE_SZ} / 1024]
+
+    local ipsec_base_process_sz=$[${IPSEC_BASE_PROCESS_SZ} / 1024]
+    local cache_clean_memory_sz=$[${CACHE_CLEAN_PROCESS_SZ} / 1024]
+    local named_memory_sz=$[${NAMED_PROCESS_SZ} / 1024]
+    local squid_base_process_sz=$[${SQUID_BASE_PROCESS_SZ} / 1024]
+    local guard_memory_sz=$[${TOTAL_GUARD_PROCESS_SZ} / 1024]
     local snmpd_memory_sz=$[${SNMPD_PROCESS_SZ} / 1024]
     local ocspd_memory_sz=$[${OCSPD_PROCESS_SZ} / 1024]
+    local dhcpd_memory_sz=$[${DHCPD_MEMORY_SZ} / 1024]
+    local clamav_memory_sz=$[${CLAMAV_MEMORY_SZ} / 1024]
+
+    local min_os_memory_sz=$[${MIN_OS_MEMORY_SZ} / 1024]
+    local qos_memory_sz=$[${QOS_MEMORY_SZ} / 1024]
+    local vpn_ipsec_access_memory_sz=$[${VPN_IPSEC_ACCESS_MEMORY_SZ} / 1024]
+    local ipsec_site_tunnel_memory_sz=$[${IPSEC_SITE_TUNNEL_MEMORY_SZ} / 1024]
+    local ipsec_site_traffic_memory_sz=$[${IPSEC_SITE_TRAFFIC_MEMORY_SZ} / 1024]
+    local cache_io_memory_sz=$[${CACHE_IO_MEMORY_SZ} / 1024]
+    local proxy_sslm_memory_sz=$[${PROXY_SSLM_MEMORY_SZ} / 1024]
+    local ssl_mimic_certificate_cache_memory_sz=$[${SSL_MIMIC_CERTIFICATE_CACHE_MEMORY_SZ} / 1024]
+    local httpd_guard_memory_sz=$[${HTTPD_GUARD_MEMORY_SZ} / 1024]
+    local proxy_tcp_memory_sz=$[${PROXY_TCP_MEMORY_SZ} / 1024]
+    local httpd_rproxy_memory_sz=$[${HTTPD_RPROXY_MEMORY_SZ} / 1024]
+    local httpd_waf_memory_sz=$[${HTTPD_WAF_MEMORY_SZ} / 1024]
 
     cat <<EOF
 # ###########################
@@ -1109,36 +1372,45 @@ EOF
     echo "PERSISTENT_WEB_LOG=${PERSISTENT_WEB_LOG}"
     echo "PERSISTENT_RWEB_LOG=${PERSISTENT_RWEB_LOG}"
     echo
-    echo "MIN_OS_MEMORY_SIZE=${min_os_memory_size}"
-    echo "SSL_MIMIC_CERTIFICATE_CACHE_SZ=${ssl_mimic_certificate_cache_sz}"
-    echo "SSL_MIMIC_CERTIFICATE_CACHE_MEMORY_SZ=${ssl_mimic_certificate_cache_memory_sz}"
-    echo "CACHE_INDEX_OBJECT_MEMORY_SZ=${CACHE_INDEX_OBJECT_MEMORY_SZ}"
-    echo "DEFAULT_STORE_AVERAGE_OBJECT_SZ=${DEFAULT_STORE_AVERAGE_OBJECT_SZ}"
-    echo "MAX_OBJECT_MEMORY_SZ=${MAX_OBJECT_MEMORY_SZ}"
-    echo "CACHE_IO_MEMORY_SZ=${cache_io_memory_sz}"
-    echo "SQUID_INITIAL_PROCESS_SZ=${squid_initial_process_sz}"
-    echo "SQUID_SSL_MEDIATE_MEMORY_SZ=${squid_ssl_mediate_memory_sz}"
-    echo "GUARD_MEMORY_SZ=${guard_memory_sz}"
-    echo "HTTPD_GUARD_MEMORY_SZ=${httpd_guard_memory_sz}"
-    echo "PROXY_MEMORY_SZ=${proxy_memory_sz}"
-    echo "HTTPD_PROXY_MEMORY_SZ=${httpd_proxy_memory_sz}"
-    echo "CACHE_CLEAN_MEMORY_SZ=${cache_clean_memory_sz}"
-    echo "DHCPD_MEMORY_SZ=${dhcpd_memory_sz}"
-    echo "CLAMAV_MEMORY_SZ=${clamav_memory_sz}"
-    echo "NAMED_MEMORY_SZ=${named_memory_sz}"
-    echo "SNMPD_MEMORY_SZ=${snmpd_memory_sz}"
-    echo "OCSPD_MEMORY_SZ=${ocspd_memory_sz}"
     echo "MAX_MEMORY_SZ=${MAX_MEMORY_SZ}"
     echo "MAX_DOWNLOAD_SZ=${MAX_DOWNLOAD_SZ}"
     echo
     echo "AV_EXTENDED_DB_SZ=${AV_EXTENDED_DB_SZ}"
     echo "AV_WHITELIST_SIG_SZ=${AV_WHITELIST_SIG_SZ}"
-    echo "PROXY_CACHE_SZ=${proxy_cache_sz}"
     echo "PROXY_CACHE_UNIT_SZ=${PROXY_CACHE_UNIT_SZ}"
-    echo "RWEB_CACHE_SZ=${web_cache_sz}"
     echo "MAX_UPLOAD_FILE_SZ=${MAX_UPLOAD_FILE_SZ}"
     echo "BACKUP_SZ=${BACKUP_SZ}"
     echo "MAX_KEYTAB_FILE_SZ=${MAX_KEYTAB_FILE_SZ}"
+    echo
+    echo "PROXY_CACHE_SZ=${proxy_cache_sz}"
+    echo "SSL_MIMIC_CERTIFICATE_CACHE_SZ=${ssl_mimic_certificate_cache_sz}"
+    echo "RWEB_CACHE_SZ=${web_cache_sz}"
+    echo
+    echo "IPSEC_BASE_PROCESS_SZ=${ipsec_base_process_sz}"
+    echo "CACHE_CLEAN_MEMORY_SZ=${cache_clean_memory_sz}"
+    echo "NAMED_MEMORY_SZ=${named_memory_sz}"
+    echo "SQUID_BASE_PROCESS_SZ=${squid_base_process_sz}"
+    echo "GUARD_MEMORY_SZ=${guard_memory_sz}"
+    echo "SNMPD_MEMORY_SZ=${snmpd_memory_sz}"
+    echo "OCSPD_MEMORY_SZ=${ocspd_memory_sz}"
+    echo "DHCPD_MEMORY_SZ=${dhcpd_memory_sz}"
+    echo "CLAMAV_MEMORY_SZ=${clamav_memory_sz}"
+    echo
+    echo "MIN_OS_MEMORY_SZ=${min_os_memory_sz}"
+    echo "QOS_MEMORY_SZ=${qos_memory_sz}"
+    echo "VPN_IPSEC_ACCESS_MEMORY_SZ=${vpn_ipsec_access_memory_sz}"
+    echo "IPSEC_SITE_TUNNEL_MEMORY_SZ=${ipsec_site_tunnel_memory_sz}"
+    echo "IPSEC_SITE_TRAFFIC_MEMORY_SZ=${ipsec_site_traffic_memory_sz}"
+    echo "CACHE_IO_MEMORY_SZ=${cache_io_memory_sz}"
+    echo "PROXY_SSLM_MEMORY_SZ=${proxy_sslm_memory_sz}"
+    echo "SSL_MIMIC_CERTIFICATE_CACHE_MEMORY_SZ=${ssl_mimic_certificate_cache_memory_sz}"
+    echo "HTTPD_GUARD_MEMORY_SZ=${httpd_guard_memory_sz}"
+    echo "PROXY_TCP_MEMORY_SZ=${proxy_tcp_memory_sz}"
+    echo "HTTPD_RPROXY_MEMORY_SZ=${httpd_rproxy_memory_sz}"
+    echo "HTTPD_WAF_MEMORY_SZ=${httpd_waf_memory_sz}"
+    echo "SQUID_MD_MEMORY_SZ=${SQUID_MD_MEMORY_SZ}"
+    echo "DEFAULT_STORE_AVERAGE_OBJECT_SZ=${DEFAULT_STORE_AVERAGE_OBJECT_SZ}"
+    echo "MAX_OBJECT_MEMORY_SZ=${MAX_OBJECT_MEMORY_SZ}"
 }
 
 gen-appliance-role()
@@ -1202,7 +1474,7 @@ export SQUID_OPTS=''
 export SQUID_ACTION_RETRY=15
 export KRB5_CONFIG=/etc/krb5.conf
 export KRB5RCACHETYPE=none
-export KRB5_KTNAME=${KERBEROS_KEYTAB_FILE_PROXY1}
+export KRB5_KTNAME=${KERBEROS_KEYTAB_FILE_FPROXY}
 export KRB5RCACHEDIR=${KERBEROS_CACHE_DIR}
 export SSL_MIMIC_CERTIFICATE_CACHE_SZ=${ssl_mimic_certificate_cache_sz}
 EOF
@@ -1362,13 +1634,11 @@ gen-implicit-parameters()
 tune-visited-site()
 {
     test -n "${1}" || return 1
-    test -n "${2}" || return 2
     local users=${1}
-    local rweb=${1}
 
     case ${APL_ROLE} in
 	gateway)
-	    local visited_site_all_users=$[${VISITED_COMMON_SITE} + ${rweb} + (${VISITED_SPECIFIC_SITE_USER} * ${users})]    
+	    local visited_site_all_users=$[${VISITED_COMMON_SITE} + (${VISITED_SPECIFIC_SITE_USER} * ${users})]
 	    VISITED_SITE_ALL_USERS=${visited_site_all_users}
 	    ;;
 	manager)
@@ -1392,18 +1662,6 @@ tune-simultaneous()
 
 	    test ${users} -ge 1 || ((users++))
 	    test ${rusers} -ge 1 || ((rusers++))
-
-	    if test ${users} -lt 5 ; then
-		SIMULTANEOUS_USERS_PCT=100
-	    elif test ${users} -lt 20 ; then
-		SIMULTANEOUS_USERS_PCT=80
-	    elif test ${users} -lt 50 ; then
-		SIMULTANEOUS_USERS_PCT=60
-	    elif test ${users} -lt 100 ; then
-		SIMULTANEOUS_USERS_PCT=30
-	    else
-		:
-	    fi
 
 	    simultaneous_users_nb=$[${SIMULTANEOUS_USERS_PCT} * ${users} / 100]
 
@@ -1465,7 +1723,7 @@ tune-users()
     local rusers=${2}
     local rweb=${3}
 
-    tune-visited-site ${users} ${rweb}
+    tune-visited-site ${users}
     tune-simultaneous ${users} ${rusers}
     tune-user-objects ${users} ${rusers}
 
@@ -1528,12 +1786,123 @@ tune-persistency-states()
     esac
 }
 
+get-power2-near-value()
+{
+    test -n "${1}" || return 1
+    local i=${1}
+
+    local j=1
+
+    while ((j < i)) ; do
+	((j = j << 1))
+    done
+
+    echo ${j}
+}
+
+get-sfq-qdisc-memory-size()
+{
+    test -n "${1}" || return 1
+    local connections=${1}
+
+    local ratio=4
+    local min_flows=16
+    local max_divisor=65536
+    local max_flows=$[65536 / ${ratio}]
+
+    local flows=${connections}
+    if test ${flows} -lt ${min_flows} ; then
+	flows=${min_flows}
+    elif test ${flows} -gt ${max_flows} ; then
+	flows=${max_flows}
+    fi
+
+    local divisor=$[${flows} * ${ratio}]
+    divisor=$(get-power2-near-value ${divisor})
+
+    test ${divisor} -le ${max_divisor} || divisor=${max_divisor}
+
+    local memory_sz=$[${QOS_SFQ_QDISC_BASE_MEMORY_SZ} + ${flows} * ${QOS_SFQ_QDISC_SLOT_MEMORY_SZ} + ${divisor} * ${QOS_SFQ_QDISC_BUCKET_MEMORY_SZ}]
+    local margin=$[${memory_sz} * ${QOS_SFQ_QDISC_OVERHEAD_MEMORY_SZ_PCT} / 100]
+    memory_sz=$[${memory_sz} + ${margin}]
+
+    echo ${memory_sz}
+}
+
+tune-qos()
+{
+    local routed_requests=$[${QOS_AVERAGE_QUEUED_PACKETS_PER_ROUTED_USER} * ${SIMULTANEOUS_USERS_NB}]
+    local peer_requests=$[${SIMULTANEOUS_USERS_NB} * ${USER_PROXY_CONNECTIONS}]
+    local av_client_requests=$[${MAX_ACL_AV_NB} * ${SIMULTANEOUS_USERS_NB}]
+
+    local users2fproxy_requests=$[${SIMULTANEOUS_USERS_NB} * ${USER_PROXY_CONNECTIONS}]
+    local fproxy_2internet_requests=${users2fproxy_requests}
+    local fproxy_requests=$[${users2fproxy_requests} + ${fproxy_2internet_requests}]
+
+    local users2rproxy_requests=$[${SIMULTANEOUS_RUSERS_NB} * ${USER_PROXY_CONNECTIONS}]
+    local rproxy_2real_servers_requests=$[${MAX_RWEB_HOST_NB} * ${RWEB_NB} * ${USER_PROXY_CONNECTIONS}]
+    local rproxy_requests=$[${users2rproxy_requests} + ${rproxy_2real_servers_requests}]
+
+    local queued_packets_memory_sz=$[(${routed_requests} + ${peer_requests} + ${av_client_requests} + ${fproxy_requests} + ${rproxy_requests}) * ${QOS_AVERAGE_SOCKET_BUFFER_SZ}]
+    
+    local fw_base_mangle_memory_sz=$[${QOS_BASE_FW_MANGLE_RULES} * ${FW_MANGLE_RULE_MEMORY_SZ}]
+    local filters_base_memory_sz=$[${QOS_BASE_FILTERS} * ${QOS_FILTER_MEMORY_SZ}]
+    local htb_base_memory_sz=$[${QOS_BASE_HTB_CLASSES} * ${QOS_HTB_CLASS_MEMORY_SZ} + ${QOS_BASE_HTB_QDISCS} * ${QOS_HTB_QDISC_MEMORY_SZ}]
+    local sfq_base_qdisc_memory_sz=$(get-sfq-qdisc-memory-size ${SIMULTANEOUS_USERS_NB})
+    sfq_base_qdisc_memory_sz=$[2 * ${sfq_base_qdisc_memory_sz}]
+
+    local qos_base_memory_sz=$[${fw_base_mangle_memory_sz} + ${queued_packets_memory_sz} + ${filters_base_memory_sz} + ${htb_base_memory_sz} + ${sfq_base_qdisc_memory_sz}]
+
+    local rweb_filters=$[2 * ${MAX_RWEB_HOST_NB} * ${RWEB_NB}]
+    local fw_rweb_mangle_memory_sz=$[${rweb_filters} * ${FW_MANGLE_RULE_MEMORY_SZ}]
+    local filters_rweb_memory_sz=$[${rweb_filters} * ${QOS_FILTER_MEMORY_SZ}]
+    local rweb_htbs=$[4 * ${RWEB_NB}]
+    local htb_rweb_memory_sz=$[${rweb_htbs} * ${QOS_HTB_CLASS_MEMORY_SZ}]
+    local sfq_rweb_qdisc_memory_sz=$(get-sfq-qdisc-memory-size ${SIMULTANEOUS_RUSERS_NB})
+    local qos_rweb_memory_sz=$[${fw_rweb_mangle_memory_sz} + ${filters_rweb_memory_sz} + ${htb_rweb_memory_sz} + ${sfq_rweb_qdisc_memory_sz}]
+
+    local acl_max=$[${MAX_ACL_WEB_NB} + ${MAX_TRANSPARENT_WEB_NB}]
+    local fw_web_access_mangle_memory_sz=$[6 * ${acl_max} * ${FW_MANGLE_RULE_MEMORY_SZ}]
+    local web_access_filters=$[4 * ${acl_max}]
+    local filters_web_access_memory_sz=$[${web_access_filters} * ${QOS_FILTER_MEMORY_SZ}]
+    local web_access_htbs=$[2 * ${acl_max}]
+    local htb_web_access_memory_sz=$[${web_access_htbs} * ${QOS_HTB_CLASS_MEMORY_SZ}]
+    local sfq_web_access_qdisc_memory_sz=$(get-sfq-qdisc-memory-size ${acl_max})
+    local qos_web_access_memory_sz=$[${fw_web_access_mangle_memory_sz} + ${filters_web_access_memory_sz} + ${htb_web_access_memory_sz} + ${sfq_web_access_qdisc_memory_sz}]
+
+    local peer_max=$[4 * ${MAX_PEERS_NB}]
+    local peer_filters=$[2 * ${peer_max}]
+    local fw_peer_mangle_memory_sz=$[${peer_filters} * ${FW_MANGLE_RULE_MEMORY_SZ}]
+    local filters_peer_memory_sz=$[${peer_filters} * ${QOS_FILTER_MEMORY_SZ}]
+    local peer_htbs=$[2 * ${peer_max}]
+    local htb_peer_memory_sz=$[${peer_htbs} * ${QOS_HTB_CLASS_MEMORY_SZ}]
+    local sfq_peer_qdisc_memory_sz=$(get-sfq-qdisc-memory-size ${peer_max})
+    local qos_peer_memory_sz=$[${fw_peer_mangle_memory_sz} + ${filters_peer_memory_sz} + ${htb_peer_memory_sz} + ${sfq_peer_qdisc_memory_sz}]
+
+    local av_client_filters=$[2 * ${MAX_ACL_AV_NB}]
+    local fw_av_client_mangle_memory_sz=$[${av_client_filters} * ${FW_MANGLE_RULE_MEMORY_SZ}]
+    local filters_av_client_memory_sz=$[${av_client_filters} * ${QOS_FILTER_MEMORY_SZ}]
+    local av_client_htbs=$[2 * ${MAX_ACL_AV_NB}]
+    local htb_av_client_memory_sz=$[${av_client_htbs} * ${QOS_HTB_CLASS_MEMORY_SZ}]
+    local sfq_av_client_qdisc_memory_sz=$(get-sfq-qdisc-memory-size ${MAX_ACL_AV_NB})
+    local qos_av_client_memory_sz=$[${fw_av_client_mangle_memory_sz} + ${filters_av_client_memory_sz} + ${htb_av_client_memory_sz} + ${sfq_av_client_qdisc_memory_sz}]
+
+    local router_filters=$[2 * ${MAX_QOS_SHAPE_ROUTER_RULES_NB}]
+    local filters_router_memory_sz=$[${router_filters} * ${QOS_FILTER_MEMORY_SZ}]
+    local router_htbs=$[2 * ${MAX_QOS_SHAPE_ROUTER_RULES_NB}]
+    local htb_router_memory_sz=$[${router_htbs} * ${QOS_HTB_CLASS_MEMORY_SZ}]
+    local sfq_router_qdisc_memory_sz=$(get-sfq-qdisc-memory-size ${MAX_QOS_SHAPE_ROUTER_RULES_NB})
+    local qos_router_memory_sz=$[${filters_router_memory_sz} + ${htb_router_memory_sz} + ${sfq_router_qdisc_memory_sz}]
+
+    local qos_memory_sz=$[(${qos_base_memory_sz} + ${qos_rweb_memory_sz} + ${qos_web_access_memory_sz} + ${qos_peer_memory_sz} + ${qos_av_client_memory_sz} + ${qos_router_memory_sz}) / 1024]
+    QOS_MEMORY_SZ=${qos_memory_sz}
+}
+
 tune-named()
 {
     case ${APL_ROLE} in
 	gateway)
-	    local named_process_sz=$[${DNS_MEMORY_PER_DN_SZ} * ${VISITED_SITE_ALL_USERS} ]
-	    test ${named_process_sz} -ge 2048 || named_process_sz=2048
+	    local named_process_sz=$[${DNS_BASE_PROCESS_SZ} + (${DNS_MEMORY_PER_DN_SZ} * ${VISITED_SITE_ALL_USERS} * ${DNS_CACHE_TTL_DAYS}) / 1024 ]
 	    NAMED_PROCESS_SZ=${named_process_sz}
 	    ;;
 	manager)
@@ -1541,21 +1910,153 @@ tune-named()
 	    ;;
 	*)
 	    ;;
-    esac 
+    esac
+}
+
+get-http-simultaneous-connecions()
+{
+    test -n "${1}" || return 1
+    local users=${1}
+
+    local connexions=$[${users} * ${BROWSER_HTTP2_CONNECTIONS_PER_DOMAIN}]
+    echo ${connexions}
+}
+
+get-httpd-server-limit()
+{
+    test -n "${1}" || return 1
+    local threads=${1}
+
+    local limit=$[${threads} * ${HTTPD_SERVER_THREADS_PCT} / 100]
+    test ${limit} -ge 1 || limit=1
+    echo ${limit}
+}
+
+get-http2-workers-limits()
+{
+    test -n "${1}" || return 1
+    local threads=${1}
+
+    local hard_max=100
+    local hard_min=2
+    local ratio=4
+
+    local max=$(echo "sqrt(${threads}.0) * ${HTTP2_MAX_WORKERS_FACTOR}" | bc)
+
+    max=$(ceil-value ${max})
+    max=$(min-value ${hard_max} ${max})
+    max=$(max-value ${hard_min} ${max})
+
+    local min=$[${max} / ${HTTP2_MIN_WORKERS_DIVIDER}]
+    min=$(max-value 1 ${min})
+
+    echo ${min}:${max}
+}
+
+tune-wadmind()
+{
+    local simultaneous_admin_nb=$[${MAX_ADMINISTRATORS_NB} / 4]
+
+    local wadmind_threads_limit=$(get-http-simultaneous-connecions ${simultaneous_admin_nb})
+    local wadmind_server_limit=$(get-httpd-server-limit ${wadmind_threads_limit})
+
+    test ${wadmind_server_limit} -le 200000 || wadmind_server_limit=200000
+
+    local wadmind_threads_per_server=$[${wadmind_threads_limit} / ${wadmind_server_limit}]
+    test ${wadmind_threads_per_server} -le 200000 || wadmind_threads_per_server=200000
+
+    ((wadmind_threads_limit /= wadmind_threads_per_server))
+    ((wadmind_threads_limit *= wadmind_threads_per_server))
+    ((wadmind_server_limit = wadmind_threads_limit / wadmind_threads_per_server))
+
+    local http2_min_max_workers=$(get-http2-workers-limits ${wadmind_threads_limit})
+    local http2_min_workers=${http2_min_max_workers/:*}
+    local http2_max_workers=${http2_min_max_workers/*:}
+
+    WADMIND_SERVER_LIMIT=${wadmind_server_limit}
+    WADMIND_THREADS_LIMIT=${wadmind_threads_limit}
+    WADMIND_THREADS_PER_SERVER=${wadmind_threads_per_server}
+    WADMIND_HTTP2_MIN_WORKERS=${http2_min_workers}
+    WADMIND_HTTP2_MAX_WORKERS=${http2_max_workers}
+}
+
+tune-httpd-simple()
+{
+    case ${APL_ROLE} in
+	gateway)
+	    local users=$[${SIMULTANEOUS_USERS_NB} / 5]
+	    test ${users} -ne 0 || users=1
+
+	    local httpd_simple_threads_limit=$(get-http-simultaneous-connecions ${users})
+	    local httpd_simple_server_limit=$(get-httpd-server-limit ${httpd_simple_threads_limit})
+
+	    test ${httpd_simple_server_limit} -le 200000 || httpd_simple_server_limit=200000
+
+	    local httpd_simple_threads_per_server=$[${httpd_simple_threads_limit} / ${httpd_simple_server_limit}]
+	    test ${httpd_simple_threads_per_server} -le 200000 || httpd_simple_threads_per_server=200000
+
+	    ((httpd_simple_threads_limit /= httpd_simple_threads_per_server))
+	    ((httpd_simple_threads_limit *= httpd_simple_threads_per_server))
+	    ((httpd_simple_server_limit = httpd_simple_threads_limit / httpd_simple_threads_per_server))
+
+	    local http2_min_max_workers=$(get-http2-workers-limits ${httpd_simple_threads_limit})
+	    local http2_min_workers=${http2_min_max_workers/:*}
+	    local http2_max_workers=${http2_min_max_workers/*:}
+
+	    HTTPD_SIMPLE_SERVER_LIMIT=${httpd_simple_server_limit}
+	    HTTPD_SIMPLE_THREADS_LIMIT=${httpd_simple_threads_limit}
+	    HTTPD_SIMPLE_THREADS_PER_SERVER=${httpd_simple_threads_per_server}
+	    HTTPD_SIMPLE_HTTP2_MIN_WORKERS=${http2_min_workers}
+	    HTTPD_SIMPLE_HTTP2_MAX_WORKERS=${http2_max_workers}
+	    ;;
+	manager)
+	    HTTPD_SIMPLE_THREADS_LIMIT=0
+	    HTTPD_SIMPLE_SERVER_LIMIT=0
+	    HTTPD_SIMPLE_THREADS_PER_SERVER=0
+	    HTTPD_SIMPLE_HTTP2_MIN_WORKERS=0
+	    HTTPD_SIMPLE_HTTP2_MAX_WORKERS=0
+	    ;;
+	*)
+	    ;;
+    esac
 }
 
 tune-httpd-guard()
 {
     case ${APL_ROLE} in
 	gateway)
-	    local in_error_req_pct=$[${ILLEGAL_REQUEST_PCT} + ${VIRUS_REQUEST_PCT} + ${GUARD_BLOCKED_PCT} + ${WAF_BLOCKED_PCT}]
-	    local server_limit=$[${SIMULTANEOUS_USERS_NB} * ${AVERAGE_OBJECTS_PER_PAGE} * ${in_error_req_pct} / 100]
-	    test ${server_limit} -ne 0 || server_limit=1
+	    local in_error_req_pct=$[${VIRUS_REQUEST_PCT} + ${GUARD_BLOCKED_PCT}]
+	    local in_error_users=$[${SIMULTANEOUS_USERS_NB} * ${AVERAGE_OBJECTS_PER_PAGE} * ${in_error_req_pct} / 100]
+	    test ${in_error_users} -ne 0 || in_error_users=1
 
-	    HTTPD_GUARD_SERVER_LIMIT=${server_limit}
+	    local httpd_guard_threads_limit=$(get-http-simultaneous-connecions ${in_error_users})
+	    local httpd_guard_server_limit=$(get-httpd-server-limit ${httpd_guard_threads_limit})
+
+	    test ${httpd_guard_server_limit} -le 200000 || httpd_guard_server_limit=200000
+
+	    local httpd_guard_threads_per_server=$[${httpd_guard_threads_limit} / ${httpd_guard_server_limit}]
+	    test ${httpd_guard_threads_per_server} -le 200000 || httpd_guard_threads_per_server=200000
+
+	    ((httpd_guard_threads_limit /= httpd_guard_threads_per_server))
+	    ((httpd_guard_threads_limit *= httpd_guard_threads_per_server))
+	    ((httpd_guard_server_limit = httpd_guard_threads_limit / httpd_guard_threads_per_server))
+
+	    local http2_min_max_workers=$(get-http2-workers-limits ${httpd_guard_threads_limit})
+	    local http2_min_workers=${http2_min_max_workers/:*}
+	    local http2_max_workers=${http2_min_max_workers/*:}
+
+	    HTTPD_GUARD_SERVER_LIMIT=${httpd_guard_server_limit}
+	    HTTPD_GUARD_THREADS_LIMIT=${httpd_guard_threads_limit}
+	    HTTPD_GUARD_THREADS_PER_SERVER=${httpd_guard_threads_per_server}
+	    HTTPD_GUARD_HTTP2_MIN_WORKERS=${http2_min_workers}
+	    HTTPD_GUARD_HTTP2_MAX_WORKERS=${http2_max_workers}
 	    ;;
 	manager)
+	    HTTPD_GUARD_THREADS_LIMIT=0
 	    HTTPD_GUARD_SERVER_LIMIT=0
+	    HTTPD_GUARD_THREADS_PER_SERVER=0
+	    HTTPD_GUARD_HTTP2_MIN_WORKERS=0
+	    HTTPD_GUARD_HTTP2_MAX_WORKERS=0
 	    ;;
 	*)
 	    ;;
@@ -1566,17 +2067,34 @@ tune-httpd-rproxy()
 {
     case ${APL_ROLE} in
 	gateway)
-	    local direct_rusers=$[${SIMULTANEOUS_RUSERS_NB} * ${DIRECT_RUSERS_PCT} / 100]
-	    local via_proxy_rusers=$[${SIMULTANEOUS_RUSERS_NB} - ${direct_rusers}]
+	    local httpd_rproxy_threads_limit=$(get-http-simultaneous-connecions ${SIMULTANEOUS_RUSERS_NB})
+	    local httpd_rproxy_server_limit=$(get-httpd-server-limit ${httpd_rproxy_threads_limit})
 
-	    local direct_connections=$[${direct_rusers} * ${FIREFOX_CONNECTIONS_PER_RWEB}]
-	    local via_proxy_connections=$[${via_proxy_rusers} * ${FIREFOX_VIA_PROXY_CONNECTIONS_PER_RWEB}]
-	    local server_limit=$[${direct_connections} + ${via_proxy_connections}]
+	    test ${httpd_rproxy_server_limit} -le 200000 || httpd_rproxy_server_limit=200000
 
-	    HTTPD_RPROXY_SERVER_LIMIT=${server_limit}
+	    local httpd_rproxy_threads_per_server=$[${httpd_rproxy_threads_limit} / ${httpd_rproxy_server_limit}]
+	    test ${httpd_rproxy_threads_per_server} -le 200000 || httpd_rproxy_threads_per_server=200000
+
+	    ((httpd_rproxy_threads_limit /= httpd_rproxy_threads_per_server))
+	    ((httpd_rproxy_threads_limit *= httpd_rproxy_threads_per_server))
+	    ((httpd_rproxy_server_limit = httpd_rproxy_threads_limit / httpd_rproxy_threads_per_server))
+
+	    local http2_min_max_workers=$(get-http2-workers-limits ${httpd_rproxy_threads_limit})
+	    local http2_min_workers=${http2_min_max_workers/:*}
+	    local http2_max_workers=${http2_min_max_workers/*:}
+
+	    HTTPD_RPROXY_SERVER_LIMIT=${httpd_rproxy_server_limit}
+	    HTTPD_RPROXY_THREADS_LIMIT=${httpd_rproxy_threads_limit}
+	    HTTPD_RPROXY_THREADS_PER_SERVER=${httpd_rproxy_threads_per_server}
+	    HTTPD_RPROXY_HTTP2_MIN_WORKERS=${http2_min_workers}
+	    HTTPD_RPROXY_HTTP2_MAX_WORKERS=${http2_max_workers}
 	    ;;
 	manager)
+	    HTTPD_RPROXY_THREADS_LIMIT=0
 	    HTTPD_RPROXY_SERVER_LIMIT=0
+	    HTTPD_RPROXY_THREADS_PER_SERVER=0
+	    HTTPD_RPROXY_HTTP2_MIN_WORKERS=0
+	    HTTPD_RPROXY_HTTP2_MAX_WORKERS=0
 	    ;;
 	*)
 	    ;;
@@ -1988,10 +2506,10 @@ tune-daemon-log-sz()
     case ${APL_ROLE} in
 	gateway)
 	    # DHCP daemon
-	    local size_day1=$[(\
-			       ${LOG_DHCPD_START_SZ} * ${DHCPD_START_PER_DAY} + \
-			       ${LOG_DHCPD_PER_USER_SZ} * ${LOG_DHCPD_PER_USER_PER_DAY} * ${USERS_NB} \
-			     ) / 1024]
+	    local size_day1=$[(${LOG_DHCPD_START_SZ} * ${DHCPD_START_PER_DAY} +
+			       ${LOG_DHCPD_PER_USER_SZ} * ${LOG_DHCPD_PER_USER_PER_DAY} *
+			       ${USERS_NB} * ${DHCP_INTERFACE_NB}
+			      ) / 1024]
 
 	    ;;
 	manager)
@@ -2080,7 +2598,7 @@ tune-ocspd()
     case ${APL_ROLE} in
 	gateway)
 	    local request_sz=8
-	    local requests=$[${SIMULTANEOUS_USERS_NB} + ${SIMULTANEOUS_RUSERS_NB}]
+	    local requests=$[(${SIMULTANEOUS_USERS_NB} + ${SIMULTANEOUS_RUSERS_NB}) / 5]
 	    local ocspd_child_nb=$[${requests} / ${REQUESTS_PER_OCSPD} + 1]
 	    local ocspd_child_process_sz=$[${OCSPD_INITIAL_PROCESS_SZ} + (${REQUESTS_PER_OCSPD} * ${request_sz})]
 	    local ocspd_process_sz=$[${OCSPD_INITIAL_PROCESS_SZ} + (${ocspd_child_nb} * ${ocspd_child_process_sz})]
@@ -2221,7 +2739,7 @@ tune-dhcp-leases-sz()
 {
     case ${APL_ROLE} in
 	gateway)
-	    local max=$[${USERS_NB} * 2]
+	    local max=$[${USERS_NB} * ${DHCP_INTERFACE_NB} * 2]
 
 	    local dhcp_leases_sz=$[( (${DHCP_LEASE_PEER_SZ} * ${DHCPD_START_PER_DAY}) + \
 				     ((${DHCP_LEASE_HEADER_SZ} + ${DHCP_LEASE_SZ}) * ${max} * 24) \
@@ -2334,7 +2852,7 @@ gen-cache-info()
     local proxy_cache_sz=$(minus-journal-size reiserfs ${fs_proxy_cache_sz})
     proxy_cache_sz=$(get-cache-conf-sz ${proxy_cache_sz})
 
-    local cache_nb=$[(${SIMULTANEOUS_USERS_NB} + ${SIMULTANEOUS_RUSERS_NB}) / ${USERS_PER_DISKD}]
+    local cache_nb=$[${SIMULTANEOUS_USERS_NB} / ${USERS_PER_DISKD}]
     test ${cache_nb} -ge 3 || cache_nb=3
     local proxy_cache_unit_sz=$[${proxy_cache_sz} / ${cache_nb}]
 
@@ -2359,7 +2877,25 @@ tune-memory()
     MEMORY_SZ=${memory_sz}
 }
 
-tune-memory-storage()
+get-httpd-http2-overhead-memory-sz()
+{
+    test -n "${1}" || return 1
+    local max_workers=${1}
+
+    if test ${max_workers} -eq 0 ; then
+	echo 0
+	return 0
+    fi
+
+    local connections_sz=$[${SIMULTANEOUS_RUSERS_NB} * ${BROWSER_HTTP2_CONNECTIONS_PER_DOMAIN} * ${HTTPD_HTTP2_OVERHEAD_CONNECTION_MEMORY_SZ}]
+    local streams_sz=$[${SIMULTANEOUS_RUSERS_NB} * ${HTTP2_MAX_SESSION_STREAMS} * ${HTTPD_HTTP2_OVERHEAD_STREAM_MEMORY_SZ}]
+    local max_workers_sz=$[${max_workers} * ${HTTPD_HTTP2_WORKER_STREAM_MEMORY_SZ}]
+
+    local total_sz=$[${connections_sz} + ${streams_sz} + ${max_workers_sz}]
+    echo ${total_sz}
+}
+
+tune-memory+storage()
 {
     test -n "${1}" || return 1
     test -n "${2}" || return 2
@@ -2368,15 +2904,13 @@ tune-memory-storage()
     test -n "${5}" || return 5
     test -n "${6}" || return 6
     test -n "${7}" || return 7
-    test -n "${8}" || return 8
-    local users_nb=${1}
-    local memory_sz=${2}
-    local records=${3}
-    local rweb_cache_sz=${4}
-    local max_upload_file_sz=${5}
-    local rweb_nb=${6}
-    local gateway_nb=${7}
-    local template_nb=${8}
+    local memory_sz=${1}
+    local records=${2}
+    local rweb_cache_sz=${3}
+    local max_upload_file_sz=${4}
+    local rweb_nb=${5}
+    local gateway_nb=${6}
+    local template_nb=${7}
 
     local env_file_sz=$[${ENV_FILE_SZ} * 3]
     local tmp_ssh_key_sz=$[${SSH_KEY_SZ} * ${MAX_SSH_KEY_NB}]
@@ -2396,6 +2930,7 @@ tune-memory-storage()
 
     case ${APL_ROLE} in
 	gateway)
+	    local fw_connections_memory_sz=$[(${FW_ETC_CONNECTIONS} + ${MAX_FW_RULES_NB}) * ${FW_CONNECTION_MEMORY_SZ} / 1024]
 	    local tls_server_sz=$[${TLS_SERVER_SZ} * ${rweb_nb} * ${TLS_NB_FACTOR}]
 	    local tls_client_sz=$[${TLS_CLIENT_SZ} * ${USERS_NB} * ${TLS_NB_FACTOR}]
 	    local av_extended_db_sz=$[(${AV_EXTENDED_DB_SZ} * 2) + (${AV_EXTENDED_DB_SZ} / ${COMPRESS_AV_EXTENDED_RATIO})]
@@ -2403,23 +2938,32 @@ tune-memory-storage()
 	    local validity_months=$[365 / ${KERBEROS_PASSWORD_VALIDITY_DAYS} * 2]
 	    local max_keytab_file_sz=$[(${validity_months} * (${rweb_nb} + 1) * ${KEYTAB_FILE_PER_SERVICE_SZ} / 1024) + 1]
 
-	    local squid_network_all_io_sz=$[${BURST_FACTOR} * (${SIMULTANEOUS_USERS_NB} + ${SIMULTANEOUS_RUSERS_NB}) * ${SQUID_NETWORK_IO_SZ}]
-	    local squid_dns_sz=$[${VISITED_SITE_ALL_USERS} * ${SQUID_IP_CACHE_SZ} * 2 / 1024]
-	    local squid_request_reply_sz=$[${VISITED_SITE_ALL_USERS} * ${SQUID_REQUEST_REPLY_SZ}]
-	    local proxy_memory_sz=$[${SQUID_INITIAL_PROCESS_SZ} + ${squid_network_all_io_sz} + ${squid_dns_sz} + ${squid_request_reply_sz}]
+	    local squid_dns_sz=$[${VISITED_SITE_ALL_USERS} * ${SQUID_DNS_ENTRY_CACHE_SZ} / 1024]
+	    local squid_tcp_connections_sz=$[${SIMULTANEOUS_USERS_NB} * ${USER_PROXY_CONNECTIONS} * ${SQUID_TCP_CONNECTION_MEMORY_SZ}]
+	    local squid_sslm_connections_sz=$[${SIMULTANEOUS_USERS_NB} * ${USER_PROXY_CONNECTIONS} * ${SQUID_SSLM_CONNECTION_MEMORY_SZ}]
+	    local proxy_base_memory_sz=$[${SQUID_BASE_PROCESS_SZ} + ${squid_dns_sz}]
+	    local proxy_tcp_memory_sz=$[${proxy_base_memory_sz} + ${squid_tcp_connections_sz}]
+
+	    local ssl_mimic_certificate_cache_sz=$[${VISITED_SITE_ALL_USERS} * ${TLS_CERTIFICATE_PAIR_SZ} * 31]
+	    local ssl_mimic_certificate_cache_memory_sz=$[${ssl_mimic_certificate_cache_sz} * ${SSL_MIMIC_CERTIFICATE_CACHE_MEMORY_PCT} / 100]
+	    local proxy_sslm_memory_sz=$[${proxy_base_memory_sz} + ${squid_sslm_connections_sz} + (${SSL_CERTIFICATE_CHILDREN} * ${SQUID_SSL_CERTIFICATE_PROCESS_SZ}) + ${ssl_mimic_certificate_cache_memory_sz}]
 	    local admin_var_urllists_size=0
 
 	    tmp_ssh_key_sz=$[${tmp_ssh_key_sz} / 1024]
 	    ssh_key_sz=$[${ssh_key_sz} / 1024]
 	    ;;
 	manager)
+	    local fw_connections_memory_sz=$[${FW_ETC_CONNECTIONS} * ${FW_CONNECTION_MEMORY_SZ} / 1024]
 	    local manager_factor=$[${template_nb} + ${gateway_nb}]
 	    local tls_server_sz=$[${TLS_SERVER_SZ} * ${MANAGER_TOTAL_RWEB_NB} * ${TLS_NB_FACTOR} * ${manager_factor}]
 	    local tls_client_sz=$[${TLS_CLIENT_SZ} * ${MANAGER_TOTAL_USERS_NB} * ${TLS_NB_FACTOR} * ${gateway_nb}]
 	    local av_extended_db_sz=$[${AV_EXTENDED_DB_SZ} * 2 / ${COMPRESS_AV_EXTENDED_RATIO}]
 	    local av_db_sz=${av_extended_db_sz}
 	    local max_keytab_file_sz=0
-	    local proxy_memory_sz=0
+	    local proxy_tcp_memory_sz=0
+	    local ssl_mimic_certificate_cache_sz=0
+	    local ssl_mimic_certificate_cache_memory_sz=0
+	    local proxy_sslm_memory_sz=0
 	    local admin_var_urllists_size=${urllists_gz_size}
 
 	    env_file_sz=$[${env_file_sz} + (${manager_factor} * ${ENV_FILE_SZ} * 3)]
@@ -2431,6 +2975,8 @@ tune-memory-storage()
 	    ;;
     esac
 
+    local ipsec_access_memory_sz=$[${IPSEC_BASE_PROCESS_SZ} + ${SIMULTANEOUS_USERS_NB} * (${IPSEC_ACCESS_TUNNEL_MEMORY_SZ} + ${IPSEC_ACCESS_TRAFFIC_MEMORY_SZ})]
+
     # AV scan for large files occupation in /var/tmp
     local av_tmp_sz=$[(${USERS_NB} + (${BURST_FACTOR} * ${RUSERS_NB})) * ${DEFAULT_STORE_AVERAGE_OBJECT_SZ}]
 
@@ -2440,9 +2986,6 @@ tune-memory-storage()
 
     local fs_gateway_log_per_day_sz=$(plus-journal-size ext4 ${GATEWAY_LOG_PER_DAY_SZ})
     fs_gateway_log_per_day_sz=$(lvm-adjust-size ${fs_gateway_log_per_day_sz})
-
-    local ssl_mimic_certificate_cache_sz=$[${VISITED_SITE_ALL_USERS} * ${TLS_CERTIFICATE_PAIR_SZ} * 31]
-    local ssl_mimic_certificate_cache_memory_sz=$[${ssl_mimic_certificate_cache_sz} * ${SSL_MIMIC_CERTIFICATE_CACHE_MEMORY_PCT} / 100]
 
     local flat_sslmediate_exception_size=$[${URLLIST_DOMAIN_RECORD_SZ} * ${records} / 1024]
     local squid_sslmediate_exception_size=$[(${URLLIST_DOMAIN_RECORD_SZ} + 1) * ${records} / 1024]
@@ -2474,26 +3017,37 @@ tune-memory-storage()
     local fs_admin_var_sz=$(plus-journal-size ext4 ${admin_var_sz})
     fs_admin_var_sz=$(lvm-adjust-size ${fs_admin_var_sz})
 
-    local httpd_noproxy_memory_sz=$[${HTTPD_MAIN_PROCESS_SZ} + (${BURST_FACTOR} * ${HTTPD_CHILD_NOPROXY_PROCESS_SZ})]
-    local httpd_guard_memory_sz=$[${HTTPD_GUARD_SERVER_LIMIT} * ${HTTPD_CHILD_NOPROXY_PROCESS_SZ}]
+    local wadmind_http2_memory_sz=$(get-httpd-http2-overhead-memory-sz ${WADMIND_HTTP2_MAX_WORKERS})
+    local wadmind_memory_sz=$[${WADMIND_MAIN_PROCESS_SZ} + (${WADMIND_CHILD_PROCESS_SZ} * ${WADMIND_SERVER_LIMIT}) + ${wadmind_http2_memory_sz}]
+
+    local httpd_simple_http2_memory_sz=$(get-httpd-http2-overhead-memory-sz ${HTTPD_SIMPLE_HTTP2_MAX_WORKERS})
+    local httpd_simple_process_sz=$[${HTTPD_WEB_MAIN_PROCESS_SZ} + (${HTTPD_WEB_CHILD_PROCESS_SZ} * ${HTTPD_SIMPLE_SERVER_LIMIT}) + ${httpd_simple_http2_memory_sz}]
+
+    local httpd_guard_http2_memory_sz=$(get-httpd-http2-overhead-memory-sz ${HTTPD_GUARD_HTTP2_MAX_WORKERS})
+    local httpd_guard_memory_sz=$[${HTTPD_WEB_MAIN_PROCESS_SZ} + ${HTTPD_GUARD_SERVER_LIMIT} * ${HTTPD_WEB_CHILD_PROCESS_SZ} + ${httpd_guard_http2_memory_sz}]
+
+    local httpd_rproxy_http2_memory_sz=$(get-httpd-http2-overhead-memory-sz ${HTTPD_RPROXY_HTTP2_MAX_WORKERS})
+    local httpd_rproxy_memory_sz=$[${HTTPD_RPROXY_MAIN_PROCESS_SZ} + (${HTTPD_RPROXY_CHILD_PROCESS_SZ} + ${HTTPD_SERVER_THREADS_PCT8_RPROXY_REQUEST_MEMORY_SZ}) * ${HTTPD_RPROXY_SERVER_LIMIT} + ${httpd_rproxy_http2_memory_sz}]
+    local httpd_waf_memory_sz=$[${HTTPD_WAF_MAIN_PROCESS_SZ} + (${HTTPD_WAF_CHILD_PROCESS_SZ} + ${HTTPD_SERVER_THREADS_PCT8_WAF_REQUEST_MEMORY_SZ}) * ${HTTPD_RPROXY_SERVER_LIMIT} + ${httpd_rproxy_http2_memory_sz}]
+
     local upload_size=$[${SIMULTANEOUS_RUSERS_NB} * ${max_upload_file_sz}]
 
-    local fs_swap_sz=$[${users_nb} * ${FS_SYS_SWAP_USER_SZ} + ${memory_sz}]
+    local fs_swap_sz=$[($[${SIMULTANEOUS_USERS_NB} + ${SIMULTANEOUS_RUSERS_NB}]) * ${FS_SYS_SWAP_USER_SZ} + ${memory_sz}]
     fs_swap_sz=$(lvm-adjust-size ${fs_swap_sz})
 
-    local min_os_memory_size=$[${KERNEL_PROCESS_SZ} + (${HTTPD_MAIN_PROCESS_SZ} * 2) + ${httpd_noproxy_memory_sz} + ${SSHD_PROCESS_SZ} + (${WADMIND_PROCESS_SZ} * 2)]
+    local min_os_memory_sz=$[${KERNEL_PROCESS_SZ} + ${fw_connections_memory_sz} + ${httpd_simple_process_sz} + ${SSHD_PROCESS_SZ} + ${wadmind_memory_sz}]
 
-    local free_memory_sz=$[${MEMORY_SZ} - ${min_os_memory_size}]
+    local free_memory_sz=$[${MEMORY_SZ} - ${min_os_memory_sz}]
     test ${free_memory_sz} -gt 0 || error 1
 
     local rweb_cache_upload_sz=${upload_size}
 
     if test ${PERSISTENT_CACHE} == True ; then
 	rweb_cache_upload_sz=$[${rweb_cache_upload_sz} + ${rweb_cache_sz}]
-	local max_objects_in_cache=$[${free_memory_sz} / ${CACHE_INDEX_OBJECT_MEMORY_SZ}]
+	local max_objects_in_cache=$[${free_memory_sz} / ${SQUID_MD_MEMORY_SZ}]
 	local swap_state_sz=$[${SWAP_STAT_RECORD_SZ} * ${max_objects_in_cache} / 1024]
     else
-	CACHE_INDEX_OBJECT_MEMORY_SZ=0
+	SQUID_MD_MEMORY_SZ=0
 	local swap_state_sz=0
     fi
 
@@ -2550,50 +3104,53 @@ tune-memory-storage()
 	local objects_per_diskd=$[${PROXY_CACHE_SZ}/${PROXY_CACHE_NB}/${DEFAULT_STORE_AVERAGE_OBJECT_SZ}]
 	test ${objects_per_diskd} -le ${MAX_OBJECTS_PER_CACHE_DIR} || warning 13
 
-	local min_cache_index_sz=$[${CACHE_INDEX_OBJECT_MEMORY_SZ} * ${MIN_OBJECTS_IN_CACHE} / 1024]
+	local min_cache_index_sz=$[${SQUID_MD_MEMORY_SZ} * ${MIN_OBJECTS_IN_CACHE} / 1024]
 	local margin=$[${min_cache_index_sz} * ${STORE_ERROR_PCT} / 100]
 	min_cache_index_sz=$[${min_cache_index_sz} + ${margin}]
 
-	local cache_disk_io_memory_sz=$[(${BURST_FACTOR} * (${SIMULTANEOUS_USERS_NB} + ${SIMULTANEOUS_RUSERS_NB}) * ${DEFAULT_STORE_AVERAGE_OBJECT_SZ}) + (${PROXY_CACHE_NB} * ${SQUID_DISKD_PROCESS_SZ})]
+	local cache_disk_io_memory_sz=$[(${BURST_FACTOR} * ${SIMULTANEOUS_USERS_NB} * ${DEFAULT_STORE_AVERAGE_OBJECT_SZ}) + (${PROXY_CACHE_NB} * ${SQUID_DISKD_PROCESS_SZ})]
 	local cache_io_memory_sz=$[${min_cache_index_sz} + ${cache_disk_io_memory_sz}]
     else
 	local cache_disk_io_memory_sz=0
 	local cache_io_memory_sz=0
     fi
 
-    local squid_ssl_mediate_memory_sz=$[(${SSL_CERTIFICATE_CHILDREN} * ${SSL_CERTIFICATE_PROCESS_SZ}) + (${SSL_SESSION_CACHE_SZ} * ${SIMULTANEOUS_RUSERS_NB}) + ${ssl_mimic_certificate_cache_memory_sz}]
-    local httpd_proxy_memory_sz=$[${HTTPD_MAIN_PROCESS_SZ} + (${BURST_FACTOR} * ${HTTPD_CHILD_PROXY_PROCESS_SZ} * ${SIMULTANEOUS_RUSERS_NB})]
-    local lease_memory_sz=$[${USERS_NB} * ${DHCP_LEASE_SZ} * 2 / 1024]
+    local lease_memory_sz=$[${USERS_NB} * ${DHCP_LEASE_SZ} * ${DHCP_INTERFACE_NB} * 2/ 1024]
     local dhcpd_memory_sz=$[${DHCPD_PROCESS_SZ} + ${lease_memory_sz}]
     local clamav_memory_sz=$[((${SIMULTANEOUS_USERS_NB} + ${SIMULTANEOUS_RUSERS_NB}) * ${VIRUS_SIGNATURE_SZ} / 1024) + ${TOTAL_AV_SCAN_PROCESS_SZ} + ${CLAMAV_PROCESS_SZ} + ${FRESHCLAM_PROCESS_SZ}]
 
-    test $[(${free_memory_sz} - ${cache_io_memory_sz}) / 1024] -gt 0 || warning 1
-    test $[(${free_memory_sz} - ${squid_ssl_mediate_memory_sz}) / 1024] -gt 0 || warning 2
+    test $[(${free_memory_sz} - ${proxy_tcp_memory_sz} - ${cache_io_memory_sz}) / 1024] -gt 0 || warning 1
+    test $[(${free_memory_sz} - ${proxy_sslm_memory_sz}) / 1024] -gt 0 || warning 2
     test $[(${free_memory_sz} - ${NAMED_PROCESS_SZ}) / 1024] -gt 0 || warning 3
     test $[(${free_memory_sz} - ${TOTAL_GUARD_PROCESS_SZ} - ${httpd_guard_memory_sz}) / 1024] -gt 0 || warning 4
-    test $[(${free_memory_sz} - ${httpd_proxy_memory_sz}) / 1024] -gt 0 || warning 5
+    test $[(${free_memory_sz} - ${httpd_waf_memory_sz}) / 1024] -gt 0 || warning 5
     test $[(${free_memory_sz} - ${dhcpd_memory_sz}) / 1024] -gt 0 || warning 6
     test $[(${free_memory_sz} - ${clamav_memory_sz}) / 1024] -gt 0 || warning 7
-    test $[(${free_memory_sz} - ${httpd_proxy_memory_sz} - ${CACHE_CLEAN_PROCESS_SZ}) / 1024] -gt 0 || warning 8
+    test $[(${free_memory_sz} - ${httpd_rproxy_memory_sz} - ${CACHE_CLEAN_PROCESS_SZ}) / 1024] -gt 0 || warning 8
     test $[(${free_memory_sz} - ${OCSPD_PROCESS_SZ}) / 1024] -gt 0 || warning 9
-    test $[(${free_memory_sz} - ${proxy_memory_sz}) / 1024] -gt 0 || warning 14
+    test $[(${free_memory_sz} - ${proxy_tcp_memory_sz}) / 1024] -gt 0 || warning 14
     test $[(${free_memory_sz} - ${SNMPD_PROCESS_SZ}) / 1024] -gt 0 || warning 15
+    test $[(${free_memory_sz} - ${ipsec_access_memory_sz}) / 1024] -gt 0 || warning 16
+    test $[(${free_memory_sz} - ${QOS_MEMORY_SZ}) / 1024] -gt 0 || warning 17
+    test $[(${free_memory_sz} - ${httpd_rproxy_memory_sz}) / 1024] -gt 0 || warning 18
 
-    local max_httpd_memory_sz=${httpd_proxy_memory_sz}
-    test ${httpd_guard_memory_sz} -lt ${httpd_proxy_memory_sz} || max_httpd_memory_sz=${httpd_guard_memory_sz}
+    local max_httpd_memory_sz=$(max-value ${httpd_rproxy_memory_sz} ${httpd_guard_memory_sz})
+    max_httpd_memory_sz=$(max-value ${max_httpd_memory_sz} ${httpd_waf_memory_sz})
 
     test $[(${free_memory_sz} - \
 			      ${cache_io_memory_sz} - \
-			      ${squid_ssl_mediate_memory_sz} - \
+			      ${proxy_tcp_memory_sz} - \
+			      ${proxy_sslm_memory_sz} - \
 			      ${NAMED_PROCESS_SZ} - \
 			      ${TOTAL_GUARD_PROCESS_SZ} - \
+			      ${max_httpd_memory_sz} - \
+			      ${CACHE_CLEAN_PROCESS_SZ} - \
 			      ${dhcpd_memory_sz} - \
 			      ${clamav_memory_sz} - \
 			      ${OCSPD_PROCESS_SZ} - \
 			      ${SNMPD_PROCESS_SZ} - \
-			      ${max_httpd_memory_sz} - \
-			      ${CACHE_CLEAN_PROCESS_SZ} - \
-			      ${proxy_memory_sz}) / 1024] -gt 0 || warning 10
+			      ${QOS_MEMORY_SZ} - \
+			      ${ipsec_access_memory_sz}) / 1024] -gt 0 || warning 10
 
     FS_ROOT_SZ=${fs_root_sz}
     BACKUP_SZ=${backup_sz}
@@ -2605,18 +3162,20 @@ tune-memory-storage()
     FS_ADMIN_TMP_SZ=${fs_admin_tmp_sz}
     FS_BASE_SZ=${fs_base_sz}
     FS_RWEB_CACHE_SZ=${fs_rweb_cache_upload_sz}
-    MIN_OS_MEMORY_SIZE=${min_os_memory_size}
-    CACHE_IO_MEMORY_SZ=${cache_io_memory_sz}
-    SQUID_SSL_MEDIATE_MEMORY_SZ=${squid_ssl_mediate_memory_sz}
     SSL_MIMIC_CERTIFICATE_CACHE_SZ=${ssl_mimic_certificate_cache_sz}
+    MAX_KEYTAB_FILE_SZ=${max_keytab_file_sz}
+    AV_WHITELIST_SIG_SZ=${av_whitelist_sig_sz}
+    MIN_OS_MEMORY_SZ=${min_os_memory_sz}
     SSL_MIMIC_CERTIFICATE_CACHE_MEMORY_SZ=${ssl_mimic_certificate_cache_memory_sz}
-    HTTPD_PROXY_MEMORY_SZ=${httpd_proxy_memory_sz}
-    PROXY_MEMORY_SZ=${proxy_memory_sz}
+    VPN_IPSEC_ACCESS_MEMORY_SZ=${ipsec_access_memory_sz}
+    CACHE_IO_MEMORY_SZ=${cache_io_memory_sz}
+    PROXY_SSLM_MEMORY_SZ=${proxy_sslm_memory_sz}
+    HTTPD_RPROXY_MEMORY_SZ=${httpd_rproxy_memory_sz}
+    HTTPD_WAF_MEMORY_SZ=${httpd_waf_memory_sz}
+    PROXY_TCP_MEMORY_SZ=${proxy_tcp_memory_sz}
     DHCPD_MEMORY_SZ=${dhcpd_memory_sz}
     CLAMAV_MEMORY_SZ=${clamav_memory_sz}
     HTTPD_GUARD_MEMORY_SZ=${httpd_guard_memory_sz}
-    MAX_KEYTAB_FILE_SZ=${max_keytab_file_sz}
-    AV_WHITELIST_SIG_SZ=${av_whitelist_sig_sz}
 }
 
 gen-cache-conf-tuned()
@@ -2624,8 +3183,8 @@ gen-cache-conf-tuned()
     test ${PERSISTENT_CACHE} == True || return 0
 
     local i
-    local q1=$[((${SIMULTANEOUS_USERS_NB} + ${SIMULTANEOUS_RUSERS_NB}) * ${AVERAGE_OBJECTS_PER_PAGE}) / ${PROXY_CACHE_NB}]
-    local q2=$[((${USERS_NB} + (${SIMULTANEOUS_RUSERS_NB} * 100 / ${SIMULTANEOUS_USERS_PCT})) * ${AVERAGE_OBJECTS_PER_PAGE}) / ${PROXY_CACHE_NB}]
+    local q1=$[(${SIMULTANEOUS_USERS_NB} * ${AVERAGE_OBJECTS_PER_PAGE}) / ${PROXY_CACHE_NB}]
+    local q2=$[(${USERS_NB} * ${AVERAGE_OBJECTS_PER_PAGE}) / ${PROXY_CACHE_NB}]
     local aufs_args="${L1_CACHE} ${L2_CACHE} Q1=${q1} Q2=${q2}"
     local squid_cache_dir=${PROXY_CACHE_DIR:${#PROXY_DIR}}
 
@@ -3047,9 +3606,10 @@ select-model()
 	    PER_RWEB_CACHE_SZ=50
 	    case ${apl_model} in
 		support)
-		    USERS_NB=100
-		    RUSERS_NB=100
-		    RWEB_NB=50
+		    USERS_NB=10
+		    RUSERS_NB=20
+		    RWEB_NB=16
+		    PER_RWEB_CACHE_SZ=50
 		    URLLIST_RECORDS_NB=5000000
 		    LOGROTATE_NB=31
 		    PERSISTENT_CACHE=on
@@ -3057,8 +3617,8 @@ select-model()
 		    PERSISTENT_RWEB_LOG=on
 		    MAX_UPLOAD_FILE_SZ=$[100 * ${mega}]
 		    CPU_NB=${CPU_NB-8}
-		    MEMORY_SZ=${MEMORY_SZ-$[8 * ${giga}]}
-		    DISK_INFOS="${DISK_INFOS-scsi x:1 $[200 * ${giga}]}"
+		    MEMORY_SZ=${MEMORY_SZ-$[6 * ${giga}]}
+		    DISK_INFOS="${DISK_INFOS-scsi x:1 $[80 * ${giga}]}"
 		    NETWORKS="${NETWORKS-eth0 eth1}"
 		    ;;
 		'test')
@@ -3074,13 +3634,13 @@ select-model()
 		    MAX_UPLOAD_FILE_SZ=$[100 * ${mega}]
 		    CPU_NB=${CPU_NB-4}
 		    MEMORY_SZ=${MEMORY_SZ-$[4 * ${giga}]}
-		    DISK_INFOS="${DISK_INFOS-scsi x:1 $[32 * ${giga}]}"
+		    DISK_INFOS="${DISK_INFOS-scsi x:1 $[30 * ${giga}]}"
 		    NETWORKS="${NETWORKS-eth0 eth1}"
 		    ;;
 		vpnsubscr-20-payg)
 		    USERS_NB=10
 		    RUSERS_NB=2
-		    RWEB_NB=1
+		    RWEB_NB=2
 		    URLLIST_RECORDS_NB=0
 		    LOGROTATE_NB=7
 		    PERSISTENT_CACHE=on
@@ -3096,7 +3656,7 @@ select-model()
 		10)
 		    USERS_NB=10
 		    RUSERS_NB=5
-		    RWEB_NB=$[${RUSERS_NB} * 2]
+		    RWEB_NB=10
 		    URLLIST_RECORDS_NB=5000000
 		    LOGROTATE_NB=31
 		    PERSISTENT_CACHE=on
@@ -3127,7 +3687,7 @@ select-model()
 		100)
 		    USERS_NB=100
 		    RUSERS_NB=$[${USERS_NB} / 5]
-		    RWEB_NB=$[${RUSERS_NB} * 2]
+		    RWEB_NB=20
 		    URLLIST_RECORDS_NB=5000000
 		    LOGROTATE_NB=31
 		    PERSISTENT_CACHE=on
@@ -3135,14 +3695,14 @@ select-model()
 		    PERSISTENT_RWEB_LOG=on
 		    MAX_UPLOAD_FILE_SZ=$[100 * ${mega}]
 		    CPU_NB=${CPU_NB-4}
-		    MEMORY_SZ=${MEMORY_SZ-$[8 * ${giga}]}
+		    MEMORY_SZ=${MEMORY_SZ-$[10 * ${giga}]}
 		    DISK_INFOS="${DISK_INFOS-scsi x:1 $[250 * ${giga}]}"
 		    NETWORKS="${NETWORKS-eth0 eth1 eth2}"
 		    ;;
 		250)
 		    USERS_NB=250
 		    RUSERS_NB=$[${USERS_NB} / 5]
-		    RWEB_NB=$[${RUSERS_NB} * 2]
+		    RWEB_NB=20
 		    URLLIST_RECORDS_NB=5000000
 		    LOGROTATE_NB=31
 		    PERSISTENT_CACHE=on
@@ -3150,14 +3710,14 @@ select-model()
 		    PERSISTENT_RWEB_LOG=on
 		    MAX_UPLOAD_FILE_SZ=$[200 * ${mega}]
 		    CPU_NB=${CPU_NB-6}
-		    MEMORY_SZ=${MEMORY_SZ-$[16 * ${giga}]}
+		    MEMORY_SZ=${MEMORY_SZ-$[20 * ${giga}]}
 		    DISK_INFOS="${DISK_INFOS-scsi x:1 $[500 * ${giga}]}"
 		    NETWORKS="${NETWORKS-eth0 eth1 eth2}"
 		    ;;
 		500)
 		    USERS_NB=500
 		    RUSERS_NB=$[${USERS_NB} / 5]
-		    RWEB_NB=$[${RUSERS_NB} * 2]
+		    RWEB_NB=20
 		    URLLIST_RECORDS_NB=5000000
 		    LOGROTATE_NB=31
 		    PERSISTENT_CACHE=on
@@ -3165,14 +3725,14 @@ select-model()
 		    PERSISTENT_RWEB_LOG=on
 		    MAX_UPLOAD_FILE_SZ=$[200 * ${mega}]
 		    CPU_NB=${CPU_NB-6}
-		    MEMORY_SZ=${MEMORY_SZ-$[24 * ${giga}]}
+		    MEMORY_SZ=${MEMORY_SZ-$[40 * ${giga}]}
 		    DISK_INFOS="${DISK_INFOS-scsi x:1 $[1000 * ${giga}]}"
 		    NETWORKS="${NETWORKS-eth0 eth1 eth2}"
 		    ;;
-		1250)
-		    USERS_NB=1250
-		    RUSERS_NB=100
-		    RWEB_NB=$[${RUSERS_NB} * 2]
+		1000)
+		    USERS_NB=1000
+		    RUSERS_NB=200
+		    RWEB_NB=30
 		    URLLIST_RECORDS_NB=5000000
 		    LOGROTATE_NB=31
 		    PERSISTENT_CACHE=on
@@ -3180,12 +3740,12 @@ select-model()
 		    PERSISTENT_RWEB_LOG=on
 		    MAX_UPLOAD_FILE_SZ=$[500 * ${mega}]
 		    CPU_NB=${CPU_NB-16}
-		    MEMORY_SZ=${MEMORY_SZ-$[64 * ${giga}]}
+		    MEMORY_SZ=${MEMORY_SZ-$[88 * ${giga}]}
 		    DISK_INFOS="${DISK_INFOS-raid5 x:1 $[2000 * ${giga}]}"
 		    NETWORKS="${NETWORKS-eth0 eth1 eth2 eth3 eth4 eth5}"
 		    ;;
 		mini)
-		    USERS_NB=3
+		    USERS_NB=1
 		    RUSERS_NB=1
 		    RWEB_NB=1
 		    URLLIST_RECORDS_NB=1000000
@@ -3196,7 +3756,7 @@ select-model()
 		    PER_RWEB_CACHE_SZ=$[1 * ${mega}]
 		    MAX_UPLOAD_FILE_SZ=$[1 * ${mega}]
 		    CPU_NB=${CPU_NB-1}
-		    MEMORY_SZ=${MEMORY_SZ-$[256 * ${mega}]}
+		    MEMORY_SZ=${MEMORY_SZ-$[320 * ${mega}]}
 		    DISK_INFOS="${DISK_INFOS-scsi x:1 $[16 * ${giga}]}"
 		    NETWORKS="${NETWORKS-eth0 eth1}"
 		    ;;
@@ -3205,8 +3765,8 @@ select-model()
 		    ((disk_sz *= disk_nb))
 
 		    USERS_NB=200
-		    RUSERS_NB=1000
-		    RWEB_NB=250
+		    RUSERS_NB=200
+		    RWEB_NB=16
 		    URLLIST_RECORDS_NB=5000000
 		    LOGROTATE_NB=31
 		    PERSISTENT_CACHE=on
@@ -3215,7 +3775,7 @@ select-model()
 		    PER_RWEB_CACHE_SZ=$[64 * ${mega}]
 		    MAX_UPLOAD_FILE_SZ=$[30 * ${mega}]
 		    CPU_NB=${CPU_NB-24}
-		    MEMORY_SZ=${MEMORY_SZ-$[48 * ${giga}]}
+		    MEMORY_SZ=${MEMORY_SZ-$[64 * ${giga}]}
 		    DISK_INFOS="${DISK_INFOS-raid1 x:1 $[${disk_sz} * ${giga}]}"
 		    NETWORKS="eth0 eth1"
 		    ;;
@@ -3282,7 +3842,7 @@ select-model()
 		    URLLIST_RECORDS_NB=5000000
 		    CPU_NB=${CPU_NB-2}
 		    MEMORY_SZ=${MEMORY_SZ-$[2 * ${giga}]}
-		    DISK_INFOS="${DISK_INFOS-scsi x:1 $[300 * ${giga}]}"
+		    DISK_INFOS="${DISK_INFOS-scsi x:1 $[500 * ${giga}]}"
 		    NETWORKS="${NETWORKS-eth0 eth1}"
 		    ;;
 		200)
@@ -3293,7 +3853,7 @@ select-model()
 		    URLLIST_RECORDS_NB=5000000
 		    CPU_NB=${CPU_NB-2}
 		    MEMORY_SZ=${MEMORY_SZ-$[2 * ${giga}]}
-		    DISK_INFOS="${DISK_INFOS-scsi x:1 $[1500 * ${giga}]}"
+		    DISK_INFOS="${DISK_INFOS-scsi x:1 $[2000 * ${giga}]}"
 		    NETWORKS="${NETWORKS-eth0 eth1}"
 		    ;;
 		500)
@@ -3307,7 +3867,7 @@ select-model()
 		    DISK_INFOS="${DISK_INFOS-scsi x:1 $[8000 * ${giga}]}"
 		    NETWORKS="${NETWORKS-eth0 eth1}"
 		    ;;
-		1000)
+		TEST)
 		    MANAGER_GATEWAY_NB=1000
 		    MANAGER_TEMPLATE_NB=50
 		    MANAGER_TOTAL_USERS_NB=100000
@@ -3315,7 +3875,7 @@ select-model()
 		    URLLIST_RECORDS_NB=5000000
 		    CPU_NB=${CPU_NB-2}
 		    MEMORY_SZ=${MEMORY_SZ-$[4 * ${giga}]}
-		    DISK_INFOS="${DISK_INFOS-scsi x:1 $[30000 * ${giga}]}"
+		    DISK_INFOS="${DISK_INFOS-scsi x:1 $[32000 * ${giga}]}"
 		    NETWORKS="${NETWORKS-eth0 eth1}"
 		    ;;
 		mini)
@@ -3325,20 +3885,9 @@ select-model()
 		    MANAGER_TOTAL_RWEB_NB=1
 		    URLLIST_RECORDS_NB=1000000
 		    CPU_NB=${CPU_NB-2}
-		    MEMORY_SZ=${MEMORY_SZ-$[1 * ${giga}]}
+		    MEMORY_SZ=${MEMORY_SZ-$[256 * ${mega}]}
 		    DISK_INFOS="${DISK_INFOS-scsi x:1 $[8 * ${giga}]}"
 		    NETWORKS="${NETWORKS-eth0}"
-		    ;;
-		TEST)
-		    MANAGER_GATEWAY_NB=2000
-		    MANAGER_TEMPLATE_NB=200
-		    MANAGER_TOTAL_USERS_NB=100000
-		    MANAGER_TOTAL_RWEB_NB=500
-		    URLLIST_RECORDS_NB=10000000
-		    CPU_NB=${CPU_NB-2}
-		    MEMORY_SZ=${MEMORY_SZ-$[8 * ${giga}]}
-		    DISK_INFOS="${DISK_INFOS-scsi x:1 $[512 * ${giga}]}"
-		    NETWORKS="${NETWORKS-eth0 eth1}"
 		    ;;
 		*)
 		    error 101
@@ -3353,8 +3902,6 @@ select-model()
 
     if test ${CPU_ARCHITECTURE} == x86_64 ; then
 	MEMORY_TYPE=64mem
-    elif test ${MEMORY_SZ} -le $[3 * ${giga}] ; then
-	MEMORY_TYPE=lowmem
     else
 	MEMORY_TYPE=highmem
     fi
@@ -3402,7 +3949,10 @@ tune-gateway-parameters-conf()
 
 tune-software-conf()
 {
+    tune-qos
     tune-named
+    tune-wadmind
+    tune-httpd-simple
     tune-httpd-guard
     tune-httpd-rproxy
     tune-guard-av
@@ -3421,9 +3971,10 @@ gen-all-configurations()
     gen-named-conf-tuned  > ${GENERATED_DIR}/named.conf-tuned
     gen-dhcpd-conf-tuned > ${GENERATED_DIR}/dhcpd.conf-tuned
     gen-wadmind-conf-tuned > ${GENERATED_DIR}/${WADMIND_NAME}.conf-tuned
-    gen-httpd-noproxy-conf-tuned > ${GENERATED_DIR}/httpd-noproxy.conf-tuned
-    gen-httpd-proxy-conf-tuned > ${GENERATED_DIR}/httpd-proxy.conf-tuned
-    gen-httpd-proxy-conf-cache-tuned > ${GENERATED_DIR}/httpd-proxy.conf-cache-tuned
+    gen-httpd-simple-conf-tuned > ${GENERATED_DIR}/httpd-simple.conf-tuned
+    gen-httpd-guard-conf-tuned > ${GENERATED_DIR}/httpd-guard.conf-tuned
+    gen-httpd-rproxy-conf-tuned > ${GENERATED_DIR}/httpd-rproxy.conf-tuned
+    gen-httpd-rproxy-conf-cache-tuned > ${GENERATED_DIR}/httpd-rproxy.conf-cache-tuned
     gen-slapd-conf-tuned > ${GENERATED_DIR}/slapd.conf-tuned
     gen-squid-conf-tuned > ${GENERATED_DIR}/squid.conf-tuned
     gen-c-icap-conf-tuned > ${GENERATED_DIR}/c-icap.conf-tuned
@@ -3458,51 +4009,6 @@ set-cpu-architecture()
 	MAX_MEMORY_SZ=$[256 * 1024 * 1024]
     else
 	MAX_MEMORY_SZ=$[64 * 1024 * 1024]
-    fi
-}
-
-set-cpu-architecture-parameters()
-{
-    case ${APL_ROLE} in
-	gateway)
-	    if test ${CPU_ARCHITECTURE} == "x86_64" ; then
-		DHCPD_PROCESS_SZ=${DHCPD_64_PROCESS_SZ}
-		CACHE_INDEX_OBJECT_MEMORY_SZ=${CACHE_INDEX_OBJECT_64_MEMORY_SZ}
-		SQUID_INITIAL_PROCESS_SZ=${SQUID_INITIAL_64_PROCESS_SZ}
-		GUARD_PROCESS_SZ=${GUARD_64_PROCESS_SZ}
-		HTTPD_MAIN_PROCESS_SZ=${HTTPD_MAIN_64_PROCESS_SZ}
-		HTTPD_CHILD_NOPROXY_PROCESS_SZ=${HTTPD_CHILD_NOPROXY_64_PROCESS_SZ}
-		HTTPD_CHILD_PROXY_PROCESS_SZ=${HTTPD_CHILD_PROXY_64_PROCESS_SZ}
-		CLAMAV_PROCESS_SZ=${CLAMAV_64_PROCESS_SZ}
-	    else
-		DHCPD_PROCESS_SZ=${DHCPD_32_PROCESS_SZ}
-		CACHE_INDEX_OBJECT_MEMORY_SZ=${CACHE_INDEX_OBJECT_32_MEMORY_SZ}
-		SQUID_INITIAL_PROCESS_SZ=${SQUID_INITIAL_32_PROCESS_SZ}
-		GUARD_PROCESS_SZ=${GUARD_32_PROCESS_SZ}
-		HTTPD_MAIN_PROCESS_SZ=${HTTPD_MAIN_32_PROCESS_SZ}
-		HTTPD_CHILD_NOPROXY_PROCESS_SZ=${HTTPD_CHILD_NOPROXY_32_PROCESS_SZ}
-		HTTPD_CHILD_PROXY_PROCESS_SZ=${HTTPD_CHILD_PROXY_32_PROCESS_SZ}
-		CLAMAV_PROCESS_SZ=${CLAMAV_32_PROCESS_SZ}
-	    fi
-	    ;;
-	manager)
-	    DHCPD_PROCESS_SZ=0
-	    CACHE_INDEX_OBJECT_MEMORY_SZ=0
-	    SQUID_INITIAL_PROCESS_SZ=0
-	    GUARD_PROCESS_SZ=0
-	    HTTPD_MAIN_PROCESS_SZ=0
-	    HTTPD_CHILD_NOPROXY_PROCESS_SZ=0
-	    HTTPD_CHILD_PROXY_PROCESS_SZ=0
-	    CLAMAV_PROCESS_SZ=0
-	    ;;
-	*)
-	    ;;
-    esac
-
-    if test ${CPU_ARCHITECTURE} == "x86_64" ; then
-	WADMIND_PROCESS_SZ=${WADMIND_64_PROCESS_SZ}
-    else
-	WADMIND_PROCESS_SZ=${WADMIND_32_PROCESS_SZ}
     fi
 }
 
@@ -3609,8 +4115,7 @@ main()
 
     tune-software-conf
 
-    tune-memory-storage \
-	$[${SIMULTANEOUS_USERS_NB} + ${SIMULTANEOUS_RUSERS_NB}] \
+    tune-memory+storage \
 	${MEMORY_SZ} \
 	${URLLIST_RECORDS_NB} \
 	${RWEB_CACHE_SZ} \

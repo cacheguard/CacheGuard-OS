@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -32,7 +31,7 @@ show-snmp-trap-form()
     itemWidth[0]=40
     itemWidth[1]=60
 
-    itemTitle[0]="Trap receiver"
+    itemTitle[0]="Trap Receiver"
     itemTitle[1]="SNMP Version"
     itemTitle[2]="Receiver IP or name"
     itemTitle[3]="Port"
@@ -42,15 +41,15 @@ show-snmp-trap-form()
     itemTitle[7]="Community (password)"
     itemTitle[8]="Encryption password"
 
-    itemID[0]=""
-    itemID[1]="version"
-    itemID[2]="server"
-    itemID[3]="port"
-    itemID[4]="user"
-    itemID[5]="hash"
-    itemID[6]="enc"
-    itemID[7]="password"
-    itemID[8]="privacy"
+    itemID[0]=''
+    itemID[1]='version'
+    itemID[2]='server'
+    itemID[3]='port'
+    itemID[4]='user'
+    itemID[5]='hash'
+    itemID[6]='enc'
+    itemID[7]='password'
+    itemID[8]='privacy'
 
     blankItemContent[1]="v3 v2c v1"
     blankItemContent[2]="type='text' size='24' maxlength='64'"
@@ -58,11 +57,10 @@ show-snmp-trap-form()
     blankItemContent[4]="type='text' size='15' maxlength='${MAX_LEN}'"
     blankItemContent[5]="sha256 sha384 sha512"
     blankItemContent[6]="des aes"
-    blankItemContent[7]="type='password' size='16' maxlength='32'"
-    blankItemContent[8]="type='password' size='16' maxlength='32'"
+    blankItemContent[7]="type='password' size='24' maxlength='32'"
+    blankItemContent[8]="type='password' size='24' maxlength='32'"
 
-    itemFormSelectCBFunction[1]="snmpTrapSelectVersionCB"
-    itemFormSelectCBArgs[1]="version user hash enc privacy"
+    itemData[1]="data-action='snmp-trap-select-version' data-version-prefix-id='version' data-user-prefix-id='user' data-hash-prefix-id='hash' data-enc-prefix-id='enc' data-privacy-prefix-id='privacy'"
 
     checkItem[0]=
     checkItem[2]=ipdomainname
@@ -78,13 +76,12 @@ show-snmp-trap-form()
     itemType[7]="password"
     itemType[8]="password"
 
-    shortcutMenuItem[0]="network-utilities"
+    shortcutMenuItem[0]="diagnostic-tools"
     shortcutMenuTitle[0]="Test Traps"
 
     listContent=${SNMP_TRAP_SERVER_LIST}
     test -n "${listContent}" || disabled=disabled
     show-title "SNMP Traps Settings" "${disabled}" "admin"
-    test -z "${CURRENT_SNMP_TRAP_SERVER_LIST}" -o ${CURRENT_ADMIN_SNMP} == False || show-shortcuts-menu
     show-multi-form ${MAX_SNMP_TRAP_NB} "${width}" "${page_ref}"
 }
 

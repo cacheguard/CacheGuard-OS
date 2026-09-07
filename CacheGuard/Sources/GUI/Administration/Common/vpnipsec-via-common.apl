@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -26,16 +25,27 @@ show-vpnipsec-via()
 {
     local in_ipsec_type=${1}
     local get_args=${2}
-    local page_ref=$(get-arg-value "${get_args}" page)
 
-    local long_title in_vpn_id
+    local title="IPsec VPN Via Gateways"
+    local helps="ip vpnipsec"
+    local gateways=$(get-external-gateways)
+
+    if test -z "${gateways}" ; then
+	show-title "${title}" disabled "${helps}"
+	echo "<div class='core-form'>"
+	echo-unavailable-message "no IPsec VPN via gateways is required for a single gateway configurations."
+	echo "</div>"
+       return 0
+    fi
+
     local width=${DEFAULT_LIST_FORM_WIDTH_2}
-    local state
+    local page_ref=$(get-arg-value "${get_args}" page)
+    local long_title in_vpn_id state
 
     case ${in_ipsec_type} in
 	site)
 	    in_vpn_id=$(get-arg-value "${get_args}" key)
-	    long_title="Site to Site VPN Id <font color='SeaGreen'>${in_vpn_id}</font>"
+	    long_title="Site to Site VPN Id <strong>${in_vpn_id}</strong></font>"
 	    ;;
 	access)
 	    in_vpn_id=${in_ipsec_type}
@@ -62,9 +72,9 @@ show-vpnipsec-via()
     singleItemID[0]='vpn_id'
     singleItemValue[0]="${in_vpn_id}"
 
-    blankItemContent[0]=""
+    blankItemContent[0]=''
 
-    blankItemContent[1]=$(get-external-gateways)
+    blankItemContent[1]=${gateways}
     blankItemContent[2]="master backup"
     blankItemContent[3]="type='text' size='3' maxlength='3'"
     
@@ -114,6 +124,6 @@ show-vpnipsec-via()
     listContentStep=3
     test -n "${listContent}" || state=disabled
 
-    show-title "IPsec VPN Via Gateways" "${state}" "ip vpnipsec"
+    show-title "${title}" "${state}" "${helps}"
     show-list-form ${MAX_IP_ROUTES_NB} "${width}" "${page_ref}" "<br />${long_title}"
 }

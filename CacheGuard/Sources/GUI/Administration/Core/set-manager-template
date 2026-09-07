@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -48,9 +47,17 @@ set-manager-template()
 		if test -z "${source}" ; then
 		    echo "manager template add ${VALUES[${id_pos}]}" >> ${transaction}
 		else
-		    source_context=${source/\>*}
-		    source_id=${source/*\>}
-		    source_context=${source_context,,}
+		    case ${source:0:3} in
+			'[G]')
+			    source_context='gateway'
+			    ;;
+			'[T]')
+			    source_context='template'
+			    ;;
+			*)
+			    ;;
+		    esac
+		    source_id=${source:3}
 		    echo "manager template add ${VALUES[${id_pos}]} ${source_context} ${source_id}" >> ${transaction}
 		fi
 	    fi

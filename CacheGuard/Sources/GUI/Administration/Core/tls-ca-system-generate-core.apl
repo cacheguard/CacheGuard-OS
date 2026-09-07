@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -33,15 +32,20 @@ show-ca-generate-form()
     local i=0 n=0
 
     if test ${APL_ROLE} == gateway ; then
-	local web_ip=$(get-web-ip cur)
-
 	itemTitle[${i}]="CA Link"
-	blankItemContent[${i}]="<a href='http://${web_ip}' target='_blank'>${web_ip}</a> (available from the internal interface)"
+	blankItemContent[${i}]="<a href='http://${SERVER_NAME}/' target='_blank'>${SERVER_NAME}</a> (available from the internal interface)"
 	itemID[${i}]="ca_links"
 	itemForm[${i}]="text"
 	((i++))
-	n=${i}
     fi
+
+    itemTitle[${i}]="Load/Save Link"
+    itemID[${i}]="manage_link"
+    blankItemContent[${i}]="<a href='/${GUI_DIR_NAME}/tls-ca-system-load-save.${GUI_EXT_NAME}'><img  src='${IMAGE_DIR}/tls-ca-system-load-save.png' title='Manage the System CA Certificate' /> ${tls}</a>"
+    itemForm[${i}]="text"
+    ((i++))
+
+    n=${i}
 
     itemTitle[${i}]="Common Name"
     checkItem[${i}]=printable ; ((i++))
@@ -102,11 +106,9 @@ show-ca-generate-form()
     show-title "System CA Generation" "enabled" "tls"
 
     show-form "${width}" enabled
-
-    echo '<script type="text/javascript">'
-    echo "doNothingOnEnterInInput( 'names' );"
-    echo "AJAX_updateTLSConf( '/${GUI_DIR_NAME}/tls-print.${GUI_EXT_NAME}?ca:system+conf', 'name', 'numbits', 'days', 'country', 'province', 'locality', 'organisation', 'unit' );"
-    echo '</script>'
+    
+    test "${REQUEST_METHOD}" == POST || \
+	echo "<div data-init-ajax-update-tls-conf data-page='tls-print' data-page-args='ca:system+conf' data-names-id='name' data-numbits-id='numbits' data-days-id='days' data-country-id='country' data-province-id='province' data-locality-id='locality' data-organisation-id='organisation' data-unit-id='unit' hidden></div>"
 }
 
 # Main()

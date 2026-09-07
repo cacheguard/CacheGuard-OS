@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -48,11 +47,11 @@ set-rweb-settings()
 
     case ${protocol} in
 	http)
-	    echo "rweb site add '${site_name}' '${protocol}' '${ip}' '${qos}'" >> ${transaction}
+	    echo "rweb site add ${site_name} ${protocol} ${ip} ${qos}" >> ${transaction}
 	    ;;
 	https)
-	    echo "rweb site add '${site_name}' '${protocol}' '${tls}' '${ip}' '${qos}'" >> ${transaction}
-	    echo "rweb rhttp '${site_name}' '${rhttp_state}'" >> ${transaction}
+	    echo "rweb site add ${site_name} ${protocol} ${tls} ${ip} ${qos}" >> ${transaction}
+	    echo "rweb rhttp ${site_name} ${rhttp_state}" >> ${transaction}
 	    ;;
 	*)
 	    ;;
@@ -65,14 +64,14 @@ set-rweb-settings()
 	    local sb_protocol=${VALUES[${i}]} ; ((i++))
 	    local sb_location=${VALUES[${i}]}
 
-	    if test ${sb_protocol} == 'none' -o -z "${sb_location}" ; then
-		echo "rweb standby '${site_name}' on" >> ${transaction}
+	    if test ${sb_protocol} == 'none' ; then
+		echo "rweb standby ${site_name} on" >> ${transaction}
 	    else
-		echo "rweb standby '${site_name}' on ${sb_protocol}://${sb_location}" >> ${transaction}
+		echo "rweb standby ${site_name} on ${sb_protocol}://${sb_location}" >> ${transaction}
 	    fi
 	    ;;
 	off)
-	    echo "rweb standby '${site_name}' off" >> ${transaction}
+	    echo "rweb standby ${site_name} off" >> ${transaction}
 	    ;;
 	*)
 	    ;;

@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       Commands
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -849,10 +848,12 @@ gen-vpn-ipsec-access-conf()
 		;;
 	    windows)
 		local windows_user_subject=$(get-windows-certificate-subject "${local_subject}")
+		windows_user_subject=${windows_user_subject//\"/\\\"}
 
 		openssl x509 -in ${SSL_CA_DIR}/${SYSTEM_CA}.certificate -text -noout > ${tmp_x509_cert_file} 2> /dev/null
 		local windows_ca_subject=$(grep 'Subject: ' ${tmp_x509_cert_file} 2> /dev/null)
 		windows_ca_subject=$(get-windows-certificate-subject "${windows_ca_subject}")
+		windows_ca_subject=${windows_ca_subject//\"/\\\"}
 		;;
 
 	    *)
@@ -935,7 +936,7 @@ ${lt}?xml version="1.0" encoding="UTF-8"?${gt}
 ${lt}!DOCTYPE plist PUBLIC "-//Apple(R) Inc//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd"${gt}
 
 ${lt}!--
-Profile to import into an Apple(R) device: save this profile to a file with the .mobileconfig extension, then import it into the Apple(R) device. Please note that Apple(R) configuration profiles do not support split tunnelling based on remote networks. ${pkcs12_message}
+Profile to import into an Apple(R) device: save this profile to a file with the .mobileconfig extension, then import it into the Apple(R) device. Note that Apple(R) configuration profiles do not support split tunnelling based on remote networks. ${pkcs12_message}
 --${gt}
 
 ${lt}plist version="1.0"${gt}
@@ -1054,7 +1055,7 @@ EOT
             ${lt}integer${gt}${dh_apple}${lt}/integer${gt}
           ${lt}/dict${gt}
 	  ${lt}key${gt}OnDemandEnabled${lt}/key${gt}
-	  ${lt}integer${gt}0${lt}/integer${gt}
+	  ${lt}integer${gt}1${lt}/integer${gt}
 	  ${lt}key${gt}OnDemandRules${lt}/key${gt}
 	  ${lt}array${gt}
 	    ${lt}dict${gt}
@@ -1573,12 +1574,12 @@ manage-vpn-ipsec-access-conf()
 	    local auto_web_proxy_message manual_web_proxy_message
 	    local ipv6_default_route_message ssl_mediation_description
 
-	    auto_web_proxy_message="Once connected to the VPN, the Web proxy will be automatically used. For your information the <strong>${vpn_name}</strong> proxy address is <u>${proxy_address}</u>."
+	    auto_web_proxy_message="Once connected to the VPN, the web proxy will be automatically used. For your information the <strong>${vpn_name}</strong> proxy address is <u>${proxy_address}</u>."
 
-	    manual_web_proxy_message="Once connected to the VPN, the Web proxy will be available at the <u>${proxy_address}</u> address. It is highly recommended to explicitly configure your device (including all your Web browsers and other applications) to always use the <strong>${vpn_name}</strong> proxy."
+	    manual_web_proxy_message="Once connected to the VPN, the web proxy will be available at the <u>${proxy_address}</u> address. It is highly recommended to explicitly configure your device (including all your web browsers and other applications) to always use the <strong>${vpn_name}</strong> proxy."
 
 	    test ${CURRENT_SSLMEDIATE_MODE} == False || \
-		ssl_mediation_description="The Web proxy uses a technology called <strong>SSL mediation</strong>. SSL mediation allows you to optimize and/or secure network traffic even in an encrypted format. This technology requires that you trust the <strong>${vpn_name}</strong> CA certificate."
+		ssl_mediation_description="The web proxy uses a technology called <strong>SSL mediation</strong>. SSL mediation allows you to optimize and/or secure network traffic even in an encrypted format. This technology requires that you trust the <strong>${vpn_name}</strong> CA certificate."
 
 	    gen-vpn-ipsec-access-conf ${client_type} ${client_tls_id} ${op} ${server_tls_id} > ${tmp_profile_file}
 	    profile_extension=$(get-vpnipsec-profile-extension ${client_type})
@@ -1678,7 +1679,7 @@ EOT
 		    if test ${CURRENT_SSLMEDIATE_MODE} == True ; then
 			cat << EOT >> ${profile_instructions_file}
 
-<li>${ssl_mediation_description} Please note that the <strong>${vpn_name}</strong> CA certificate is installed as a trusted CA certificate for Web browsing by the PowerShell setup script.</li>
+<li>${ssl_mediation_description} Note that the <strong>${vpn_name}</strong> CA certificate is installed as a trusted CA certificate for web browsing by the PowerShell setup script.</li>
 EOT
 		    fi
 		    ;;
@@ -1702,7 +1703,7 @@ EOT
 	    cat << EOT > ${body_file}
 Dear ${to},
 <p>
-Attached you will find a ${profile_type} file that allows you to connect your <strong>${client_type^}</strong> device to the <strong>${vpn_name}</strong> VPN and Web proxy.
+Attached you will find a ${profile_type} file that allows you to connect your <strong>${client_type^}</strong> device to the <strong>${vpn_name}</strong> VPN and web proxy.
 <p>
 <strong>Important notice</strong>: your ${profile_type} file embeds a password protected private key that you should not share with third parties. Your administrator should be able to transmit you its password in a secure way. Your private key identifier is <strong>${client_vpn_id}</strong> and allows you to have one and only one VPN connection at the same time.
 <p>

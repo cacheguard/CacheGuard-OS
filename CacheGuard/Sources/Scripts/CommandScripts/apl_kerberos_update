@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       Scripts
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -28,7 +27,7 @@ source ${APPLIANCE_DIR}/etc/role
 source ${LOCAL_DIR}/lib/apl_functions
 source ${BASE_DIR}/${ADMIN_NAME}/${ENV_RDIR}/${ENV_CURRENT_NAME}
 
-kerberos-update()
+ad-kerberos-update()
 {
     test -n "${1}" || return 1
     test -n "${2}" || return 2
@@ -41,16 +40,17 @@ kerberos-update()
        
     test -f ${keytab_file} || return 11
 
-    local message
+    local message timeout=16
 
-    message=$(msktutil auto-update \
-		       --no-reverse-lookups --server-behind-nat \
-		       --auto-update-interval ${KERBEROS_PASSWORD_VALIDITY_DAYS} \
-		       --keytab ${keytab_file} \
-		       --computer-name ${computer_name} \
-		       --hostname ${full_service_name} \
-		       --sasl-mechanisms "GSS-SPNEGO GSSAPI" \
-		       2>&1)
+    message=$(timeout --signal=TERM --kill-after=5s ${timeout}s \
+		      msktutil auto-update \
+		      --no-reverse-lookups --server-behind-nat \
+		      --auto-update-interval ${KERBEROS_PASSWORD_VALIDITY_DAYS} \
+		      --keytab ${keytab_file} \
+		      --computer-name ${computer_name} \
+		      --hostname ${full_service_name} \
+		      --sasl-mechanisms "GSS-SPNEGO GSSAPI" \
+		      2>&1)
 
     test -n "${message}" || return 0
 
@@ -62,13 +62,14 @@ kerberos-update()
 
 main()
 {
+    test ${CURRENT_AUTHENTICATE_AD_MODE} == True || return 0
     test-current-kerberos-auth-state || return 0
-    test ${CURRENT_HA_MODE} == False  || return 0
-    test -f ${PROXY_DIR}${KERBEROS_KEYTAB_FILE_PROXY1} || return 11
+    test -z "${CURRENT_AD_WEBGATEWAY_PASSWORD}" || return 0
+    test -f ${PROXY_DIR}${KERBEROS_KEYTAB_FILE_FPROXY} || return 11
 
     local keytab_file_sz
 
-    keytab_file_sz=$(du -bs ${PROXY_DIR}${KERBEROS_KEYTAB_FILE_PROXY1} 2> /dev/null | expand)
+    keytab_file_sz=$(du -bs ${PROXY_DIR}${KERBEROS_KEYTAB_FILE_FPROXY} 2> /dev/null | expand)
     keytab_file_sz=${keytab_file_sz/ *}
     keytab_file_sz=$[${keytab_file_sz} / 1024]
 
@@ -80,8 +81,8 @@ main()
     fi
 
     ! test-current-kerberos-web-is-active || \
-	kerberos-update \
-	    ${PROXY_DIR}${KERBEROS_KEYTAB_FILE_PROXY1} \
+	ad-kerberos-update \
+	    ${PROXY_DIR}${KERBEROS_KEYTAB_FILE_FPROXY} \
 	    ${CURRENT_KERBEROS_SERVICE_NAME} \
 	    ${CURRENT_KERBEROS_SERVICE_NAME}.${CURRENT_DOMAIN_NAME} \
 	    fProxy
@@ -99,8 +100,8 @@ main()
 		    ;;
 		1)
 		    computer_name=${elt}
-		    kerberos-update \
-			${PROXY_DIR}${KERBEROS_KEYTAB_FILE_PROXY1} \
+		    ad-kerberos-update \
+			${PROXY_DIR}${KERBEROS_KEYTAB_FILE_FPROXY} \
 			${computer_name} \
 			${site_name} \
 			rProxy
@@ -113,8 +114,8 @@ main()
 	done
     fi
 
-    diff --brief ${PROXY_DIR}${KERBEROS_KEYTAB_FILE_PROXY1} ${WEB_SERVER_DIR}${KERBEROS_KEYTAB_FILE_PROXY2} > /dev/null 2>&1 || \
-	cp -f ${PROXY_DIR}${KERBEROS_KEYTAB_FILE_PROXY1} ${WEB_SERVER_DIR}${KERBEROS_KEYTAB_FILE_PROXY2}
+    diff --brief ${PROXY_DIR}${KERBEROS_KEYTAB_FILE_FPROXY} ${WEB_SERVER_DIR}${KERBEROS_KEYTAB_FILE_RPROXY} > /dev/null 2>&1 || \
+	cp -f ${PROXY_DIR}${KERBEROS_KEYTAB_FILE_FPROXY} ${WEB_SERVER_DIR}${KERBEROS_KEYTAB_FILE_RPROXY}
 }
 
 # Main()

@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -26,12 +25,12 @@ source waf-common.${GUI_EXT_NAME}
 
 show-filter-generic-form()
 {
-    local length=8 width=300
+    local width=300
 
     show-title "Default WAF Filters" "enabled" "waf"
 
     echo "<div class='core-form'>"
-    show-form-begin ${length}
+    show-form-begin
     echo "<input name='dummy' type='hidden' value='on'>"
     echo "<table class='highlight-form' width='${width}'>"
     show-generic-waf ${WAF_GENERIC}

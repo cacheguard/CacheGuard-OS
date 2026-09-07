@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       Build
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -27,27 +26,27 @@ source CacheGuard.env
 gen-index-html-top()
 {
     echo '<!DOCTYPE html>'
-    echo '<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">'
+    echo '<html lang="en">'
     echo
     echo '<head>'
     echo "<title>${COMMERCIAL_NAME} OS Command Line Manual</title>"
-    echo "<link rel='stylesheet' type='text/css' href='/${DOC_DIR_NAME}/apl.css' />"
+    echo "<link rel='stylesheet' type='text/css' href='/${DOC_DIR_NAME}/apl-${GUI_FE_VERSION}.css' />"
+    echo "<link rel='shortcut icon' type='image/x-image' href='/favicon.ico' />"
     echo '</head>'
     echo
     echo '<body bgcolor="#ffffff">'
     echo "<a href=index.html><img src='/${DOC_DIR_NAME}/${IMAGE_DIR_NAME}/CacheGuardLogo.png' alt='' border='0' align='left' height='65' /></a>"
     echo '<center>'
     echo "<font size=6 COLOR='firebrick'>"
-    echo "${COMMERCIAL_NAME} OS"
+    echo "${COMMERCIAL_NAME}-OS"
     echo '</font>'
     echo '<br />'
     echo "<font size=3 color='firebrick'>"
     echo "Command Line Manual - Version ${OS_GENERATION}-${OS_VERSION}"
     echo '</font>'
     echo '</center>'
-    echo '<p />'
-    echo '<br />'
-    echo '<table cellspacing="0" cellpadding="0" cols="2" width="70%" style="margin:20px;">'
+    echo '<p><br />'
+    echo '<table>'
 }
 
 gen-core-index-html()
@@ -56,12 +55,12 @@ gen-core-index-html()
     local summary=${2}
 
       echo "<tr>"
-      echo "<td width=25%>"
+      echo "<td>"
       echo "<strong>"
       echo "<a href=\"${command}.html\">${command}</a>"
       echo "</strong>"
       echo "</td>"
-      echo "<td width=75%>${summary}</td>"
+      echo "<td>${summary}</td>"
       echo "</tr>"
 }
 

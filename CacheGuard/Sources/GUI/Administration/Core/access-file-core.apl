@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -61,7 +60,6 @@ show-access-file-form()
     test -n "${listContent}" || disabled=disabled
 
     show-title "Trusted File Servers" "${disabled}" "access password"
-    show-shortcuts-menu
     show-list-form ${MAX_ACL_FILE_NB} "${width}" "${page_ref}"
 }
 

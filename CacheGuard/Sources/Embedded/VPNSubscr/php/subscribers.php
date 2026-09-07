@@ -4,7 +4,6 @@
 ###########################################################################
 #
 # MODULE:       VPN Subscription
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -30,7 +29,7 @@ vpnsubscr_check_login( );
 
 function vpnsubscr_subscribers_print_error( $code, $message )
 {
-    echo "<div class='box-error'>\n";
+    echo "<div class='error'>\n";
     vpnsubscr_print_error( $code, $message );
     echo "</div>\n";
 }
@@ -38,18 +37,20 @@ function vpnsubscr_subscribers_print_error( $code, $message )
 function vpnsubscr_display_subscribers( )
 {
     $title = 'Refresh';
-        echo <<< EOT
-<table class='box-list'>
-<tr>
-  <td>Username</td>
-  <td>Contact</td>
-  <td>Status</td>
-  <td>Profile</td>
-  <td>Password</td>
-  <td>Edit</td>
-</tr>
-
-EOT;
+    echo <<< EOT
+  <table class='highlight-list'>
+  <thead>
+    <tr>
+      <th>Username</th>
+      <th>Contact</th>
+      <th>Status</th>
+      <th>Profile</th>
+      <th>Password</th>
+      <th>Edit</th>
+    </tr>
+  </thead>
+  <tbody>
+  EOT;
     $method = isset( $_SERVER['REQUEST_METHOD']  ) ? $_SERVER['REQUEST_METHOD']  : '';
     $method = filter_var( $method, FILTER_SANITIZE_FULL_SPECIAL_CHARS );
         
@@ -127,9 +128,10 @@ EOT;
 EOT;
         }
         $remaining_subscribers = $max_subscribers - $subscribers;
-        echo <<< EOT
+echo <<< EOT
+</tbody>
 </table>
-<center>[<u>$remaining_subscribers / $max_subscribers Remaining Subscriber Accounts</u>]</center>
+[<u>$remaining_subscribers / $max_subscribers Remaining Subscriber Accounts</u>]
 
 EOT;
     }
@@ -150,30 +152,14 @@ function vpnsubscr_display_title( )
 ?>
 <!DOCTYPE html>
 <html>
-  <head>
-    <title><?php echo vpnsubscr_get_org_name( ); ?> Subscribers</title>
-    
-    <link rel="shortcut icon" type="image/x-image" href="/image/favicon.ico" />
-    <link rel="stylesheet" type="text/css" href="/chromestyle.css" />
-    <link rel="stylesheet" type="text/css" href="/style.css" />
-    
-    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
-    <meta name="robots" content="noindex, nofollow, noarchive, noarchive, nosnippet, noodp, noydir" >
-    <meta name="description" content="This page allows you to manage VPN subscribers." />
-
-    <script type="text/javascript" src="/js/chrome.js"></script>
-    <script type="text/javascript" src="/js/vpnsubscr.js"></script>
-    <script type="text/javascript" src="/js/printmenu.js"></script>
-    <script type="text/javascript" src="/js/logout.js"></script>
-  </head>
-
+<?php vpnsubscr_display_html_header( "Reset Service" ); ?>
   <body>
     <?php vpnsubscr_display_header( ); ?>
-    <div class='box-centered-container'>
-      <div class='box-centered-nested'>
+    <div class='centered-container'>
+      <div class='centered-nested'>
 	<div class='page-title'><?php vpnsubscr_display_title( ); ?></div>
-	<div class="box-help">
-	  Click on an item to perform the associated action on a subscriber.
+	<div class="help">
+	  Click on an item to perform the associated action for a subscriber.
 	</div>
 	<?php vpnsubscr_display_subscribers( ); ?>
       </div>

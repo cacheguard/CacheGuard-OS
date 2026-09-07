@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -38,13 +37,13 @@ set-waf-rweb-errors()
 	del_pos=$[${pos} + 3]
 	
 	if [[ "${ATTRIBUTES[${del_pos}]}" =~ ^del_[0-9]+$ ]] ; then
-	    echo "waf rweb errors del '${VALUES[${name_pos}]}'" >> ${transaction}
+	    echo "waf rweb errors del ${VALUES[${name_pos}]}" >> ${transaction}
 	    pos=$[${pos} + 4]
 	else
 	    if test "${VALUES[${entry_pos}]}" == anew -a \
 		    -n "${VALUES[${name_pos}]}" -a \
 		    -n "${VALUES[${policy_pos}]}" ; then
-		echo "waf rweb errors add '${VALUES[${name_pos}]}' '${VALUES[${policy_pos}]}'" >> ${transaction}
+		echo "waf rweb errors add ${VALUES[${name_pos}]} ${VALUES[${policy_pos}]}" >> ${transaction}
 	    fi
 	    pos=$[${pos} + 3]
 	fi

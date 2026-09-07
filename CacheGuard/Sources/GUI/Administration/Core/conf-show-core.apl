@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -26,20 +25,17 @@ show-conf-show-form()
 {
     local conf=/tmp/conf.show.${$} line
     local apply_title=$(get-apply-icon-title)
-    local title i=0
+    local i=0
 
     if gui-is-in-contextual-role ; then
 	local context_base=${GUI_CONTEXT/:*}
 	local context_leaf=${GUI_CONTEXT/*:}
-	title="[ ${context_base^} > ${context_leaf} ] Configuration Overview"
-    else
-	title="${APL_ROLE^} Configuration Overview"
     fi
 
     local commands="conf"
     ! gui-is-in-contextual-role || commands="${commands} manager"
 
-    show-title "${title}" "disabled" "${commands}"
+    show-title "Configuration Overview" "disabled" "${commands}"
     execute-command-with-output "conf" > ${conf}
 
     shortcutMenuItem[${i}]=apply
@@ -59,7 +55,6 @@ show-conf-show-form()
     shortcutMenuIcon[${i}]=
     shortcutMenuTitle[${i}]=""
     ((i++))
-
 
     shortcutMenuItem[${i}]=conf-load-save
     shortcutMenuArgs[${i}]=''
@@ -94,15 +89,14 @@ show-conf-show-form()
 	fi
     fi
 
-    show-shortcuts-menu
-
     echo "<div class='core-form'>"
-    echo "<table class='highlight-list' width='100%'>"
+    show-shortcuts-menu
+    echo "<table class='highlight-report'>"
     echo "<thead>"
     echo "<tr>"
-    echo "<td class='table-header indicator-table-header' align='left' width='300' >Command</td>"
-    echo "<td class='table-header' align='center' width='40'>State</td>"
-    echo "<td class='table-header'  align='left'>Value(s)</td>"
+    echo "<th class='table-header' align='left'>Command</th>"
+    echo "<th class='table-header' align='center'>State</th>"
+    echo "<th class='table-header'  align='left'>Value(s)</th>"
     echo "</tr>"
     echo "</thead>"
 
@@ -115,9 +109,6 @@ show-conf-show-form()
 
     echo "</tbody>"
     echo "</table>"
-
-    show-scroll-top
-
     echo "</div>"
 }
 

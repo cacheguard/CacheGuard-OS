@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       Build
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -106,6 +105,13 @@ install-login-scripts()
     sudo install -m 755 -o root -g root ${dir}/apl_serial_login ${APL}${LOCAL_DIR}/bin
 }
 
+install-etc-scripts()
+{
+    local dir=EtcScripts
+
+    sudo install -m 755 -o root -g root ${dir}/apl_sni_guard ${APL}${PROXY_DIR}/bin
+}
+
 # Main()
 
 mkdir -p ${FULL_GENERATED_DIR}
@@ -118,3 +124,4 @@ install-command-scripts
 install-daemon-scripts
 install-network-scripts
 install-login-scripts
+install-etc-scripts

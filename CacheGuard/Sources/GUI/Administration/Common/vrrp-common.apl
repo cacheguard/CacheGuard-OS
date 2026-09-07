@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -92,7 +91,6 @@ show-vrrp-form()
     ip2=$(ipcalc -s ${ip_mask} -b) ; ip2=${ip2/BROADCAST=}
 
     local message="${ip1} < IP < ${ip2}"
-    local message_width=260
 
     itemTitle[0]=""
     itemTitle[1]="VRRP IP"
@@ -108,7 +106,7 @@ show-vrrp-form()
     itemID[4]="vrid"
     
     blankItemContent[0]=""
-    blankItemContent[1]="type='text' size='15' maxlength='15' onMouseOver='ddrivetip( \\\"${message}\\\", ${message_width} );' onMouseOut='hideddrivetip( );'"
+    blankItemContent[1]="type='text' size='15' maxlength='15' data-action='show-tooltip' data-tip='${message}'"
     blankItemContent[2]="master backup"
     blankItemContent[3]="type='text' size='3' maxlength='3'"
     blankItemContent[4]="type='text' size='3' maxlength='3'"
@@ -121,7 +119,6 @@ show-vrrp-form()
 
     test -n "${listContent}" || state=disabled
 
-    call-js-function "hideddrivetip( )"
     show-title "${title}" "${state}" "vrrp"
     show-list-form ${MAX_VRRP_NB} "${width}" "${page_ref}"
 }
@@ -153,14 +150,14 @@ set-vrrp()
 		-n "${VALUES[${vrrp_pos}]}" -a \
 		-n "${VALUES[${state_pos}]}" ; then
 		if test -n "${VALUES[${priority_pos}]}" ; then
-		    echo "vrrp '${dev}' add '${VALUES[${vrrp_pos}]}' '${VALUES[${state_pos}]}' '${VALUES[${priority_pos}]}' '${VALUES[${vrid_pos}]}'" >> ${transaction}
+		    echo "vrrp ${dev} add ${VALUES[${vrrp_pos}]} ${VALUES[${state_pos}]} ${VALUES[${priority_pos}]} ${VALUES[${vrid_pos}]}" >> ${transaction}
 		else
 		    case "${VALUES[${state_pos}]}" in
 			master)
-			    echo "vrrp '${dev}' add '${VALUES[${vrrp_pos}]}' '${VALUES[${state_pos}]}' 110 '${VALUES[${vrid_pos}]}'" >> ${transaction}
+			    echo "vrrp ${dev} add ${VALUES[${vrrp_pos}]} ${VALUES[${state_pos}]} 110 ${VALUES[${vrid_pos}]}" >> ${transaction}
 			    ;;
 			backup)
-			    echo "vrrp '${dev}' add '${VALUES[${vrrp_pos}]}' '${VALUES[${state_pos}]}' 100 '${VALUES[${vrid_pos}]}'" >> ${transaction}
+			    echo "vrrp ${dev} add ${VALUES[${vrrp_pos}]} ${VALUES[${state_pos}]} 100 ${VALUES[${vrid_pos}]}" >> ${transaction}
 			    ;;
 			*)
 			    ;;
@@ -168,10 +165,10 @@ set-vrrp()
 		    
 		fi
 	    fi
-	    
+
 	    pos=$[${pos} + 5]
 	else
-	    echo "vrrp ${dev} del '${VALUES[${vrrp_pos}]}'" >> ${transaction}
+	    echo "vrrp ${dev} del ${VALUES[${vrrp_pos}]}" >> ${transaction}
 	    pos=$[${pos} + 6]
 	fi
     done

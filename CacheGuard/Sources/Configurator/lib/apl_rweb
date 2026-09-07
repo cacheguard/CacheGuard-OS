@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       Configurator
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -188,10 +187,10 @@ gen-httpd-proxy-compress-conf()
 
 gen-httpd-rweb-cache-conf()
 {
-    cat httpd-proxy.conf-cache-constant
-    cat httpd-proxy.conf-cache-tuned
+    cat httpd-rproxy.conf-cache-constant
+    cat httpd-rproxy.conf-cache-tuned
 
-    local size=$[${FREE_MEMORY_SZ} * (100 - ${PROXY_PROXY2_RATIO_PCT}) / 100]
+    local size=$[${FREE_MEMORY_SZ} * (100 - ${FPROXY_RPROXY_RATIO_PCT}) / 100]
 
     local web_cache_sz=$[${RWEB_CACHE_SZ} * 1024]
     local cache_max_object_sz=$(min-value ${web_cache_sz} ${CACHE_MAX_OBJECT_SZ})
@@ -214,11 +213,21 @@ gen-httpd-rweb-from-local()
     done
 }
 
+gen-httpd-rproxy-general-conf()
+{
+    echo "ProxyMaxForwards 8"
+    echo "ProxyTimeout 60"
+    echo "ProxyVia Off"
+    echo "ProxyRequests Off"
+
+    echo "Header edit WWW-Authenticate ^[n|N][t|T][l|L][m|M]$ Dummy"
+}
+
 gen-httpd-proxy-general-conf()
 {
     gen-httpd-proxy-compress-conf
 
-    if test ${RWEB_HTTPS_MODE} == True -a ${RWEB_MODE} == True -a ${PROXY2_MODE} == True ; then
+    if test ${RWEB_SITE_HTTPS_MODE} == True -a ${RWEB_MODE} == True ; then
 	echo "AllowCONNECT ${HTTPS_PORT}"
     fi
 
@@ -540,75 +549,6 @@ set-rweb-name-qos-list-cur()
 set-rweb-list()
 {
     set-rweb-name-qos-list-new
-
-    test ${RWEB_MODE} == True -a ${PROXY2_MODE} == False || return 0
-
-    local elt range i=0
-    local site_name hosts host
-    local protocol ip port weight record
-    local name names nb
-
-    local rweb_host_list
-    local rweb_host_sites_list
-
-    for elt in ${_RWEB_SITE_HOSTS_LIST}
-    do
-	range=$[${i} % 2]
-	case ${range} in
-	    0)
-		site_name=${elt}
-		;;
-	    1)
-		hosts=$(colon2space ${elt})
-		
-		for host in ${hosts}
-		do
-		    host=${host//_/ }
-
-		    protocol=$(get-nth-arg 2 ${host})
-		    ip=$(get-nth-arg 3 ${host})
-		    port=$(get-nth-arg 4 ${host})
-		    weight=$(get-nth-arg 5 ${host})
-
-		    record=${protocol}_${ip}_${port}_${weight}
-		    member "${rweb_host_list}" ${record} || rweb_host_list="${rweb_host_list} ${record}"
-		done
-		;;
-	    *)
-		return 1
-		;;
-	esac
-	((i++))
-    done
-
-    for record in ${rweb_host_list:1}
-    do
-	i=0 nb=1
-	unset names
-	for elt in ${_RWEB_SITE_HOSTS_LIST}
-	do
-	    range=$[${i} % 2]
-	    case ${range} in
-		0)
-		    name=${elt}
-		    ;;
-		1)
-		    hosts=$(colon2space ${elt})
-		    ! host-member-of-hosts "${hosts}" ${record} || names="${names} ${name},${nb}"
-		    ((nb++))
-		    ;;
-		*)
-		    return 255
-		    ;;
-	    esac
-	    ((i++))
-	done
-
-	names=$(space2colon "${names:1}")
-	rweb_host_sites_list="${rweb_host_sites_list} ${record} ${names}"
-    done
-
-    RWEB_HOST_SITES_LIST=${rweb_host_sites_list:1}
 }
 
 gen-httpd-rweb-waf-conf()
@@ -653,7 +593,7 @@ gen-httpd-rweb-ssl-conf()
 gen-httpd-rweb-log-conf()
 {
     test ${LOG_MODE} == True -a ${LOG_TYPE_RWEB/:*} == True || return 0
-    test ${RWEB_MODE} == True -a ${PROXY2_MODE} == True || return 0
+    test ${RWEB_MODE} == True || return 0
 
     test -n "${1}" || return 1
     local protocol=${1}
@@ -831,10 +771,9 @@ gen-httpd-proxy-rweb-conf()
     done
 }
 
-gen-httpd-proxy-conf()
+gen-rweb-conf()
 {
-    cat httpd-proxy.conf-tuned
-
+    gen-httpd-rproxy-general-conf
     gen-httpd-proxy-general-conf
     gen-httpd-auth-general
     gen-httpd-proxy-rweb-general-conf

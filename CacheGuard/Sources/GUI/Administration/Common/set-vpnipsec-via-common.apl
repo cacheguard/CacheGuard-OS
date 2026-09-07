@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -61,11 +60,11 @@ set-vpnipsec-via()
 	[[ "${ATTRIBUTES[${del_pos}]}" =~ ^del_[0-9]+$ ]]
 	if test ${?} -ne 0 ; then
 	    if test "${VALUES[${entry_pos}]}" == anew ; then
-		echo "vpnipsec via ${vpn_key} add '${VALUES[${gateway_pos}]}' '${VALUES[${role_pos}]}' '${VALUES[${prio_pos}]}'" >> ${transaction}
+		echo "vpnipsec via ${vpn_key} add ${VALUES[${gateway_pos}]} ${VALUES[${role_pos}]} ${VALUES[${prio_pos}]}" >> ${transaction}
 	    fi
 	    pos=$[${pos} + 4]
 	else
-	    echo "vpnipsec via ${vpn_key} del '${VALUES[${gateway_pos}]}'" >> ${transaction}
+	    echo "vpnipsec via ${vpn_key} del ${VALUES[${gateway_pos}]}" >> ${transaction}
 	    pos=$[${pos} + 5]
 	fi
     done

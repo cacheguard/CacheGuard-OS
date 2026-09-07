@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -59,12 +58,12 @@ show-snmp-form()
 	engine="&lt;not running&gt;"
     fi
 
-    blankItemContent[0]="<span style='font-family:monospace;'>${engine}</span>"
-    blankItemContent[1]="type='text' size='16' maxlength='${MAX_USER_LEN}' value='${SNMP_USER}'"
-    blankItemContent[2]="type='password' size='16' maxlength='32' value=''"
-    blankItemContent[3]="type='password' size='16' maxlength='32' value=''"
-    blankItemContent[4]="type='password' size='16' maxlength='32' value=''"
-    blankItemContent[5]="type='password' size='16' maxlength='32' value=''"
+    blankItemContent[0]="<span>${engine}</span>"
+    blankItemContent[1]="type='text' size='24' maxlength='${MAX_USER_LEN}' value='${SNMP_USER}'"
+    blankItemContent[2]="type='password' size='24' maxlength='32' value=''"
+    blankItemContent[3]="type='password' size='24' maxlength='32' value=''"
+    blankItemContent[4]="type='password' size='24' maxlength='32' value=''"
+    blankItemContent[5]="type='password' size='24' maxlength='32' value=''"
     blankItemContent[6]="type='checkbox'$(checked ${SNMP_TLS})"
     blankItemContent[7]="type='checkbox'$(checked ${SNMP_UDP})"
     blankItemContent[8]="type='checkbox'$(checked ${SNMP_TCP})"

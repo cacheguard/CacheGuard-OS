@@ -4,7 +4,6 @@
 ###########################################################################
 #
 # MODULE:       VPN Subscription
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -30,8 +29,7 @@ vpnsubscr_check_login( );
 
 function vpnsubscr_display_report( )
 {
-    echo "<center>\n";
-    echo "<table class='box-report'>\n";
+    echo "<table class='report'>\n";
 
     if (!file_exists( LOG_FILE )) {
         echo "<tr><td><font color='SeaGreen'>All requested operations have been successfully performed.</font></td></tr>\n";
@@ -65,35 +63,18 @@ function vpnsubscr_display_report( )
     }
 
     echo "</table>\n";
-    echo "</center>\n";
 }
 
 ?>
 <!DOCTYPE html>
 <html>
-  <head>
-    <title><?php echo vpnsubscr_get_org_name( ); ?> Operations Report</title>
-    
-    <link rel="shortcut icon" type="image/x-image" href="/image/favicon.ico" />
-    <link rel="stylesheet" type="text/css" href="/chromestyle.css" />
-    <link rel="stylesheet" type="text/css" href="/style.css" />
-
-    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
-    <meta name="robots" content="noindex, nofollow, noarchive, noarchive, nosnippet, noodp, noydir" />
-    <meta name="description" content="This page dsiplays the latest action report." />
-
-    <script type="text/javascript" src="/js/chrome.js"></script>
-    <script type="text/javascript" src="/js/vpnsubscr.js"></script>
-    <script type="text/javascript" src="/js/printmenu.js"></script>
-    <script type="text/javascript" src="/js/logout.js"></script>
-  </head>
-
+<?php vpnsubscr_display_html_header( ); ?>
   <body>
     <?php vpnsubscr_display_header( ); ?>
-    <div class='box-centered-container'>
-      <div class='box-centered-nested'>
+    <div class='centered-container'>
+      <div class='centered-nested'>
 	<div class='page-title'>Operations Report <a href='report.php'><img src='/image/refresh.png' title='Refresh' alt='Refresh' /></a></div>
-	<div class='box-help'>Here you can find a report on the latest requested operation.</div>
+	<div class='help'>Here you can find a report on the most recently requested operation.</div>
 	<?php vpnsubscr_display_report( ); ?>
       </div>
     </div>

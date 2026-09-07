@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -34,8 +33,13 @@ show-password-email-form()
     
     itemID[0]="email_account"
     itemID[1]="email_password"
-    
-    blankItemContent[0]="smtp://${EMAIL_ACCOUNT_USERNAME}@${EMAIL_ACCOUNT_SERVER_FQDN}:${EMAIL_ACCOUNT_SERVER_PORT}"
+
+    if test -n "${EMAIL_ACCOUNT_USERNAME}" -a -n "${EMAIL_ACCOUNT_SERVER_FQDN}" ; then
+	blankItemContent[0]="smtp://${EMAIL_ACCOUNT_USERNAME}@${EMAIL_ACCOUNT_SERVER_FQDN}:${EMAIL_ACCOUNT_SERVER_PORT}"
+    else
+	blankItemContent[0]="<i>N/A</i>"
+    fi
+
     blankItemContent[1]="type='password' size='32' maxlength='64'"
 
     checkItem[1]=printable
@@ -46,7 +50,6 @@ show-password-email-form()
     shortcutMenuTitle[0]="Email Account"
 
     show-title "Administrator Email Account Password" "enabled" "email password"
-    show-shortcuts-menu
     show-form "${width}"
 }
 

@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -26,4 +25,35 @@ source set-peer-common.${GUI_EXT_NAME}
 
 # Main()
 
-set-peers next
+set-next-peers()
+{
+    local pos=0 entry_pos del_pos
+    local ip_pos port_pos qos_pos
+
+    local transaction=/tmp/${TRANSACTION_FILE}.wadmin.${REMOTE_USER}.${$}
+    rm -f ${transaction}
+
+    while test ${pos} -lt ${ATTRIBUTE_NB}
+    do
+	entry_pos=${pos}
+	ip_pos=$[${pos} + 1]
+	port_pos=$[${pos} + 2]
+	qos_pos=$[${pos} + 3]
+	del_pos=$[${pos} + 4]
+	
+	[[ "${ATTRIBUTES[${del_pos}]}" =~ ^del_[0-9]+$ ]]
+	if test ${?} -ne 0 ; then
+	    if test "${VALUES[${entry_pos}]}" == anew -a -n "${VALUES[${ip_pos}]}" ; then
+		echo "peer next add ${VALUES[${ip_pos}]} ${VALUES[${port_pos}]} ${VALUES[${qos_pos}]}" >> ${transaction}
+	    fi
+	    pos=$[${pos} + 4]
+	else
+	    echo "peer next del ${VALUES[${ip_pos}]} ${VALUES[${port_pos}]}" >> ${transaction}
+	    pos=$[${pos} + 5]
+	fi
+    done
+    
+    execute-transaction ${transaction}
+}
+
+set-next-peers

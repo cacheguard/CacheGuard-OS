@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -92,7 +91,7 @@ show-av-wl-load-form()
     blankItemContent[0]="$(print-operation "${file_servers}" ${operation})"
     blankItemContent[1]="$(show-file-protocol1 ${VALUES[1]:1})"
     blankItemContent[2]=${file_servers}
-    blankItemContent[3]="type='text' size='48' maxlength='128' value='${VALUES[3]}'"
+    blankItemContent[3]="type='text' size='32' maxlength='128' value='${VALUES[3]}'"
 
     checkItem[3]=printable
 
@@ -100,7 +99,7 @@ show-av-wl-load-form()
     itemForm[1]="select"
     itemForm[2]="select"
 
-    itemFormSelectCB[0]="antivirusWhitelistOperationSelectCB( '${operation_id}', '${protocol_id}', '${server_id}', '${filename_id}' );"
+    itemData[0]="data-action='antivirus-whitelist-operation' data-operation-id='${operation_id}' data-protocol-id='${protocol_id}' data-server-id='${server_id}' data-filename-id='${filename_id}'"
 
     shortcutMenuItem[0]="access-file"
     shortcutMenuItem[1]="password-file"
@@ -108,8 +107,6 @@ show-av-wl-load-form()
     shortcutMenuTitle[1]="Accounts"
 
     show-title "Load white list of virus names" enabled "access antivirus password"
-    show-shortcuts-menu
-
     show-form "${width}" enabled
 }
 

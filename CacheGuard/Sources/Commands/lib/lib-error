@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       Commands
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -22,25 +21,94 @@
 #
 ###########################################################################
 
+get-html-bold-command()
+{
+    test -n "${1}" || return 1
+    local cmd=${1}
+
+    cmd="<a href='${DOC_COMMAND_DIR}/${cmd}.html' target='_blank'>${cmd}</a>"
+
+    echo ${cmd}
+}
+
+get-magnified-command()
+{
+    test -n "${1}" || return 1
+    local cmd=${1}
+
+    if test ${TERM} == ${WADMIN_TERM} ; then
+	cmd=$(get-html-bold-command ${cmd})
+    else
+	cmd=$(get-terminal-bold-text ${cmd})
+    fi
+
+    echo ${cmd}
+}
+
+get-magnified-error-text()
+{
+    test -n "${1}" || return 1
+    local in_txt=${1}
+
+    local out_txt wrd len
+
+    for wrd in ${in_txt}
+    do
+	if test ${wrd:0:1} != '@' ; then
+	    out_txt="${out_txt} ${wrd}"
+	    continue
+	fi
+
+	len=${#wrd}
+	((len--))
+
+	if test ${wrd:${len}:1} != '@' ; then
+	    out_txt="${out_txt} ${wrd}"
+	    continue
+	fi
+
+	((len--))
+	wrd=${wrd:1:${len}}
+	wrd=$(get-magnified-command ${wrd})
+
+	out_txt="${out_txt} [${wrd}]"
+    done
+
+    test ${TERM} == ${WADMIN_TERM} || out_txt="${out_txt} To do, so use the $(get-terminal-bold-text help) command followed by the command name."
+
+    out_txt=${out_txt:1}
+    echo ${out_txt}
+}
+
 display-error()
 {
     test -n "${1}" || return 1
     local err=${1}
     local txt=${2}
 
-    local com txt tag
+    local txt tag com trx
 
     txt="${txt}${Errors[${err}]}"
-
-    test -z "${TRANSACTION}" || com=" (command ${ARGS[0]})"
 
     if test ${TERM} == ${WADMIN_TERM} ; then
 	tag="${ERROR_TAG}"
     else
 	tag='***'
+	com=$(file-basename ${ARGS[0]})
+	test -z "${TRANSACTION}" || trx=" ($(get-magnified-command "${com}") command)"
     fi
-    test -n "${txt}" || txt="No error description has been defined for this error."
-    echo "${tag} Error ${err}${com} - ${txt}" >&2
+
+    if test -z "${txt}" ; then
+	txt="No error description has been defined for this error."
+    else
+	if test ${err} -le 254 -o ${err} -ge 512 ; then
+	    test ${TERM} == ${WADMIN_TERM} || txt="${txt} Refer to the invoked command manual: use the $(get-terminal-bold-text "help ${com}") command."
+	else
+	    txt=$(get-magnified-error-text "${txt}")
+	fi
+    fi
+
+    echo -e "${tag} Error ${err}${trx} - ${txt}" >&2
 }
 
 error()

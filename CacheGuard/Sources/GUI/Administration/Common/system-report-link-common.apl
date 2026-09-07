@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -36,28 +35,23 @@ get-html-bond-devs()
 show-system-report-link()
 {
     test -s ${RUN_DIR}/${LINKS_STATE_FILENAME} || return 0
-
+    test -n "${1}" || return 1
     local display_time=${1}
-    local table_width=${2}
-    test -n "${table_width}" || table_width="405"
+    local compact=${2}
+
     local dev state ips
     local ip
 
-    echo "<div class='core-form'>"
+    test ${display_time} != time || display-appliance-time-table
+    test -z "${compact}" || compact=' compact'
 
-    if test -n "${display_time}" ; then
-	echo "<table class='highlight-form' style='margin-bottom:5px;' width='${table_width}'>"
-	display-appliance-time-row right
-	echo "</table>"
-    fi
-
-    echo "<table class='highlight-list' width='${table_width}'>"
+    echo "<table class='highlight-list${compact}'>"
 
     echo "<thead>"
     echo "<tr>"
-    echo "<td class='table-header indicator-table-header' width='30%' align='center'>Device</td>"
-    echo "<td class='table-header' width='20%' align='center'>State</td>"
-    echo "<td class='table-header' width='50%' align='center'>IP Address(es)</td>"
+    echo "<th class='table-header' align='left'>Device</th>"
+    echo "<th class='table-header' align='left'>IP Address(es)</th>"
+    echo "<th class='table-header' align='center'>State</th>"
     echo "</tr>"
     echo "</thead>"
 
@@ -70,23 +64,23 @@ show-system-report-link()
 	dev=$(get-html-bond-devs ${dev})
 	echo ${dev}
 
-	if test "${state}" == OK ; then
-	    echo "<td align='center'><img src='${IMAGE_DIR}/ok.png' /></td>"
-	else
-	    echo "<td align='center'><img src='${IMAGE_DIR}/ko.png' title='KO' /></td>"
-	fi
-
 	echo "<td align='left'>"
 	for ip in ${ips}
 	do
 	    echo "${ip}<br />"
 	done
 	echo "</td>"
+
+	if test "${state}" == OK ; then
+	    echo "<td><img class='small' src='${IMAGE_DIR}/ok.png' /></td>"
+	else
+	    echo "<td><img class='small' src='${IMAGE_DIR}/ko.png' title='KO' /></td>"
+	fi
+
 	echo "</tr>"
 
     done < ${RUN_DIR}/${LINKS_STATE_FILENAME}
 
     echo "</tbody>"
     echo "</table>"
-    echo "</div>"
 }

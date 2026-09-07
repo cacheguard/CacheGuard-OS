@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       Build
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -92,7 +91,7 @@ set-main-env()
 	echo "**** Error: the ${SYSLINUX_DIR}/${file} file is missing."
 	exit 11
     done
-    
+
     export KERNEL_FILE=${APL}/boot/kernel-${SYS_VERSION}-${SYS_NAME}
     export KERNEL_HM_FILE=${APL}/boot/kernel-${SYS_VERSION}-${SYS_HM_NAME}
     export KERNEL_64_FILE=${APL}/boot/kernel-${SYS_VERSION}-${SYS_64_NAME}
@@ -102,7 +101,7 @@ gen-dev2run-env()
 {
     echo export PATH=/sbin:/usr/sbin:${LOCAL_DIR}/sbin:/bin:/usr/bin:${LOCAL_DIR}/bin
     echo export INSTALL_BACKTITLE="'${COMMERCIAL_NAME}-OS ${OS_GENERATION}-${OS_VERSION}'"
-    echo export APL=/mnt/$(basename ${APL})
+    echo export APL=/mnt/$(file-basename ${APL})
     echo export LICENSE=${ADMIN_DIR}${APPLIANCE_DIR}/man/man1/license.1
     echo export MAX_UPLOAD_FILE_SZ=$[${MAX_UPLOAD_FILE_SZ} / 1024]
     echo export DEFAULT_MAX_UPLOAD_FILE_SZ=$[${MAX_UPLOAD_FILE_SZ} / 1024]
@@ -358,7 +357,7 @@ pxe-install()
     sudo cp -rf ${CDROM_GENERATED_DIR}/${TECHNICAL_NAME} ${TFTPBOOT_DIR}/
 
     sudo chown \
-	 -R nobody:nogroup \
+	 -R tftp:tftp \
 	 ${TFTPBOOT_DIR}/${TECHNICAL_NAME} \
 	 ${TFTPBOOT_DIR}/${TECHNICAL_NAME}-boot
 }
@@ -400,7 +399,7 @@ iso-install()
     local extension=$(get-compressed-file-extension)
 
     local grub_arch kernel
-    local file files
+    local file files name
 
     case ${SYS_ARCHITECTURE} in
 	x86_64)
@@ -465,12 +464,13 @@ iso-install()
     cp -f ${src_doc_dir}/UsersGuide/Schema/*.png ${doc_dir}/${IMAGE_DIR_NAME}
     cp -f ${src_doc_dir}/UsersGuide/Image/* ${doc_dir}/${IMAGE_DIR_NAME}
     cp -f ${src_doc_dir}/Image/* ${doc_dir}/${IMAGE_DIR_NAME}
-    cp -f ${src_doc_dir}/apl.css ${doc_dir}
+    cp -f ${src_doc_dir}/CSS/apl.css ${doc_dir}/apl-${OS_VERSION}.css
     cp -f ${src_doc_dir}/favicon.ico ${doc_dir}
 
     for file in ${src_doc_dir}/JS/*.js
     do
-	cp -f ${file} ${js_dir}
+	name=$(file-basename ${file} .js)
+	cp -f ${file} ${js_dir}/${name}-${OS_VERSION}.js
     done
 
     files=$(find ${doc_dir} -type f -name "*.html")
@@ -479,7 +479,7 @@ iso-install()
 	sed -i -e "s@/${DOC_DIR_NAME}/@../@g" ${file}
     done
 
-    cat ${src_doc_dir}/jquery_treeview.css | sed -e "s@/${DOC_DIR_NAME}/${IMAGE_DIR_NAME}/@${IMAGE_DIR_NAME}/@g" > ${doc_dir}/jquery_treeview.css
+    cat ${src_doc_dir}/CSS/treeview.css | sed -e "s@/${DOC_DIR_NAME}/${IMAGE_DIR_NAME}/@${IMAGE_DIR_NAME}/@g" > ${doc_dir}/treeview-${OS_VERSION}.css
 
     install -m 644 ${GENERATED_DIR}/grub.cfg ${grub_dir}/grub.cfg
 
@@ -549,7 +549,7 @@ make-cdrom()
 	-full-iso9660-filenames \
 	-rational-rock \
 	-m . -m .. \
-	-joliet-long \
+	-joliet -joliet-long \
 	-allow-lowercase \
 	-appid "${application_id}" \
 	-abstract ../${GENERATED_DIR}/abstract.txt \
@@ -621,10 +621,7 @@ custom-ramdisk()
 {
     test -n "${1}" || return 1
     local dst_rdir=${1}
-
     test -d ${dst_rdir} || return 11
-    test -f ${GENERATED_DIR}/busybox-applets || return 13
-
     local file base link rdir
     local kernel
 
@@ -654,6 +651,10 @@ custom-ramdisk()
     sudo install -v -m 754 -o root -g root install ${dst_rdir}/etc/rc.d/init.d/install
     sudo install -v -m 755 -o root -g root ${APL}/usr/sbin/dhclient-script ${dst_rdir}/usr/sbin/dhclient-script
 
+    rm -f \
+       ${dst_rdir}/etc/modprobe.d/bonding.conf \
+       ${dst_rdir}/etc/modprobe.d/ifb.conf
+
     sudo ln -vsf ../init.d/install ${dst_rdir}/etc/rc.d/rc7.d/S00install
     sudo ln -vsf install ${dst_rdir}/root
 
@@ -670,20 +671,14 @@ custom-ramdisk()
 	 ${dst_rdir}/usr/bin \
 	 ${dst_rdir}/usr/sbin
 
-    while read file
-    do
-	test -n "${file}" || continue
-	test ${file:0:1} != '#' || continue
+    sudo install -v -m 755 -o root -g root ${APL}/usr/bin/bc ${dst_rdir}/usr/bin/bc
 
-	sudo ln -vsf busybox ${dst_rdir}/usr/bin/${file}
-    done < ${GENERATED_DIR}/busybox-applets
+    sudo ln -vsf busybox ${dst_rdir}/usr/bin/vi
 
     while read file
     do
 	test -n "${file}" || continue
 	test ${file:0:1} != '#' || continue
-
-	! grep --quiet ${file} ${GENERATED_DIR}/busybox-applets || continue
 	rdir=$(file-dirname ${file})
 	sudo cp -va ${APL}/${file} ${dst_rdir}/${rdir}/
     done < binaries.lst
@@ -747,6 +742,7 @@ usr/lib/lsb
 usr/lib/modules
 usr/lib/services/init-functions
 usr/lib/udev
+usr/libexec/sshd-auth
 usr/libexec/sshd-session
 usr/share/${BINKEYMAP_DIR_NAME}
 usr/share/groff
@@ -798,15 +794,15 @@ $(cat binaries.lst) $(cat ${GENERATED_DIR}/libraries.lst)
     case ${COMPRESS_MODE} in
 	xz)
 	    echo "+++ XZ Compressing the InitRD..."
-	    xz --memlimit=20% --threads=${WORKING_CPU_NB} --check=crc32 ${GENERATED_DIR}/${initrd}
+	    sudo nice --adjustment=-10 xz --memlimit=20% --threads=${WORKING_CPU_NB} --check=crc32 ${GENERATED_DIR}/${initrd}
 	    ;;
 	gz)
 	    echo "+++ GZip Compressing the InitRD..."
-	    gzip ${GENERATED_DIR}/${initrd}
+	    sudo nice --adjustment=-10 gzip ${GENERATED_DIR}/${initrd}
 	    ;;
 	*)
 	    echo "+++ GZip Compressing the InitRD..."
-	    gzip ${GENERATED_DIR}/${initrd}
+	    sudo nice --adjustment=-10 gzip ${GENERATED_DIR}/${initrd}
 	    ;;
     esac
 }

@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -37,8 +36,6 @@ show-panel-board()
     do
 	echo "<div class='item-board'><a href='/${GUI_DIR_NAME}/${MENU_PAGE[${i}]}.${GUI_EXT_NAME}'><center><img alt='${MENU_PAGE_TITLE[${i}]}' title='${MENU_PAGE_TITLE[${i}]}' src='/image/${MENU_PAGE[${i}]}.png' align= 'top' /></center><h4>${MENU_PAGE_TITLE[${i}]}</h4></a></div>"
     done
-
-    echo "<div style='clear:left'></div>"
 }
 
 # Main()

@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       Scripts
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -68,7 +67,8 @@ main()
 	while true
 	do
 	    read date code message < ${log_file_in}
-	    echo ${date} ${code} ${message} >> ${log_file_out}
+	    test -n "${message}" || continue
+	    echo "${date} ${code} ${message}" >> ${log_file_out}
 	    test ${log_remote} == 'no' || send-to-syslog_servers "${message}"
 	done
     else
@@ -76,6 +76,7 @@ main()
 	tail --follow --lines=0 ${log_file_in} | \
 	    while read date code message
 	    do
+		test -n "${message}" || continue
 		send-to-syslog_servers "${message}"
 	    done
     fi

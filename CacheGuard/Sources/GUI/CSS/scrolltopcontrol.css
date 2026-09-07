@@ -1,0 +1,50 @@
+/*
+###########################################################################
+#
+# MODULE:       GUI
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+*/
+
+#topcontrol{
+    position:fixed;
+    right:20px;
+    bottom:20px;
+    opacity:0;
+    cursor:pointer;
+    z-index:9999;
+    width:48px;
+    height:48px;
+    padding:0;
+    border:0;
+    border-radius:50%;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    background-color:var(--title-bg);
+    background-image:url("/image/top.png");
+    background-repeat:no-repeat;
+    background-position:center;
+    background-size:20px 20px;
+    box-shadow:0 4px 12px rgba(0,0,0,.15);
+    transition:opacity .3s ease,transform .2s ease;
+}
+
+#topcontrol:hover{
+    transform:scale(1.08);
+}

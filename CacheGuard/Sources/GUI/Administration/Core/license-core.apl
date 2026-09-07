@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -24,17 +23,16 @@
 
 show-license-form()
 {
-    local width
+    local width accept_id=accept
 
     local first_action=$(get-first-startup-action)
 
     itemWidth[0]=90
     itemWidth[1]=10
 
-    itemTitle[0]="I agree to terms of the <a href=/doc/command/license.html target=_blank>${COMMERCIAL_NAME}-OS License</a>"
-    itemID[0]=accept
-    blankItemContent[0]="type='checkbox' onClick='agreeLicense(\"accept\")'"
-
+    itemTitle[0]="I agree to the terms of the<br /><a href=${DOC_COMMAND_DIR}/license.html target=_blank>${COMMERCIAL_NAME}-OS License</a>"
+    itemID[0]=${accept_id}
+    blankItemContent[0]="type='checkbox' data-action='agree-license' data-value='${accept_id}'"
     show-title "License Terms Acceptance" disabled "license"
 
     if test "${first_action}" != license ; then
@@ -47,7 +45,6 @@ show-license-form()
 
     echo "<div class='core-form'>"
     cat ${ETC_HTML_DIR}/license.html
-    show-scroll-top
     echo "</div>"
 
 }

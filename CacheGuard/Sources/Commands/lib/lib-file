@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       Commands
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -821,14 +820,14 @@ Content-Transfer-Encoding: 8bit
 <header>
 <meta http-equiv='Content-Type' content='text/html; charset=UTF-8' />
 </header>
-<body bgcolor='Gainsboro' style='margin:0; padding:10px;'>
-<div id='outer' style='margin:0; padding:0;'>
-<div id='inner' style='display:table;margin:0 auto; padding:0; width:70%; min-width:600px; max-width:600px;'>
-<div style='float:right; font-size:80%; text-align:right;'>
+<body>
+<div id='outer'>
+<div id='inner'>
+<div>
 </div>
 <br />
-<div style='font-size:95%; text-align:justify; background-color:${main_color}; margin:0; margin-top:5px; margin-bottom:5px; padding:${padding}; border-radius:${border_radius};'>
-<div style='margin:0; padding:${padding};'>
+<div>
+<div>
 EOT
     cat ${html_file_path} >> ${email_file}
     cat << EOT >> ${email_file}

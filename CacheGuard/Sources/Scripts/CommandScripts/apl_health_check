@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       Scripts
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -35,6 +34,22 @@ source ${LOCAL_DIR}/lib/apl_common
 source ${ABASE_DIR}/${ENV_RDIR}/${ENV_CURRENT_NAME}
 
 export CHECK_LINKS_DONE='no'
+
+set-environment()
+{
+    if test -n "${1}" ; then
+	CALLER_PID=${1}
+	REPORTS=${2}
+	MODE=${3}
+    else
+	CALLER_PID=${$}
+    fi
+
+    TMP_WAITING_PROCESS=/tmp/${WAITING_PROCESS}.${CALLER_PID}
+    HC_INTERRUPT=0
+
+    trap "clean-end-cb" USR1 INT QUIT TERM
+}
 
 health-check-logger()
 {
@@ -92,6 +107,61 @@ check-supervisor-fifo()
     test ${HC_INTERRUPT} -eq 0 || clean-exit 10
 }
 
+update-gui-access-check()
+{
+    test ${CURRENT_ADMIN_WADMIN} == True || return 0
+    test ${CURRENT_ADMIN_WAUDIT} == True || return 0
+
+    local base file files
+    local date date_wadmin date_waudit
+
+    files=$(ls -1 ${ADMIN_DIR}/tmp/${GUI_CHECK_DATE_FILENAME}.* 2> /dev/null)
+    for file in ${files}
+    do
+	base=$(file-basename ${file})
+
+	if test -f ${file}.2del ; then
+	    rm -f \
+	       ${file} \
+	       ${file}.2del \
+	       ${WEB_SERVER_DIR}/tmp/${base} \
+	       ${WEB_SERVER_DIR}/tmp/${base}.2del
+	    continue
+	fi
+
+	if test -f ${WEB_SERVER_DIR}/tmp/${base} ; then
+
+	    date_wadmin=$(cat ${file})
+	    date_waudit=$(cat ${WEB_SERVER_DIR}/tmp/${base})
+
+	    max-value ${date_wadmin} ${date_waudit} > ${file}
+	fi
+    done
+
+    files=$(ls -1 ${WEB_SERVER_DIR}/tmp/${GUI_CHECK_DATE_FILENAME}.* 2> /dev/null)
+    for file in ${files}
+    do
+	base=$(file-basename ${file})
+
+	if test -f ${file}.2del ; then
+	    rm -f \
+	       ${file} \
+	       ${file}.2del \
+	       ${ADMIN_DIR}/tmp/${base} \
+	       ${ADMIN_DIR}/tmp/${base}.2del
+	    continue
+	fi
+
+	if test -f ${ADMIN_DIR}/tmp/${base} ; then
+
+	    date_wadmin=$(cat ${file})
+	    date_waudit=$(cat ${ADMIN_DIR}/tmp/${base})
+
+	    max-value ${date_wadmin} ${date_waudit} > ${file}
+	fi
+    done
+}
+
 check-service()
 {
     test -n "${1}" || return 1
@@ -102,40 +172,42 @@ check-service()
     case ${service} in
 	ocspd)
 	    process=$(get-ocsp-process)
-	    test -n "${process}" || return 1
+	    test -n "${process}" || return 11
 	    ;;
 	iked)
 	    process=$(get-ike-process)
-	    test -n "${process}" || return 1
+	    test -n "${process}" || return 13
 	    ;;
 	rlogger)
 	    process=$(get-rlogger-process)
-	    test -n "${process}" || return 1
+	    test -n "${process}" || return 15
 	    ;;
 	smanager)
 	    process=$(get-smanager-process)
-	    test -n "${process}" || return 1
+	    test -n "${process}" || return 17
 	    ;;
 	*)
 	    getpids ${service} > /dev/null
-	    test ${?} -eq 0 || return 1
+	    test ${?} -eq 0 || return 21
 	    ;;
     esac
 
-    if test -n "${2}" ; then
-	test -n "${3}" || return 1
-	local ip=${2} ; test ${ip} != '-' || unset ip
-	local port=${3}
-	local socket=$(ss -lHntu | grep ${ip}:${port} 2> /dev/null)
-	test -n "${socket}"
-    fi
+    test -n "${2}" || return 0
+    test -n "${3}" || return 0
+
+    local ip=${2}
+    local port=${3}
+    test ${ip} != '-' || unset ip
+
+    local socket=$(ss -lHntu | grep ${ip}:${port} 2> /dev/null)
+    test -n "${socket}"
 }
 
-check-services-start()
+check-services()
 {
     local mode
 
-    case "${1}" in
+    case ${1} in
 	active|passive)
 	    mode=${1}
 	    ;;
@@ -222,11 +294,11 @@ check-services-start()
 		;;
 	esac
 
-        # This down VRRP IPs => Fail over!
 	/etc/rc.d/init.d/keepalived stop > /dev/null 2>&1
-        # Now No more Health Checking
-	echo -n "off" > ${RUN_DIR}/${HEALTH_STATE_FILENAME}
 	/etc/rc.d/init.d/health stop > /dev/null 2>&1
+
+	echo -n "off" > ${RUN_DIR}/${HEALTH_STATE_FILENAME}
+
 	message="The Health Checker cannot restart vital services. The HA manager has forced a fail over"
 	health-check-notification 4 "${srv}" "${message}"
 	((i++))
@@ -813,10 +885,19 @@ clean-exit()
 
     local code=${1}
 
-    rm -f /var/lock/apl_health_check
-    rm -f ${RUN_DIR}/${WAITING_PROCESS}.${CALLER_PID}
+    rm -f \
+       /var/lock/apl_health_check \
+       ${TMP_WAITING_PROCESS}
 
     exit ${code}
+}
+
+signal-process-termination()
+{
+    touch ${TMP_WAITING_PROCESS}
+    install -m 664 -o ${ADMIN_NAME} -g ${GROUP_NAME} ${TMP_WAITING_PROCESS} \
+	    ${RUN_DIR}/${SUPERVISOR_CALLER}/${WAITING_PROCESS}.${CALLER_PID}
+    rm -f ${TMP_WAITING_PROCESS}
 }
 
 clean-end-cb()
@@ -824,53 +905,38 @@ clean-end-cb()
     HC_INTERRUPT=1
 }
 
-init-clean-end-trap()
-{
-    HC_INTERRUPT=0
-    trap "clean-end-cb" USR1 INT QUIT TERM
-    touch ${RUN_DIR}/${WAITING_PROCESS}.${CALLER_PID}
-}
-
 main()
 {
-    local reports mode
+    set-environment "${@}"
 
-    if test -n "${1}" ; then
-	CALLER_PID=${1}
-	reports=${2}
-	mode=${3}
-    else
-	CALLER_PID=${$}
-    fi
+    update-gui-access-check
 
-    init-clean-end-trap
-
-    if test -z "${reports}" ; then
+    if test -z "${REPORTS}" ; then
 	check-links
 	check-vpnipsec
 	report-disks
-	check-services-start
+	check-services
 	update-connections
 	report-av-update
 	check-tls
     else
 	local report_major
-	reports=${reports//:/ }
+	REPORTS=${REPORTS//:/ }
 
-	for report_major in ${reports}
+	for report_major in ${REPORTS}
 	do
 	    case ${report_major} in
 		link)
 		    check-links
 		    ;;
 		vpnipsec)
-		    check-vpnipsec ${mode}
+		    check-vpnipsec ${MODE}
 		    ;;
 		disk)
-		    report-disks ${mode}
+		    report-disks ${MODE}
 		    ;;
 		service)
-		    check-services-start ${mode}
+		    check-services ${MODE}
 		    ;;
 		connection)
 		    update-connections
@@ -890,6 +956,7 @@ main()
 	done
     fi
 
+    signal-process-termination
     clean-exit 0
 }
 

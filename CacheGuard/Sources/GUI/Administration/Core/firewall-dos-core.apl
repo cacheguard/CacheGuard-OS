@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -24,10 +23,10 @@
 
 show-waf-limit-form()
 {
-    local width=600
+    local width=550
 
-    itemWidth[0]=85
-    itemWidth[1]=15
+    itemWidth[0]=80
+    itemWidth[1]=20
 
     local default_tcp_limit=$(get-default-tcp-flood-limit)
     local default_tcp_burst=$(get-default-tcp-flood-burst)
@@ -49,27 +48,27 @@ show-waf-limit-form()
 
     local i=0
 
-    itemTitle[${i}]="Allowed TCP SYN/RST per second <span style='color:SeaGreen;'>[default to ${default_tcp_limit}]</span>" ; ((i++))
-    itemTitle[${i}]="Allowed TCP SYN/RST burst limit <span style='color:SeaGreen;'>[default to ${default_tcp_burst}]</span>" ; ((i++))
+    itemTitle[${i}]="Allowed TCP SYN/RST per second [<u><i>default to ${default_tcp_limit}</i></u>]" ; ((i++))
+    itemTitle[${i}]="Allowed TCP SYN/RST burst limit> [<u><i>default to ${default_tcp_burst}</i></u>]" ; ((i++))
     itemTitle[${i}]="<hr />" ; ((i++))
 
-    itemTitle[${i}]="Allowed UDP requests per second <span style='color:SeaGreen;'>[default to ${default_udp_limit}]</span>" ; ((i++))
-    itemTitle[${i}]="Allowed UDP requests burst limit <span style='color:SeaGreen;'>[default to ${default_udp_burst}]</span>" ; ((i++))
+    itemTitle[${i}]="Allowed UDP requests per second> [<u><i>default to ${default_udp_limit}</i></u>]" ; ((i++))
+    itemTitle[${i}]="Allowed UDP requests burst limit> [<u><i>default to ${default_udp_burst}</i></u>]" ; ((i++))
     itemTitle[${i}]="<hr />" ; ((i++))
 
-    itemTitle[${i}]="Allowed new Web requests per second <span style='color:SeaGreen;'>[default to ${default_web_limit}]</span>" ; ((i++))
-    itemTitle[${i}]="Allowed new Web requests burst limit <span style='color:SeaGreen;'>[default to ${default_web_burst}]</span>" ; ((i++))
+    itemTitle[${i}]="Allowed new Web requests per second> [<u><i>default to ${default_web_limit}</i></u>]" ; ((i++))
+    itemTitle[${i}]="Allowed new Web requests burst limit> [<u><i>default to ${default_web_burst}</i></u>]" ; ((i++))
     itemTitle[${i}]="<hr />" ; ((i++))
 
-    itemTitle[${i}]="Allowed new rWeb requests per second <span style='color:SeaGreen;'>[default to ${default_rweb_limit}]</span>" ; ((i++))
-    itemTitle[${i}]="Allowed new rWeb requests burst limit <span style='color:SeaGreen;'>[default to ${default_rweb_burst}]</span>" ; ((i++))
+    itemTitle[${i}]="Allowed new rWeb requests per second> [<u><i>default to ${default_rweb_limit}</i></u>]" ; ((i++))
+    itemTitle[${i}]="Allowed new rWeb requests burst limit> [<u><i>default to ${default_rweb_burst}</i></u>]" ; ((i++))
     itemTitle[${i}]="<hr />" ; ((i++))
 
-    itemTitle[${i}]="Maximum routed TCP SYN per source IP <span style='color:SeaGreen;'>[default to ${default_piptcp}]</span>" ; ((i++))
-    itemTitle[${i}]="Maximum new Web requests per source IP <span style='color:SeaGreen;'>[default to ${default_pipweb}]</span>" ; ((i++))
-    itemTitle[${i}]="Maximum new rWeb requests per source IP <span style='color:SeaGreen;'>[default to ${default_piprweb}]</span>" ; ((i++))
-    itemTitle[${i}]="Maximum new TCP DNS requests per source IP <span style='color:SeaGreen;'>[default to ${default_pipdns}]</span>" ; ((i++))
-    itemTitle[${i}]="Maximum new OCSP requests per source IP <span style='color:SeaGreen;'>[default to ${default_pipocsp}]</span>" ; ((i++))
+    itemTitle[${i}]="Maximum routed TCP SYN per source IP> [<u><i>default to ${default_piptcp}</i></u>]" ; ((i++))
+    itemTitle[${i}]="Maximum new Web requests per source IP> [<u><i>default to ${default_pipweb}</i></u>]" ; ((i++))
+    itemTitle[${i}]="Maximum new rWeb requests per source IP> [<u><i>default to ${default_piprweb}</i></u>]" ; ((i++))
+    itemTitle[${i}]="Maximum new TCP DNS requests per source IP> [<u><i>default to ${default_pipdns}</i></u>]" ; ((i++))
+    itemTitle[${i}]="Maximum new OCSP requests per source IP> [<u><i>default to ${default_pipocsp}</i></u>]" ; ((i++))
 
     local n=${i}
 
@@ -97,34 +96,33 @@ show-waf-limit-form()
     itemID[${i}]="pipocsp" ; ((i++))
 
     i=0
-    blankItemContent[${i}]="type='text' size='10' maxlength='5' value='${FW_DOS_TCP_FLOOD/ *}' onMouseOver=showMinMaxToolTip(1,10000); onMouseOut=hideMinMaxToolTip();" ; ((i++))
-    blankItemContent[${i}]="type='text' size='10' maxlength='5' value='${FW_DOS_TCP_FLOOD/* }' onMouseOver=showMinMaxToolTip(1,10000); onMouseOut=hideMinMaxToolTip();" ; ((i++))
+    blankItemContent[${i}]="type='text' size='10' maxlength='5' value='${FW_DOS_TCP_FLOOD/ *}' data-action='show-min-max-tooltip' data-min='1' data-max='10000'" ; ((i++))
+    blankItemContent[${i}]="type='text' size='10' maxlength='5' value='${FW_DOS_TCP_FLOOD/* }' data-action='show-min-max-tooltip' data-min='1' data-max='10000'" ; ((i++))
     blankItemContent[${i}]="<hr />" ; itemForm[${i}]=text ; ((i++))
 
-    blankItemContent[${i}]="type='text' size='10' maxlength='5' value='${FW_DOS_UDP_FLOOD/ *}' onMouseOver=showMinMaxToolTip(1,10000); onMouseOut=hideMinMaxToolTip();" ; ((i++))
-    blankItemContent[${i}]="type='text' size='10' maxlength='5' value='${FW_DOS_UDP_FLOOD/* }' onMouseOver=showMinMaxToolTip(1,10000); onMouseOut=hideMinMaxToolTip();" ; ((i++))
+    blankItemContent[${i}]="type='text' size='10' maxlength='5' value='${FW_DOS_UDP_FLOOD/ *}' data-action='show-min-max-tooltip' data-min='1' data-max='10000'" ; ((i++))
+    blankItemContent[${i}]="type='text' size='10' maxlength='5' value='${FW_DOS_UDP_FLOOD/* }' data-action='show-min-max-tooltip' data-min='1' data-max='10000'" ; ((i++))
     blankItemContent[${i}]="<hr />" ; itemForm[${i}]=text ; ((i++))
 
-    blankItemContent[${i}]="type='text' size='10' maxlength='5' value='${FW_DOS_WEB_FLOOD/ *}' onMouseOver=showMinMaxToolTip(1,10000); onMouseOut=hideMinMaxToolTip();" ; ((i++))
-    blankItemContent[${i}]="type='text' size='10' maxlength='5' value='${FW_DOS_WEB_FLOOD/* }' onMouseOver=showMinMaxToolTip(1,10000); onMouseOut=hideMinMaxToolTip();" ; ((i++))
+    blankItemContent[${i}]="type='text' size='10' maxlength='5' value='${FW_DOS_WEB_FLOOD/ *}' data-action='show-min-max-tooltip' data-min='1' data-max='10000'" ; ((i++))
+    blankItemContent[${i}]="type='text' size='10' maxlength='5' value='${FW_DOS_WEB_FLOOD/* }' data-action='show-min-max-tooltip' data-min='1' data-max='10000'" ; ((i++))
     blankItemContent[${i}]="<hr />" ; itemForm[${i}]=text ; ((i++))
 
-    blankItemContent[${i}]="type='text' size='10' maxlength='5' value='${FW_DOS_RWEB_FLOOD/ *}' onMouseOver=showMinMaxToolTip(1,10000); onMouseOut=hideMinMaxToolTip();" ; ((i++))
-    blankItemContent[${i}]="type='text' size='10' maxlength='5' value='${FW_DOS_RWEB_FLOOD/* }' onMouseOver=showMinMaxToolTip(1,10000); onMouseOut=hideMinMaxToolTip();" ; ((i++))
+    blankItemContent[${i}]="type='text' size='10' maxlength='5' value='${FW_DOS_RWEB_FLOOD/ *}' data-action='show-min-max-tooltip' data-min='1' data-max='10000'" ; ((i++))
+    blankItemContent[${i}]="type='text' size='10' maxlength='5' value='${FW_DOS_RWEB_FLOOD/* }' data-action='show-min-max-tooltip' data-min='1' data-max='10000'" ; ((i++))
     blankItemContent[${i}]="<hr />" ; itemForm[${i}]=text ; ((i++))
 
-    blankItemContent[${i}]="type='text' size='10' maxlength='10' value='${FW_DOS_TCP_LIMIT}' onMouseOver=showMinMaxToolTip(0,1000000000); onMouseOut=hideMinMaxToolTip();" ; ((i++))
-    blankItemContent[${i}]="type='text' size='10' maxlength='10' value='${FW_DOS_WEB_LIMIT}' onMouseOver=showMinMaxToolTip(0,1000000000); onMouseOut=hideMinMaxToolTip();" ; ((i++))
-    blankItemContent[${i}]="type='text' size='10' maxlength='10' value='${FW_DOS_RWEB_LIMIT}' onMouseOver=showMinMaxToolTip(0,1000000000); onMouseOut=hideMinMaxToolTip();" ; ((i++))
-    blankItemContent[${i}]="type='text' size='10' maxlength='10' value='${FW_DOS_DNS_LIMIT}' onMouseOver=showMinMaxToolTip(0,1000000000); onMouseOut=hideMinMaxToolTip();" ; ((i++))
-    blankItemContent[${i}]="type='text' size='10' maxlength='10' value='${FW_DOS_OCSP_LIMIT}' onMouseOver=showMinMaxToolTip(0,1000000000); onMouseOut=hideMinMaxToolTip();" ; ((i++))
+    blankItemContent[${i}]="type='text' size='10' maxlength='10' value='${FW_DOS_TCP_LIMIT}' data-action='show-min-max-tooltip' data-min='0' data-max='1000000000'" ; ((i++))
+    blankItemContent[${i}]="type='text' size='10' maxlength='10' value='${FW_DOS_WEB_LIMIT}' data-action='show-min-max-tooltip' data-min='0' data-max='1000000000'" ; ((i++))
+    blankItemContent[${i}]="type='text' size='10' maxlength='10' value='${FW_DOS_RWEB_LIMIT}' data-action='show-min-max-tooltip' data-min='0' data-max='1000000000'" ; ((i++))
+    blankItemContent[${i}]="type='text' size='10' maxlength='10' value='${FW_DOS_DNS_LIMIT}' data-action='show-min-max-tooltip' data-min='0' data-max='1000000000'" ; ((i++))
+    blankItemContent[${i}]="type='text' size='10' maxlength='10' value='${FW_DOS_OCSP_LIMIT}' data-action='show-min-max-tooltip' data-min='0' data-max='1000000000'" ; ((i++))
 
     for ((i=0 ; i<n ; i++))
     do
 	checkItem[${i}]=digit
     done
 
-    call-js-function "hideMinMaxToolTip( )"
     show-title "Firewall Dos Limits" "enabled" "firewall"
     show-form "${width}"
 }

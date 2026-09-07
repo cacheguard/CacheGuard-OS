@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -28,12 +27,12 @@ set-antivirus()
     local transaction=/tmp/${TRANSACTION_FILE}.wadmin.${REMOTE_USER}.${$}
     rm -f ${transaction}
 
-    test -z "${VALUES[0]}" || echo "antivirus auto '${VALUES[0]}'" >> ${transaction}
+    test -z "${VALUES[0]}" || echo "antivirus auto ${VALUES[0]}" >> ${transaction}
     test -z "${VALUES[1]}" || echo "antivirus extended method ${VALUES[1]}" >> ${transaction}
 
     if test -n "${VALUES[2]}" -a -n "${VALUES[3]}" ; then
 	local url=${VALUES[2]:1}://${VALUES[3]}
-	echo "antivirus extended url '${url}'" >> ${transaction}
+	echo "antivirus extended url ${url}" >> ${transaction}
     fi
 
     case ${APL_ROLE} in
@@ -54,7 +53,7 @@ set-antivirus()
 	local pua=off i=4
 	local modifier
 
-	test -z "${VALUES[${i}]}" || echo "antivirus maxobject '${VALUES[${i}]}'" >> ${transaction}
+	test -z "${VALUES[${i}]}" || echo "antivirus maxobject ${VALUES[${i}]}" >> ${transaction}
 	((i++))
 
 	local pua=off

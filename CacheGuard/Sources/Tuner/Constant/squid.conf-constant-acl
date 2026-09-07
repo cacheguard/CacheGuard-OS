@@ -1,10 +1,27 @@
 acl http proto http
 acl https proto https
 acl ftp proto ftp
+acl has-request has request
 
 acl http-status-ok http_status 200
 acl transfer-encoding-chunked rep_header Transfer-Encoding -i chunked
-acl compressible-mime rep_mime_type -i (text\/|application\/ecmascript|application\/javascript|application\/x-javascript|application\/x-protobuf|application\/rss\+xml|application\/xml)
+acl compressible rep_mime_type \
+    -i text/plain \
+    -i text/html \
+    -i text/css \
+    -i text/javascript \
+    -i application/javascript \
+    -i application/json \
+    -i application/ld+json \
+    -i application/manifest+json \
+    -i application/xml \
+    -i application/xhtml+xml \
+    -i application/rss+xml \
+    -i application/soap+xml \
+    -i text/xml \
+    -i image/svg+xml
+
+acl already-encoded rep_header Content-Encoding .+
 
 acl snmp_string snmp_community cacheguard
 
@@ -46,3 +63,7 @@ acl sslmediate-depth-zero-self-signed-cert ssl_error X509_V_ERR_DEPTH_ZERO_SELF_
 acl sslmediate-self-signed-cert-in-chain ssl_error X509_V_ERR_SELF_SIGNED_CERT_IN_CHAIN
 
 acl fetch_intermediate_certificate transaction_initiator certificate-fetching
+
+acl sslmediate-step-1 at_step SslBump1
+acl sslmediate-step-2 at_step SslBump2
+acl sslmediate-step-3 at_step SslBump3

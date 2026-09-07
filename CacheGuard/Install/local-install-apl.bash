@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       Build
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -27,24 +26,7 @@ source /tmp/Build.env
 
 gen-busybox-applets()
 {
-    local applet
-
-    busybox --list > /tmp/busybox-applets.${$}
-
-    while read applet
-    do
-	test -n "${applet}" || continue
-	test ${applet:0:1} != '#' || continue
-
-	test ${applet} != '' || continue
-
-	echo ${applet}
-
-    done < /tmp/busybox-applets.${$} > /tmp/busybox-applets
-    rm -f /tmp/busybox-applets.${$}
-
-    echo vi > /tmp/busybox-applets
-
+    busybox --list > /tmp/busybox-applets
 }
 
 gen-boot-efi()

@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       Scripts
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -47,7 +46,7 @@ set-debug-mode()
     check-digit ${level} || return 13
     test ${level} -lt 6 || return 15
 
-    apl_services stop daemon-only
+    apl_service stop daemon-only
     apl_health_check < /dev/console
     APPLIANCE_DEBUG_LEVEL=${level} apl_configure
 
@@ -57,7 +56,7 @@ set-debug-mode()
 	rm -f ${LOG_DIR}/${WAF_DEBUG_LOG}
     fi
 
-    apl_services start daemon-only
+    apl_service start daemon-only
 }
 
 set-debug-mode "${@}"

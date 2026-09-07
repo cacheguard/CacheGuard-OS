@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -39,16 +38,16 @@ set-tls-server-form()
 	[[ "${ATTRIBUTES[${del_pos}]}" =~ ^del_[0-9]+$ ]]
 	if test ${?} -ne 0 ; then
 	    if test "${VALUES[${entry_pos}]}" == anew -a -n "${VALUES[${tls_pos}]}" ; then
-		echo "tls server add '${VALUES[${tls_pos}]}'" >> ${transaction}
+		echo "tls server add ${VALUES[${tls_pos}]}" >> ${transaction}
 		if test "${VALUES[${status_pos}]}" == cancelRevocation ; then
-		    echo "tls server revoke '${VALUES[${tls_pos}]}' cancel" >> ${transaction}
+		    echo "tls server revoke ${VALUES[${tls_pos}]} cancel" >> ${transaction}
 		elif test "${VALUES[${status_pos}]}" != '' ; then
-		    echo "tls server revoke '${VALUES[${tls_pos}]}' '${VALUES[${status_pos}]}'" >> ${transaction}
+		    echo "tls server revoke ${VALUES[${tls_pos}]} ${VALUES[${status_pos}]}" >> ${transaction}
 		fi
 	    fi
 	    pos=$[${pos} + 3]
 	else
-	    echo "tls server del '${VALUES[${tls_pos}]}'" >> ${transaction}
+	    echo "tls server del ${VALUES[${tls_pos}]}" >> ${transaction}
 	    pos=$[${pos} + 4]
 	fi  
     done

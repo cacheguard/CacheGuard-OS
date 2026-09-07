@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -26,7 +25,7 @@ source edit-guard-common.${GUI_EXT_NAME}
 
 set-all-guard-filters()
 {
-    local i=0 nb=0 elt range
+    local elt range i=0 nb=0
     local filter_name
     local description
     local ip_key ip1 ip2
@@ -142,13 +141,12 @@ show-edit-guard-policy()
     local i=0 nb elt range
     local policy_name filters_col filters_lst
     local filter filter_type filter_name
-    local filter_item filter_description
+    local filter_item filter_description from_filters_tips
 
-    local from_filters_array
-    local to_filters_array
-    
-    local arrow_sz=25px
-    local length=2
+    local available_filters_array
+    local selected_filters_array
+    local select1_id='available-filters'
+    local select2_id='selected-filters'
 
     for elt in ${GUARD_POLICY_LIST}
     do
@@ -178,12 +176,12 @@ show-edit-guard-policy()
 
     echo "<div class='table-title'>Associated filters to the <strong>${in_policy_name}</strong> policy</div>"
 
-    echo "<table class='highlight-list'>"
+    echo "<table class='bi-select-list'>"
     echo "<thead>"
     echo "<tr>"
-    echo "<td class='table-header' width='47%'>Available Filters</td>"
-    echo "<td class='table-header' width='6%' style='background:none; background-color:White; border:none'></td>"
-    echo "<td class='table-header' width='47%'>Selected Filters</td>"
+    echo "<th class='table-header'>Available Filters</th>"
+    echo "<th></th>"
+    echo "<th class='table-header'>Selected Filters</th>"
     echo "</tr>"
     echo "</thead>"
     
@@ -191,9 +189,9 @@ show-edit-guard-policy()
     echo "<tr>"
 
     set-all-guard-filters
-
-    echo "<td style='background-color:White;padding:0;margin:0;padding-top:5px;padding-bottom:5px;'>"
-    echo "<select name='filter_from' id='filter_from' multiple size='16' style='width:100%;'>"
+    
+    echo "<td>"
+    echo "<select name='${select1_id}' id='${select1_id}' multiple>"
 
     nb=${#FILTERS[@]}
     
@@ -202,44 +200,27 @@ show-edit-guard-policy()
 	filter=${FILTERS[${i}]}
 	! member "${filters_lst}" ${filter/:/_} || continue
 
-	filter_type=${filter/:*}
-	case ${filter_type} in
-	    ip)
-		tip_width=250
-		;;
-	    "time")
-		tip_width=250
-		;;
-	    ldap)
-		tip_width=400
-		;;
-	    *)
-		;;
-	esac
-	
+	filter_type=${filter/:*}	
 	filter_name=${filter/*:}
 	filter_item="[${filter_type}] ${filter_name}"
 	filter_description=${FILTER_DESCRIPTIONS[${i}]}
-	from_filters_array="${from_filters_array},['${filter}','${filter}']"
-	from_filters_tips="${from_filters_tips},'${tip_width}:${filter_description}'"
+	available_filters_array="${available_filters_array},['${filter}','${filter_item}']"
+	from_filters_tips="${from_filters_tips},'${filter_description}'"
 
-	echo -n "<option id='${filter}' value='${filter}' onMouseOver='ddrivetip( \"${filter_description}\", ${tip_width} );' onMouseOut='hideddrivetip( );'>${filter_item}</option>"
+	echo -n "<option id='${filter}' value='${filter}' data-action='show-tooltip' data-tip='${filter_description}'>${filter_item}</option>"
     done
     echo "</select>"
     echo "</td>"
 
-    from_filters_array="[${from_filters_array:1}]"
+    available_filters_array="[${available_filters_array:1}]"
     from_filters_tips="[${from_filters_tips:1}]"
 
-    echo "<td style='background-color:White;padding:0;margin:0;'>"
-    echo "<center><a href='JavaScript:void( 0 );' id='add_button'><img src='/image/right-arrow.png' alt='Add Selected Filters' title='Add Selected Filters' align='top' width='${arrow_sz}' height='${arrow_sz}' style='height:${arrow_sz}; width:${arrow_sz};' /></a></center>"
+    echo-add-remove-selected-row ${select1_id} ${select2_id} "Policies"
 
-    echo "<center><a href='JavaScript:void( 0 );' id='del_button'><img src='/image/left-arrow.png' alt='Remove Selected Filters' title='Remove Selected Filters' align='top' width='${arrow_sz}' height='${arrow_sz}' style='height:${arrow_sz}; width:${arrow_sz};' /></a></center>"
-    echo "</td>"
+    echo "<td>"
 
-    echo "<td style='background-color:White;padding:0;margin:0;padding-top:5px;padding-bottom:5px;'>"
+    echo "<select name='${select2_id}' id='${select2_id}' multiple>"
 
-    echo "<select name='filter' id='filter' multiple size='16' style='width:100%;'>"
     for filter in ${filters_lst}
     do
 	test ${filter} != self_self || continue
@@ -250,46 +231,41 @@ show-edit-guard-policy()
 	case ${filter_type} in
 	    ip)
 		filter_description=$(get-ip-filter ${filter_name})
-		tip_width=250
 		;;
-	    "time")
-		tip_width=250
+	    'time')
 		filter_description=$(get-time-filter ${filter_name})
 		;;
 	    ldap)
-		tip_width=400
 		filter_description=$(get-ldap-filter ${filter_name})
 		;;
 	    *)
 		;;
 	esac
 
-	to_filters_array="${to_filters_array},['${filter}','${filter}']"
-	to_filters_tips="${to_filters_tips},'${tip_width}:${filter_description}'"
-	echo -n "<option id='${filter}' value='${filter}' onMouseOver='ddrivetip( \"${filter_description}\", ${tip_width} );' onMouseOut='hideddrivetip( );'>${filter_item}</option>"
+	selected_filters_array="${selected_filters_array},['${filter}','${filter_item}']"
+	to_filters_tips="${to_filters_tips},'${filter_description}'"
+	echo -n "<option id='${filter}' value='${filter}' data-action='show-tooltip' data-tip='${filter_description}'>${filter_item}</option>"
 
     done
 
-    to_filters_array="[${to_filters_array:1}]"
+    selected_filters_array="[${selected_filters_array:1}]"
     to_filters_tips="[${to_filters_tips:1}]"
 
     echo "</select>"
     echo "</td>"
 
-    echo "<tr>"
+    echo "</tr>"
+
     echo "</tbody>"
     echo "</table>"
-    echo "<br />"
 
-    show-form-begin ${length}
+    show-form-begin
     echo "<input name='policy_name' type='hidden' value='${in_policy_name}' />"
-    echo "<input name='action' type='hidden' value='${action}' />"
-    
-    show-do ${state} ${state} "addHiddenInputFromSelectionItem( 'mainform', 'filter' )" "setSelectOptions( 'filter_from', ${from_filters_array}, ${from_filters_tips} ); setSelectOptions( 'filter', ${to_filters_array}, ${to_filters_tips} )"
+
+    show-do-apply ${state} 'add-hidden-input-from-selection-item' "[\"${select2_id}\"]" before
+    show-do-reset ${state} 'set-select-guard-policy-options' "[\"${select1_id}\",\"${available_filters_array}\",\"${from_filters_tips}\",\"${select2_id}\",\"${selected_filters_array}\",\"${to_filters_tips}\"]"
+
     show-form-end
-    echo "<script type='text/javascript'>"
-    echo "initSelectionList( 'filter_from', 'filter', 'add_button', 'del_button' );"
-    echo "</script>"
 }
 
 edit-guard-rule()
@@ -311,7 +287,6 @@ edit-guard-rule()
     fi
 
     show-title "Editing a URL Guarding Policy" "${state}" "guard"
-
     echo "<div class='core-form'>"
     show-edit-guard-policy ${name} ${state}
     echo "</div>"

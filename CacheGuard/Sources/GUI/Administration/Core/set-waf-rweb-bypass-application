@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -41,11 +40,11 @@ set-waf-rweb-bypass-application()
 	if test ${?} -ne 0 ; then
 	    if test "${VALUES[${entry_pos}]}" == anew -a -n "${VALUES[${name_pos}]}" ; then
 		application=${VALUES[${application_pos}]}
-		test -z "${application}" || echo "waf rweb bypass application '${VALUES[${name_pos}]}' set '${application}'" >> ${transaction}
+		test -z "${application}" || echo "waf rweb bypass application ${VALUES[${name_pos}]} set ${application}" >> ${transaction}
 	    fi
 	    pos=$[${pos} + 3]
 	else
-	    echo "waf rweb bypass application '${VALUES[${name_pos}]}' raz" >> ${transaction}
+	    echo "waf rweb bypass application ${VALUES[${name_pos}]} raz" >> ${transaction}
 	    pos=$[${pos} + 4]
 	fi
     done

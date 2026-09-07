@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       InitScript
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -27,6 +26,7 @@ source /lib/lsb/init-functions
 CACHEGUARD_DIR=/etc/sysconfig/cacheguard
 source ${CACHEGUARD_DIR}/constant
 source ${APPLIANCE_DIR}/etc/role
+source ${LOCAL_DIR}/lib/apl_common
 
 [ ! -f /etc/sysconfig/rlogger ] || source /etc/sysconfig/rlogger
 
@@ -36,7 +36,10 @@ PROG="rlogger"
 
 start-rlogger()
 {
-    local i=0 pids
+    local process=$(get-rlogger-process)
+    test -z "${process}" || return 11
+
+    local pids i=0
     local log_file_in log_file_out log_remote
     declare -t log_file_in log_file_out log_remote
 
@@ -51,7 +54,7 @@ start-rlogger()
 
     for ((i=0 ; i<n ; i++))
     do
-	/usr/local/bin/apl_rloggerd ${log_file_in[${i}]} ${log_file_out[${i}]} ${log_remote[${i}]} &
+	${LOCAL_DIR}/bin/apl_rloggerd ${log_file_in[${i}]} ${log_file_out[${i}]} ${log_remote[${i}]} &
 	pids="${pids} ${!}"
     done
     pids="${pids:1}"
@@ -70,9 +73,9 @@ stop-rlogger()
 
     for pid in ${pids}
     do
-	kill -KILL -- ${pid} > /dev/null
+	kill -KILL -- ${pid} > /dev/null 2>&1
 	((ret += ${?}))
-	break
+	wait-process ${pid}
     done
 
     rm -f /var/run/${PROG}.pid

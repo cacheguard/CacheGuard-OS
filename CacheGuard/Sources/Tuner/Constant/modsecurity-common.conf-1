@@ -28,8 +28,8 @@ SecCookieFormat 0
 SecCookieV0Separator ;
 SecUploadFileMode 0600
 SecUploadFileLimit 100
-SecPcreMatchLimit 10000
-SecPcreMatchLimitRecursion 10000
+SecPcreMatchLimit 100000
+SecPcreMatchLimitRecursion 100000
 
 SecRequestBodyAccess On
 SecRequestBodyLimitAction Reject

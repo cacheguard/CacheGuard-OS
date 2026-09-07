@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       Configurator
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -275,7 +274,7 @@ reset-av-extended-dbs()
 
     rm -f ${AV_VAR_DIR}/${AV_EXTENDED_LAST_UPDATE_FILENAME}
     ret=${?}
-    
+
     while read db sz md5
     do
 	test -n "${md5}" || continue
@@ -602,7 +601,7 @@ commit-clamav-extended()
 	reset-av-extended-db-sz
     fi
 
-    test "${AV_EXTENDED_MODE}" == True -a ${mode} != force || reset-av-extended-dbs
+    test "${AV_EXTENDED_MODE}" == True || reset-av-extended-dbs
 }
 
 restore-clamav-extended()
@@ -647,11 +646,15 @@ verify-av-signature()
     test -n "${1}" || return 1
     local db=${1}
 
+    local extension
+    
     if test -f ${AV_DB_DIR}/${db}.cld ; then
-	sigtool --quiet -i ${AV_DB_DIR}/${db}.cld 2> /dev/null
+	extension=cld
     else
-	sigtool --quiet -i ${AV_DB_DIR}/${db}.cvd 2> /dev/null
+	extension=cvd
     fi
+
+    sigtool --quiet -i ${AV_DB_DIR}/${db}.${extension} 2> /dev/null
 }
 
 LIB_APL_AV=Yes

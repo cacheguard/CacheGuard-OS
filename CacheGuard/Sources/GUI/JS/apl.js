@@ -2,7 +2,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -22,32 +21,6 @@
 ###########################################################################
 */
 
-var AJAX_UNSENT = 0;
-var AJAX_OPENED = 1;
-var AJAX_HEADERS_RECEIVED = 2;
-var AJAX_LOADING = 3;
-var AJAX_DONE = 4;
-var LOGOUT_TIMEOUT = 1800000;
-var SHORTCUTS_UPDATE_INTERVAL = 2000;
-var POWER_PAGE_LOGOUT_TIMEOUT = SHORTCUTS_UPDATE_INTERVAL + 1000;
-var CONF_LOG_UPDATE_INTERVAL = 2000;
-var AUDIT_LOG_UPDATE_INTERVAL = 3000;
-var UNUSED_COLOR = "WhiteSmoke";
-var SUBMIT_ID = "submit";
-var RESET_ID = "reset";
-var CORE_ID = 'core';
-var AUOTO_UPDATE_ID = 'auto-update-log';
-var RESPONSE_UPDATE_ARRIVED = 1;
-var AJAX_HTTP_REQUEST = false;
-var UPDATE_TIMER = null;
-var LOGOUT_TIMER = null;
-var REFRESH_SHORTCUTS_TIMER = null;
-var BLINK_DIV_TIMER = null;
-var BLINK_ICON_TIMERS = [];
-var PRELOADED_IMAGES = new Array( );
-var LOGOUT_URI = GUI_DIR + "login" + GUI_EXTENSION + "?logout";
-var UNAVAILABLE_MSG = "<center><div style='margin:2px; padding:2px;'><img src='" + GUI_IMAGE_DIR + "loading.gif' width='340' /></div></center>"
-
 function UTF82B64( str )
 {
     var encoded = window.btoa(unescape( encodeURIComponent( str )));
@@ -60,32 +33,62 @@ function B64UTF82( str )
     return decodeURIComponent( escape(window.atob( str )));
 }
 
+function encodeString( str )
+{
+    const bytes = new TextEncoder( ).encode( str );
+    let binary = '';
+
+    for (const byte of bytes) {
+        binary += String.fromCharCode( byte );
+    }
+
+    return btoa( binary );
+}
+
+function decodeString( str )
+{
+    const binary = atob( str );
+    const bytes = Uint8Array.from( binary, c => c.charCodeAt( 0 ));
+
+    return new TextDecoder( ).decode( bytes );
+}
+
 function checkInput( id, regexp )
 {
-    var obj = document.getElementById ( id );
-    var val = obj.value;
+    var obj = document.getElementById( id );
+    if (!obj) return false;
 
-    val = removeTrailerBlank ( val );
+    val = obj.value;
+    if (typeof val !== "string") return false;
 
-    if (isBlank( val )) {
-	setInputOK ( obj );
-	return true;
+    var val = removeTrailerBlank( val );
+
+    if ( isBlank( val ) ) {
+        setInputOK( obj );
+        return true;
     }
 
-    if (isBlank( regexp )) {
-	return true;
+    if ( isBlank( regexp ) ) {
+        return true;
     }
 
-    regexp = eval( "/" + regexp + "/" );
-    
-    if (val.match( regexp )) {
-	setInputOK (obj );
-	return true;
+    var pattern;
+
+    try {
+        pattern = new RegExp( regexp );
     }
-    else {
-	setInputKO (obj );
-	return false;
+    catch ( error ) {
+        setInputKO( obj );
+        return false;
     }
+
+    if ( pattern.test( val ) ) {
+        setInputOK( obj );
+        return true;
+    }
+
+    setInputKO( obj );
+    return false;
 }
 
 function checkText( id )
@@ -261,7 +264,8 @@ function checkDN( id )
 function isPort( val )
 {
     if (val.match( /(^[1-9][0-9]{0,4}|^0)$/ )) {
-	val = parseInt( val );
+	val = parseInt( val, 10 );
+
 	if (val >= 0 && val < 65536) {
 		return true;
 	}
@@ -332,8 +336,17 @@ function checkPorts( id )
 	var port2 = ports.substr( ++index );
 
 	if (isPort( port1 ) && isPort( port2 )) {
-	    port1 = parseInt( port1 );
-	    port2 = parseInt( port2 );
+	    port1 = parseInt( port1, 10 );
+	    port2 = parseInt( port2, 10 );
+
+	    if ( port1.isNaN( page ) ) {
+		return false;
+	    }
+
+	    if ( port2.isNaN( page ) ) {
+		return false;
+	    }
+
 	    if (port1 <= port2) {
 		setInputOK ( obj );
 		return true;
@@ -448,11 +461,6 @@ function checkIP( id )
     }
 }
 
-function checkIKEIdentifier( id )
-{
-    return checkInput( id, "^[a-zA-Z0-9-_@.]+$" );
-}
-
 function checkIPList( id )
 {
     var obj = document.getElementById ( id );
@@ -562,6 +570,11 @@ function checkURL( url )
     }
 }
 
+function checkComputerName( id )
+{
+    return (checkInput( id, "^(?![0-9]+$)[A-Za-z0-9](?:[A-Za-z0-9-]{0,13}[A-Za-z0-9])?$" ));
+}
+
 function basename( path )
 {
     return path.replace( /.*\//, "" );
@@ -574,7 +587,10 @@ function dirname( path )
 
 function gotoTopWindow( )
 {
-    window.scrollTo( 0, 0 );
+    window.scrollTo( {
+	top:100,
+	left:100,
+	behavior:'auto'} );
 }
 
 function alertMaxReached( max )
@@ -660,24 +676,6 @@ function setCalendarDay( year_id, month_id, day_id )
     }
 }
 
-function initSubmitOnEnterEverywhere( button_id )
-{
-    var button = document.getElementById( button_id );
-    if (button == null) return true;
-
-    $( document ).keyup( function( event ) {
-	if (event.keyCode == 13) {
-
-            event.preventDefault( );
-	    var button = document.getElementById( button_id );
-	    if (button == null) return true;
-
-	    if (! $( '#' + button_id ).is( ':disabled' ))
-		$( '#' + button_id ).click( );
-	}
-    } );
-}
-
 function initSubmitOnEnterInInput( button_id, input_id )
 {
     var input = document.getElementById( input_id );
@@ -718,6 +716,8 @@ function doNothingOnEnterInInput( input_id )
 function setSelectOptions( select_id, values, tips )
 {
     var select = document.getElementById( select_id );
+    if (select == null) return false;
+
     var tips_length;
 
     if (typeof( tips ) == "undefined") {
@@ -727,24 +727,20 @@ function setSelectOptions( select_id, values, tips )
 	tips_length = tips.length;
     }
 
-    if (select == null) return false;
     if (select.options == null) return false;
     while (select.options.length > 0) {
 	select.remove( 0 );
     }
-    
+
     for (var i = 0 ; i < values.length ; i++) {
 	var option = document.createElement( 'option' );
 	option.value = values[i][0];
         option.id = values[i][0];
-	option.innerHTML = values[i][1];
-	if (values[i][2] !== 'undefined') option.style = values[i][2];
+	option.textContent = values[i][1];
+
 	if (tips_length != 0) {
-	    var pos = tips[i].indexOf( ':' );
-	    var width = tips[i].substring( 0, pos );
-	    pos++;
-	    var tip = tips[i].substring( pos );
-	    option.onmouseover = new Function( "ddrivetip( '" + tip + "', " + width + " );" );
+	    var tip = tips[i];
+	    option.onmouseover = function ( ) { ddrivetip( tip ); };
 	    option.onmouseout = function( ) { hideddrivetip( ); } ;
 	}
 	select.appendChild( option );
@@ -754,6 +750,10 @@ function setSelectOptions( select_id, values, tips )
 function addHiddenInputFromSelectionItem( form_id, select_id )
 {
     var form = document.getElementById( form_id );
+    var select = document.getElementById( select_id );
+    if (!form) return false;
+    if (!select) return false;
+
     var hiddenInput;
 
     $( '#' + select_id + ' option' ).each( function( ) {
@@ -774,22 +774,20 @@ function initSelectionList( select_from, select_to, add_button, del_button )
         add_button = '#' + add_button;
         del_button = '#' + del_button;
 
-        var option_id, option_style, onmouseover, onmouseout;
+        var option_id, onmouseover, onmouseout;
 	var option_val, option_text;
 
         $( add_button ).click( function( ) {
             $( select_from + ' option:selected' ).each( function( ) {
-		
 		option_val = $( this ).val ( );
 		option_text = $( this ).text ( );
 		option_id = $( this ).attr( "id" );
-		option_style = $( this ).attr( "style" );
 		onmouseover = $( this ).attr( "onmouseover" );
 		onmouseout = $( this ).attr( "onmouseout" );
 
                 $( this ).remove( );
 
-		$(select_to).append( "<option style='" + option_style + "' value='" + option_val + "' id='" + option_id + "' onMouseOver='" + onmouseover + "' onMouseOut='" + onmouseout + "'>" + option_text + "</option>" );
+		$(select_to).append( "<option value='" + option_val + "' id='" + option_id + "' onMouseOver='" + onmouseover + "' onMouseOut='" + onmouseout + "'>" + option_text + "</option>" );
 		$( select_to ).append( $( select_to + " option" ).remove( ).sort( function( a, b ) {
 		    var at = $( a ).text( ), bt = $( b ).text( );
 		    return(  at > bt) ? 1 : ((at < bt) ? -1 : 0 );
@@ -804,13 +802,12 @@ function initSelectionList( select_from, select_to, add_button, del_button )
 		option_val = $( this ).val ( );
 		option_text = $( this ).text ( );
 		option_id = $( this ).attr( "id" );
-		option_style = $( this ).attr( "style" );
 		onmouseover = $( this ).attr( "onmouseover" );
 		onmouseout = $( this ).attr( "onmouseout" );
 
                 $( this ).remove( );
 
-		$( select_from ).append( "<option style='" + option_style + "' value='" + $( this ).val( ) +"' id='" + option_id + "' onMouseOver='" + onmouseover + "' onMouseOut='" + onmouseout + "'>" + $( this ).text( ) + "</option>" );
+		$( select_from ).append( "<option value='" + $( this ).val( ) +"' id='" + option_id + "' onMouseOver='" + onmouseover + "' onMouseOut='" + onmouseout + "'>" + $( this ).text( ) + "</option>" );
 
 		$( select_from ).append( $( select_from + " option" ).remove( ).sort( function( a, b ) {
 		    var at = $( a ).text( ), bt = $( b ).text( );
@@ -820,6 +817,50 @@ function initSelectionList( select_from, select_to, add_button, del_button )
 
             } );
         } );
+    } );
+}
+
+function initSelectionList( select_from, select_to, add_button, del_button )
+{
+    var selectFrom, selectTo, addButton, delButton;
+
+    selectFrom = document.getElementById( select_from );
+    selectTo = document.getElementById( select_to );
+    addButton = document.getElementById( add_button );
+    delButton = document.getElementById( del_button );
+
+
+    function sortSelect( select )
+    {
+        var options;
+
+        options = Array.from( select.options );
+
+        options.sort( function( a, b ) {
+            return( a.text.localeCompare( b.text ) );
+        } );
+
+        options.forEach( function( option ) {
+            select.appendChild( option );
+        } );
+    }
+
+    addButton.addEventListener( "click", function( ) {
+        var selected;
+        selected = Array.from( selectFrom.selectedOptions );
+        selected.forEach( function( option ) {
+            selectTo.appendChild( option );
+        } );
+        sortSelect( selectTo );
+    } );
+
+    delButton.addEventListener( "click", function( ) {
+        var selected;
+        selected = Array.from( selectTo.selectedOptions );
+        selected.forEach( function( option ) {
+            selectFrom.appendChild( option );
+        } );
+        sortSelect( selectFrom );
     } );
 }
 
@@ -870,46 +911,29 @@ function hideTimeToolTip( )
     return true;
 }
 
-function blinkDiv( id )
-{
-    var div = document.getElementById( id );
-
-    if (div.style.visibility == 'hidden') {
-	div.style.visibility = 'visible';
-    } else {
-	div.style.visibility = 'hidden';
-    }
-
-    return true;
-}
-
-function initBlinkDiv( id, comment )
-{
-    if (BLINK_DIV_TIMER != null) clearTimeout( BLINK_DIV_TIMER );
-    BLINK_DIV_TIMER = setInterval( "blinkDiv( '" + id + "' )", 500 );
-
-    return true;
-}
-
-function blinkIcon( image_id, image_source )
+function blinkIcon( image_id )
 {
     var image = document.getElementById( image_id );
     if (!image) return false;
-    var src = basename( image.src );
 
-    if (src == image_source ) {
-	image.src = GUI_IMAGE_DIR + "blank-reflect.png";
-    } else {
-        image.src = GUI_IMAGE_DIR + image_source;
-    }
+    image.classList.toggle( 'item-ivisible' );
 
     return true;
 }
 
-function initBlinkIcon( index, id, image )
+function initBlinkIcon( index, id )
 {
-    if (BLINK_ICON_TIMERS[index] != null) clearTimeout( BLINK_ICON_TIMERS[index] );
-    BLINK_ICON_TIMERS[index] = setInterval( "blinkIcon( '" + id + "', '" + image + "' )", 500 );
+    if (BLINK_ICON_TIMERS[index] != null) {
+        clearInterval( BLINK_ICON_TIMERS[index] );
+    }
+
+    BLINK_ICON_TIMERS[index] = setInterval(
+        function( )
+        {
+            blinkIcon( id );
+        },
+        500
+    );
 
     return true;
 }
@@ -919,7 +943,8 @@ function hideZone( id )
     var object = document.getElementById( id );
     if (!object) return false;
 
-    object.style.display = "none";
+    object.classList.remove( 'item-displayed' );
+    object.classList.add( 'item-not-displayed' );
 }
 
 function showZone( id )
@@ -927,7 +952,8 @@ function showZone( id )
     var object = document.getElementById( id );
     if (!object) return false;
 
-    object.style.display = "inline";
+    object.classList.remove( 'item-not-displayed' );
+    object.classList.add( 'item-displayed' );
 }
 
 function toggleZone( id )
@@ -935,11 +961,10 @@ function toggleZone( id )
     var zone = document.getElementById( id );
     if (!zone) return false;
 
-    var display = zone.style.display;
-    if (display == "inline") {
+    if (zone.classList.contains( 'item-displayed' )) {
 	hideZone( id );
     }
-    else {
+    else if (zone.classList.contains( 'item-not-displayed' )) {
 	showZone( id );
     }
 }
@@ -1059,18 +1084,12 @@ function agreeLicense( id )
     }
 }
 
-function collapseCheckZone( checkId, zoneId, order )
+function collapseCheckZone( checkId, zoneId )
 {
-    var checked = document.getElementById( checkId ).checked;
+    var checkedObj = document.getElementById( checkId );
+    if (!checkedObj) return false;
 
-    if (order == 0) {
-	var state=true;
-    }
-    else {
-	var state=false;
-    }
-
-    if (checked == state) {
+    if (checkedObj.checked == false) {
 	showZone( zoneId );
     }
     else {
@@ -1083,22 +1102,28 @@ function resetZone( id )
     document.getElementById( id ).innerHTML = "";
 }
 
-function setIconImage( id, cssClass, icon, title = "" )
+function setIconImage( id, icon, cssClass = '', title = '' )
 {
     var zone = document.getElementById( id );
     if (!zone) return false;
 
-    if (title != "") {
+    if (title != '') {
 	title = " alt='" + title + "' title='" + title + "'";
     }
 
-    zone.innerHTML = "<div class='" + cssClass + "'><img src='" + GUI_IMAGE_DIR + icon + "'" + title + " /></div>";
+    if (cssClass != '') {
+	cssClass = " class='" + cssClass + "'";
+    }
+
+    zone.innerHTML = "<span" + cssClass + "'><img src='" + GUI_IMAGE_DIR + icon + "'" + title + " /></span>";
+
+
     return true;
 }
 
 function setWorkingIconBar( id, title = "Loading" )
 {
-    setIconImage( id, "iconbar-item", "working-flower.gif", title );
+    setIconImage( id, "working-flower.gif", '', title );
 }
 
 function setWorking( title = "" )
@@ -1132,13 +1157,19 @@ function deactivatePostButtons( )
 
 function stopWorking( state, message )
 {
-    if (state == true) {
-	document.getElementById( "working" ).innerHTML = "";
-	hideZone( "working" );
+    var id = "working";
+    var obj = document.getElementById( id );
+
+    if (obj) {
+   	if (state == true) {
+	    obj.innerHTML = "";
+	    hideZone( id );
+	}
+	else {
+	    obj.innerHTML = "<img src='" + GUI_IMAGE_DIR + "error-reflect.png' alt='" + message + "!' title='" + message + "!' />";
+	}
     }
-    else {
-	document.getElementById( "working" ).innerHTML = "<a href='' class='iconbar-item'><img src='" + GUI_IMAGE_DIR + "error-reflect.png' alt='" + message + "!' title='" + message + "!' /></a>";
-    }
+
     activateReloadIconBarState( );
     activateSubmitButton( );
     activateOKIconBar( );
@@ -1155,15 +1186,17 @@ function resetUpdateTimer( )
     }
 }
 
-function autoDisplay( f, force, timeout )
+function autoDisplay( f, timeout )
 {
-    if (force != 1) {
-	UPDATE_TIMER = setTimeout( f, timeout );
-    }
-    else {
-	if (UPDATE_TIMER) clearTimeout( UPDATE_TIMER);
-	UPDATE_TIMER = setTimeout( f, timeout );
-    }
+    if ( UPDATE_TIMER )
+        clearTimeout( UPDATE_TIMER );
+
+    if ( typeof f !== "function" )
+        return false;
+
+    UPDATE_TIMER = setTimeout( f, timeout );
+
+    return true;
 }
 
 function resetAJAX_HTTP_REQUEST( )
@@ -1175,7 +1208,7 @@ function resetAJAX_HTTP_REQUEST( )
     }
 }
 
-function AJAX_refreshReportCB( )
+function AJAX_refreshReportCB( page )
 {
     switch (AJAX_HTTP_REQUEST.readyState) {
     case AJAX_UNSENT:
@@ -1191,14 +1224,24 @@ function AJAX_refreshReportCB( )
 	break;
 
     case AJAX_DONE:
-	RESPONSE_UPDATE_ARRIVED = 1;
-	if (AJAX_HTTP_REQUEST.status == 200) {
-	    var html_array = $.parseHTML( AJAX_HTTP_REQUEST.responseText, document, true );
-	    $( '#' + AUTO_REPORT_ID ).html( html_array );
-	}
-	else {
-	    document.getElementById( AUTO_REPORT_ID ).innerHTML = UNAVAILABLE_MSG;
-	}
+        RESPONSE_UPDATE_ARRIVED = 1;
+
+        if ( AJAX_HTTP_REQUEST.status == 200 ) {
+
+            const root = document.getElementById( AUTO_REPORT_ID );
+
+            if ( !root ) {
+                break;
+            }
+
+            const html_array = $.parseHTML( AJAX_HTTP_REQUEST.responseText, document, true );
+
+            $( root ).html( html_array );
+            activateContent( root, page );
+        }
+        else {
+            document.getElementById( AUTO_REPORT_ID ).innerHTML = UNAVAILABLE;
+        }
 	break;
 
     default:
@@ -1284,8 +1327,9 @@ function TLSComponentSelectCB( component_id, operation_id, days_id, ocsp_id, pag
     printTLS( page, component_id, div_id );
 }
 
-function IPsecVPNAccessConfSelectCB( system_id, tls_id, page, div_id)
+function IPsecVPNAccessConfSelectCB( system_id, tls_id, div_id)
 {
+    const page = GUI_DIR + "vpnipsec-access-conf-print" + GUI_EXTENSION;
     var systems = document.getElementById( system_id );
     var tlss = document.getElementById( tls_id );
     var div = document.getElementById( div_id );
@@ -1293,7 +1337,7 @@ function IPsecVPNAccessConfSelectCB( system_id, tls_id, page, div_id)
     if (systems == null) return false;
     if (div == null) return false;
 
-    div.innerHTML = UNAVAILABLE_MSG;
+    div.innerHTML = UNAVAILABLE;
 
     var system = systems.options[systems.selectedIndex].value;
 
@@ -1396,25 +1440,26 @@ function initRefreshShortcuts( )
 	clearInterval( REFRESH_SHORTCUTS_TIMER );
     }
 
-    REFRESH_SHORTCUTS_TIMER = setInterval( "refreshShortCuts( )", SHORTCUTS_UPDATE_INTERVAL );
+    REFRESH_SHORTCUTS_TIMER = setInterval( refreshShortCuts, SHORTCUTS_UPDATE_INTERVAL );
 }
 
-function updateReport( cgi, force, arg_type = "", arg_value = "")
+function updateReport( page, force, arg_type = '', arg_value = '')
 {
     switch (arg_type) {
 
-    case 'js':
+    case 'ObjectId':
 	var object = document.getElementById( arg_value );
 	if (object == null) return false;
-	var cgi_value = object.value;
+	var page_value = object.value;
 	break;
 
-    case 'cgi':
-	var cgi_value = arg_value;
+    case 'Page':
+	var page_value = arg_value;
 	break;
 
     default:
-	var cgi_value = "";
+	var arg_type = '';
+	var page_value = '';
 	break;
     }
 
@@ -1425,139 +1470,20 @@ function updateReport( cgi, force, arg_type = "", arg_value = "")
 
 	if (auto == true || force == 1) {
 	    RESPONSE_UPDATE_ARRIVED = 0;
-	    var fcgi = GUI_DIR + cgi + GUI_EXTENSION;
-	    if (cgi_value != "") fcgi += '?' + cgi_value;
+	    var fpage = GUI_DIR + page + GUI_EXTENSION;
+	    if (page_value != "") fpage += '?' + page_value;
 	    resetAJAX_HTTP_REQUEST( );
-	    AJAX_HTTP_REQUEST.open( "GET", fcgi, true );
-	    AJAX_HTTP_REQUEST.onreadystatechange = function( ) { AJAX_refreshReportCB( ); };
+	    AJAX_HTTP_REQUEST.open( "GET", fpage, true );
+	    AJAX_HTTP_REQUEST.onreadystatechange = function( ) { AJAX_refreshReportCB( page ); };
 	    AJAX_HTTP_REQUEST.send( null );
 	}
     }
 
-    var js_function = updateReport.caller.name;
-    js_function += "( 0";
+    var update_function = function( ) {
+	updateReport( page, 0, arg_type, arg_value );
+    };
 
-    if (arg_value != "" ) {
-	js_function += ", \"" + arg_value + "\"";
-    }
-    js_function += " )";
-
-    autoDisplay( js_function, force, CONF_LOG_UPDATE_INTERVAL );
-}
-
-function update_apply( force )
-{
-    updateReport( "update-apply", force );
-}
-
-function update_file_exchange( force )
-{
-    updateReport( "update-file-exchange", force );
-}
-
-function update_system_report_load( force )
-{
-    updateReport( "update-system-report-load", force );
-}
-
-function update_system_report_disk( force )
-{
-    updateReport( "update-system-report-disk", force );
-}
-
-function update_system_report_connection( force )
-{
-    updateReport( "update-system-report-connection", force );
-}
-
-function update_system_report_gateway( force )
-{
-    updateReport( "update-system-report-gateway", force );
-}
-
-function update_system_report_link( force )
-{
-    updateReport( "update-system-report-link", force );
-}
-
-function update_system_report_memory( force )
-{
-    updateReport( "update-system-report-memory", force );
-}
-
-function update_network_activity( force )
-{
-    updateReport( "update-network-activity", force );
-}
-
-function update_system_report_raid( force )
-{
-    updateReport( "update-system-report-raid", force );
-}
-
-function update_system_report_service( force )
-{
-    updateReport( "update-system-report-service", force );
-}
-
-function update_urllist_antivirus_report( force )
-{
-    updateReport( "update-urllist-antivirus-report", force );
-}
-
-function update_vpnipsec_report( force, report_type )
-{
-    updateReport( "update-vpnipsec-report", force, 'cgi', report_type );
-}
-
-function update_manager_sync_report( force )
-{
-    updateReport( "update-manager-sync-report", force );
-}
-
-function update_urllist_update( force )
-{
-    updateReport( "update-urllist-update", force );
-}
-
-function update_log_rotate( force )
-{
-    updateReport( "update-log-rotate", force );
-}
-
-function update_antivirus_create( force )
-{
-    updateReport( "update-antivirus-create", force );
-}
-
-function update_antivirus_update( force )
-{
-    updateReport( "update-antivirus-update", force );
-}
-
-function update_cache_clear( force )
-{
-    updateReport( "update-cache-clear", force );
-}
-
-function update_system_backup( force )
-{
-    updateReport( "update-system-backup", force );
-}
-
-function update_file_operation( force )
-{
-    updateReport( "update-file-operation", force );
-}
-
-function update_authenticate_kerberos_create( force )
-{
-    updateReport( "update-authenticate-kerberos-create", force );
-}
-
-function update_manager_gateway_operation( force, operation_id )
-{
-    updateReport( "update-manager-gateway-operation", force, 'js', operation_id );
+    autoDisplay( update_function, CONF_LOG_UPDATE_INTERVAL );
 }
 
 function AJAX_refreshURLCB( id )
@@ -1584,7 +1510,7 @@ function AJAX_refreshURLCB( id )
 	    input_object.innerHTML = AJAX_HTTP_REQUEST.responseText;
 	}
 	else {
-	    input_object.innerHTML.innerHTML = UNAVAILABLE_MSG;
+	    input_object.innerHTML.innerHTML = UNAVAILABLE;
 	}
 	break;
 	
@@ -1618,19 +1544,19 @@ function ping( report_id, machine_id, width )
 
     var machine = machine_object.value;
     if (machine == "") {
-	report_object.innerHTML = "<div class='with-border' style='font-size:90%; font-style:italic; color:FireBrick; width:" + width + "px; margin-bottom:5px;'>Please specify an IP address or a host name to ping.</div>";
+	report_object.innerHTML = "<div class='diagnostic-tools-msg'>Please specify an IP address or a host name to ping.</div>";
 	return true;
     }
     else if (!checkIPDomainname( machine_id )) {
-	report_object.innerHTML = "<div class='with-border' style='font-size:90%; font-style:italic; color:FireBrick; width:" + width + "px; margin-bottom:5px;'>This is not a valid machine name!</div>";
+	report_object.innerHTML = "<div class='diagnostic-tools-msg'>This is not a valid machine name!</div>";
 	return false;
     }
 
-    var page = GUI_DIR + "ping.apl?" + machine + '&' + width;
+    var page = GUI_DIR + "ping.apl?" + machine;
     ajaxpage( page, report_id );
 }
 
-function traceroute( report_id, machine_id, protocol_id, width )
+function traceroute( report_id, machine_id, protocol_id )
 {
     var report_object = document.getElementById( report_id );
     var machine_object = document.getElementById( machine_id );
@@ -1643,11 +1569,11 @@ function traceroute( report_id, machine_id, protocol_id, width )
     var machine = machine_object.value;
 
     if (machine == "") {
-	report_object.innerHTML = "<div class='with-border' style='font-size:90%; font-style:italic; color:FireBrick; width:" + width + "px; margin-bottom:5px;'>Please specify an IP address or a host name to trace the route to it.</div>";
+	report_object.innerHTML = "<div class='diagnostic-tools-msg'>Please specify an IP address or a host name to trace the route to it.</div>";
 	return true;
     }
     else if (!checkIPDomainname( machine_id )) {
-	report_object.innerHTML = "<div class='with-border' style='font-size:90%; font-style:italic; color:FireBrick; width:" + width + "px; margin-bottom:5px;'>This is not a valid machine name!</div>";
+	report_object.innerHTML = "<div class='diagnostic-tools-msg'>This is not a valid machine name!</div>";
 	return false;
     }
 
@@ -1661,11 +1587,11 @@ function traceroute( report_id, machine_id, protocol_id, width )
 
     if (protocol == false) return true;
 
-    var page = GUI_DIR + "traceroute.apl?" + machine + '&' + protocol + '&' + width;
+    var page = GUI_DIR + "traceroute.apl?" + machine + '&' + protocol;
     ajaxpage( page, report_id );
 }
 
-function sendEmail( report_id, email_id, width )
+function sendEmail( report_id, email_id )
 {
     var report_object = document.getElementById( report_id );
     var email_object = document.getElementById( email_id );
@@ -1675,29 +1601,29 @@ function sendEmail( report_id, email_id, width )
 
     var email = email_object.value;
     if (email == "") {
-	report_object.innerHTML = "<div class='with-border' style='font-size:90%; font-style:italic; color:FireBrick; width:" + width + "px; margin-bottom:5px;'>Please specify an email address.</div>";
+	report_object.innerHTML = "<div class='diagnostic-tools-msg'>Please specify an email address.</div>";
 	return true;
     }
     else if (!checkEmail( email_id )) {
-	report_object.innerHTML = "<div class='with-border' style='font-size:90%; font-style:italic; color:FireBrick; width:" + width + "px; margin-bottom:5px;'>This is not a valid email address!</div>";
+	report_object.innerHTML = "<div class='diagnostic-tools-msg'>This is not a valid email address!</div>";
 	return false;
     }
 
-    var page = GUI_DIR + "email-test.apl?" + email + '&' + width;
+    var page = GUI_DIR + "email-test.apl?" + email;
     ajaxpage( page, report_id );
 }
 
-function ipNeighbour( report_id, width )
+function ipNeighbour( report_id )
 {
     var report_object = document.getElementById( report_id );
 
     if (!report_object) return true;
 
-    var page = GUI_DIR + "ip-neighbour.apl?" + width;
+    var page = GUI_DIR + "ip-neighbour.apl";
     ajaxpage( page, report_id );
 }
 
-function authenticateLDAPTest( report_id, login_id, password_id, width )
+function authenticateLDAPTest( report_id, login_id, password_id )
 {
     var report_object = document.getElementById( report_id );
     var login_object = document.getElementById( login_id );
@@ -1710,11 +1636,11 @@ function authenticateLDAPTest( report_id, login_id, password_id, width )
     var login = login_object.value;
     var password = password_object.value;
 
-    var page = GUI_DIR + "authenticate-ldap-test" + GUI_EXTENSION + '?' + width + '&' + login + '&' + password;
+    var page = GUI_DIR + "authenticate-ldap-test" + GUI_EXTENSION + '?' + login + '&' + password;
     ajaxpage( page, report_id );
 }
 
-function LDAPSearch( report_id, filter_id, width )
+function LDAPSearch( report_id, filter_id )
 {
     var report_object = document.getElementById( report_id );
     var filter_object = document.getElementById( filter_id );
@@ -1723,7 +1649,17 @@ function LDAPSearch( report_id, filter_id, width )
     if (!filter_object) return true;
 
     var filter = UTF82B64( filter_object.value );
-    var page = GUI_DIR + "ldap-search" + GUI_EXTENSION + '?' + width + '&' + filter;
+    var page = GUI_DIR + "ldap-search" + GUI_EXTENSION + '?' + filter;
+
+    ajaxpage( page, report_id );
+}
+
+function showKerberosKeytab( report_id )
+{
+    var report_object = document.getElementById( report_id );
+    if (!report_object) return true;
+
+    var page = GUI_DIR + "show-kerberos-keytab" + GUI_EXTENSION;
 
     ajaxpage( page, report_id );
 }
@@ -1750,9 +1686,7 @@ function managerSelectContextCB( select_id )
     window.location.href = location;
 }
 
-// Auditing
-
-function AJAX_refreshWebLogCB( )
+function AJAX_refreshLogCB( )
 {
     switch (AJAX_HTTP_REQUEST.readyState) {
     case AJAX_UNSENT:
@@ -1770,11 +1704,14 @@ function AJAX_refreshWebLogCB( )
     case AJAX_DONE:
 	if (AJAX_HTTP_REQUEST.status == 200) {
 	    var obj = document.getElementById( AUTO_REPORT_ID );
+
+	    if (!obj) return false;
+
 	    obj.innerHTML = AJAX_HTTP_REQUEST.responseText;
 	    obj.scrollTop = obj.scrollHeight;
 	}
 	else {
-	    document.getElementById( AUTO_REPORT_ID ).innerHTML = UNAVAILABLE_MSG;
+	    document.getElementById( AUTO_REPORT_ID ).innerHTML = UNAVAILABLE;
 	}
 	break;
 
@@ -1783,29 +1720,35 @@ function AJAX_refreshWebLogCB( )
     }
 }
 
-function AJAX_updateAuditLog( cgi, force )
+function updateLog( cgi, force )
 {
     var auto = document.getElementById( AUOTO_UPDATE_ID );
-    if (auto == null) return false;
+
+    if ( auto == null )
+        return false;
+
     auto = auto.checked;
- 
-    if (auto == true || force == 1) {
 
-	var last = document.getElementById( "last" ).value;
-	var fcgi = GUI_DIR + cgi + GUI_EXTENSION + '?' + last;
+    if ( auto == true || force == 1 ) {
+        var last = document.getElementById( "last" ).value;
+        var fcgi = GUI_DIR + cgi + GUI_EXTENSION + "?" + last;
 
-	resetAJAX_HTTP_REQUEST( );
-	AJAX_HTTP_REQUEST.open( "GET", fcgi, true );
-	AJAX_HTTP_REQUEST.onreadystatechange = function( ) { AJAX_refreshWebLogCB( ); };
-	AJAX_HTTP_REQUEST.send( null );
+        resetAJAX_HTTP_REQUEST( );
+        AJAX_HTTP_REQUEST.open( "GET", fcgi, true );
+        AJAX_HTTP_REQUEST.onreadystatechange = function( ) {
+            AJAX_refreshLogCB( );
+        };
+        AJAX_HTTP_REQUEST.send( null );
     }
 
-    var f = "AJAX_updateAuditLog( \"" + cgi + "\", " + 0 + " )";
+    autoDisplay( function( ) {
+        updateLog( cgi, 0 );
+    }, AUDIT_LOG_UPDATE_INTERVAL );
 
-    autoDisplay( f, force, AUDIT_LOG_UPDATE_INTERVAL );
+    return true;
 }
 
-function refreshAuditLog1( id )
+function refreshAuditLogCB1( id )
 {
     switch (AJAX_HTTP_REQUEST.readyState) {
     case AJAX_UNSENT:
@@ -1825,7 +1768,7 @@ function refreshAuditLog1( id )
 	    document.getElementById( id ).innerHTML = AJAX_HTTP_REQUEST.responseText;
 	}
 	else {
-	    document.getElementById( id ).innerHTML = UNAVAILABLE_MSG;
+	    document.getElementById( id ).innerHTML = UNAVAILABLE;
 	}
 	break;
 
@@ -1836,21 +1779,24 @@ function refreshAuditLog1( id )
 
 function showAuditLog( name, force )
 {
-    if (force == 1) {
-	var f = "updateAuditLog( 'update-audit-log', " + 0 + " )";
-	autoDisplay( f, force, AUDIT_LOG_UPDATE_INTERVAL );
+    if ( force == 1 ) {
+        autoDisplay( function( ) {
+            updateAuditLog( "update-audit-log", 0 );
+        }, AUDIT_LOG_UPDATE_INTERVAL );
     }
 
     var log = document.getElementById( "request" ).value;
-    var fcgi = GUI_DIR + "show-audit-log" + GUI_EXTENSION + '?' + name + "+" + log;
- 
+    var fcgi = GUI_DIR + "show-audit-log" + GUI_EXTENSION + "?" + name + "+" + log;
+
     resetAJAX_HTTP_REQUEST( );
     AJAX_HTTP_REQUEST.open( "GET", fcgi, true );
-    AJAX_HTTP_REQUEST.onreadystatechange = function( ) { refreshAuditLog1( 'audit' ); };
+    AJAX_HTTP_REQUEST.onreadystatechange = function( ) {
+        refreshAuditLogCB1( "audit" );
+    };
     AJAX_HTTP_REQUEST.send( null );
 }
 
-function refreshAuditLog( id )
+function refreshAuditLogCB( id )
 {
     switch (AJAX_HTTP_REQUEST.readyState) {
     case AJAX_UNSENT:
@@ -1882,7 +1828,7 @@ function refreshAuditLog( id )
 	    showAuditLog( document.getElementById( "sitename" ).value, 0 );
 	}
 	else {
-	    document.getElementById( id ).innerHTML = UNAVAILABLE_MSG;
+	    document.getElementById( id ).innerHTML = UNAVAILABLE;
 	}
 	break;
 
@@ -1891,77 +1837,109 @@ function refreshAuditLog( id )
     }
 }
 
-function updateAuditLog( cgi, force )
+function updateAuditLog( cgi, force = 1)
 {
     var auto = document.getElementById( AUOTO_UPDATE_ID );
-    if (auto == null) return false;
+
+    if ( auto == null )
+        return false;
+
     auto = auto.checked;
 
-    if (auto == true || force == 1) {
+    if ( auto == true || force == 1 ) {
+        var last = document.getElementById( "last" ).value;
+        var name = document.getElementById( "sitename" ).value;
+        var fcgi = GUI_DIR + cgi + GUI_EXTENSION + "?" + last + "+" + name;
 
-	var last = document.getElementById( "last" ).value;
-	var name = document.getElementById( "sitename" ).value;
-
-	var fcgi = GUI_DIR + cgi + GUI_EXTENSION + '?' + last + "+" + name;
-
-	resetAJAX_HTTP_REQUEST( );
-	AJAX_HTTP_REQUEST.open( "GET", fcgi, true );
-	AJAX_HTTP_REQUEST.onreadystatechange = function( ) { refreshAuditLog( AUTO_REPORT_ID ); };
-	AJAX_HTTP_REQUEST.send( null );
+        resetAJAX_HTTP_REQUEST( );
+        AJAX_HTTP_REQUEST.open( "GET", fcgi, true );
+        AJAX_HTTP_REQUEST.onreadystatechange = function( ) {
+            refreshAuditLogCB( AUTO_REPORT_ID );
+        };
+        AJAX_HTTP_REQUEST.send( null );
     }
 
-    var f = "updateAuditLog( \"" + cgi + "\", " + 0 + " )";
-    autoDisplay( f, force, AUDIT_LOG_UPDATE_INTERVAL );
+    autoDisplay( function( ) {
+        updateAuditLog( cgi, 0 );
+    }, AUDIT_LOG_UPDATE_INTERVAL );
+
+    return true;
 }
 
-function update_web_log( force )
+function autoLogout()
 {
-    AJAX_updateAuditLog( "update-web-log", force );
+    var rest = window.location.href;
+    var pos = rest.indexOf(':');
+    var proto = rest.substring(0, pos);
+
+    resetUpdateTimer();
+
+    pos += 3;
+    rest = rest.substring(pos);
+    pos = rest.indexOf("/");
+    var uri = rest.substring(0, pos);
+    var logout = proto + "://" + uri + LOGOUT_URI;
+
+    window.location = logout;
 }
 
-function update_rweb_log( force )
+function initAutoLogout( )
 {
-    AJAX_updateAuditLog( "update-rweb-log", force );
-}
+    const backCheckInterval = 60 * 1000;
+    const frontCheckInterval = 20 * 1000;
 
-function update_vpnipsec_log( force )
-{
-    AJAX_updateAuditLog( "update-vpnipsec-log", force );
-}
+    let lastFrontCheck = Date.now( );
+    let lastBackCheck = 0;
 
-function update_firewall_log( force )
-{
-    AJAX_updateAuditLog( "update-firewall-log", force );
-}
+    function registerFrontCheck( )
+    {
+        lastFrontCheck = Date.now( );
+    }
 
-function update_antivirus_log( force )
-{
-    AJAX_updateAuditLog( "update-antivirus-log", force );
-}
+    function setBackCheck( )
+    {
+        if (lastFrontCheck <= lastBackCheck)
+            return true;
 
-function update_avserver_log( force )
-{
-    AJAX_updateAuditLog( "update-avserver-log", force );
-}
+        lastBackCheck = lastFrontCheck;
 
-function update_guard_log( force )
-{
-    AJAX_updateAuditLog( "update-guard-log", force );
-}
+        $.get( GUI_DIR + "auto-logout" + GUI_EXTENSION + "?touch" );
+    }
 
-function update_waf_log( force )
-{
-    AJAX_updateAuditLog( "update-waf-log", force );
-}
+    function checkAutoLogout( )
+    {
+	$.get( GUI_DIR + "auto-logout" + GUI_EXTENSION + "?check", function( result )
+        {
+            if ($.trim( result ) == "KO")
+                autoLogout( );
+        } );
+    }
 
-function update_audit_log( force )
-{
-    updateAuditLog( "update-audit-log", force );
+    $( document ).ready( function( )
+    {
+        $( document ).on(
+            "keydown " +
+            "keyup " +
+            "mouseup " +
+            "click " +
+            "scroll " +
+            "touchstart",
+            registerFrontCheck
+        );
+
+        setInterval( setBackCheck, backCheckInterval );
+        setInterval( checkAutoLogout, frontCheckInterval );
+
+        setBackCheck( );
+    } );
 }
 
 function doLogout( )
 {
-    location.href = LOGOUT_URI;
+    $.get( GUI_DIR + "auto-logout" + GUI_EXTENSION + "?raz", function( )
+    {
+	location.href = LOGOUT_URI;
+    } );
 }
 
 function requestLogout( )
@@ -1969,76 +1947,6 @@ function requestLogout( )
     var logout = confirm( "Would you like to logout?" );
     if (logout == true) {
 	doLogout( );
-    }
-}
-
-function doClickButton( button_id )
-{
-    var button = document.getElementById( button_id );
-
-    if (!button) return false;
-
-    var onclick = button.onclick;
-    if (onclick) onclick( );
-
-    $( '#' + button_id ).click( );
-}
-
-function autoLogout( )
-{
-    var rest = window.location.href;
-    var pos = rest.indexOf( ':' );
-    var proto = rest.substring( 0, pos );
-
-    resetUpdateTimer( );
-
-    pos += 3;
-    rest = rest.substring( pos )
-    pos = rest.indexOf( "/" );
-    var uri = rest.substring( 0, pos );
-    var logout = proto + '://' + uri + LOGOUT_URI;
-    window.location = logout;
-}
-
-function armAutoLogout( )
-{
-    if (LOGOUT_TIMER) clearTimeout( LOGOUT_TIMER );
-    LOGOUT_TIMER = setTimeout( "autoLogout( )", LOGOUT_TIMEOUT );
-}
-
-function initAutoLogout( )
-{
-    $( document ).ready( function( ) {
-	$( this ).keydown( function( e ) {
-	    armAutoLogout( );
-	} );
-
-	$( this ).keyup( function( e ) {
-	    armAutoLogout( );
-	} );
-
-	$( this ).mousedown( function( e ) {
-	    armAutoLogout( );
-	} );
-
-	$( this ).mouseup( function( e ) {
-	    armAutoLogout( );
-	} );
-
-	$( this ).mousemove( function( e ) {
-	    armAutoLogout( );
-	} );
-
-    } );
-
-    armAutoLogout( );
-}
-
-function runPreloadImages( )
-{
-    for (var i = 0 ; i < arguments.length ; i++) {
-	PRELOADED_IMAGES[i] = document.createElement( 'img' );
-	PRELOADED_IMAGES[i].setAttribute( 'src', GUI_IMAGE_DIR + arguments[i] );
     }
 }
 
@@ -2059,6 +1967,9 @@ function getExistingPage2show( recordsPerPage, page2show )
 
 function getSubmitPathWithPageArg( recordsPerPage, page2show )
 {
+    page2show = parseInt( page2show, 10 );
+    page2show = isNaN( page2show ) ? 0 : page2show;
+
     var queryOut = "";
 
     var dir = dirname( window.location.pathname );
@@ -2079,6 +1990,502 @@ function getSubmitPathWithPageArg( recordsPerPage, page2show )
     return path;
 }
 
+function initListRecordsConfig( config )
+{
+    RecordInsertState = config.insertState;
+    RecordBlankColumns = config.blankColumns;
+
+    RecordID = new Array( );
+    RecordInputType = new Array( );
+    RecordContent = new Array( );
+    RecordContentValues = new Array( );
+    RecordData = new Array( );
+    RecordCheck = new Array( );
+    RecordInputState = new Array( );
+
+    config.records.forEach( function( record, index ) {
+
+        const i = index + 1;
+
+        RecordID[i] = record.id;
+        RecordInputType[i] = record.inputType;
+        RecordContent[i] = record.content;
+        RecordContentValues[i] = record.contentValues;
+        RecordData[i] = record.data;
+        RecordCheck[i] = record.check;
+        RecordInputState[i] = record.inputState;
+
+    } );
+}
+
+function initMultiFormRecordsConfig( config )
+{
+    RecordID = new Array( );
+    RecordInputType = new Array( );
+    RecordContent = new Array( );
+    RecordContentValues = new Array( );
+    RecordData = new Array( );
+    RecordCheck = new Array( );
+    RecordTitle = new Array( );
+
+    RecordTitle[1] = config.title;
+
+    config.records.forEach( function( record, index ) {
+
+        const i = index + 1;
+
+        RecordID[i] = record.id;
+	RecordTitle[i] = record.title;
+        RecordInputType[i] = record.inputType;
+        RecordContent[i] = record.content;
+        RecordContentValues[i] = record.contentValues;
+        RecordData[i] = record.data;
+        RecordCheck[i] = record.check;
+    } );
+}
+
+function initTilesContent( config )
+{
+    config.tiles.forEach( function( tile ) {
+
+        TILES[tile.page] = new Array(
+            tile.title,
+            tile.width,
+            tile.height,
+            tile.left,
+            tile.top,
+            tile.state
+        );
+
+        if (tile.state) {
+            mosaicOpen( config.parentId, tile.page,
+			function( content ) {
+			    activateContent( content, tile.page );
+			} );
+        }
+    } );
+
+    mosaicMoveInitialize( );
+    mosaicMenuInitialize( config.dashboardMenuId, config.dashboardControlId );
+}
+
+function activateContent( root = document, loadedPage )
+{
+    root.querySelectorAll( '[data-redirect]' ).forEach( function( element ) {
+        window.location.replace( element.dataset.redirect );
+    } );
+
+    root.querySelectorAll( '[data-init-get-content]' ).forEach( function( element ) {
+	initGetContent(
+            element.dataset.reloadId,
+            element.dataset.submitPage,
+            element.dataset.checkboxId
+	);
+
+	element.remove( );
+    } );
+
+    root.querySelectorAll( '[data-init-post-content]' ).forEach( function( element ) {
+	initPostContent(
+            element.dataset.buttonId,
+            element.dataset.formId,
+            element.dataset.confirmation === 'true',
+	    element.dataset.actionBeforePost,
+            element.dataset.actionArgs
+	);
+
+	element.remove( );
+    } );
+
+    root.querySelectorAll( '[data-show-errors-zone]' ).forEach(function( element ) {
+        showZone( element.dataset.showErrorsZone );
+        element.remove( );
+    } );
+
+    root.querySelectorAll( '[data-init-table-form]' ).forEach( function( element ) {
+	initTableForm( parseInt( element.dataset.recordNb, 10 ));
+	element.remove( );
+    } );
+
+    root.querySelectorAll( '[data-table-navigation]' ).forEach( function( element ) {
+        initTableNavigation( element );
+    } );
+
+    root.querySelectorAll( '[data-ddtabcontent]' ).forEach( function( element ) {
+	var formTabs = new ddtabcontent( element.dataset.ddtabcontent );
+	formTabs.setpersist( element.dataset.persist === 'true' );
+	formTabs.setselectedClassTarget( element.dataset.selectedClassTarget );
+	formTabs.init( );
+    } );
+
+    root.querySelectorAll( '[data-init-bi-select-list]' ).forEach(
+	function( element ) {
+            initSelectionList(
+		element.dataset.selectId1,
+		element.dataset.selectId2,
+		element.dataset.addToSelectedId,
+		element.dataset.delFromSelectedId
+            );
+            element.remove( );
+	}
+    );
+
+    root.querySelectorAll( '[data-init-blink-icon]' ).forEach(
+	function( element ) {
+            initBlinkIcon(
+		parseInt( element.dataset.index, 10 ),
+		element.dataset.imageId
+            );
+            element.remove( );
+	}
+    );
+
+    root.querySelectorAll( '[data-init-refresh-shortcuts]' ).forEach(
+	function( element ) {
+            initRefreshShortcuts( );
+            element.remove( );
+	}
+    );
+
+    root.querySelectorAll( '[data-init-refresh-exchange-file-percent]' ).forEach(
+    function( element ) {
+        initRefreshExchangeFilePercent(
+            element.dataset.filenameId,
+            element.dataset.progressId,
+            parseInt( element.dataset.progression, 10 ),
+            element.dataset.page
+        );
+        element.remove();
+    } );
+
+    root.querySelectorAll( '[data-init-focus]' ).forEach(
+	function( element ) {
+	    document.getElementById( element.dataset.targetId )?.focus();
+	    element.remove();
+	}
+    );
+
+    root.querySelectorAll( 'script[type="application/json"][data-list-records-config]' ).forEach( function( element ) {
+	const config = JSON.parse( element.textContent );
+	initListRecordsConfig( config );
+	element.remove( );
+    } );
+
+    root.querySelectorAll( 'script[type="application/json"][data-multi-form-records-config]' ).forEach( function( element ) {
+	const config = JSON.parse( element.textContent );
+	initMultiFormRecordsConfig( config );
+	element.remove( );
+    } );
+
+    var page;
+
+    if (loadedPage) {
+        page = loadedPage;
+    }
+    else {
+	var page = window.location.pathname
+	    .split( '/' )
+	    .pop( )
+	    .replace( /\.[^.]+$/, '' );
+    }
+
+    switch (page) {
+
+    case 'admin':
+    case 'first-login':
+	root.querySelectorAll( '[data-init-qrcode]' ).forEach(
+	    function( element ) {
+		const size = 95;
+		new QRCode(
+		    document.getElementById( element.dataset.targetId ),
+		    {
+			text: element.dataset.text,
+			width: size,
+			height: size,
+			colorDark: 'firebrick',
+			colorLight: 'white',
+			correctLevel: QRCode.CorrectLevel.M
+		    }
+		);
+		element.remove( );
+	    }
+	);
+	break;
+
+    case 'conf-load-save-core':
+	const form = document.getElementById( element.dataset.formId );
+	if ( form ) {
+            form.submit( );
+	}
+	break;
+
+    case 'dynamicdns':
+	root.querySelectorAll( '[data-init-dynamic-dns-select]' ).forEach(
+	    function( element ) {
+		dynamicDNSSelectCB(
+		    element.dataset.stateId,
+		    element.dataset.providerId,
+		    element.dataset.hostnameId,
+		    element.dataset.usernameId,
+		    element.dataset.usernameId,
+		    element.dataset.providerWebsiteId
+		);
+		element.remove( );
+	    }
+	);
+	break;
+
+    case 'register':
+	root.querySelectorAll( '[data-init-registration-mode-select]' ).forEach(
+	    function( element ) {
+		registrationModeSelectCB(
+		    element.dataset.mode,
+		    element.dataset.link,
+		    element.dataset.email
+		);
+		element.remove( );
+	    }
+	);
+
+	root.querySelectorAll( '[data-init-registration-action-select]' ).forEach(
+	    function( element ) {
+		registrationActionSelectCB(
+		    element.dataset.action,
+		    element.dataset.osKey
+		);
+		element.remove( );
+	    }
+	);
+	break;
+
+    case '':
+    case 'system-report':
+    case 'login':
+	root.querySelectorAll( '[data-init-mosaic-auto-reload-all]' ).forEach(
+	    function( element ) {
+		mosaicInitAutoReloadAll(
+		    element.dataset.autoId,
+		    parseInt( element.dataset.interval, 10 ),
+		    function( content, page ) {
+			activateContent( content, page );
+		    } );
+		element.remove( );
+	    }
+	);
+
+	root.querySelectorAll( 'script[type="application/json"][data-init-tiles]' ).forEach( function( element ) {
+	    const config = JSON.parse( element.textContent );
+	    initTilesContent( config );
+	    element.remove( );
+	    } );
+	break;
+
+    case 'update-system-report-memory':
+    case 'system-report-load-memory':
+	root.querySelectorAll( 'script[type="application/json"][data-init-memory-pie-chart]' ).forEach( function( element ) {
+	    initMemoryPieCharts( JSON.parse( element.textContent ) );
+	    element.remove( );
+	} );
+	break;
+
+    case 'update-network-activity':
+    case 'network-activity-internal':
+    case 'network-activity-external':
+    case 'network-activity-auxiliary':
+	root.querySelectorAll( 'script[type="application/json"][data-init-graph-chart]' ).forEach( function( element ) {
+	    initGraphChart( JSON.parse( element.textContent ));
+	    element.remove( );
+	} );
+	break;
+
+    case 'cache-report':
+	root.querySelectorAll( 'script[type="application/json"][data-init-gauge-chart]' ).forEach( function( element ) {
+	    var config = JSON.parse( element.textContent );
+	    initGaugeChart( config );
+	    element.remove( );
+	} );
+	break;
+
+    case 'system-report-counter':
+	root.querySelectorAll( '[data-init-bar-chart]' ).forEach( function( element ) {
+            initBarChart( JSON.parse( element.textContent ));
+            element.remove( );
+	} );
+	break;
+
+    case 'qos-report':
+	root.querySelectorAll( 'script[type="application/json"][data-init-qos-pie-chart]' ).forEach( function( element ) {
+	    var config = JSON.parse( element.textContent );
+	    var id = config.bindto.replace( /^#/, "" );
+
+	    initGenericPieChart(
+		id,
+		config.data.columns,
+		Number( config.size.width ),
+		Number( config.size.height )
+	    );
+	    element.remove( );
+	} );
+	break;
+
+    case 'time':
+	root.querySelectorAll( '[data-init-start-clock]' ).forEach(
+	    function( element ) {
+		startClock(
+		    element.dataset.containerId,
+		    parseInt( element.dataset.dateSeconds, 10 ),
+		    parseInt( element.dataset.dateOffsetMn, 10 )
+		);
+		element.remove( );
+	    }
+	);
+	break;	
+
+    case 'tls-ca-system-load-save':
+	root.querySelectorAll( '[data-init-print-tls]' ).forEach(
+	    function( element ) {
+		printTLS(
+		    element.dataset.page,
+		    element.dataset.componentId,
+		    element.dataset.contentId
+		);
+		element.remove( );
+	    }
+	);
+	break;
+
+    case 'tls-ca-third-load':
+	root.querySelectorAll( '[data-init-print-tls-ca]' ).forEach(
+	    function( element ) {
+		printTLSCA(
+		    GUI_DIR + element.dataset.page + GUI_EXTENSION + '?' + element.dataset.pageArgs,
+		    element.dataset.contentId
+		);
+		element.remove( );
+	    }
+	);
+	break;
+
+    case 'tls-client-manage':
+	root.querySelectorAll( '[data-init-print-tls]' ).forEach(
+	    function( element ) {
+		printTLS(
+		    GUI_DIR + element.dataset.page + GUI_EXTENSION + '?' + element.dataset.pageArgs,
+		    element.dataset.componentId,
+		    element.dataset.contentId
+		);
+		element.remove( );
+	    }
+	);
+	break;
+
+    case 'tls-ca-system-generate':
+    case 'tls-server-generate':
+	root.querySelectorAll( '[data-init-ajax-update-tls-conf]' ).forEach(
+	    function( element ) {
+
+		AJAX_updateTLSConf(
+		    GUI_DIR + element.dataset.page + GUI_EXTENSION + '?' + element.dataset.pageArgs,
+		    element.dataset.namesId,
+		    element.dataset.numbitsId,
+		    element.dataset.daysId,
+		    element.dataset.countryId,
+		    element.dataset.provinceId,
+		    element.dataset.localityId,
+		    element.dataset.organisationId,
+		    element.dataset.unitId
+		);
+		element.remove();
+	    }
+	);
+	break;
+
+    case 'tls-server-manage':
+	root.querySelectorAll( '[data-init-tls-component-select]' ).forEach(
+	    function( element ) {
+		TLSComponentSelectCB(
+		    element.dataset.componentId,
+		    element.dataset.operationId,
+		    element.dataset.daysId,
+		    element.dataset.ocspId,
+		    element.dataset.page,
+		    element.dataset.contentId
+		);
+		element.remove( );
+	    }
+	);
+	break;
+
+    case 'urllist-content':
+	root.querySelectorAll( '[data-init-url-list-content-select]' ).forEach(
+	    function( element ) {
+		URLListContentSelectCB(
+		    element.dataset.operationId,
+		    element.dataset.protocolId,
+		    element.dataset.serverId,
+		    element.dataset.filenameId,
+		    element.dataset.verifyId
+		);
+		element.remove( );
+	    }
+	);
+	break;
+
+    case 'vpnipsec-access-conf':
+	root.querySelectorAll( '[data-show-ipsec-access-conf]' ).forEach( function( element ) {
+	    IPsecVPNAccessConfSelectCB( element.dataset.systemId, element.dataset.tlsId, element.dataset.contentId );
+	    element.remove( );
+	} );
+	break;
+
+    case 'vpnipsec-authenticate':
+	root.querySelectorAll( '[data-init-vpn-ipsec-authenticate-select]' ).forEach(
+	    function( element ) {
+		VPNIPsecAuthenticateSelectCB(
+		    element.dataset.methodId,
+		    element.dataset.autoPskId,
+		    element.dataset.pskId,
+		    element.dataset.tlsIdId,
+		    element.dataset.usedIdId
+		);
+
+		element.remove( );
+	    }
+	);
+	break;
+
+    case 'vpnipsec-site-settings':
+	root.querySelectorAll( '[data-init-vpn-ipsec-site-settings]' ).forEach(
+	    function( element ) {
+		VPNIPsecSiteSettingsCB(
+		    element.dataset.authenticateId,
+		    element.dataset.tlsAuthenticateId,
+		    element.dataset.tlsIdId,
+		    element.dataset.dnFqdnId,
+		    element.dataset.pskId
+		);
+		element.remove( );
+	    }
+	);
+	break;
+
+    case 'waf-rweb-custom':
+	root.querySelectorAll( '[data-init-show-waf-rules]' ).forEach(
+	    function( element ) {
+		showWAFRules(
+		    element.dataset.page,
+		    element.dataset.targetId
+		);
+		element.remove( );
+	    }
+	);
+	break;
+
+    default:
+	break;
+    }
+}
+
 function initPageSelectionBrowseCB( selectedPage, recordsPerPage, previousButton, nextButton, pages, action )
 {
     var page2show = selectedPage.value;
@@ -2086,6 +2493,8 @@ function initPageSelectionBrowseCB( selectedPage, recordsPerPage, previousButton
 
     if ( ! $.isNumeric( page2show )) return false;
     if ( ! $.isNumeric( recordsPPage )) return false;
+
+    let newPage = page2show;
 
     switch (action) {
     case 'select':
@@ -2096,8 +2505,8 @@ function initPageSelectionBrowseCB( selectedPage, recordsPerPage, previousButton
 	break;
 
     case 'next':
-	if (page2show < (pages - 1)) {
-	    page2show++;
+	if (page2show < pages) {
+	    newPage++;
 	}
 	else {
 	    return false;
@@ -2106,7 +2515,7 @@ function initPageSelectionBrowseCB( selectedPage, recordsPerPage, previousButton
 
     case 'previous':
 	if ( page2show > 0) {
-	    page2show--;
+	    newPage--;
 	}
 	else {
 	    return false;
@@ -2123,144 +2532,229 @@ function initPageSelectionBrowseCB( selectedPage, recordsPerPage, previousButton
     previousButton.disabled = true;
     nextButton.disabled = true;
 
-    var page = getSubmitPathWithPageArg( recordsPPage, page2show );
+    var page = getSubmitPathWithPageArg( recordsPPage, newPage );
 
     setWorking( );
-    var get = $.get( page,
+
+    $.get( page,
 		     function( resultData, status )
 		     {
 			 switch (status) {
 			 case 'success':
-			     $( '#' + CORE_ID ).html( resultData );
+			     {
+				 const core = document.getElementById( CORE_ID );
+				 if ( !core ) {
+				     stopWorking( false, "Missing content zone" );
+				     return;
+				 }
+
+				 core.innerHTML = resultData;
+				 activateContent( core );
+				 stopWorking( true );
+			     };
 			     break;
 			     
 			 default:
 			     stopWorking( false, "Communication Error" );
 			     break;
 			 }
-		     } );
-    
-    get.fail( function( ) { stopWorking( false, "Unable to get this page" ); } );
+		     } )
+	.fail( function( ) { stopWorking( false, "Unable to get this page" ); } );
+
+    return true;
 }
 
-function initPageSelection( pages, page2show )
+function initTableNavigation( navigation )
 {
-    if (! $.isNumeric( pages )) return false;
-    if (! $.isNumeric( page2show )) return false;
+    navigation.dataset.initialised = 'true';
+}
+
+function initPageSelection( )
+{
+    const selectedPage = document.getElementById( SELECTED_PAGE_ID );
+    const previousButton = document.getElementById( PREVIOUS_PAGE_ID );
+    const nextButton = document.getElementById( NEXT_PAGE_ID );
+
+    if ( !selectedPage ||
+         !previousButton ||
+         !nextButton ) {
+
+        return false;
+    }
+
+    const page2show = parseInt( selectedPage.value, 10 );
+    const pages = selectedPage.options.length;
+
+    previousButton.disabled = ( page2show === 0 );
+    nextButton.disabled = ( page2show === (pages - 1) );
+
+    return true;
+}
+
+function initTableForm( recordNb )
+{
+    window.NewRecords = 0;
+    window.DeletedRecords = 0;
+    window.TableRecordCursor = recordNb;
+    window.InitialTableRecordCursor = recordNb;
+
+    const table = document.getElementById( MAIN_TABLE_ID );
+
+    if ( table ) {
+        window.OldTable = $( table ).clone( true );
+    }
+
+    initPageSelection( );
+    deactivateOKIconBar( );
+}
+
+function postContent( form_id, confirmation )
+{
+    const form = document.getElementById( form_id );
+
+    if ( !form ) {
+        return false;
+    }
+
+    if ( form.beforePost ) {
+
+	switch (form.beforePost.action) {
+
+	case 'add-hidden-input-from-selection-item':
+	    addHiddenInputFromSelectionItem( form_id, form.beforePost.args )
+	    break;
+
+	default:
+	    break;
+	}
+    }
+
+    if ( confirmation ) {
+        var message = "Are you sure you want to perform this action?";
+        var response = confirm( message );
+
+        if ( !response ) {
+            return false;
+        }
+    }
 
     var selectedPage = document.getElementById( SELECTED_PAGE_ID );
-    if (selectedPage == null) return false;
-
     var recordsPerPage = document.getElementById( RECORDS_PPAGE_ID );
-    if (recordsPerPage == null) return false;
-
     var previousButton = document.getElementById( PREVIOUS_PAGE_ID );
-    if ( previousButton == null) return false;
-
     var nextButton = document.getElementById( NEXT_PAGE_ID );
-    if ( nextButton == null) return false;
 
-    while (selectedPage.options.length > 0) {
-	selectedPage.remove( 0 );
-    }
+    var page;
 
-    for (var i = 0 ; i < pages ; i++) {
-	var option = document.createElement( 'option' );
-	option.value = i;
-        option.id = "page_" + String( i );
-	option.innerHTML = "Page " + String( i + 1 );
-	selectedPage.appendChild( option );
-    }
+    if ( selectedPage != null &&
+         recordsPerPage != null &&
+         previousButton != null &&
+         nextButton != null ) {
 
-    selectedPage.value = page2show;
+        selectedPage.disabled = true;
+        recordsPerPage.disabled = true;
+        previousButton.disabled = true;
+        nextButton.disabled = true;
 
-    $( '#' + SELECTED_PAGE_ID ).change( function( ) {
-	initPageSelectionBrowseCB( selectedPage, recordsPerPage, previousButton, nextButton, pages, "select" );
-    } );
+        var page2show = parseInt( selectedPage.value, 10 );
+        var recordsPPage = parseInt( recordsPerPage.value, 10 );
 
-    $( '#' + RECORDS_PPAGE_ID ).change( function( ) {
-	initPageSelectionBrowseCB( selectedPage, recordsPerPage, previousButton, nextButton, pages, "records" );	
-    } );
+        page2show = getExistingPage2show( recordsPPage, page2show );
 
-    $( '#' + PREVIOUS_PAGE_ID ).click( function( ) {
-	initPageSelectionBrowseCB( selectedPage, recordsPerPage, previousButton, nextButton, pages, "previous" );	
-    } );
-
-    $( '#' + NEXT_PAGE_ID ).click( function( ) {
-	initPageSelectionBrowseCB( selectedPage, recordsPerPage, previousButton, nextButton, pages, "next" );	
-    } );
-
-    if (page2show == 0) {
-	previousButton.disabled = true;
+        page = getSubmitPathWithPageArg( recordsPPage, page2show );
     }
     else {
-	previousButton.disabled = false;
+        page = form.action;
     }
 
-    if (page2show == (pages - 1)) {
-	nextButton.disabled = true;
+    var postData, processData, contentType;
+
+    if ( form.enctype === 'multipart/form-data' ) {
+
+        postData = new FormData( form );
+        processData = false;
+        contentType = false;
+
     }
     else {
-	nextButton.disabled = false;
+	postData = $( '#' + form_id ).serialize( );
+	var processData = true;
+	var contentType = 'application/x-www-form-urlencoded; charset=UTF-8';
     }
+
+    setWorking( "Submitting" );
+
+    var post = $.ajax( {
+        url: page,
+        type: 'POST',
+        data: postData,
+        processData: false,
+        contentType: false,
+
+        success: function( resultData, status ) {
+            switch ( status ) {
+            case 'success':
+                const core = document.getElementById( CORE_ID );
+                core.innerHTML = resultData;
+                activateContent( core );
+                break;
+
+            default:
+                stopWorking( false, "Communication Error" );
+                break;
+            }
+        }
+    } );
+
+    post.fail( function( ) {
+        stopWorking( false, "Unable to post this page" );
+    } );
+
+    return true;
 }
 
-function initPostContent( button_id, form_id, confirmation )
+function initPostContent( button_id, form_id, confirmation,  action, args )
 {
+    const button = document.getElementById( button_id );
+    const form = document.getElementById( form_id );
+
+    if ( !button || !form ) {
+        return false;
+    }
+
+    button.dataset.postFormId = form_id;
+    button.dataset.confirmation = confirmation;
+
+    form.beforePost = {
+        action: action || '',
+        args: args ? JSON.parse( args ) : []
+    };
+
     $( '#' + button_id ).click( function( ) {
-	if (confirmation) {
-	    var message = "Are you sure you want to perform this action?";
-	    var response = confirm( message );
-	    if (!response) return false;
-	}
-
-	var selectedPage = document.getElementById( SELECTED_PAGE_ID );
-	var recordsPerPage = document.getElementById( RECORDS_PPAGE_ID );
-	var previousButton = document.getElementById( PREVIOUS_PAGE_ID );
-	var nextButton = document.getElementById( NEXT_PAGE_ID );
-
-	if (selectedPage != null && recordsPerPage != null && previousButton != null && nextButton != null) {
-
-	    selectedPage.disabled = true;
-	    recordsPerPage.disabled = true;
-	    previousButton.disabled = true;
-	    nextButton.disabled = true;
-	    
-	    var page2show = parseInt( selectedPage.value, 10 );
-	    var recordsPPage = parseInt( recordsPerPage.value, 10 );
-	    page2show = getExistingPage2show( recordsPPage, page2show );
-	    var page = getSubmitPathWithPageArg( recordsPPage, page2show );
-	}
-	else {
-	    var page = $( '#' + form_id ).attr( 'action' );
-	}
-
-	var postData = $( '#' + form_id ).serialize( );
-
-	setWorking( "Submitting" );
-
-	var post = $.post( page,
-			   postData,
-			   function( resultData, status ) {
-			       switch (status) {
-			       case 'success':
-				   $( '#' + CORE_ID ).html( resultData );
-				   break;
-
-			       default:
-				   stopWorking( false, "Communication Error" );
-				   break;
-			       }
-			   } );
-        post.fail( function( ) { stopWorking( false, "Unable to post this page" ); } );
+	postContent( form_id, confirmation );
     } );
+}
 
-    initSubmitOnEnterEverywhere( button_id );
+function doClickButton( button_id )
+{
+    const button = document.getElementById( button_id );
+
+    if ( !button ) {
+        return false;
+    }
+
+    if ( button.dataset.postFormId ) {
+        return postContent(
+            button.dataset.postFormId,
+            button.dataset.confirmation === 'true'
+        );
+    }
+
+    return true;
 }
 
 function initGetContent( link_id, page, option_checkbox_id )
 {
-    $( '#' + link_id ).click( function( ) {
+    $( '#' + link_id ).on('click', function( ) {
 	var selectedPage = document.getElementById( SELECTED_PAGE_ID );
 	var recordsPerPage = document.getElementById( RECORDS_PPAGE_ID );
 	var previousButton = document.getElementById( PREVIOUS_PAGE_ID );
@@ -2299,7 +2793,9 @@ function initGetContent( link_id, page, option_checkbox_id )
 			 function( resultData, status ) {
 			     switch (status) {
 			     case 'success':
-				 $( '#' + CORE_ID ).html( resultData );
+				 const core = document.getElementById( CORE_ID );
+				 core.innerHTML = resultData;
+				 activateContent( core );
 				 break;
 
 			     default:
@@ -2326,26 +2822,40 @@ function makeFunctionArgs( inArgs )
 
 function makeOptionsList( items, itemValues, selected )
 {
+    const group_prefix_begin = "__group_begin:";
+    const group_end = "__group_end";
+
     var options = "";
     var range = "opt_" + String( TableRecordCursor ) + "_";
     var flag;
 
     for (i=0 ; i<items.length ; i++) {
 	var option = items[i];
-	if (itemValues) {
-	    var optionValue = itemValues[i];
+	if ( option.indexOf( group_prefix_begin ) === 0 ) {
+	    options += "<optgroup label='" + option.substring( group_prefix_begin.length ) + "'>";
 	}
 	else {
-	    var optionValue = option;
+	    if (option == group_end) {
+		options += "</optgroup>";
+	    }
+	    else {
+		if (itemValues.length === 0) {
+		    var optionValue = option;
+		}
+		else {
+		    var optionValue = itemValues[i];
+		}
+
+		if (optionValue == selected) {
+		    flag = " selected";
+		}
+		else {
+		    flag = "";
+		}
+
+		options += "<option id='" + range + option + "' name='" + range + option + "' value='" + optionValue + "'" + flag + ">" + option + "</option>"
+	    }
 	}
-	if (optionValue == selected) {
-	    flag = " selected";
-	}
-	else {
-	    flag = "";
-	}
-	optionValue = optionValue.replace( /&nbsp;/g, "" );
-	options += "<option id='" + range + option + "' name='" + range + option + "' value='" + optionValue + "'" + flag + ">" + option + "</option>"
     }
 
     return options;
@@ -2367,32 +2877,29 @@ function getRowsInRecord( )
 function newListTableRecord( table_id, type, src_inputs )
 {
     var record = "<tr class='" + RECORD_CLASS_PREFIX + TableRecordCursor + "'>";
-    var recordSeparator = "border-bottom:2px dotted black;";
-    var value, content, rows = 1, index_value = 1, separator = "";
+    var value, content, rows = 1, index_value = 1, separator = '';
     var record_rows = getRowsInRecord( );
-    var input_style;
-    record += "<td style='padding:1px;'>";
-    record += "<input id='" + ENTRY_ID_PREFIX + TableRecordCursor + "' name='" + ENTRY_ID_PREFIX + TableRecordCursor + "' type='hidden' value='" + type + "' />";
-    record += "<button type='button' class='" + ROW_ACTION_CLASS + "' style='background-image:url( \"" + GUI_IMAGE_DIR + "delete.png\" );' onclick='removeRecord( " + TableRecordCursor + " )';></button>";
-    
-    if (RecordInsertState) {
-	record += "<button type='button' class='" + ROW_ACTION_CLASS + " move' style='background-image:url( \"" + GUI_IMAGE_DIR + "up.png\" );' onClick='moveUpTableRecord( \"" + table_id + "\", \"" + RECORD_CLASS_PREFIX + TableRecordCursor + "\" )';></button>";
-	record += "<button type='button' class='" + ROW_ACTION_CLASS + " move' style='background-image:url( \"" + GUI_IMAGE_DIR + "down.png\" );' onClick='moveDownTableRecord( \"" + table_id + "\", \"" + RECORD_CLASS_PREFIX + TableRecordCursor + "\" )';></button>";
-    }
 
-    record += "</td>";
+    record += "<td><div class='center'>";
+    record += "<input id='" + ENTRY_ID_PREFIX + TableRecordCursor + "' name='" + ENTRY_ID_PREFIX + TableRecordCursor + "' type='hidden' value='" + type + "' />";
+    record += "<button type='button' class='" + ROW_ACTION_CLASS + " delete-item' data-action='remove-record' data-record-cursor='" + TableRecordCursor + "'></button>";
+
+    if ( RecordInsertState ) {
+	record += "<button type='button' class='" + ROW_ACTION_CLASS + " move-item-up' data-action='move-up-table-record' data-table-id='" + table_id + "' data-record-class='" + RECORD_CLASS_PREFIX + TableRecordCursor + "'></button>";
+	record += "<button type='button' class='" + ROW_ACTION_CLASS + " move-item-down' data-action='move-down-table-record' data-table-id='" + table_id + "' data-record-class='" + RECORD_CLASS_PREFIX + TableRecordCursor + "'></button>";
+    }
+    record += "</div></td>";
     
     var with_br = false;
     for (var i = 1 ; i < RecordID.length ; i++) {
 
-	input_style = "";
 	input_state = "";
 
 	switch (RecordInputType[i]) {
 	case 'br':
 	    rows++;
 	    if ((rows % record_rows) == 0) {
-		separator = recordSeparator;
+		separator = 'list-item-separator';
 	    }
 	    with_br = true;
 
@@ -2400,23 +2907,28 @@ function newListTableRecord( table_id, type, src_inputs )
                 record += "<td></td>";
 	    }
 
-	    record += "</tr><tr class='" + RECORD_CLASS_PREFIX + TableRecordCursor + "'><td style='" + separator + "' bgcolor='" + UNUSED_COLOR + "'>" + RecordContent[i] + "</td>";
+	    record += "</tr><tr class='" + RECORD_CLASS_PREFIX + TableRecordCursor + "'><td class='" + separator + "' bgcolor='" + UNUSED_COLOR + "'>" + RecordContent[i] + "</td>";
 	    break;
 
 	case 'input':
 	case 'encoded':
 	    if (src_inputs) {
-		value = src_inputs[index_value];
+		if (RecordInputType[i] == 'encoded') {
+		    value = decodeString( src_inputs[index_value] );
+		}
+		else {
+		    value = src_inputs[index_value];
+		}
 		index_value++;
 	    }
 	    else {
 		value="";
 	    }
-	    record += "<td style='" + separator + "'" + "><input name='" + RecordID[i] + "_" + TableRecordCursor + "' id='" + RecordID[i] + "_" + TableRecordCursor + "' " + RecordContent[i] + " onblur='" + RecordCheck[i] + "( \"" + RecordID[i] + "_" + TableRecordCursor + "\" );' value='" + value + "' /></td>";
+	    record += "<td class='" + separator + "'" + "><input name='" + RecordID[i] + "_" + TableRecordCursor + "' id='" + RecordID[i] + "_" + TableRecordCursor + "' " + RecordContent[i] + " data-action='check-input' data-check-function='" + RecordCheck[i] + "' value='" + value + "' /></td>";
 	    break;
 
 	case 'text':
-	    record += "<td style='" + separator + "'" + "></td>";
+	    record += "<td class='" + separator + "'" + "></td>";
 	    break;
 
 	case 'textarea':
@@ -2428,7 +2940,7 @@ function newListTableRecord( table_id, type, src_inputs )
 	    else {
 		value="";
 	    }
-	    record += "<td style='" + separator + "'" + "><textarea name='" + RecordID[i] + "_" + TableRecordCursor + "' id='" + RecordID[i] + "_" + TableRecordCursor + "' " + RecordContent[i] + " onblur='" + RecordCheck[i] + "( \"" + RecordID[i] + "_" + TableRecordCursor + "\" );'>" + value + "</textarea></td>";
+	    record += "<td class='" + separator + "'" + "><textarea name='" + RecordID[i] + "_" + TableRecordCursor + "' id='" + RecordID[i] + "_" + TableRecordCursor + "' " + RecordContent[i] + " data-action='check-input' data-check-function='" + RecordCheck[i] + "'>" + value + "</textarea></td>";
 	    break;
 
 	case 'state':
@@ -2447,15 +2959,15 @@ function newListTableRecord( table_id, type, src_inputs )
 		content = RecordContent[i];
 		value="";
 	    }
-	    record += "<td style='" + separator + "'" + "><center><input name='" + RecordID[i] + "_" + TableRecordCursor + "' id='" + RecordID[i] + "_" + TableRecordCursor + "' " + content + value + " /></center></td>";
+	    record += "<td class='" + separator + "'" + "><center><input name='" + RecordID[i] + "_" + TableRecordCursor + "' id='" + RecordID[i] + "_" + TableRecordCursor + "' " + content + value + " /></center></td>";
 	    break;
 	    
 	case 'text':
 	    if (!RecordID[i] && !RecordContent[i]) {
-		record += "<td style='" + separator + "' bgcolor='" + UNUSED_COLOR + "'></td>";
+		record += "<td class='" + separator + "' bgcolor='" + UNUSED_COLOR + "'></td>";
 	    }
 	    else {
-		record += "<td style='" + separator + "'>" + RecordContent[i] + "</td>";
+		record += "<td class='" + separator + "'>" + RecordContent[i] + "</td>";
 	    }
 	    break;
 
@@ -2468,22 +2980,16 @@ function newListTableRecord( table_id, type, src_inputs )
 		value="";
 	    }
 
-	    if (RecordSelectCBFunction[i]) {
-		var args = makeFunctionArgs( RecordSelectCBArgs[i] );
-		var onChange = RecordSelectCBFunction[i] + "( " + args + " );";
+	    if (RecordData[i]) {
+		var data = ' ' + RecordData[i];
 	    }
 	    else {
-		var onChange = "";
+		var data = "";
 	    }
 
 	    content = makeOptionsList( RecordContent[i], RecordContentValues[i], value );
 
-	    if (RecordInputState[i] == "disabled") {
-		// input_state = "disabled";
-		input_style = " style='cursor:not-allowed; background:White url( \"" + GUI_IMAGE_DIR + "gray-hatched.png\" ) center center repeat" + "' ";
-	    }
-
-	    record += "<td style='" + separator + "'" + "><select " + input_state + input_style + "name='" + RecordID[i] + "_" + TableRecordCursor + "' id='" + RecordID[i] + "_" + TableRecordCursor + "' onChange=\"" + onChange + "\">" + content + "</select></td>";
+	    record += "<td class='" + separator + "'" + "><select " + input_state + "name='" + RecordID[i] + "_" + TableRecordCursor + "' id='" + RecordID[i] + "_" + TableRecordCursor + "'" + data + ">" + content + "</select></td>";
 	    break;
 	    
 	default:
@@ -2492,7 +2998,7 @@ function newListTableRecord( table_id, type, src_inputs )
     }
 
     for (i = 0 ; i < RecordBlankColumns ; i++) {
-	record += "<td style='" + separator + "'></td>";
+	record += "<td class='" + separator + "'></td>";
     }
 
     record += "</tr>";
@@ -2502,9 +3008,9 @@ function newListTableRecord( table_id, type, src_inputs )
 
 function newMultiTableRecord( table_id, type, src_inputs )
 {
-    var record = "<tr class='" + RECORD_CLASS_PREFIX + TableRecordCursor + "' id='row_" + RecordID[0] + "_" + TableRecordCursor + "'><td style='background-color:White;' width='" + RecordWidth[0] + "%'><strong>" + RecordTitle[0] + "</strong></td><td width='" + RecordWidth[0] + "%'><input id='" + ENTRY_ID_PREFIX + TableRecordCursor + "' name='" + ENTRY_ID_PREFIX + TableRecordCursor + "' type='hidden' value='" + type + "' />";
+    var record = "<tr class='" + RECORD_CLASS_PREFIX + TableRecordCursor + " " + RECORD_FIRST_TR_CLASS + "' id='row_" + RecordID[0] + "_" + TableRecordCursor + "'><td><strong>" + RecordTitle[0] + "</strong></td><td><input id='" + ENTRY_ID_PREFIX + TableRecordCursor + "' name='" + ENTRY_ID_PREFIX + TableRecordCursor + "' type='hidden' value='" + type + "' />";
 
-    record += "<button type='button' class='" + ROW_ACTION_CLASS + "' style='background-image:url( \"" + GUI_IMAGE_DIR + "delete.png\" );' onclick='removeRecord( " + TableRecordCursor + " )';><img src='" + GUI_IMAGE_DIR + "delete.png' align='top' width='12' /></button></td></tr>";
+    record += "<button type='button' class='" + ROW_ACTION_CLASS + " delete-item' data-action='remove-record' data-record-cursor='" + TableRecordCursor + "'></button></td></tr>";
 
     var item, value, index_value = 3;
 
@@ -2519,16 +3025,15 @@ function newMultiTableRecord( table_id, type, src_inputs )
 		value="";
 	    }
 
-	    if (RecordSelectCBFunction[i]) {
-		var args = makeFunctionArgs( RecordSelectCBArgs[i] );
-		var onChange = RecordSelectCBFunction[i] + "( " + args + " );";
+	    if (RecordData[i]) {
+		var data = ' ' + RecordData[i];
 	    }
 	    else {
-		var onChange = "";
+		var data = "";
 	    }
 
 	    var content = makeOptionsList( RecordContent[i], RecordContentValues[i], value );
-	    item = "<select name='" + RecordID[i] + "_" + TableRecordCursor + "' id='" + RecordID[i] + "_" + TableRecordCursor + "' onChange=\"" + onChange + "\">" + content + "</select>";
+	    item = "<select name='" + RecordID[i] + "_" + TableRecordCursor + "' id='" + RecordID[i] + "_" + TableRecordCursor + "'" + data + ">" + content + "</select>";
 	    break;
 
 	case 'input':
@@ -2541,7 +3046,7 @@ function newMultiTableRecord( table_id, type, src_inputs )
 		value="";
 	    }
 
-	    item = "<input name='" + RecordID[i] + "_"  + TableRecordCursor + "' id='" + RecordID[i] + "_"  + TableRecordCursor + "' " + RecordContent[i] + "onblur='" + RecordCheck[i] + "( \"" + RecordID[i] + "_" + TableRecordCursor + "\" );' value='" + value + "' />";
+	    item = "<input name='" + RecordID[i] + "_"  + TableRecordCursor + "' id='" + RecordID[i] + "_"  + TableRecordCursor + "' " + RecordContent[i] + "data-action='check-input' data-check-function='" + RecordCheck[i] + "' value='" + value + "' />";
 	    break;
 
 	case 'textarea':
@@ -2554,13 +3059,13 @@ function newMultiTableRecord( table_id, type, src_inputs )
 		value="";
 	    }
 
-	    item = "<textarea name='" + RecordID[i] + "_"  + TableRecordCursor + "' id='" + RecordID[i] + "_"  + TableRecordCursor + "' " + RecordContent[i] + "onblur='" + RecordCheck[i] + "( \"" + RecordID[i] + "_" + TableRecordCursor + "\" );'>" + value + "</textarea>";
+	    item = "<textarea name='" + RecordID[i] + "_"  + TableRecordCursor + "' id='" + RecordID[i] + "_"  + TableRecordCursor + "' " + RecordContent[i] + "data-action='check-input' data-check-function='" + RecordCheck[i] + "'>" + value + "</textarea>";
 	    break;
 
 	default:
 	    break;
 	}
-	item = "<tr class='" + RECORD_CLASS_PREFIX + TableRecordCursor + "' id='row_" + RecordID[i] + "_" + TableRecordCursor + "'><td width='" + RecordWidth[0] + "%'>" + RecordTitle[i] + "</td><td width='" + RecordWidth[1] + "%'>" + item + "</td></tr>"
+	item = "<tr class='" + RECORD_CLASS_PREFIX + TableRecordCursor + "' id='row_" + RecordID[i] + "_" + TableRecordCursor + "'><td>" + RecordTitle[i] + "</td><td>" + item + "</td></tr>"
 	record += item;
     }
 
@@ -2582,7 +3087,7 @@ function removeRecord( record_index )
 
 function deleteTableRecord( table_type, record_class, del_id )
 {
-    var rows = document.querySelectorAll( '.' + record_class );
+    var rows = document.querySelectorAll( '[class ~= "' + record_class + '"]' );
     if (rows == null) return false;
 
     var del = document.getElementById( del_id );
@@ -2606,7 +3111,7 @@ function deleteTableRecord( table_type, record_class, del_id )
         for (var i=init ; i<rows.length ; i++) {
             var cells = rows[i].getElementsByTagName( 'td' );
             for (var j=init ; j<cells.length ; j++) {
-                cells[j].style.background = "url( '" + GUI_IMAGE_DIR + "red-hatched.png' ) center center repeat";
+		cells[j].classList.add( 'to-delete' );
             }
         }
 	DeletedRecords++;
@@ -2615,7 +3120,7 @@ function deleteTableRecord( table_type, record_class, del_id )
         for (var i=init ; i<rows.length ; i++) {
             var cells = rows[i].getElementsByTagName( 'td' );
             for (var j=init ; j<cells.length ; j++) {
-                cells[j].style.background = 'inherit';
+		cells[j].classList.remove( 'to-delete' );
             }
         }
 	DeletedRecords--;
@@ -2663,6 +3168,57 @@ function toggleSelection( selection_class, state1, state2 )
 	    selection.value = state1;
 	}
     }
+}
+
+function preventSelect( e )
+{
+    e.preventDefault( );
+}
+
+function enableInput( element )
+{
+    switch (element.tagName) {
+    case 'INPUT':
+    case 'TEXTAREA':
+        element.readOnly = false;
+        break;
+
+    case 'SELECT':
+        element.removeEventListener( 'mousedown', preventSelect );
+        element.removeEventListener( 'keydown', preventSelect );
+        break;
+    }
+
+    element.classList.remove( 'read-only' );
+}
+
+function disableInput( element )
+{
+    switch ( element.tagName ) {
+    case 'INPUT':
+    case 'TEXTAREA':
+        element.readOnly = true;
+        break;
+
+    case 'SELECT':
+        element.addEventListener( 'mousedown', preventSelect );
+        element.addEventListener( 'keydown', preventSelect );
+        break;
+    }
+
+    element.classList.add( 'read-only' );
+}
+
+function enableInputByID( input_id )
+{
+    var input = document.getElementById( input_id );
+    enableInput( input );
+}
+
+function disableInputByID( input_id )
+{
+    var input = document.getElementById( input_id );
+    disableInput( input );
 }
 
 function selectURLListAutoProtocolCB( protocol_id, server_id, filename_id )
@@ -2774,7 +3330,7 @@ function deleteTableSelectedRecords( table_type, table_id )
 		if (id.substring( 0, SEL_ID_PREFIX.length ) == SEL_ID_PREFIX) {
 		    var sel_id = input.getAttribute( 'id' );
 		    if (input.type == 'checkbox' && input.checked == true) {
-			record_class = row.getAttribute( 'class' );
+			record_class = row.classList.item( 0 );
 			deleteTableRecord( table_type, record_class, del_id );
 		    }
 		}
@@ -3093,7 +3649,7 @@ function addSelectedTableRecords( add_type, before_record_class, table_id, table
 		if (id.substring( 0, SEL_ID_PREFIX.length ) == SEL_ID_PREFIX) {
 		    var sel_id = input.getAttribute( 'id' );
 		    if (input.type == 'checkbox' && input.checked == true) {
-			var src_record_class = row.getAttribute( 'class' );
+			var src_record_class = row.getAttribute( 'class' ).split( ' ' )[0];
 			var pos = addCopyPasteTableRecord( add_type, before_record_class, table_id, table_type, src_record_class );
 			if (pos <= i) {
 			    i += record_length;
@@ -3167,25 +3723,16 @@ function updateTableButtons( )
         }
     }
 
-    var add_label = document.getElementById( ADD_LABEL_ID );
-    if (add_label != null) {
-        if (item2add_disabled) {
-            add_label.innerHTML = "COPY / PASTE";
-        }       
-        else {
-            add_label.innerHTML = "ADD";
-        }
-    }
-
     var inserts = document.querySelectorAll( '.' + INSERT_IMAGE_CLASS );
     for (i=0 ; i<inserts.length ; i++) {
         if (item2add_disabled) {
-	    var background_image = "insert-paste.png";
+	    inserts[i].classList.add( 'insert-paste-item' );
+	    inserts[i].classList.remove( 'insert-item' );
 	}
 	else {
-	    var background_image = "insert.png";
+	    inserts[i].classList.add( 'insert-item' );
+	    inserts[i].classList.remove( 'insert-paste-item' );
 	}
-        inserts[i].style.backgroundImage = "url( '" + GUI_IMAGE_DIR + background_image + "' )";
     }
 }
 
@@ -3201,15 +3748,19 @@ function isBlank( val )
     return( val.match( /^[ \t]*$/ ));
 }
 
-function setInputOK( obj )
+function setInputOK( object )
 {
-    obj.style.color = "DarkSlateGray";
+    object.classList.remove( 'input-is-ko' );
+    object.classList.add( 'input-is-ok' );
+
     return true;
 }
 
-function setInputKO( obj )
+function setInputKO( object )
 {
-    obj.style.color = "red";
+    object.classList.remove( 'input-is-ok' );
+    object.classList.add( 'input-is-ko' );
+
     return false;
 }
 
@@ -3244,34 +3795,6 @@ function URLListContentSelectCB( operation_id, protocol_id, server_id, filename_
 	verify.disabled = false;
 	break;
     }
-}
-
-function enableInput( input )
-{
-    input.readOnly = false;
-    input.style.background = 'White none';
-    input.style.removeProperty( "cursor" );
-    // input.disabled = false;
-}
-
-function disableInput( input )
-{
-    input.readOnly = true;
-    input.style.background = "White url( '" + GUI_IMAGE_DIR + "gray-hatched.png' ) center center repeat";
-    input.style.cursor = "not-allowed";
-    // input.disabled = true;
-}
-
-function enableInputByID( input_id )
-{
-    var input = document.getElementById( input_id );
-    enableInput( input );
-}
-
-function disableInputByID( input_id )
-{
-    var input = document.getElementById( input_id );
-    disableInput( input );
 }
 
 function registrationModeSelectCB( mode_id, link_id, email_id )
@@ -3538,35 +4061,27 @@ function cacheSizeCB( state_id, min_size_id, max_size_id )
     }
 }
 
-function configurationLoadSaveSelectCB( operation_id, protocol_id, state_id, server_id, filename_id )
+function configurationLoadSaveSelectCB( operation_id, state_id, server_id, filename_id )
 {
     var operations = document.getElementById( operation_id );
-    var protocols = document.getElementById( protocol_id );
     var state = document.getElementById( state_id );
     var server = document.getElementById( server_id );
     var filename = document.getElementById( filename_id );
 
     if (operations == null) return false;
-    if (protocols == null) return false;
     if (state == null) return false;
     if (server == null) return false;
     if (filename == null) return false;
 
     var operation = operations.options[operations.selectedIndex].value;
-    var protocol = protocols.options[protocols.selectedIndex].value.substring( 1 );
 
     switch (operation) {
     case 'load':
 	state.disabled = true;
-	var options=["sftp", "tftp", "ftp"]
-	if (protocol == "web") {
-	    protocol = "tftp";
-	}
 	break;
 
     case 'save':
 	state.disabled = false;
-	var options=["web", "sftp", "tftp", "ftp"]
 	break;
 
     default:
@@ -3575,37 +4090,8 @@ function configurationLoadSaveSelectCB( operation_id, protocol_id, state_id, ser
 
     var selectedOption = null;
 
-    while (protocols.options.length > 0) {
-	protocols.remove( 0 );
-    }
-    for (var i = 0 ; i < options.length ; i++) {
-	var option = document.createElement( 'option' );
-	option.value = "_" + options[i];
-	option.innerHTML = options[i];
-	protocols.appendChild( option );
-	if (options[i] == protocol) {
-	    selectedOption = option;
-	}
-    }
-
     if (selectedOption) {
 	selectedOption.selected = true;
-    }
-
-    switch (protocol) {
-    case 'web':
-	server.disabled = true;
-	break;
-
-    case 'sftp':
-    case 'tftp':
-    case 'ftp':
-	server.disabled = false;
-	filename.disabled = false;
-	break;
-
-    default:
-	break;
     }
 }
 
@@ -3651,6 +4137,13 @@ function customWAFActionSelectCB( operation_id, protocol_id, server_id, filename
 	protocol.disabled = true;
 	server.disabled = true;
 	filename.disabled = true;
+	newState.disabled = true;
+	break;
+
+    case 'load':
+	protocol.disabled = false;
+	server.disabled = false;
+	filename.disabled = false;
 	newState.disabled = true;
 	break;
 
@@ -3726,6 +4219,42 @@ function firewallSelectCB( action_id, protocol_id, dst_ports_id, src_nat_ip_id, 
 	    break;
 	}
 
+	break;
+
+    default:
+	break;
+    }
+}
+
+function authenticateKerberosADSelectCB( modes_id, rdn_id, login_id, password1_id, password2_id )
+{
+    var modes = document.getElementById( modes_id );
+    var rdn = document.getElementById( rdn_id );
+    var login = document.getElementById( login_id );
+    var password1 = document.getElementById( password1_id );
+    var password2 = document.getElementById( password2_id );
+
+    if (modes == null) return false;
+    if (rdn == null) return false;
+    if (login == null) return false;
+    if (password1 == null) return false;
+    if (password2 == null) return false;
+
+    var mode = modes.options[modes.selectedIndex].value;
+
+    switch (mode) {
+    case 'off':
+	rdn.disabled = true;
+	login.disabled = true;
+	password1.disabled = true;
+	password2.disabled = true;
+	break;
+
+    case 'on':
+	rdn.disabled = false;
+	login.disabled = false;
+	password1.disabled = false;
+	password2.disabled = false;
 	break;
 
     default:
@@ -4068,25 +4597,6 @@ function setImageSrcDelay( elem, src, msg, delay )
 		      delay );
 }
 
-function toggleLeftMenu( id_section, id_arrow )
-{
-    var src, width, msg, delay = '400';
-    var img = document.getElementById( id_arrow );
-    if (img.getAttribute( "src" ) == (GUI_IMAGE_DIR + "arrowleft.png")) {
-	src = GUI_IMAGE_DIR + "arrowright.png";
-	msg = "Show Menu"
-	width = 0;
-    }
-    else {
-	src = GUI_IMAGE_DIR + "arrowleft.png";
-	msg = "Hide Menu"
-	width = "200px";
-    }
-
-    $( id_section ).toggle( delay );
-    setImageSrcDelay( img, src, msg, delay );
-}
-
 function setGUICookie( name, value, expire )
 {
     var date = new Date( );
@@ -4117,34 +4627,34 @@ function getCookieValue( name )
     return null;
 }
 
-function showHideLeftMenu( section, status )
+function initTopMenu( section_id, control_id )
 {
-    section = "#" + section;
+    var jq_section_id = "#" + section_id;
+    var jq_control_id = "#" + control_id;
 
-    var image;
+    $(jq_control_id).on( 'click', function(e)
+    {
+        e.preventDefault( );
 
-    if (status == 0) {
-	$( section ).hide( );
-    }
-    else {
-	$( section ).show( );
-    }
-}
+        var delay = 400;
+        var status;
 
-function setLeftMenuArrow( arrow, status )
-{
-    arrow = "#" + arrow;
+        if ($(jq_section_id).is( ':visible' )) {
+            status = 0;
+        }
+        else {
+            status = 1;
+        }
 
-    var image;
+        $(jq_section_id).stop( ).slideToggle( delay );
 
-    if (status == 0) {
-	image = {"background-image":"url( \'" + GUI_IMAGE_DIR + "arrowright.png\' )"};
-    }
-    else {
-	image = {"background-image":"url( \'" + GUI_IMAGE_DIR + "arrowleft.png\' )"};
-    }
+        window.setTimeout(function( )
+        {
+            $( jq_control_id ).toggleClass( "up", status != 0 ).toggleClass( "down", status == 0 );
 
-    $( arrow ).css( image );
+            setGUICookie( GUI_COOKIE_TOP_MENU_NAME + GUI_MODULE_NAME, status, 31 );
+        }, delay);
+    });
 }
 
 function showHideTopMenu( section, control, status )
@@ -4152,32 +4662,14 @@ function showHideTopMenu( section, control, status )
     section = "#" + section;
     control = "#" + control;
 
-    var image;
-
     if (status == 0) {
-	$( section ).hide( );
-	image = {"background-image":"url( \'" + GUI_IMAGE_DIR + "arrowdown.png\' )"};
+        $(section).hide();
+        $(control).removeClass("up").addClass("down");
     }
     else {
-	$( section ).show( );
-	image = {"background-image":"url( \'" + GUI_IMAGE_DIR + "arrowup.png\' )"};
+        $(section).show();
+        $(control).removeClass("down").addClass("up");
     }
-
-    $( control ).css( image );
-}
-
-function updateTopMenuArrow( arrow_id, state )
-{
-    var image;
-    var jq_arrow_id = "#" + arrow_id;
-
-    if (state == "block") {
-        image = {"background-image":"url( '" + GUI_IMAGE_DIR + "arrowdown.png' )"};
-    }
-    else {
-        image = {"background-image":"url( '" + GUI_IMAGE_DIR + "arrowup.png' )"};
-    }
-    $( jq_arrow_id ).css( image );
 }
 
 function initLeftMenu( section_id, arrow_id )
@@ -4185,43 +4677,48 @@ function initLeftMenu( section_id, arrow_id )
     var jq_section_id = "#" + section_id;
     var jq_arrow_id = "#" + arrow_id;
 
-    $( jq_arrow_id ).live( 'click', function( e )
+    $( jq_arrow_id ).on( 'click', function( e )
     {
-	e.preventDefault( );
-	var delay = '400', image, status;
-	if ($( jq_section_id ).is( ':visible' )) {
-	    image = {"background-image":"url( '" + GUI_IMAGE_DIR + "arrowright.png' )"};
-	    status = 0;
-	}
-	else {
-	    image = {"background-image":"url( '" + GUI_IMAGE_DIR + "arrowleft.png' )"};
-	    status = 1;
-	}
-	$( jq_section_id ).stop( ).toggle( delay );
-	window.setTimeout( function( ) { $( jq_arrow_id ).css( image ); setGUICookie( GUI_COOKIE_LEFT_MENU_NAME+GUI_MODULE_NAME, status, 31 ); }, delay );
-    } );
+        e.preventDefault( );
+
+        var delay = 400;
+        var status;
+
+        if ($( jq_section_id ).is( ':visible' )) {
+            status = 0;
+        }
+        else {
+            status = 1;
+        }
+
+        $( jq_section_id ).stop( ).toggle( delay );
+
+        window.setTimeout( function( )
+        {
+            $( jq_arrow_id ).toggleClass("left", status != 0).toggleClass("right", status == 0);
+            setGUICookie( GUI_COOKIE_LEFT_MENU_NAME + GUI_MODULE_NAME, status, 31 );
+
+        }, delay);
+    });
 }
 
-function initTopMenu( section_id, control_id )
+function showHideLeftMenu( section, control, status )
 {
-    var jq_section_id = "#" + section_id;
-    var jq_control_id = "#" + control_id;
+    section = "#" + section;
+    control = "#" + control;
 
-    $( jq_control_id ).live( 'click', function( e )
-    {
-	e.preventDefault( );
-	var delay = '400', image, status;
-	if ($( jq_section_id ).is( ':visible' )) {
-	    image = {"background-image":"url( '" + GUI_IMAGE_DIR + "arrowdown.png' )"};
-	    status = 0;
-	}
-	else {
-	    image = {"background-image":"url( '" + GUI_IMAGE_DIR + "arrowup.png' )"};
-	    status = 1;
-	}
-	$( jq_section_id ).stop( ).slideToggle( delay );
-	window.setTimeout( function( ) { $( jq_control_id ).css( image ); setGUICookie( GUI_COOKIE_TOP_MENU_NAME+GUI_MODULE_NAME, status, 31 ); }, delay );
-    } );
+    if (status == 0) {
+        $(section).hide();
+        $(control)
+            .removeClass("left")
+            .addClass("right");
+    }
+    else {
+        $(section).show();
+        $(control)
+            .removeClass("right")
+            .addClass("left");
+    }
 }
 
 function updateTLSInfo( names_id, names, numbits_id, numbits, days_id, days, country_id, country, province_id, province, locality_id, locality, organisation_id, organisation, unit_id, unit )
@@ -4319,10 +4816,15 @@ function copyToClipboard( textarea_id, icon_id, text )
     }, 350 );
 
     textarea.textContent = text;
-    textarea.style.visibility = 'visible';
+
+    textarea.classList.remove( 'item-ivisible' );
+    textarea.classList.add( 'item-visible' );
+
     textarea.select( );
     document.execCommand( 'copy' );
-    textarea.style.visibility = 'hidden';
+
+    textarea.classList.remove( 'item-visible' );
+    textarea.classList.add( 'item-ivisible' );
 }
 
 function copyPreToClipboard( pre_id, icon_id )
@@ -4353,10 +4855,15 @@ function copyPreToClipboard( pre_id, icon_id )
     }, 350 );
 
     textarea.textContent = text;
-    textarea.style.visibility = 'visible';
+
+    textarea.classList.remove( 'item-ivisible' );
+    textarea.classList.add( 'item-visible' );
+
     textarea.select( );
     document.execCommand( 'copy' );
-    textarea.style.visibility = 'hidden';
+
+    textarea.classList.remove( 'item-visible' );
+    textarea.classList.add( 'item-ivisible' );
 }
 
 function sendPhoneNumber( system, phone_id, message )
@@ -4388,4 +4895,52 @@ function sendPhoneNumber( system, phone_id, message )
     }
 
     window.open( url, '_blank' );
+}
+
+function startClock( clock_id, utcSeconds, offsetMinutes ) {
+    const clock = document.getElementById( clock_id );
+
+    if (!clock) {
+        return false;
+    }
+
+    let current = new Date( (utcSeconds + offsetMinutes * 60) * 1000 );
+
+    function pad( n ) {
+        return n.toString( ).padStart( 2, '0' );
+    }
+
+     function update( ) {
+        clock.textContent =
+            current.getUTCFullYear( ) + '/' +
+            pad( current.getUTCMonth( ) + 1) + '/' +
+            pad( current.getUTCDate( )) + '-' +
+            pad( current.getUTCHours( )) + ':' +
+            pad( current.getUTCMinutes( )) + ':' +
+            pad( current.getUTCSeconds( ));
+
+        current.setUTCSeconds(current.getUTCSeconds() + 1);
+    }
+
+    update();
+    setInterval( update, 1000 );
+
+    return true;
+}
+
+function refreshHealthChecks( )
+{
+    var get = $.get( GUI_DIR + "refresh-health-checks" + GUI_EXTENSION,
+		     function( result, status )
+		     {
+			 switch (status) {
+			 case "success":
+			     break;
+
+			 default:
+			     break;
+			 }
+		     } );
+
+    get.fail( function( ) { } );
 }

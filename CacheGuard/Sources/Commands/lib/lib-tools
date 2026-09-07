@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       Commands
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -80,6 +79,35 @@ stop-working()
     >&2 echo -ne "${WORKING_STOP_SIGN}"
 }
 
+get-terminal-bold-text()
+{
+    test -n "${1}" || return 1
+
+    local normal="\e[0m"
+    local bold="\e[1m"
+
+    echo "${bold}${1}${normal}"
+}
+
+get-terminal-blink-text()
+{
+    test -n "${1}" || return 1
+
+    local normal="\e[0m"
+    local blink="\e[5m"
+
+    echo "${blink}${1}${normal}"
+}
+
+get-terminal-normal-text()
+{
+    test -n "${1}" || return 1
+
+    local normal="\e[0m"
+
+    echo "${normal}${1}${normal}"
+}
+
 init-global-variables()
 {
     export PRINT_COL=28
@@ -103,28 +131,17 @@ init-global-variables()
 	export MARK_REV="${TXT_MARK_REV}"
 	export MARK_DIF="${TXT_MARK_DIF}"
     else
-	local normal="\e[0m"
-	local highlight="\e[1m"
-	local blink="\e[5m"
+	export STATE_OK=$(get-terminal-bold-text "${TXT_STATE_OK}")
+	export STATE_KO=$(get-terminal-blink-text "${TXT_STATE_KO}")
+	export STATE_OO=$(get-terminal-blink-text "${TXT_STATE_OO}")
+	export MARK_CUR=$(get-terminal-normal-text "${TXT_MARK_CUR}")
+	export MARK_NEW=$(get-terminal-bold-text "${TXT_MARK_NEW}")
+	export MARK_DEL=$(get-terminal-bold-text "${TXT_MARK_DEL}")
+	export MARK_REV=$(get-terminal-bold-text "${TXT_MARK_REV}")
+	export MARK_DIF=$(get-terminal-bold-text "${TXT_MARK_DIF}")
 
-	export STATE_OK="${highlight}${TXT_STATE_OK}${normal}"
-	export STATE_KO="${blink}${TXT_STATE_KO}${normal}"
-	export STATE_OO="${blink}${TXT_STATE_OO}${normal}"
-	export MARK_CUR="${normal}${TXT_MARK_CUR}${normal}"
-	export MARK_NEW="${highlight}${TXT_MARK_NEW}${normal}"
-	export MARK_DEL="${highlight}${TXT_MARK_DEL}${normal}"
-	export MARK_REV="${highlight}${TXT_MARK_REV}${normal}"
-	export MARK_DIF="${highlight}${TXT_MARK_DIF}${normal}"
 	set-working-variables
     fi
-}
-
-get-highlight-text()
-{
-	local normal="\e[0m"
-	local blink="\e[5m"
-
-	echo "${blink}${1}${normal}"
 }
 
 clean-command-exit()
@@ -162,7 +179,7 @@ echo-mark-cur()
 echo-mark-new()
 {
     if test "${TERM}" == "${WADMIN_TERM}" ; then
-	echo -n "<td align='center'><div style='color:firebrick; margin:0; padding:0;'>${MARK_NEW}</div></td>"
+	echo -n "<td align='center'><font color='FireBrick'>${MARK_NEW}</font></td>"
     else
 	local print_col=${1}
 	if test -z "${print_col}" ; then
@@ -179,7 +196,7 @@ echo-mark-new()
 echo-mark-del()
 {
     if test "${TERM}" == "${WADMIN_TERM}" ; then
-	echo -n "<td align='center'><span style='color:firebrick;'>${MARK_DEL}</span></td>"
+	echo -n "<td align='center'><font color='FireBrick'>${MARK_DEL}</font></td>"
     else
 	echo -ne " [${MARK_DEL}]"
     fi
@@ -188,7 +205,7 @@ echo-mark-del()
 echo-mark-rev()
 {
     if test "${TERM}" == "${WADMIN_TERM}" ; then
-	echo -n "<td align='center'><span style='color:firebrick;'>${MARK_REV}</span></td>"
+	echo -n "<td align='center'><font color='FireBrick'>${MARK_REV}</font></td>"
     else
 	echo -ne " [${MARK_REV}]"
     fi
@@ -197,7 +214,7 @@ echo-mark-rev()
 echo-mark-dif()
 {
     if test "${TERM}" == "${WADMIN_TERM}" ; then
-	echo -n "<td align='center'><span style='color:blue;'>${MARK_DIF}</span></td>"
+	echo -n "<td align='center'><font color='Blue'>${MARK_DIF}</font></td>"
     else
 	echo -ne " [${MARK_DIF}]"
     fi
@@ -206,7 +223,7 @@ echo-mark-dif()
 echo-mark-message()
 {
     if test "${TERM}" == "${WADMIN_TERM}" ; then
-	echo "<td><i>Extra changes</i></td><td><div style='color:firebrick; font-style:italic; margin:0; padding:0;'><center>${MARK_NEW}</center></div></td><td><i>${1}</i></td>"
+	echo "<td><i>Extra changes</i></td><td><font color='FireBrick'>${MARK_NEW}</font></td><td><i>${1}</i></td>"
     else
 	echo "${1}"
     fi
@@ -264,7 +281,7 @@ echo-value()
     local options=${3}
 
     if test "${TERM}" == "${WADMIN_TERM}" ; then
-        echo ${options} "<td><span style='color:green;'>${values}</span></td>"
+        echo ${options} "<td>${values}</td>"
     elif test "${__BATCH_MODE}" == yes ; then
 	echo " ${values}"
     else
@@ -285,7 +302,7 @@ echo-highlighted-value()
     local print_col=${2}
 
     if test "${TERM}" == "${WADMIN_TERM}" ; then
-        echo "<td><span style='color:green; font-weight:bold'>${label}</span>:</td>"
+        echo "<td><u>${label}</u>:</td>"
     elif test "${__BATCH_MODE}" == yes ; then
 	echo " ${label}"
     else
@@ -340,6 +357,8 @@ get-command-form-gui-page()
 	    echo 'vpnipsec-access'
 	elif test ${in_command_form:0:19} == 'dynamicdns_interval' ; then
 	    echo 'dynamicdns'
+	elif test ${in_command_form:0:12} == 'manager_sync' ; then
+	    echo 'manager-sync'
 	else
 	    case ${in_command_form} in
 		mode_dhcp|mode_dns|mode_ha|mode_ftppassive|mode_qos|mode_router|mode_snat|mode_transparent|mode_tweb|mode_tnat|mode_vlan)
@@ -362,9 +381,9 @@ echo-command-form()
     local command_form=${1}
 
     if test "${TERM}" == "${WADMIN_TERM}" ; then
-	local command=${command_form/ *} size=20
+	local command=${command_form/ *}
 	local page=$(get-command-form-gui-page ${command_form// /_})
-        echo -n "<td style='line-height:${size}px;'><a href='${DOC_COMMAND_DIR}/${command}.html' target='_blank'><img style='margin:0; margin-right:10px;' src='${IMAGE_DIR}/help.png' alt='Get Help' title='Get Help' /></a> <a href='/${GUI_DIR_NAME}/${page}.${GUI_EXT_NAME}'><img style='margin:0; margin-right:10px;' src='${IMAGE_DIR}/${page}.png' alt='' title='Go to GUI page' /></a>${command_form}</td>"
+        echo -n "<td><a href='${DOC_COMMAND_DIR}/${command}.html' target='_blank'><img src='${IMAGE_DIR}/help.png' alt='Get Help' title='Get Help' /></a> <a href='/${GUI_DIR_NAME}/${page}.${GUI_EXT_NAME}'><img src='${IMAGE_DIR}/${page}.png' alt='' title='Go to GUI page' /></a>${command_form}</td>"
     else
         echo -n ${command_form}
     fi
@@ -393,8 +412,8 @@ file-size()
 
     test -n "${1}" || return 1
     local file=${1}
-    
-    local size=$(ls -s --block-size=1024 ${file} 2>/dev/null)
+
+    local size=$(ls --size --block-size=1024 ${file} 2>/dev/null)
     size=${size/ */}
 
     check-integer ${size}
@@ -477,6 +496,74 @@ echo-state()
 	esac
     fi
     echo ${ext_state}
+}
+
+supervisor-push-args()
+{
+    local arg
+
+    for arg in "${@}"
+    do
+	echo "${arg}"
+    done > ${RUN_DIR}/${SUPERVISOR_ARGS}/${USER} 2> /dev/null
+}
+
+supervisor-action()
+{
+    test -n "${1}" || return 1
+    local action=${1}
+    local inform=${2}
+    local wait4=${3}
+
+    test -p ${RUN_DIR}/${SUPERVISOR_FIFO} || return 11
+    echo "${action} ${USER} ${$}" > ${RUN_DIR}/${SUPERVISOR_FIFO} 2> /dev/null
+
+    test -n "${inform}" || return 0
+
+    if test -n "${wait4}" ; then
+	termination-message ${action} ${wait4}
+    else
+	termination-message ${action} &
+    fi
+}
+
+supervisor-wait4-report()
+{
+    local loops=${1}
+    local total_timeout=${2}
+
+    if test -z ${loops} ; then
+	loops=5
+	total_timeout=500000
+    elif test -z ${total_timeout} ; then
+	total_timeout=500000
+    fi
+
+    local i=0
+    local step_time=$[${total_timeout} / ${loops}]
+
+    while true
+    do
+	usleep ${step_time}
+	test ${i} -lt ${loops} || break
+	test ! -f ${RUN_DIR}/${SUPERVISOR_CALLER}/${WAITING_PROCESS}.${$} || break
+	((i++))
+    done
+
+    rm -f ${RUN_DIR}/${SUPERVISOR_CALLER}/${WAITING_PROCESS}.${$}
+}
+
+update-report()
+{
+    test -n "${1}" || return 1
+    local action=${1}
+    local loops=${2}
+    local total_timeout=${3}
+
+    supervisor-action ${action}
+    test ${?} -eq 0 || return 3
+
+    supervisor-wait4-report ${loops} ${total_timeout}
 }
 
 update-dynamic-log-value()
@@ -849,72 +936,6 @@ termination-message()
     test "${__BATCH_MODE}" == yes -o -n "${wait4}" || echo -e "\n\nThe '${operation}' operation has been terminated.\n"
 }
 
-supervisor-action()
-{
-    test -n "${1}" || return 1
-    local action=${1}
-    local inform=${2}
-    local wait4=${3}
-
-    test -p ${RUN_DIR}/${SUPERVISOR_FIFO} || return 11
-    echo "${action} ${USER} ${$}" > ${RUN_DIR}/${SUPERVISOR_FIFO} 2> /dev/null
-
-    test -n "${inform}" || return 0
-
-    if test -n "${wait4}" ; then
-	termination-message ${action} ${wait4}
-    else
-	termination-message ${action} &
-    fi
-}
-
-supervisor-push-args()
-{
-    local arg
-
-    for arg in "${@}"
-    do
-	echo "${arg}"
-    done > ${RUN_DIR}/${SUPERVISOR_ARGS}/${USER} 2> /dev/null
-}
-
-supervisor-wait4-report()
-{
-    local loops=${1}
-    local total_timeout=${2}
-
-    if test -z ${loops} ; then
-	loops=5
-	total_timeout=500000
-    elif test -z ${total_timeout} ; then
-	total_timeout=500000
-    fi
-
-    local i=0
-    local step_time=$[${total_timeout} / ${loops}]
-
-    while true
-    do
-	usleep ${step_time}
-	test ${i} -lt ${loops} || break
-	test -f ${RUN_DIR}/${WAITING_PROCESS}.${$} || break
-	((i++))
-    done
-}
-
-update-report()
-{
-    test -n "${1}" || return 1
-    local action=${1}
-    local loops=${2}
-    local total_timeout=${3}
-
-    supervisor-action ${action}
-    test ${?} -eq 0 || return 3
-    
-    supervisor-wait4-report ${loops} ${total_timeout}
-}
-
 manager-report()
 {
     test -n "${1}" || return 1
@@ -953,7 +974,10 @@ get-template-numbers()
 
 push-args-1()
 {
+    unset ARGS
+    export ARGS
     export ARGS_NB=0
+
     local arg
 
     for arg in "${@}"
@@ -969,9 +993,6 @@ push-args-1()
 push-args()
 {
     test -z "${TRANSACTION}" || return 0
-
-    unset ARGS
-    export ARGS
 
     push-args-1 "${0}" "${@}"
 }
@@ -1051,10 +1072,10 @@ remove-quotes()
     local first=${value:0:1}
     local last=${value:${len}:1}
 
-    if test ${first} == "'" -a ${last} == "'" ; then
+    if test "${first}" == "'" -a "${last}" == "'" ; then
 	((len--))
 	echo -n ${value:1:${len}}
-    elif test ${first} == '"' -a ${last} == '"' ; then
+    elif test "${first}" == '"' -a "${last}" == '"' ; then
 	((len--))
 	echo -n ${value:1:${len}}
     else

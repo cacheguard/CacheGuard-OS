@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -43,11 +42,10 @@ show-tls-client-component()
     local component_id=${2}
     local content_id=${3}
 
-    echo "<div style='clear:left;'></div><br />"
     echo "<div class='table-title'>The TLS object</div>"
     echo "<div id='${content_id}'></div>"
 
-    call-js-function "printTLS( '/${GUI_DIR_NAME}/tls-print.${GUI_EXT_NAME}?client:${tls}', '${component_id}', '${content_id}' )"
+    echo "<div data-init-print-tls data-page='tls-print' data-page-args='client:${tls}' data-component-id='${component_id}' data-content-id='${content_id}' hidden></div>"
 }
 
 show-tls-load-save-form()
@@ -106,7 +104,7 @@ show-tls-load-save-form()
     itemForm[4]="select"
     itemForm[5]="select"
 
-    itemFormSelectCB[2]="printTLS( '/${GUI_DIR_NAME}/tls-print.${GUI_EXT_NAME}?client:${tls}', '${component_id}', '${content_id}' );"
+    itemData[2]="data-action='print-tls' data-url='/${GUI_DIR_NAME}/tls-print.${GUI_EXT_NAME}?client:${tls}' data-component-id='${component_id}' data-content-id='${content_id}'"
 
     shortcutMenuItem[0]="access-file"
     shortcutMenuItem[1]="password-file"
@@ -114,7 +112,6 @@ show-tls-load-save-form()
     shortcutMenuTitle[1]="Accounts"
 
     show-title "Load/Save Client TLS" "${state}" "access password tls"
-    show-shortcuts-menu
     show-form "${width}" "${state}" "show-tls-client-component ${tls} ${component_id} ${content_id}"
 }
 

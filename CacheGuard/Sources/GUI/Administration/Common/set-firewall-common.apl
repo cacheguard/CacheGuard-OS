@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -112,8 +111,8 @@ set-firewall()
 			    ;;
 		    esac
 
-		    rule="'${rule_id}' '${action}' '${protocol}' '${src_ip}' '${dst_dev}' '${dst_ip}' '${dst_ports}'"
-		    rule="${rule} '${src_nat_ip}' '${dst_nat_ip}' '${dst_pat_port}'"
+		    rule="${rule_id} ${action} ${protocol} ${src_ip} ${dst_dev} ${dst_ip} ${dst_ports}"
+		    rule="${rule} ${src_nat_ip} ${dst_nat_ip} ${dst_pat_port}"
 
 		    new_list="${new_list} ${rule_id}"
 
@@ -139,7 +138,7 @@ set-firewall()
 
 		    for ((i=0 ; i<insert_nb ; i++))
 		    do
-			echo "firewall ${rset} 'insert:${rule_id}' ${insert_array[${i}]}" >> ${transaction}
+			echo "firewall ${rset} insert:${rule_id} ${insert_array[${i}]}" >> ${transaction}
 		    done
 		    unset insert_array
 		    insert_nb=0
@@ -155,14 +154,14 @@ set-firewall()
 
     for ((i=0 ; i<insert_nb ; i++))
     do
-        echo "firewall ${rset} 'insert:${rule_id}' ${insert_array[${i}]}" >> ${transaction}
+        echo "firewall ${rset} insert:${rule_id} ${insert_array[${i}]}" >> ${transaction}
     done
 
     if test -n "${old_rule_id}" ; then
 	rule_id=${old_rule_id}
 	for ((i=0 ; i<add_nb ; i++))
 	do
-	    echo "firewall ${rset} 'add:${rule_id}' ${add_array[${i}]}" >> ${transaction}
+	    echo "firewall ${rset} add:${rule_id} ${add_array[${i}]}" >> ${transaction}
 	    rule_id=${add_array[${i}]/ *}
 	done
     else
@@ -181,10 +180,10 @@ set-firewall()
 	if test -z "${prev_rule_id}" ; then
 	    position=${location#*:}
 	    position=${position/:*}
-	    echo "firewall ${rset} move:${position} '${rule_id}'" >> ${transaction}
+	    echo "firewall ${rset} move:${position} ${rule_id}" >> ${transaction}
 	else
 	    
-	    echo "firewall ${rset} 'move:+${prev_rule_id}' '${rule_id}'" >> ${transaction}
+	    echo "firewall ${rset} move:+${prev_rule_id} ${rule_id}" >> ${transaction}
 	fi
     done
 

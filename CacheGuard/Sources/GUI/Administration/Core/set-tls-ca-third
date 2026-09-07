@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -40,12 +39,12 @@ set-tls-ca-third()
 	if test ${?} -ne 0 ; then
 	    if test "${VALUES[${entry_pos}]}" == anew -a -n "${VALUES[${tls_ca_pos}]}" ; then
 		if test -n "${VALUES[${pos}]}" ; then
-		    echo "tls ca third add '${VALUES[${tls_ca_pos}]}' ${VALUES[${browsing_pos}]}" >> ${transaction}
+		    echo "tls ca third add ${VALUES[${tls_ca_pos}]} ${VALUES[${browsing_pos}]}" >> ${transaction}
 		fi
 	    fi
 	    pos=$[${pos} + 3]
 	else
-	    echo "tls ca third del '${VALUES[${tls_ca_pos}]}'" >> ${transaction}
+	    echo "tls ca third del ${VALUES[${tls_ca_pos}]}" >> ${transaction}
 	    pos=$[${pos} + 4]
 	fi  
     done

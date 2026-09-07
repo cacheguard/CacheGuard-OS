@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -24,11 +23,8 @@
 
 show-apply-log()
 {
-    refresh-buttons "update_apply( 1 )"
-
-    echo "<div style='clear:left;'></div><br />"
-    echo "<span class='table-title'>Last apply report</span>"
-    echo "<div style='clear:left;'></div>"
+    refresh-buttons
+    echo "<div class='table-title'>Last apply report</div>"
     echo "<div id='${AUTO_REPORT_ID}' class='log-report'></div>"
 }
 
@@ -44,13 +40,13 @@ show-apply-form()
 
     itemTitle[0]="Check Integrity Only"
     itemID[0]=${check_id}
-    blankItemContent[0]="type='checkbox'${checked}"
+    itemForm[0]='check'
+    blankItemContent[0]="${checked}"
 
     shortcutMenuItem[0]="cancel"
     shortcutMenuTitle[0]="Cancel Changes"
 
     show-title "Apply New Configuration" "${state}" "apply cancel"
-    show-shortcuts-menu
     show-form "${width}" "${state}" show-apply-log
 }
 

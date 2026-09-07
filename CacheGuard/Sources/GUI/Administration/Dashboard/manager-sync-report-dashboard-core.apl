@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -27,7 +26,7 @@ source /home/${ADMIN_NAME}/${ENV_RDIR}/${ENV_CURRENT_NAME}
 
 show-manager-sync-report-dashboard()
 {
-    show-manager-sync-report
+    show-manager-sync-report 'compact'
     reset-gui-error-log
 }
 

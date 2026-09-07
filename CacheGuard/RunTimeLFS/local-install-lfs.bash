@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       Build
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -46,6 +45,8 @@ gen-bin-keymaps()
 gen-proxy-tar()
 {
     cd ${PROXY_DIR}
+
+    install -m 755 -o root -g root /usr/bin/bash bin/bash
     gen-library-list /tmp/proxy-binaries.lst /tmp/proxy-unlinked-libraries.lst > /tmp/proxy-libraries.lst
 
     tar \

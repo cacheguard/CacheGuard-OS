@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -39,14 +38,14 @@ set-guard-filter-time()
 	del_pos=$[${pos} + 4]
 	
 	if [[ "${ATTRIBUTES[${del_pos}]}" =~ ^del_[0-9]+$ ]] ; then
-	    echo "guard filter time del '${VALUES[${name_pos}]}'" >> ${transaction}
+	    echo "guard filter time del ${VALUES[${name_pos}]}" >> ${transaction}
 	    pos=$[${pos} + 5]
 	else
 	    if test "${VALUES[${entry_pos}]}" == anew -a \
 		-n "${VALUES[${name_pos}]}" -a \
 		-n "${VALUES[${type_pos}]}" -a \
 		-n "${VALUES[${time_pos}]}" ; then
-		echo "guard filter time add '${VALUES[${name_pos}]}' '${VALUES[${type_pos}]}' '${VALUES[${time_pos}]}'" >> ${transaction}
+		echo "guard filter time add ${VALUES[${name_pos}]} ${VALUES[${type_pos}]} ${VALUES[${time_pos}]}" >> ${transaction}
 	    fi
 	    pos=$[${pos} + 4]
 	fi

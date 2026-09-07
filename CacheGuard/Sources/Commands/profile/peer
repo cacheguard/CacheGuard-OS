@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       Commands
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -109,8 +108,25 @@ __complete-peer()
 		    ;;
 		next)
 		    case ${COMP_WORDS[2]} in
-			add)
+			add|del)
 			    COMPREPLY=('' '<RET>' '<port-number>')
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		*)
+		    COMPREPLY=()
+		    ;;
+	    esac
+	    ;;
+	5)
+	    case ${COMP_WORDS[1]} in
+		next)
+		    case ${COMP_WORDS[2]} in
+			add)
+			    COMPREPLY=('' '<RET>' '<qos>')
 			    ;;
 			*)
 			    COMPREPLY=()

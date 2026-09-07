@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -39,12 +38,12 @@ set-urllist()
 	if test ${?} -ne 0 ; then
 	    if test "${VALUES[${entry_pos}]}" == anew -a -n "${VALUES[${name_pos}]}" ; then
 		if test -n "${VALUES[${pos}]}" ; then
-		    echo "urllist add '${VALUES[${name_pos}]}'" >> ${transaction}
+		    echo "urllist add ${VALUES[${name_pos}]}" >> ${transaction}
 		fi
 	    fi
 	    pos=$[${pos} + 2]
 	else
-	    echo "urllist del '${VALUES[${name_pos}]}'" >> ${transaction}
+	    echo "urllist del ${VALUES[${name_pos}]}" >> ${transaction}
 	    pos=$[${pos} + 3]
 	fi  
     done

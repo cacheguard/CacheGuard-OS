@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       Commands
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -92,6 +91,29 @@ manager-context-exist()
     test -d ${dir}/${id}
 }
 
+get-contextual-role()
+{
+    local system
+
+    case ${APL_ROLE} in
+	gateway)
+	    system=${APL_ROLE}
+	    ;;
+	manager)
+	    if is-in-manager-conf-context ; then
+		system=gateway
+	    else
+		system=${APL_ROLE}
+	    fi
+	    ;;
+	*)
+	    system=${APL_ROLE}
+	    ;;
+    esac
+
+    echo ${system}
+}
+
 cli-enter-manager-conf-context()
 {
     test -n "${1}" || return 1
@@ -175,29 +197,6 @@ is-in-top-level-context()
 	    return 11
 	    ;;
     esac
-}
-
-get-contextual-role()
-{
-    local system
-
-    case ${APL_ROLE} in
-	gateway)
-	    system=${APL_ROLE}
-	    ;;
-	manager)
-	    if is-in-manager-conf-context ; then
-		system=gateway
-	    else
-		system=${APL_ROLE}
-	    fi
-	    ;;
-	*)
-	    system=${APL_ROLE}
-	    ;;
-    esac
-
-    echo ${system}
 }
 
 get-contextual-users-nb()
@@ -299,7 +298,6 @@ init-env-variables()
 
 		local tmp_dir=$(get-manager-context-tmp-dir ${context_base})
 		tmp_dir=${ROOT_DIR}${tmp_dir}
-		mkdir -p ${tmp_dir}/${context_leaf}
 
 		USERENV_FILE_FACTORY=${ROOT_DIR}/save/${ENV_FACTORY_NAME}.gateway
 		USERENV_FILE_FACTORY_CURRENT=${ROOT_DIR}/save/${ENV_CURRENT_FACTORY_NAME}.gateway
@@ -321,16 +319,7 @@ init-env-variables()
 		VPN_IPSEC_DIR=${ADMIN_DIR}/${env_rdir}/${VPN_IPSEC_RDIR}
 		SSH_PUBLIC_KEY_DIR=${ADMIN_DIR}/${env_rdir}/${SSH_PUBLIC_KEY_RDIR}
 
-		case ${context_base} in
-		    template)
-			;;
-		    gateway)
-			HARD_DIR=${ADMIN_DIR}/${env_rdir}/${HARD_DIR_NAME}
-			;;
-		    *)
-			return 255
-			;;
-		esac
+		HARD_DIR=${ADMIN_DIR}/${env_rdir}/${HARD_DIR_NAME}
 	    else
 		USERENV_DIR=${ROOT_DIR}${ADMIN_DIR}/${ENV_RDIR}
 		USERENV_FILE_FACTORY=${ROOT_DIR}/save/${ENV_FACTORY_NAME}.${APL_ROLE}

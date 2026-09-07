@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       Build
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -95,6 +94,7 @@ gen-squid-conf-constant()
 
     cat Constant/squid.conf-constant-acl
     echo
+    echo "acl to-self-deny-domain dstdomain ${WEB_SERVER_DENY_NAME}"
     echo "acl to-cloud-metadata-ip dst ${CLOUD_METADATA_IP}/32"
     echo "acl to-cloud-azure-fabric-ip dst ${CLOUD_AZURE_FABRIC_IP}/32"
     echo
@@ -132,8 +132,8 @@ gen-sudoers-constant()
 {
     cat Constant/sudoers-constant-1
 
-    echo 'env_keep = "TERM", \'
-    echo -e "\ttimestampdir = \"/var/lib/sudo\""
+    echo -e "\t env_keep = \"TERM\", \\"
+    echo -e "\t timestampdir = \"/var/lib/sudo\""
     echo
     echo "Runas_Alias ROOT = root"
     echo
@@ -141,12 +141,13 @@ gen-sudoers-constant()
     echo "User_Alias SUPER_ADMINISTRATOR = ${SUPERADMIN_NAME}"
     echo "User_Alias SNMP_AGENT = snmp"
     echo
+    echo "Cmnd_Alias ALL_COMMAND = ALL"
     echo "Cmnd_Alias CHROOT_ADMIN = /usr/sbin/chroot ${ADMIN_DIR} su --login ${ADMIN_NAME}*"
     echo "Cmnd_Alias APL_COMMAND = ${LOCAL_DIR}/bin/apl_*,${LOCAL_DIR}/sbin/apl_*"
     echo "Cmnd_Alias HEALTH_CHECK = ${LOCAL_DIR}/bin/apl_health_check*"
     echo
     echo "ADMINISTRATOR SECUREHOST = (ROOT) NOPASSWD: CHROOT_ADMIN"
-    echo "SUPER_ADMINISTRATOR SECUREHOST = (ROOT) NOPASSWD: APL_COMMAND"
+    echo "SUPER_ADMINISTRATOR SECUREHOST = (ROOT) NOPASSWD: ALL_COMMAND"
     echo "SNMP_AGENT SECUREHOST = (ROOT) NOPASSWD: HEALTH_CHECK"
 }
 
@@ -154,7 +155,7 @@ gen-admin-sudoers-constant()
 {
     cat Constant/sudoers-constant-1
 
-    echo 'env_keep = "TERM MANAGER_CONTEXT_ENV", \'
+    echo -e "\t env_keep = \"TERM MANAGER_CONTEXT_ENV\", \\"
     echo -e "\t timestampdir = \"/var/run/sudo\""
     echo
     echo "Cmnd_Alias CONFIGURE = \\"
@@ -212,7 +213,7 @@ gen-httpd-conf-common()
 	;;
     esac
 
-    cat Constant/httpd.conf-common-constant | \
+    cat Constant/httpd.conf-common-constant-template | \
 	sed \
 	    -e "s@_ErrorLocation_@${ERROR_LOCATION}@g" \
 	    -e "s@_Web_Server_Dir_@${WEB_SERVER_DIR}@g" \
@@ -225,7 +226,7 @@ gen-httpd-modules.conf-constant()
     sed \
     -e "s@_Web_Server_Dir_@${WEB_SERVER_DIR}@g" \
     -e "s@_Local_Dir_@${LOCAL_DIR}@g" \
-    Constant/httpd-modules.conf-constant-1
+    Constant/httpd-modules.conf-constant-template
 }
 
 gen-httpd.conf-constant()
@@ -265,7 +266,11 @@ gen-wadmind.conf-constant()
     echo "Mutex file:${ADMIN_DIR}/var/run"
     echo
     echo "PidFile var/run/${WADMIND_NAME}.pid"
-    sed -e "s@_Web_Server_Dir_@${WEB_SERVER_DIR}@g" Constant/wadmind.conf-constant-1
+
+    sed -e "s@_Web_Server_Dir_@${WEB_SERVER_DIR}@g" Constant/wadmind.conf-constant-template
+    echo
+    cat Constant/httpd-ssl.conf-constant
+
     echo "SSLSessionCache shmcb:${ADMIN_DIR}/var/run/ssl_scache(32000)"
     echo
     echo "ScriptAlias /${GUI_DIR_NAME}/ \"${GUI_DIR}/${CGI_RDIR}/\""
@@ -277,11 +282,24 @@ gen-wadmind.conf-constant()
 
 gen-sshd_config-constant()
 {
-    echo "AllowGroups users ${SUPERADMIN_NAME}"
-    echo "Banner ${LOCAL_DIR}/etc/banner"
-    echo "HostKey ${SSH_HOST_RSA_KEY_FILE}"
+    local permit_flag allow_groups="users ${SUPERADMIN_NAME}"
+    
+    if test "${APL_MODEL}" == 'test' ; then
+	permit_flag=yes
+	allow_groups="${allow_groups} root"
+    else
+	permit_flag=no
+    fi
 
     cat Constant/sshd_config-constant-1
+
+    cat << EOF
+Banner ${LOCAL_DIR}/etc/banner
+HostKey ${SSH_HOST_RSA_KEY_FILE}
+PermitEmptyPasswords ${permit_flag}
+PermitRootLogin ${permit_flag}
+AllowGroups ${allow_groups}
+EOF
 }
 
 gen-tst-links()
@@ -469,13 +487,6 @@ gen-snmp.conf-constant()
     cat Constant/snmp.conf-constant-1
 }
 
-gen-rt_tables-constant()
-{
-    cat Constant/rt_tables-constant-1
-
-    echo ${IPSEC_ROUTE_TABLE_NB} ${IPSEC_ROUTE_TABLE_NAME}
-}
-
 gen-pam_d_sshd()
 {
     cat pam.d/sshd-1
@@ -500,7 +511,7 @@ gen-ipsec-charon-conf()
 	-e "s/routing_table_prio =.*/routing_table_prio = ${IPSEC_ROUTE_PRIORITY}/" \
 	-e "s/user =.*/user = ${IPSEC_USER}/" \
 	\
-	IPsec/charon.conf
+	IPsec/charon.conf-template
 }
 
 gen-ipsec-conf()
@@ -546,7 +557,6 @@ gen-tuner-conf()
     gen-lcd4linux.conf-constant > ${GENERATED_DIR}/lcd4linux.conf-constant
     gen-snmpd.conf-constant > ${GENERATED_DIR}/snmpd.conf-constant
     gen-snmp.conf-constant > ${GENERATED_DIR}/snmp.conf-constant
-    gen-rt_tables-constant > ${GENERATED_DIR}/rt_tables-constant
     gen-pam_d_sshd > ${GENERATED_DIR}/pam.d.sshd
 }
 
@@ -580,14 +590,15 @@ install-tuner-conf()
     sudo install -m 644 -o root -g root ${GENERATED_DIR}/snmpd.conf-constant ${APL}${CONF_DIR}/snmpd.conf-constant
     sudo install -m 644 -o root -g root ${GENERATED_DIR}/snmp.conf-constant ${APL}${CONF_DIR}/snmp.conf-constant
     sudo install -m 400 -o root -g root ${GENERATED_DIR}/rsyslog.conf-constant ${APL}${CONF_DIR}/rsyslog.conf-constant
-    sudo install -m 400 -o root -g root ${GENERATED_DIR}/rt_tables-constant ${APL}${CONF_DIR}/rt_tables-constant
     sudo install -m 444 -o root -g root ${GENERATED_DIR}/certificate.cnf-head-constant ${APL}${ADMIN_DIR}${APPLIANCE_DIR}/etc/certificate.cnf-head-constant
 
+    sudo install -m 400 -o root -g root Constant/rt_tables-constant ${APL}${CONF_DIR}/rt_tables-constant
     sudo install -m 400 -o root -g root Constant/sysctl.conf-constant ${APL}${CONF_DIR}/sysctl.conf-constant
     sudo install -m 400 -o root -g root Constant/named.conf-top-constant ${APL}${CONF_DIR}/named.conf-top-constant
     sudo install -m 400 -o root -g root Constant/named.conf-bottom-constant ${APL}${CONF_DIR}/named.conf-bottom-constant
     sudo install -m 400 -o root -g root Constant/dhcpd.conf-constant ${APL}${CONF_DIR}/dhcpd.conf-constant
-    sudo install -m 400 -o root -g root Constant/httpd-proxy.conf-cache-constant ${APL}${CONF_DIR}/httpd-proxy.conf-cache-constant
+    sudo install -m 400 -o root -g root Constant/httpd-rproxy.conf-cache-constant ${APL}${CONF_DIR}/httpd-rproxy.conf-cache-constant
+    sudo install -m 400 -o root -g root Constant/httpd-ssl.conf-constant ${APL}${CONF_DIR}/httpd-ssl.conf-constant
     sudo install -m 400 -o root -g root Constant/ntp.conf-constant ${APL}${CONF_DIR}/ntp.conf-constant
     sudo install -m 400 -o root -g root Constant/wpad.pac-1-constant ${APL}${CONF_DIR}/wpad.pac-1-constant
     sudo install -m 400 -o root -g root Constant/wpad.pac-3-constant ${APL}${CONF_DIR}/wpad.pac-3-constant

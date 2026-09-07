@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       Configurator
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -99,28 +98,22 @@ gen-issue()
 	done
     fi
 
-    echo "Copyrights (C) ${YEARS} ${COMMERCIAL_NAME} - All rights reserved"
+    echo "Copyrights (C) ${YEARS} ${COMPANY_NAME} - All rights reserved"
     echo
 }
 
 gen-sysctl()
 {
-    local rp_filter ip_forward ha_mode
+    local ip_forward ha_mode
 
     cat sysctl.conf-constant
 
     echo
 
-    if test ${TPROXY_MODE} == False ; then
-	rp_filter=1
-    else
-	rp_filter=0
-    fi
-
     if test ${ROUTER_MODE} == True ; then
 	ip_forward=1
     else
-	ip_forward=1
+	ip_forward=0
     fi
 
     if test ${HA_MODE} == True ; then
@@ -130,11 +123,20 @@ gen-sysctl()
     fi
     
     echo "net.ipv4.ip_forward = ${ip_forward}"
-    echo "net.ipv4.conf.default.rp_filter = ${rp_filter}"
-    echo "net.ipv4.conf.all.rp_filter = ${rp_filter}"
+
     echo "net.ipv4.conf.all.arp_ignore = ${ha_mode}"
     echo "net.ipv4.conf.all.arp_announce = ${ha_mode}"
     echo "net.ipv4.ip_nonlocal_bind = ${ha_mode}"
+
+    if test ${TPROXY_MODE} == False ; then
+	echo "net.ipv4.conf.default.rp_filter = 1"
+	echo "net.ipv4.conf.all.rp_filter = 1"
+	echo "net.ipv4.ip_nonlocal_bind = 0"
+    else
+	echo "net.ipv4.conf.default.rp_filter = 0"
+	echo "net.ipv4.conf.all.rp_filter = 0"
+	echo "net.ipv4.ip_nonlocal_bind = 1"
+    fi
 }
 
 gen-sysnetctl()
@@ -265,7 +267,7 @@ set-memory-cache-parameters()
 	    local max_objects_in_cache
 
 	    ((max_objects_in_cache = PROXY_CACHE_SZ * 1024 / store_average_object_sz))
-	    ((cache_index_memory_sz = max_objects_in_cache * CACHE_INDEX_OBJECT_MEMORY_SZ / 1024 / 1024))
+	    ((cache_index_memory_sz = max_objects_in_cache * SQUID_MD_MEMORY_SZ / 1024 / 1024))
 
 	    if test ${cache_index_memory_sz} -le ${free_memory_sz} ; then
 		((hdd_cache_usable_pct = 100))
@@ -274,7 +276,7 @@ set-memory-cache-parameters()
 		local objects_in_cache
 
 		((cache_index_memory_sz = free_memory_sz))
-		((objects_in_cache = cache_index_memory_sz * 1024 * 1024 / CACHE_INDEX_OBJECT_MEMORY_SZ))
+		((objects_in_cache = cache_index_memory_sz * 1024 * 1024 / SQUID_MD_MEMORY_SZ))
 		((hdd_cache_usable = objects_in_cache * store_average_object_sz / 1024))
 		((hdd_cache_usable_pct = hdd_cache_usable * 100 / PROXY_CACHE_SZ))
 	    fi
@@ -390,8 +392,8 @@ gen-domainname()
 
 gen-embedded-vpnsubscr-cron()
 {
-    local manage_interval_mn=3
-    local report_interval_mn=10
+    local manage_interval_mn=1
+    local report_interval_mn=5
 
     echo "SHELL=/bin/bash"
     echo "PATH=${PATH}"

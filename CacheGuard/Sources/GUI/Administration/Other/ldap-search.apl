@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -26,31 +25,33 @@ source functions
 
 ldap-search()
 {
-    test -n "${1}" || return 1
-    local args=${@}
-    local width=${args/&*}
-    local encoded_args=${args#*&}
+    local encoded_args=${@}
     
-    echo "<div class='with-border' style='font-size:90%; font-style:italic; width:${width}px; margin-bottom:5px;'><pre>"
+    echo "<div class='diagnostic-tools-msg'><pre>"
 
     if test -n "${encoded_args}" ; then
 
 	local stdout_tmp_file=/tmp/search-ldap.stdout.${$}
 	local stderr_tmp_file=/tmp/search-ldap.stderr.${$}
-	local decoded_args args filter
+	local decoded_args filter
 
 	decoded_args=${encoded_args//@/=}
 	decoded_args=$(decode-string "${decoded_args}")
-	args=${decoded_args//\\\&/ }
-	filter=${args}
+
+	filter=${decoded_args//\\\&/ }
 
 	execute-command-with-output "ldap search ${filter}" > ${stdout_tmp_file} 2>${stderr_tmp_file}
+
 	if test -s ${stderr_tmp_file} ; then
 	    local error=$(cat ${stderr_tmp_file} 2> /dev/null)
 	    error=${error/${ERROR_TAG} /}
-	    echo "<span style='color:FireBrick;'>${error}</span>"
+	    echo "<span>${error}</span>"
 	else
-	    cat ${stdout_tmp_file}
+	    if test -s ${stdout_tmp_file} ; then
+		cat ${stdout_tmp_file}
+	    else
+		echo "<i>&lt;empty response&gt;</i>"
+	    fi
 	fi
 	rm -f ${stdout_tmp_file} ${stderr_tmp_file}
     else

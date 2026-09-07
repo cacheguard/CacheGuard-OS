@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -39,10 +38,9 @@ gui-show-manager-gateway-pull-report()
     local log=${MANAGER_PULL_OPERATION_LOG}
 
     if test ! -s ${log} ; then
-	echo-content-unavailable 100% "This report is not yet available"
+	echo-unavailable-message "this report is not yet available"
 	return 0
     fi
-
 
     echo "<table class='report' width='100%'>"
     display-manager-gateway-pull-report
@@ -54,7 +52,7 @@ gui-show-manager-gateway-push-report()
     local log=${MANAGER_PUSH_OPERATION_LOG}
 
     if test ! -s ${log} ; then
-	echo-content-unavailable 100% "This report is not yet available"
+	echo-unavailable-message "this report is not yet available"
 	return 0
     fi
 
@@ -68,7 +66,7 @@ gui-show-manager-gateway-apply-report()
 {
     local log=${MANAGER_LOCAL_EXEC_OPERATION_LOG}
     if test ! -s ${log} ; then
-	echo-content-unavailable 100% "This report is not yet available"
+	echo-unavailable-message "this report is not yet available"
 	return 0
     fi
 
@@ -82,7 +80,7 @@ main()
     test ${APL_ROLE} == manager || return 0
 
     local operation=${1}
-    test -n "${operation}" || operation=pull
+    test -n "${operation}" || operation='pull'
 
     local title
 
@@ -98,7 +96,7 @@ main()
 	    ;;
     esac
 
-    echo "<span class='table-title'>Last ${title} report</span>"
+    echo "<div class='table-title'>Last ${title} report</div>"
     gui-show-manager-gateway-${operation}-report
 }
 

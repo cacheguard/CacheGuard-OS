@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       Commands
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -126,36 +125,6 @@ check-fw-protocol-pat()
     return 0
 }
 
-check-fw-port-range()
-{
-    test -n "${1}" || return 1
-    local ports=${1}
-
-    [[ "${ports}" =~ (^[1-9][0-9]{0,4}|^0)[:]([1-9][0-9]{0,4}|0)$ ]] || return 2
-
-    local port1=${ports/:*}
-    local port2=${ports/*:}
-
-    test ${port1} -ge 0 || return 3
-    test ${port1} -le 65535 || return 4
-
-    test ${port2} -ge 0 || return 5
-    test ${port2} -le 65535 || return 6
-
-    test ${port1} -le ${port2} || return 7
-
-    return 0
-}
-
-check-fw-port()
-{
-    test -n "${1}" || return 1
-    local ports=${1}
-
-    test ${ports} != any || return 0
-    check-port-nb ${ports} || check-fw-port-range ${ports} || return 1
-}
-
 show-fw-rules1()
 {
     test -n "${1}" || return 1
@@ -221,22 +190,28 @@ show-fw-rules1()
 
 		rule="${id} [${state}] ${action} ${protocol} ${src_ip} ${dst_dev} ${dst_ip}"
 		
-		if test "${src_nat_ip}" != "nil" ; then
-		    if test "${dst_nat_ip}" != "nil" ; then
-			if test "${dst_pat_port}" != "nil" ; then
-			    rule="${rule} ${dst_ports} snat:${src_nat_ip} dnat:${dst_nat_ip} dpat:${dst_pat_port}"
+		if test "${src_nat_ip}" == "nil" ; then
+		    if test "${dst_nat_ip}" == "nil" ; then
+			if test "${dst_pat_port}" == "nil" ; then
+			    rule="${rule} ${dst_ports}"
 			else
-			    rule="${rule} ${dst_ports} snat:${src_nat_ip} dnat:${dst_nat_ip}"
+			    rule="${rule} ${dst_ports} snat:${src_nat_ip} dnat:${dst_nat_ip} dpat:${dst_pat_port}"
 			fi
 		    else
-			rule="${rule} ${dst_ports} snat:${src_nat_ip}"
+			if test "${dst_pat_port}" == "nil" ; then
+			    rule="${rule} ${dst_ports} snat:${src_nat_ip} dnat:${dst_nat_ip}"
+			else
+			    rule="${rule} ${dst_ports} snat:${src_nat_ip} dnat:${dst_nat_ip} dpat:${dst_pat_port}"
+			fi
 		    fi
 		else
-		    if test "${dst_nat_ip}" != "nil" ; then
-			if test "${dst_pat_port}" != "nil" ; then
-			    rule="${rule} ${dst_ports} snat:${src_nat_ip} dnat:${dst_nat_ip} dpat:${dst_pat_port}"
-			else
+		    if test "${dst_nat_ip}" == "nil" ; then
+			rule="${rule} ${dst_ports} snat:${src_nat_ip}"
+		    else
+			if test "${dst_pat_port}" == "nil" ; then
 			    rule="${rule} ${dst_ports} snat:${src_nat_ip} dnat:${dst_nat_ip}"
+			else
+			    rule="${rule} ${dst_ports} snat:${src_nat_ip} dnat:${dst_nat_ip} dpat:${dst_pat_port}"
 			fi
 		    fi
 		fi
@@ -951,7 +926,7 @@ run()
 
 		    local dst_ports=${ARGS[9]}
 		    test -n "${dst_ports}" || dst_ports=any
-		    check-fw-port ${dst_ports} || return 60
+		    check-rule-port ${dst_ports} || return 60
 		    check-fw-protocol-port ${protocol} ${dst_ports} || return 67
 
 		    if test ${action} == allow ; then

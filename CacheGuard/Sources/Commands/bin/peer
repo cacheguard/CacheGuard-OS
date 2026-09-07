@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       Commands
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -43,25 +42,30 @@ check-peer-nb()
     test -n "${1}" || return 1
     local peer_type=${1}
 
-    local peer_list len
+    local peer_list record_len len
 
     case ${peer_type} in
 	share)
 	    peer_list=${PEER_SHARE_LIST}
+	    record_len=2
 	    ;;
 	ha)
 	    peer_list=${PEER_HA_LIST}
-	    ;;
-	next)
-	    peer_list=${PEER_NEXT_LIST}
+	    record_len=2
 	    ;;
 	previous)
 	    peer_list=${PEER_PREVIOUS_LIST}
+	    record_len=2
+	    ;;
+	next)
+	    peer_list=${PEER_NEXT_LIST}
+	    record_len=3
 	    ;;
 	*)
 	    return 1
     esac
-    len=$(record2-length-list "${peer_list}")
+
+    len=$(record-length-list ${record_len} "${peer_list}")
     test ${len} -lt ${MAX_PEERS_NB}
 }
 
@@ -81,27 +85,19 @@ show-peer-list1()
 	return 0
     fi
 
-    local ip netmask qos port
-    local i=0 n=0 elt rang
+    local ip qos port
+    local elt range i=0 n=0
 
     for elt in ${peers}
     do
-	rang=$[${i} % 2]
-	case ${rang} in
+	range=$[${i} % 2]
+	case ${range} in
 	    0)
 		ip=${elt}
 		;;
 	    1)
 		test ${n} -eq 0 || echo-blank-command
 		case ${peer_type} in
-		    next)
-			if test "${elt}" == nil ; then
-			    unset port
-			else
-			    port=" ${elt}"
-			fi
-			echo-value "${ip}${port}"
-			;;
 		    share|ha|previous)
 			qos="${elt}"
 			qos=" ${qos}%"
@@ -111,6 +107,48 @@ show-peer-list1()
 			error 255
 			;;
 		esac
+		((n++))
+		;;
+	    *)
+		return 1
+		;;
+	esac
+	((i++))
+    done
+}
+
+show-next-peer-list1()
+{
+    local peers=${2}
+
+    echo-command-form "peer next"
+    if test "${1}" == "new" ; then
+	echo-mark-new
+    else
+	echo-mark-cur
+    fi
+    if test -z "${peers}" ; then
+	echo-value-null
+	return 0
+    fi
+
+    local ip qos port
+    local elt range i=0 n=0
+
+    for elt in ${peers}
+    do
+	range=$[${i} % 3]
+	case ${range} in
+	    0)
+		ip=${elt}
+		;;
+	    1)
+		port=${elt}
+		;;
+	    2)
+		qos=${elt}
+		test ${n} -eq 0 || echo-blank-command
+		echo-value "${ip} ${port} ${qos}%"
 		((n++))
 		;;
 	    *)
@@ -143,14 +181,25 @@ show-ha-peers()
     show-peer-list ha "${CURRENT_PEER_HA_LIST}" "${PEER_HA_LIST}"
 }
 
-show-next-peers()
-{
-    show-peer-list next "${CURRENT_PEER_NEXT_LIST}" "${PEER_NEXT_LIST}"
-}
-
 show-previous-peers()
 {
     show-peer-list previous "${CURRENT_PEER_PREVIOUS_LIST}" "${PEER_PREVIOUS_LIST}"
+}
+
+show-next-peer-list()
+{
+    local current_peer_list=${1}
+    local peer_list=${2}
+
+    show-next-peer-list1 'current' "${current_peer_list}"
+    if test "${current_peer_list}" != "${peer_list}" ; then
+	show-next-peer-list1 'new' "${peer_list}"
+    fi
+}
+
+show-next-peers()
+{
+    show-next-peer-list "${CURRENT_PEER_NEXT_LIST}" "${PEER_NEXT_LIST}"
 }
 
 show-peers()
@@ -163,17 +212,17 @@ show-peers()
 	ha)
 	    show-ha-peers
 	    ;;
-	next)
-	    show-next-peers
-	    ;;
 	previous)
 	    show-previous-peers
 	    ;;
-	"")
+	next)
+	    show-next-peers
+	    ;;
+	'')
 	    show-share-peers
 	    show-ha-peers
-	    show-next-peers
 	    show-previous-peers
+	    show-next-peers
 	    ;;
 	*)
 	    error 255
@@ -191,55 +240,20 @@ raz-peers()
 
     case ${peer_type} in
 	share)
-	    export PEER_SHARE_LIST=""
+	    unset PEER_SHARE_LIST
 	    ;;
 	ha)
-	    export PEER_HA_LIST=""
+	    unset PEER_HA_LIST
 	    ;;
 	next)
-	    export PEER_NEXT_LIST=""
+	    unset PEER_NEXT_LIST
 	    ;;
 	previous)
-	    export PEER_PREVIOUS_LIST=""
+	    unset PEER_PREVIOUS_LIST
 	    ;;
 	*)
 	    error 255
     esac
-}
-
-peer-remove()
-{
-    test -n "${1}" || return 1
-    test -n "${2}" || return 1
-    local in_list=${1}
-    local in_ip=${2}
-
-    local out_list=""
-    local ip qos
-    local elt i=0 rang
-
-    for elt in ${in_list}
-    do
-	rang=$[${i} % 2]
-	case ${rang} in
-	    0)
-		ip=${elt}
-		;;
-	    1)
-		qos=${elt}
-		if test "${ip}" != "${in_ip}"
-		then
-		    out_list="${out_list} ${ip} ${qos}"
-		fi
-		;;
-	    *)
-		return 1
-		;;
-	esac
-	((i++))
-    done
-    echo "${out_list}"
-    return 0
 }
 
 run()
@@ -269,11 +283,18 @@ run()
 		case ${pt} in
 		    next)
 			if test -z "${ARGS[4]}" ; then
-			    local pr=nil
+			    local pr=${PEER_HTTP_PORT}
+			    local qos=100
 			else
 			    local pr=${ARGS[4]}
 			    pr=$(remove-leading-zeros ${pr})
 			    check-service-port-nb ${pr} || return 61
+			    if test -z "${ARGS[5]}" ; then
+				local qos=100
+			    else
+				local qos=${ARGS[5]}
+				check-percentage ${qos} || return 11
+			    fi
 			fi
 			;;
 		    share|ha|previous)
@@ -292,33 +313,57 @@ run()
 		
 		test ${ip} != "127.0.0.1" || return 38
 		check-peer-nb ${pt} || return 90
+	    else
+		if test ${pt} == next ; then
+		    local pr=${ARGS[4]}
+		    test -n "${pr}" || pr=${PROXY_PORT}
+		    pr=$(remove-leading-zeros ${pr})
+		    check-service-port-nb ${pr} || return 61
+		fi
 	    fi
 	    
 	    case ${pt} in
 		share)
-		    export PEER_SHARE_LIST=$(peer-remove "${PEER_SHARE_LIST}" "${ip}")
+		    export PEER_SHARE_LIST=$(remove-record-from-list 2 1 "${ip}" "${PEER_SHARE_LIST}")
 		    if test ${act} == add ; then
-			export PEER_SHARE_LIST="${PEER_SHARE_LIST} ${ip} ${qos}"
+			if test -z "${PEER_SHARE_LIST}" ; then
+			    export PEER_SHARE_LIST="${ip} ${qos}"
+			else
+			    export PEER_SHARE_LIST="${PEER_SHARE_LIST} ${ip} ${qos}"
+			fi
 		    fi
 		    ;;
 		ha)
-		    export PEER_HA_LIST=$(peer-remove "${PEER_HA_LIST}" "${ip}")
+		    export PEER_HA_LIST=$(remove-record-from-list 2 1 "${ip}" "${PEER_HA_LIST}")
 		    if test ${act} == add ; then
-			export PEER_HA_LIST="${PEER_HA_LIST} ${ip} ${qos}"
-		    fi
-		    ;;
-		next)
-		    export PEER_NEXT_LIST=$(peer-remove "${PEER_NEXT_LIST}" "${ip}")
-		    if test ${act} == add ; then
-			export PEER_NEXT_LIST="${PEER_NEXT_LIST} ${ip} ${pr}"
+			if test -z "${PEER_HA_LIST}" ; then
+			    export PEER_HA_LIST="${ip} ${qos}"
+			else
+			    export PEER_HA_LIST="${PEER_HA_LIST} ${ip} ${qos}"
+			fi
 		    fi
 		    ;;
 		previous)
-		    export PEER_PREVIOUS_LIST=$(peer-remove "${PEER_PREVIOUS_LIST}" "${ip}")
+		    export PEER_PREVIOUS_LIST=$(remove-record-from-list 2 1 "${ip}" "${PEER_PREVIOUS_LIST}")
 		    if test ${act} == add ; then
-			export PEER_PREVIOUS_LIST="${PEER_PREVIOUS_LIST} ${ip} ${qos}"
+			if test -z "${PEER_PREVIOUS_LIST}" ; then
+			    export PEER_PREVIOUS_LIST="${ip} ${qos}"
+			else
+			    export PEER_PREVIOUS_LIST="${PEER_PREVIOUS_LIST} ${ip} ${qos}"
+			fi
 		    fi
 		    ;;
+		next)
+		    export PEER_NEXT_LIST=$(remove-record-from-list 3 2 "${ip} ${pr}" "${PEER_NEXT_LIST}")
+		    if test ${act} == add ; then
+			if test -z "${PEER_NEXT_LIST}" ; then
+			    export PEER_NEXT_LIST="${ip} ${pr} ${qos}"
+			else
+			    export PEER_NEXT_LIST="${PEER_NEXT_LIST} ${ip} ${pr} ${qos}"
+			fi
+		    fi
+		    ;;
+
 		*)
 		    error 255
 		    ;;

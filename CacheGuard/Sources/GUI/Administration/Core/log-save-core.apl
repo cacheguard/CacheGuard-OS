@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -33,15 +32,13 @@ show-list-logs()
     local logs=$(ls -r /var/log/system.[0-9]*.log.[0-9]*.tar.gz 2> /dev/null)
     local log date seconds serial rest
 
-    echo "<div style='clear:left;'></div><br />"
-
     if test -n "${logs}" ; then
-        echo "<div class='table-title'>Archived logs</div>"
+        echo "<div class='table-title'>Archived Logs</div>"
 	echo "<table class='highlight-list' width='${width}'>"
         echo "<thead>"
         echo "<tr>"
-        echo "<td class='table-header' width='${left}%'>Serial Nb</td>"
-        echo "<td class='table-header' width='${right}%' align='right'>Date</td>"
+        echo "<th class='table-header' width='${left}%'>Serial Nb</th>"
+        echo "<th class='table-header' width='${right}%' align='right'>Date</th>"
         echo "</tr>"
         echo "</thead>"
         echo "<tbody>"
@@ -147,7 +144,6 @@ show-log-save-form()
     shortcutMenuTitle[1]="Rotate Logs"
 
     show-title "Save Logs" "${state}" "access log password"
-    show-shortcuts-menu
     show-form "${width}" "${state}" show-list-logs ${width}
 }
 

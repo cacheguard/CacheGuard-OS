@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -61,11 +60,11 @@ set-vpnipsec-network()
 	[[ "${ATTRIBUTES[${del_pos}]}" =~ ^del_[0-9]+$ ]]
 	if test ${?} -ne 0 ; then
 	    if test "${VALUES[${entry_pos}]}" == anew -a -n "${VALUES[${ip_pos}]}" ; then
-		echo "vpnipsec network ${network_command} add '${VALUES[${location_pos}]}' '${VALUES[${ip_pos}]}' '${VALUES[${mk_pos}]}'" >> ${transaction}
+		echo "vpnipsec network ${network_command} add ${VALUES[${location_pos}]} ${VALUES[${ip_pos}]} ${VALUES[${mk_pos}]}" >> ${transaction}
 	    fi
 	    pos=$[${pos} + 4]
 	else
-	    echo "vpnipsec network ${network_command} del '${VALUES[${location_pos}]}' '${VALUES[${ip_pos}]}' '${VALUES[${mk_pos}]}'" >> ${transaction}
+	    echo "vpnipsec network ${network_command} del ${VALUES[${location_pos}]} ${VALUES[${ip_pos}]} ${VALUES[${mk_pos}]}" >> ${transaction}
 	    pos=$[${pos} + 5]
 	fi
     done

@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -26,9 +25,9 @@ show-system-report-load()
 {
     test -f /proc/loadavg || return 0
 
+    test -n "${1}" || return 1
     local display_time=${1}
-    local table_width=${2}
-    test -n "${table_width}" || table_width="405"
+    local compact=${2}
 
     local cpu_usage=$(cat /var/run/${CPU_USAGE_FILENAME} 2> /dev/null)
     local load=$(get-system-load) load1 load2 load3
@@ -38,19 +37,17 @@ show-system-report-load()
     load3=${load/*:}
 
     test -n "${cpu_usage}" || cpu_usage=0
+    test -z "${compact}" || compact=' compact'
 
-    echo "<div class='core-form'>"
-    echo "<table class='highlight-form' width='${table_width}'>"
-
-    test -z "${display_time}" || display-appliance-time-row
-
+    echo "<table class='highlight-form${compact}'>"
+    test ${display_time} != time || display-appliance-time-row left
     echo "<tr>"
-    echo "<td>"
+    echo "<td width='40%'>"
     echo "CPU usage over ${STATISTICS_INTERVAL} seconds"
     echo "</td>"
-    echo "<td>"
+    echo "<td width='60%'>"
     echo "<div id='cpu1'></div>"
-    draw-percent-bar ${PERCENT_BAR_WIDTH} ${cpu_usage}
+    draw-load-meter-bar ${cpu_usage}${compact}
     echo "</td>"
     echo "</tr>"
 
@@ -60,7 +57,7 @@ show-system-report-load()
     echo "</td>"
     echo "<td>"
     echo "<div id='cpu1'></div>"
-    draw-percent-bar ${PERCENT_BAR_WIDTH} ${load1}
+    draw-load-meter-bar ${load1}${compact}
     echo "</td>"
     echo "</tr>"
 
@@ -70,7 +67,7 @@ show-system-report-load()
     echo "</td>"
     echo "<td>"
     echo "<div id='cpu5'></div>"
-    draw-percent-bar ${PERCENT_BAR_WIDTH} ${load2}
+    draw-load-meter-bar ${load2}${compact}
     echo "</td>"
     echo "</tr>"
 
@@ -80,10 +77,9 @@ show-system-report-load()
     echo "</td>"
     echo "<td>"
     echo "<div id='cpu15'></div>"
-    draw-percent-bar ${PERCENT_BAR_WIDTH} ${load3}
+    draw-load-meter-bar ${load3}${compact}
     echo "</td>"
     echo "</tr>"
 
     echo "</table>"
-    echo "</div>"
 }

@@ -1,0 +1,128 @@
+/*
+###########################################################################
+#
+# MODULE:       Documentation
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+*/
+
+/*--------------------------------------------------------------
+  CacheGuard Documentation Tree
+--------------------------------------------------------------*/
+
+#uguide,
+#uguide ul {
+    margin:0;
+    padding:0;
+    list-style:none;
+}
+
+#uguide li {
+    position:relative;
+    margin:2px 0;
+    padding-left:22px;
+}
+
+#uguide ul {
+    display:none;
+    margin-left:12px;
+}
+
+#uguide li.open > ul {
+    display:block;
+}
+
+/*--------------------------------------------------------------
+  Expand / Collapse Arrow
+--------------------------------------------------------------*/
+
+#uguide li.folder-node::before {
+    content:"▶";
+    position:absolute;
+    left:4px;
+    top:4px;
+    width:12px;
+    color:DimGray;
+    font-size:11px;
+    line-height:24px;
+    cursor:pointer;
+    user-select:none;
+}
+
+#uguide li.folder-node.open::before {
+    content:"▼";
+}
+
+/*--------------------------------------------------------------
+  Folder
+--------------------------------------------------------------*/
+
+#uguide .folder {
+    cursor:pointer;
+    user-select:none;
+}
+
+#uguide .folder::before {
+    content:"";
+    display:inline-block;
+    width:24px;
+    height:24px;
+    margin-right:8px;
+    vertical-align:middle;
+    background-image:url("/doc/image/folder.png");
+    background-repeat:no-repeat;
+    background-position:center;
+}
+
+#uguide li.open > .folder::before {
+    background-image:url("/doc/image/folder-open.png");
+}
+
+/*--------------------------------------------------------------
+  File
+--------------------------------------------------------------*/
+
+#uguide .file::before {
+    content:"";
+    display:inline-block;
+    width:24px;
+    height:24px;
+    margin-right:8px;
+    vertical-align:middle;
+    background-image:url("/doc/image/file.png");
+    background-repeat:no-repeat;
+    background-position:center;
+}
+
+/*--------------------------------------------------------------
+  Links
+--------------------------------------------------------------*/
+
+#uguide a {
+    color:inherit;
+    text-decoration:none;
+}
+
+#uguide a:hover {
+    text-decoration:underline;
+}
+
+#uguide a.current {
+    color:FireBrick;
+    font-weight:bold;
+}

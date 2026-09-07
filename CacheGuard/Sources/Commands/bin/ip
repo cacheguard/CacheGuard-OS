@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       Commands
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -31,12 +30,12 @@ vlan-exist()
     local vlans=${1}
     local vlan=${2}
 
-    local elt i=0 range
+    local elt range i=0
 
     for elt in ${vlans}
     do
 	range=$[${i} % 2]
-	test ${range} -eq 0 && test "${elt}" == "${vlan}" && return 0
+	test ${range} -eq 0 && test ${elt} -eq ${vlan} && return 0
 	((i++))
     done
     return 1
@@ -149,8 +148,10 @@ show-ip-vlan()
 	return ${?}
     fi
 
-    local vlan ip_netmask1 ip_netmask2
-    vlan=${1}
+    local vlan=${1}
+    vlan=$((10#${vlan}))
+
+    local ip_netmask1 ip_netmask2
 
     ip_netmask1=$(get-vlan-ip-netmask ${vlan} cur)
     ip_netmask2=$(get-vlan-ip-netmask ${vlan} new)
@@ -182,10 +183,11 @@ show-ip-vlan()
 
 show-ip()
 {
-    local ret=0
+    local dev=${1}
+    local vlan ret=0
 
     echo-begin-show
-    if test -z "${1}" ; then
+    if test -z "${dev}" ; then
 
 	! contextual-command-is-allowed || show-ip-external
 	show-ip-internal
@@ -196,14 +198,14 @@ show-ip()
 	    ret=${?}
 	fi
     else
-	case ${1} in
+	case ${dev} in
 	    internal)
-		show-ip-${1}
+		show-ip-${dev}
 		ret=${?}
 		;;
 
 	    external|auxiliary)
-		! contextual-command-is-allowed || show-ip-${1}
+		! contextual-command-is-allowed || show-ip-${dev}
 		ret=${?}
 		;;
 	    vlan)
@@ -211,9 +213,10 @@ show-ip()
 		;;
 	    *)
 		if contextual-command-is-allowed ; then
-		    if test "${1:0:9}" == "internal." ; then
-			if check-vlan "${1:9}" ; then
-			    show-ip-vlan "${1:9}"
+		    if test "${dev:0:9}" == "internal." ; then
+			vlan=${dev:9}
+			if check-vlan "${vlan}" ; then
+			    show-ip-vlan "${vlan}"
 			    ret=${?}
 			else
 			    ret=41
@@ -758,9 +761,10 @@ show-ip-neighbour()
 
     while read ip dev mac
     do
-	echo-command-form ip
-	echo-value "${ip} ${dev}" ${PRINT_COL} -n
-	echo-value "${mac}" 50
+	echo-command-form "ip"
+	echo-value "${ip}" 10 -n
+	echo-value "${dev}" 30 -n
+	echo-value "${mac}" 40
     done < /var/run/${IP_NEIGHBOUR_FILENAME}
 
     echo-end-show
@@ -769,9 +773,10 @@ show-ip-neighbour()
 run()
 {
     local interface=${ARGS[1]}
+    local vlan
 
     case "${interface}" in
-	"")
+	'')
 	    show-ip
 	    return ${?}
 	    ;;
@@ -813,11 +818,11 @@ run()
 		;;
 
 	    *)
-		
 		if test "${ARGS[1]:0:9}" == "internal." ; then
 		    contextual-command-is-allowed || return 209
-		    if check-vlan "${ARGS[1]:9}"; then
-			show-ip-vlan "${ARGS[1]:9}"
+		    vlan=${ARGS[1]:9}
+		    if check-vlan "${vlan}"; then
+			show-ip-vlan "${vlan}"
 			return 0
 		    else
 			return 41
@@ -893,11 +898,12 @@ run()
 	    ;;
 	*)
 	    if test "${ARGS[1]:0:9}" == "internal." ; then
-		if check-vlan "${ARGS[1]:9}"; then
-		    local vlan=${ARGS[1]:9}
+		vlan=${ARGS[1]:9}
+
+		if check-vlan "${vlan}"; then
+		    vlan=$((10#${vlan}))
 		    vlan-exist "${VLAN_FLOW_LIST}" "${vlan}"  || return 42
-		    export IP_VLAN_LIST=$(remove-ip_vlan_list_vlan "${IP_VLAN_LIST}" "${vlan}")
-		    export IP_VLAN_LIST="${IP_VLAN_LIST} ${vlan} ${ip} ${mk}"
+		    export IP_VLAN_LIST=$(insert-record-in-slist 3 1 "${vlan} ${ip} ${mk}" "${IP_VLAN_LIST}" numerical)
 		else
 		    return 41
 		fi

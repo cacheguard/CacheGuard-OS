@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -22,22 +21,8 @@
 #
 ###########################################################################
 
-TILE_BUTTON_WIDHT=24
-TILE_BUTTON_HEIGHT=24
-
 source system-report-load-common.${GUI_EXT_NAME}
 source system-report-memory-common.${GUI_EXT_NAME}
-
-include-js-window()
-{
-    echo "<script type='text/javascript' src='/js/dhtmlwindow.js'></script>"
-}
-
-include-js-mosaic()
-{
-    echo "<script type='text/javascript' src='/js/mosaic-constant.js'></script>"
-    echo "<script type='text/javascript' src='/js/mosaic.js'></script>"
-}
 
 display-dashboard-auto-refresh()
 {
@@ -58,7 +43,7 @@ display-dashboard-auto-refresh()
 	    ;;
     esac
 
-    echo "<td align='center'><span class='dashboard-icon tooltip' style='width:${TILE_BUTTON_WIDHT}px;height:${TILE_BUTTON_HEIGHT}px;'><input class='dashboard-refresh-checkbox' name='${id}' id='${id}' type='checkbox'${checked} /><label for='${id}'></label><span class='tooltip-text'>${title}</span></span></td>"
+    echo "<span class='title-bar-item'><span class='contextual-help'><input class='dashboard-refresh-checkbox' name='${id}' id='${id}' type='checkbox'${checked} /><label for='${id}'></label><span class='contextual-help-text'>${title}</span></span></span>"
 }
 
 display-dashboard-reset-save()
@@ -66,7 +51,7 @@ display-dashboard-reset-save()
     local title="Reset & Save"
     local id="dashboard-reset-save"
 
-    echo "<td align='center'><a href='#' onClick=\"mosaicResetSave( '${id}' );\"><img align='middle' class='dashboard-icon' style='width:${TILE_BUTTON_WIDHT}px;height:${TILE_BUTTON_HEIGHT}px;' id='${id}' src='${IMAGE_DIR}/${id}.png' alt='${title}' title='${title}' /></a></td>"
+    echo "<span class='title-bar-item'><a href='#' data-action='mosaic-reset-save' data-id='${id}'><img id='${id}' src='${IMAGE_DIR}/${id}.png' alt='${title}' title='${title}' /></a></span>"
 }
 
 display-dashboard-save()
@@ -74,18 +59,17 @@ display-dashboard-save()
     local title="Save Layout"
     local id="dashboard-save"
 
-    echo "<td align='center'><a href='#' onClick=\"mosaicSave( '${id}' );\"><img align='middle' class='dashboard-icon' style='width:${TILE_BUTTON_WIDHT}px;height:${TILE_BUTTON_HEIGHT}px;' id='${id}' src='${IMAGE_DIR}/${id}.png' alt='${title}' title='${title}' /></a></td>"
+    echo "<span class='title-bar-item'><a href='#' data-action='mosaic-save' data-id='${id}'><img id='${id}' src='${IMAGE_DIR}/${id}.png' alt='${title}' title='${title}' /></a></span>"
 }
 
 display-check-new-version()
 {
     local id="new-os"
-    local title="Check OS Updates"
+    local title="Check OS Upgrade"
 
-    echo "<td><a onClick='getLatestVersion( \"/${GUI_DIR_NAME}/system-soft-check.${GUI_EXT_NAME}\", \"${id}\" )'><span style='cursor:pointer;'><img align='middle' class='dashboard-icon' style='width:${TILE_BUTTON_WIDHT}px;height:${TILE_BUTTON_HEIGHT}px;' src='${IMAGE_DIR}/system-patch.png' alt='${title}' title='${title}' /></span></a></td>"
+    echo "<span class='title-bar-item'><a href='#' data-action='get-latest-version' data-url='/${GUI_DIR_NAME}/system-soft-check.${GUI_EXT_NAME}' data-target-id='${id}'><img src='${IMAGE_DIR}/system-patch.png' alt='${title}' title='${title}' /></a></span>"
 
-    echo "<td align='left' width='100%' bgcolor='Gainsboro'><div id='${id}' style='margin:0;margin-left:5px;padding:0;color:DarkSlateGray;font-size:14px;'><i>Update not yet Checked</i></div></td>"
-
+    echo "<span class='title-bar-item compact' id='${id}'></span>"
 }
 
 get-stick-grid-value()
@@ -105,19 +89,19 @@ init-auto-refresh-system-report()
     local auto_id="${1}"
     local interval="${2}"
 
-    call-js-function "mosaicInitAutoReloadAll( '${auto_id}', ${interval} )"
+    echo "<div data-init-mosaic-auto-reload-all data-auto-id='${auto_id}' data-interval='${interval}' hidden></div>"
 }
 
 # Main()
 
 show-system-report()
 {
-    local margin_y=$[${GUI_MOSAIC_GRID_STICK} * 6]
+    local margin_y=$[${GUI_MOSAIC_GRID_STICK} * 2]
     local parent_id="mosaic-container"
     local dashboard_menu_id="dashboard-menu"
     local dashboard_control_id="dashboard-control"
     local auto_refresh_id="dashboard-auto-refresh"
-    local refresh_interval=15
+    local refresh_interval=10
     local default_state
 
     local rows_0 rows_1 rows_nb
@@ -219,8 +203,8 @@ show-system-report()
 	((i++))
 
 	pages[${i}]=urllist-antivirus-report
-	widths[${i}]=$[${GUI_MOSAIC_GRID_STICK}*2+${GUI_MOSAIC_WIDTH}*2]
-	heights[${i}]=$[${GUI_MOSAIC_HEIGHT}*2]
+	widths[${i}]=$[${GUI_MOSAIC_GRID_STICK} * 2 +${GUI_MOSAIC_WIDTH} * 2]
+	heights[${i}]=$[${GUI_MOSAIC_HEIGHT} * 2]
 	states[${i}]='false'
 	((i++))
 
@@ -290,28 +274,11 @@ show-system-report()
 	done > ${dashboard_file}
     fi
 
-    include-js-window
-    include-js-mosaic
-
     local controls="system-report ${dashboard_control_id} Toggle_Dashboard_Menu"
-    local commands
 
-    case ${APL_ROLE} in
-	gateway)
-	    commands="antivirus cache urllist system vpnipsec"
-	    ;;
-	manager)
-	    commands="system"
-	    ;;
-	*)
-	    ;;
-    esac
-    
-    show-title "Health Dashboard" "disabled" "${commands}" "${controls}" "disabled"
+    show-title "Health Dashboard" 'disabled' '' "${controls}" 'disabled'
 
-    echo "<div id='${dashboard_menu_id}' style='margin=0; margin-bottom:5px;margin-left:3px;'>"
-    echo "<table style='margin:0;padding:0;'>"
-    echo "<tr>"
+    echo "<div id='${dashboard_menu_id}' class='dashboard-bar'>"
 
     display-dashboard-auto-refresh ${auto_refresh_id}
 
@@ -322,24 +289,30 @@ show-system-report()
 	title=${titles[${i}]}
 	var=${page//-/_}
 
-	echo "<td align='center'><a href='#' onClick=\"if (typeof ${var} !== 'undefined') mosaicShow( '${parent_id}', '${page}' ); return false;\"><img align='middle' class='dashboard-icon' style='width:${TILE_BUTTON_WIDHT}px;height:${TILE_BUTTON_HEIGHT}px;' src='${IMAGE_DIR}/${page}.png' alt='${title}' title='${title}' /></a></td>"
+	echo "<span class='title-bar-item'><a href='#' data-action='mosaic-show' data-parent-id='${parent_id}' data-page='${page}'><img src='${IMAGE_DIR}/${page}.png' alt='${title}' title='${title}' /></a></span>"
     done
 
     display-dashboard-reset-save
     display-dashboard-save
     display-check-new-version
 
-    echo "</tr>"
-    echo "</table>"
     echo "</div>"
 
     local token=$(get-auth-token)
+    local separator
 
-    echo "<div class='core-form' style='margin-top:0; font-size:14px;'>"
+    echo "<div class='dashboard-container'>"
     echo "<input type='hidden' id='${GUI_CSRF_ATTRIBUTE}' name='${GUI_CSRF_ATTRIBUTE}' value='${token}' />"
 
-    echo "<div id='${parent_id}' style='position:relative; margin:0; padding:0;'>"
-    echo "<script type='text/javascript'>"
+    echo "<div id='${parent_id}' class='dashboard-container'>"
+        cat << EOT
+<script type='application/json' data-init-tiles>
+{
+"parentId": "${parent_id}",
+"dashboardMenuId": "${dashboard_menu_id}",
+"dashboardControlId": "${dashboard_control_id}",
+"tiles": [
+EOT
 
     for ((i=0 ; i<n ; i++))
     do
@@ -350,21 +323,25 @@ show-system-report()
 	left=${lefts[${i}]}
 	top=${tops[${i}]}
 	state=${states[${i}]}
-	var=${page//-/_}
 
-	echo "TILES['${page}'] = new Array( '${title}', ${width}, ${height}, ${left}, ${top}, ${state} );"
+	echo "${separator}{"
+	echo "\"page\": \"${page}\","
+	echo "\"title\": \"${title}\","
+	echo "\"width\": ${width},"
+	echo "\"height\": ${height},"
+	echo "\"left\": ${left},"
+	echo "\"top\": ${top},"
+	echo "\"state\": ${state}"
+	echo "}"
 
-	if test "${state}" == 'true' ; then
-	    echo "${var} = mosaicOpen( '${parent_id}', '${page}' );"
-	else
-	    echo "${var} = false;"
-	fi
+	separator=","
     done
 
-    echo "mosaicMoveInitialize( );"
-    echo "mosaicMenuInitialize( '${dashboard_menu_id}', '${dashboard_control_id}' );"
-
-    echo "</script>"
+    cat << EOT
+]
+}
+</script>
+EOT
     echo "</div>"
     echo "</div>"
 

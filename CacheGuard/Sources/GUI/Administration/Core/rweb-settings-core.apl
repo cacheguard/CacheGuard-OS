@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -75,7 +74,7 @@ show-rweb-settings()
 	itemTitle[${i}]="HTTP to HTTPS Redirection" ; ((i++))
     fi
 
-    itemTitle[${i}]="Quality of Service (QoS)" ; ((i++))
+    itemTitle[${i}]="Quality of Service (QoS) %" ; ((i++))
     itemTitle[${i}]="Standby State" ; ((i++))
     itemTitle[${i}]="Standby URL Protocol" ; ((i++))
     itemTitle[${i}]="Standby Location" ; ((i++))
@@ -94,10 +93,17 @@ show-rweb-settings()
 	itemID[${i}]="rhttp_state" ; ((i++))
     fi
 
-    itemID[${i}]="qos" ; ((i++))
+    itemID[${i}]="qos"
+    checkItem[${i}]=percent
+    ((i++))
+
     itemID[${i}]="sb_state" ; ((i++))
     itemID[${i}]="sb_protocol" ; ((i++))
-    itemID[${i}]="sb_location" ; ((i++))
+
+    itemID[${i}]="sb_location"
+    checkItem[${i}]=printable
+    ((i++))
+
     itemID[${i}]="backend_servers" ; ((i++))
     itemID[${i}]="load_balancing" ; ((i++))
     itemID[${i}]="via_gateways" ; ((i++))
@@ -121,18 +127,7 @@ show-rweb-settings()
     itemForm[${i}]="text" ; ((i++))
     itemForm[${i}]="text" ; ((i++))
 
-    if test ${in_protocol} == 'https' ; then
-	i=0
-    else
-	i=3
-    fi
-
-    checkItem[2]=ip
-    checkItem[$((4-i))]=percent
-    checkItem[$((7-i))]=printable
-
     local elt range 
-
     local site_name protocol ip qos
     local tls tls_id ca_id
     local sb_state sb_site_name sb_protocol sb_location
@@ -193,16 +188,18 @@ show-rweb-settings()
 
     if test "${sb_site_name}" == ${in_site_name} ; then
 	sb_state=on
+	test ${sb_protocol} != 'none' || unset sb_location
     else
 	sb_state=off
+	unset sb_site_name sb_protocol sb_location
     fi
 
     local color='SeaGreen'
 
     i=0
-    blankItemContent[${i}]="type='text' size='24' maxlength='64' value='${in_site_name}' readonly style='color:${color}; border:0;'" ; ((i++))
-    blankItemContent[${i}]="type='text' size='5' maxlength='5' value='${in_protocol}' readonly style='color:${color}; border:0;'" ; ((i++))
-    blankItemContent[${i}]="type='text' size='15' maxlength='15' value='${in_ip}' readonly style='color:${color}; border:0;'" ; ((i++))
+    blankItemContent[${i}]="type='text' size='24' maxlength='64' value='${in_site_name}' readonly class='non-editable'" ; ((i++))
+    blankItemContent[${i}]="type='text' size='5' maxlength='5' value='${in_protocol}' readonly class='non-editable'" ; ((i++))
+    blankItemContent[${i}]="type='text' size='15' maxlength='15' value='${in_ip}' readonly class='non-editable'" ; ((i++))
 
     if test ${in_protocol} == 'https' ; then
 
@@ -231,7 +228,6 @@ show-rweb-settings()
     shortcutMenuTitle[0]="Manage Server TLS"
 
     show-title "Website Settings" "${state}" "rweb tls"
-    show-shortcuts-menu
     show-form "${width}" enabled
 }
 

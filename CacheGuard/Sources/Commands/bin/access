@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       Commands
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -47,6 +46,9 @@ check-access-list-nb()
 	antivirus)
 	    list="${ACCESS_AV_LIST}"
 	    ;;
+	fweb)
+	    list="${ACCESS_FORWARDED_WEB_LIST}"
+	    ;;
 	manager)
 	    list="${ACCESS_MANAGER_LIST}"
 	    ;;
@@ -56,6 +58,9 @@ check-access-list-nb()
     esac
 
     case ${access_type} in
+	fweb)
+	    len=$(record2-length-list "${list}")
+	    ;;
 	manager)
 	    len=$(record3-length-list "${list}")
 	    ;;
@@ -65,7 +70,7 @@ check-access-list-nb()
     esac
 
     case ${access_type} in
-	web)
+	web|fweb)
 	    test ${len} -lt ${MAX_ACL_WEB_NB}
 	    ;;
 	file)
@@ -96,36 +101,7 @@ access-remove()
     local in_list=${1}
     local record=${2}
 
-    local out_list
-    local f0 f1 f2 f3
-    local elt i=0 range
-
-    for elt in ${in_list}
-    do
-	range=$[${i} % 4]
-	case ${range} in
-	    0)
-		f0=${elt}
-		;;
-	    1)
-		f1=${elt}
-		;;
-	    2)
-		f2=${elt}
-		;;
-	    3)
-		f3=${elt}
-		if test "${f0} ${f1} ${f2}" != "${record}" ; then
-		    out_list="${out_list} ${f0} ${f1} ${f2} ${f3}"
-		fi
-		;;
-	    *)
-		return 1
-		;;
-	esac
-	((i++))
-    done
-    echo "${out_list:1}"
+    remove-record-from-list 4 3 "${record}" "${in_list}"
 }
 
 show-access-list1()
@@ -167,7 +143,14 @@ show-access-list1()
 		test ${n} -eq 0 || echo-blank-command
 		case ${access_type} in
 		    web|antivirus)
-			echo-value "${interface} ${ip} ${netmask} ${qos}%"
+			case ${interface} in
+			    vpnipsec)
+				echo-value "${interface} ${ip} ${netmask}"
+				;;
+			    *)
+				echo-value "${interface} ${ip} ${netmask} ${qos}%"
+				;;
+			esac
 			;;
 		    admin)
 			echo-value "${interface} ${ip} ${netmask}"
@@ -226,6 +209,52 @@ show-access-av()
     show-access-list 'antivirus' "${CURRENT_ACCESS_AV_LIST}" "${ACCESS_AV_LIST}"
 }
 
+show-access-fweb1()
+{
+    local access=${2}
+
+    echo-command-form "access fweb"
+    if test "${1}" == "new" ; then
+	echo-mark-new
+    else
+	echo-mark-cur
+    fi
+
+    if test -z "${access}" ; then
+	echo-value-null
+	return 0
+    fi
+
+    local interface ip mk
+    local elt range i=0 n=0
+
+    for elt in ${access}
+    do
+	range=$[${i} % 2]
+	case ${range} in
+	    0)
+		ip=${elt}
+		;;
+	    1)
+		mk=${elt}
+		test ${n} -eq 0 || echo-blank-command
+		echo-value "${ip} ${mk}"
+		((n++))
+		;;
+	    *)
+		return 255
+		;;
+	esac
+	((i++))
+    done
+}
+
+show-access-fweb()
+{
+    show-access-fweb1 'cur' "${CURRENT_ACCESS_FORWARDED_WEB_LIST}"
+    test "${CURRENT_ACCESS_FORWARDED_WEB_LIST}" == "${ACCESS_FORWARDED_WEB_LIST}" || show-access-fweb1 'new' "${ACCESS_FORWARDED_WEB_LIST}"
+}
+
 show-access-manager1()
 {
     local access=${2}
@@ -280,6 +309,7 @@ show-access-manager()
 show-access()
 {
     echo-begin-show
+
     case "${1}" in
 	web)
 	    ! contextual-command-is-allowed || show-access-web
@@ -296,6 +326,9 @@ show-access()
 	mon)
 	    show-access-mon
 	    ;;
+	fweb)
+	    ! contextual-command-is-allowed || show-access-fweb
+	    ;;
 	manager)
 	    ! contextual-command-is-allowed || show-access-manager
 	    ;;
@@ -309,6 +342,7 @@ show-access()
 		    show-access-file
 		    show-access-admin
 		    show-access-mon
+		    show-access-fweb
 		    show-access-manager
 		    ;;
 		manager)
@@ -333,7 +367,7 @@ check-access()
     test -n "${1}" || return 1
 
     case "${1}" in
-	admin|antivirus|file|manager|mon|web)
+	admin|antivirus|file|fweb|manager|mon|web)
 	    return 0
 	    ;;
 	*)
@@ -408,6 +442,9 @@ run()
 		antivirus)
 		    unset ACCESS_AV_LIST
 		    ;;
+		fweb)
+		    unset ACCESS_FORWARDED_WEB_LIST
+		    ;;
 		manager)
 		    unset ACCESS_MANAGER_LIST
 		    rm -f \
@@ -436,6 +473,10 @@ run()
 		    test -n "${ARGS[5]}" || return 1
 		    local ip=${ARGS[5]}
 		fi
+	    elif test ${as} == 'fweb' ; then
+		test -n "${ARGS[3]}" || return 1
+		local ip=${ARGS[3]}
+		shift-args
 	    else
 		local interface=${ARGS[3]}
 		check-access-interface ${as} ${interface} || return 43
@@ -488,17 +529,21 @@ run()
 
 	    case ${as} in
 		web|antivirus)
-		    if test -z "${px}" ; then
-			local qos=${ARGS[6]}
-		    else
-			local qos=${ARGS[5]}
-		    fi
-		    if test -z "${qos}" ; then
+		    if test ${interface} == vpnipsec ; then
 			qos=100
 		    else
-			qos=$(remove-leading-zeros ${qos})
-			qos=$(get-percent-value ${qos})
-			check-percentage ${qos} || return 11
+			if test -z "${px}" ; then
+			    local qos=${ARGS[6]}
+			else
+			    local qos=${ARGS[5]}
+			fi
+			if test -z "${qos}" ; then
+			    qos=100
+			else
+			    qos=$(remove-leading-zeros ${qos})
+			    qos=$(get-percent-value ${qos})
+			    check-percentage ${qos} || return 11
+			fi
 		    fi
 
 		    access="${interface} ${ip} ${mk}"
@@ -506,15 +551,13 @@ run()
 		    case ${as} in
 			web)
 			    export ACCESS_WEB_LIST=$(access-remove "${ACCESS_WEB_LIST}" "${access}")
-			    if test ${act} == add ; then
-				export ACCESS_WEB_LIST="${ACCESS_WEB_LIST} ${access} ${qos}"
-			    fi
+			    test ${act} != add || \
+				export ACCESS_WEB_LIST=$(add-record-to-list "${access} ${qos}" "${ACCESS_WEB_LIST}")
 			    ;;
 			antivirus)
 			    export ACCESS_AV_LIST=$(access-remove "${ACCESS_AV_LIST}" "${access}")
-			    if test ${act} == add ; then
-				export ACCESS_AV_LIST="${ACCESS_AV_LIST} ${access} ${qos}"
-			    fi
+			    test ${act} != add || \
+				export ACCESS_AV_LIST=$(add-record-to-list "${access} ${qos}" "${ACCESS_AV_LIST}")
 			    ;;
 			*)
 			    return 255
@@ -536,6 +579,7 @@ run()
 					add)
 					    if test -n "${ARGS[7]}" ; then
 						file_password="${ARGS[7]}"
+						check-file-password "${file_password}" || return 163
 					    else
 						test ${TERM} != ${WADMIN_TERM} || return 0
 						test "${__BATCH_MODE}" != yes || error 111
@@ -574,7 +618,7 @@ run()
 		    export ACCESS_FILE_LIST=$(access-remove "${ACCESS_FILE_LIST}" "${access}")
 		    case ${act} in
 			add|add:encrypted)
-			    export ACCESS_FILE_LIST="${ACCESS_FILE_LIST} ${access} 100"
+			    export ACCESS_FILE_LIST=$(add-record-to-list "${access} 100" "${ACCESS_FILE_LIST}")
 			    ;;
 			*)
 			    ;;
@@ -584,12 +628,20 @@ run()
 		admin)
 		    access="${interface} ${ip} ${mk}"
 		    export ACCESS_ADMIN_LIST=$(access-remove "${ACCESS_ADMIN_LIST}" "${access}")
-		    test ${act} != add || export ACCESS_ADMIN_LIST="${ACCESS_ADMIN_LIST} ${access} 100"
+		    test ${act} != add || \
+			export ACCESS_ADMIN_LIST=$(add-record-to-list "${access} 100" "${ACCESS_ADMIN_LIST}")
 		    ;;
 		mon)
 		    access="${interface} ${ip} 255.255.255.255"
 		    export ACCESS_MON_LIST=$(access-remove "${ACCESS_MON_LIST}" "${access}")
-		    test ${act} != add || export ACCESS_MON_LIST="${ACCESS_MON_LIST} ${access} 100"
+		    test ${act} != add || \
+			export ACCESS_MON_LIST=$(add-record-to-list "${access} 100" "${ACCESS_MON_LIST}")
+		    ;;
+		fweb)
+		    access="${ip} ${mk}"
+		    export ACCESS_FORWARDED_WEB_LIST=$(remove-record-from-list 2 2 "${access}" "${ACCESS_FORWARDED_WEB_LIST}")
+		    test ${act} != add || \
+			export ACCESS_FORWARDED_WEB_LIST=$(add-record-to-list "${access}" "${ACCESS_FORWARDED_WEB_LIST}")
 		    ;;
 		manager)
 		    local ssh_key_id=$(get-manager-key-id ${manager_role})

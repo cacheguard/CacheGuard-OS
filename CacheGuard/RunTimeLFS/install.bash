@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       Build
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -256,6 +255,7 @@ do-mkdir-admin()
     sudo install -d -m 1777 -o root -g root ${APL}${LOCK_DIR}
 
     sudo install -d -m  775 -o ${ADMIN_UID} -g ${USERS_GID} ${APL}${RUN_DIR}/${SUPERVISOR_ARGS}
+    sudo install -d -m  775 -o ${ADMIN_UID} -g ${USERS_GID} ${APL}${RUN_DIR}/${SUPERVISOR_CALLER}
     sudo install -d -m  755 -o ${ADMIN_UID} -g ${USERS_GID} ${APL}${SSL_CLIENT_DIR}
     sudo install -d -m  755 -o ${ADMIN_UID} -g ${USERS_GID} ${APL}${SSL_SNMP_DIR}
 
@@ -508,6 +508,7 @@ install-conf-files()
 {
     sudo install -m 400 -o root -g root sysconfig.modules-constant ${APL}/etc/sysconfig/modules-constant
     sudo install -m 400 -o root -g root sysconfig.modules-network ${APL}/etc/sysconfig/modules-network
+    sudo install -m 644 -o root -g root modprobe.ifb.conf ${APL}/etc/modprobe.d/ifb.conf
     sudo install -m 644 -o root -g root ${GENERATED_DIR}/sysconfig.modules ${APL}/etc/sysconfig/modules
     sudo install -m 644 -o root -g root ${GENERATED_DIR}/etc.${SN_ID} ${APL}${HARD_DIR}/${SN_ID}
     sudo install -m 644 -o root -g root ${GENERATED_DIR}/etc.inittab ${APL}/etc/inittab

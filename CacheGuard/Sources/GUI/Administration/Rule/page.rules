@@ -4,6 +4,8 @@ access-admin			(\?page:[[:digit:]]{0,3}-[[:digit:]]{0,3})? (\&entry_[0-9]{1,2}=(
 
 access-file			(\?page:[[:digit:]]{0,3}-[[:digit:]]{0,3})? (\&entry_[0-9]{1,2}=(old|anew)\&interface_[0-9]{1,2}=(internal|external|auxiliary|vpnipsec)\&server_[0-9]{1,2}=[[:print:]]{0,192}(\&del_[0-9]{1,2}=on)?){0,99}
 
+access-fweb			(\?page:[[:digit:]]{0,3}-[[:digit:]]{0,3})? (\&entry_[0-9]{1,2}=(old|anew)\&ip_[0-9]{1,2}=[[:print:]]{0,45}\&mk_[0-9]{1,2}=[[:print:]]{0,45}(\&del_[0-9]{1,2}=on)?){0,99}
+
 access-mon			(\?page:[[:digit:]]{0,3}-[[:digit:]]{0,3})? (\&entry_[0-9]{1,2}=(old|anew)\&interface_[0-9]{1,2}=(internal|external|auxiliary|vpnipsec)\&server_[0-9]{1,2}=[[:print:]]{0,192}(\&del_[0-9]{1,2}=on)?){0,99}
 
 access-web			(\?page:[[:digit:]]{0,3}-[[:digit:]]{0,3})? (\&entry_[0-9]{1,2}=(old|anew)\&interface_[0-9]{1,2}=(internal|auxiliary|vpnipsec|admin|antivirus|file|mon|rweb|web)\&ip_[0-9]{1,2}=[[:print:]]{0,45}\&mk_[0-9]{1,2}=[[:print:]]{0,45}\&qos_[0-9]{1,2}=[[:print:]]{0,12}(\&del_[0-9]{1,2}=on)?){0,99}
@@ -23,6 +25,8 @@ admin-snmp-certificate		nil operation=(raz|load\&protocol=(_ftp|_sftp|_tftp)?\&s
 admin-ssh-key			(\?page:[[:digit:]]{0,3}-[[:digit:]]{0,3})? (\&entry_[0-9]{1,2}=(old|anew)\&key_id_[0-9]{1,2}=[[:print:]]{0,66}(\&del_[0-9]{1,2}=on)?){0,99}
 
 admin-ssh-key-load		(\?[[:print:]]{0,66})? key_id=[[:print:]]{0,66}\&protocol=(_ftp|_sftp|_tftp)?\&server=[[:print:]]{0,192}\&filename=[[:print:]]{0,384}
+
+admin-ssh-key-set		(\?[[:print:]]{0,66})? key_id=[[:print:]]{0,66}\&key_value=[[:print:]]{0,3000}
 
 tls-ocsp-etc			nil admin_tls=[[:print:]]{0,66}\&admin_ca=[[:print:]]{0,66}(\&tls_days=[[:print:]]{0,24}\&tls_client_days=[[:print:]]{0,24}&tls_ocsp_host=[[:print:]]{0,192}\&port_ocsp=[[:print:]]{0,15}\&tls_ocsp_days=[[:print:]]{0,6}&tls_ocsp_tls=[[:print:]]{0,66}&ldaps_ca=[[:print:]]{0,66}&syslog_ca=[[:print:]]{0,66})?
 
@@ -48,9 +52,9 @@ authenticate			nil dummy=on(\&ldap=on)?(\&kerberos=on)?(\&web=on)?(\&rweb=on)?
 
 authenticate-ldap-request	nil user_base_dn=[[:print:]]{0,768}\&login_attribute=[[:print:]]{0,192}\&password_attribute=[[:print:]]{0,192}\&filter=[[:print:]]{0,1152}\&group_base_dn=[[:print:]]{0,768}(bind_required=on\&)?bind_dn=[[:print:]]{0,768}\&bind_password=[[:print:]]{0,192}
 
-authenticate-ldap-server	(\?page:[[:digit:]]{0,3}-[[:digit:]]{0,3})? (\&entry_[0-9]{1,2}=(old|anew)\&protocol_[0-9]{1,2}=(ldap|ldaps|sldap)\&name_[0-9]{1,2}=[[:print:]]{0,192}\&ip_[0-9]{1,2}=[[:print:]]{0,45}\&port_[0-9]{1,2}=[[:print:]]{0,15}(\&del_[0-9]{1,2}=on)?){0,99}
+authenticate-ldap-server	(\?page:[[:digit:]]{0,3}-[[:digit:]]{0,3})? (\&entry_[0-9]{1,2}=(old|anew)\&protocol_[0-9]{1,2}=(ldap|ldaps|sldap)\&name_[0-9]{1,2}=[[:print:]]{0,192}\&port_[0-9]{1,2}=[[:print:]]{0,15}(\&del_[0-9]{1,2}=on)?){0,99}
 
-authenticate-kerberos-ad	nil encrypt=(aes|des)\&ad_rdn=[[:print:]]{0,768}\&service_name=[[:print:]]{0,192}\&password1=[[:print:]]{0,96}\&password2=[[:print:]]{0,96}
+authenticate-kerberos-ad	nil service_name=[[:print:]]{0,192}\&ad=(on|off)(\&rdn=[[:print:]]{0,768}\&login=[[:print:]]{0,96}\&password1=[[:print:]]{0,96}\&password2=[[:print:]]{0,96})?
 
 authenticate-kerberos-server	(\?page:[[:digit:]]{0,3}-[[:digit:]]{0,3})? (\&entry_[0-9]{1,2}=(old|anew)\&server_[0-9]{1,2}=[[:print:]]{0,192}(\&del_[0-9]{1,2}=on)?){0,7}
 
@@ -70,7 +74,7 @@ cancel				nil nil
 
 conf-factoryreset		nil nil
 
-conf-load-save			nil operation=(load|save)\&protocol=(_web|_ftp|_sftp|_tftp)(\&version=(new|current))?(\&server=[[:print:]]{0,192})?(\&filename=[[:print:]]{0,384})?
+conf-load-save			nil operation=(load|save|upload|download)\&protocol=(_ftp|_sftp|_tftp|_web)(\&version=(new|current))?(\&server=[[:print:]]{0,192})?(\&filename=[[:print:]]{0,384})?
 
 conf-show			(\?(template|gateway|manager)?:[[:print:]]{0,66})?
 
@@ -82,11 +86,11 @@ dashboard-reset-save		nil nil
 
 dhcp-peer			(\?page:[[:digit:]]{0,3}-[[:digit:]]{0,3})? (\&entry_[0-9]{1,2}=(old|anew)\&role_[0-9]{1,2}=(active|passive)\&ip_[0-9]{1,2}=[[:print:]]{0,45}(\&del_[0-9]{1,2}=on)?){0,2}
 
-dhcp-fixed			(\?page:[[:digit:]]{0,3}-[[:digit:]]{0,3})? (entry_[0-9]{1,3}=(old|anew)\&hostname_[0-9]{1,3}=[[:print:]]{0,192}\&mac_[0-9]{1,3}=[[:print:]]{0,51}\&ip_[0-9]{1,3}=[[:print:]]{0,45}(\&del_[0-9]{1,3}=on)?)+
+dhcp-fixed			(\?page:[[:digit:]]{0,3}-[[:digit:]]{0,3})? (entry_[0-9]{1,3}=(old|anew)\&hostname_[0-9]{1,3}=[[:print:]]{0,192}\&interface_[0-9]{1,3}=(internal|auxiliary)\&mac_[0-9]{1,3}=[[:print:]]{0,51}\&ip_[0-9]{1,3}=[[:print:]]{0,45}(\&del_[0-9]{1,3}=on)?)+
 
 dhcp-report			(\?page:[[:digit:]]{0,3}-[[:digit:]]{0,3})? nil
 
-dhcp-range			(\?page:[[:digit:]]{0,3}-[[:digit:]]{0,3})? (\&entry_[0-9]{1,3}=(old|anew)\&ip1_[0-9]{1,3}=[[:print:]]{0,45}\&ip2_[0-9]{1,3}=[[:print:]]{0,45}(\&del_[0-9]{1,3}=on)?)+
+dhcp-range			(\?page:[[:digit:]]{0,3}-[[:digit:]]{0,3})? (\&entry_[0-9]{1,3}=(old|anew)\&interface_[0-9]{1,3}=(internal|auxiliary)\&ip1_[0-9]{1,3}=[[:print:]]{0,45}\&ip2_[0-9]{1,3}=[[:print:]]{0,45}(\&del_[0-9]{1,3}=on)?)+
 
 dns				(\?page:[[:digit:]]{0,3}-[[:digit:]]{0,3})? (\&entry_[0-9]{1,2}=(old|anew)\&ip_[0-9]{1,2}=[[:print:]]{0,45}(\&del_[0-9]{1,2}=on)?){0,7}
 
@@ -94,7 +98,7 @@ dns-resolve			nil dummy=on(\&arm_resolve=on)?
 
 dynamicdns			nil state=(on|off)\&provider=(changeip|dnshome|freemyip|myonlineportal|noip)\&hostname=[[:print:]]{0,192}\&username=[[:print:]]{0,192}\&password=[[:print:]]{0,192}\&interval=[[:digit:]]{1,2}
 
-edit-guard-rule			(\?[[:print:]]{0,192})? policy_name=[[:print:]]{0,192}\&action=(allow|deny)(\&urllist=[[:print:]]{0,192}){0,99}
+edit-guard-rule			(\?[[:print:]]{0,192})? policy_name=[[:print:]]{0,192}\&policy_action=(allow|deny)(\&urllist=[[:print:]]{0,192}){0,99}
 
 email				nil ftp_email=[[:print:]]{0,192}\&admin_email=[[:print:]]{0,192}\&admin_name=[[:print:]]{0,192}\&server=[[:print:]]{0,192}\&port=[[:print:]]{0,15}\&username=[[:print:]]{0,192}\&password=[[:print:]]{0,192}
 
@@ -104,7 +108,7 @@ error
 
 file-exchange
 
-file-operation			nil operation=(clear|load|save|del)(\&protocol=(_ftp|_sftp|_tftp)\&server=[[:print:]]{0,192}\&dirname=[[:print:]]{0,384}((admin_snmp_certificate|admin_ssh_key|tls_ca_third|tls_server|tls_ca_system|tls_client|waf_rweb_custom|antivirus_whitelist_signature|manager_ssh)=on)*)?
+file-operation			nil operation=(clear|load|save|del)(\&protocol=(_ftp|_sftp|_tftp)\&server=[[:print:]]{0,192}\&dirname=[[:print:]]{0,384}((admin_snmp_certificate|tls_ca_third|tls_server|tls_ca_system|tls_client|waf_rweb_custom|antivirus_whitelist_signature|manager_ssh)=on)*)?
 
 first-login			nil (password1=[[:print:]]{0,96}\&password2=[[:print:]]{0,96})?
 
@@ -124,7 +128,7 @@ guard-policy			(\?page:[[:digit:]]{0,3}-[[:digit:]]{0,3})? (\&entry_[0-9]{1,2}=(
 
 edit-guard-policy		(\?[[:print:]]{0,192})? policy_name=[[:print:]]{0,192}(\&filter=[[:print:]]{0,192}){0,99}
 
-guard-rule			(\?page:[[:digit:]]{0,3}-[[:digit:]]{0,3})? (\&entry_[0-9]{1,2}=(old|anew|inew|move[[:digit:]]{1,3})\&policy_name_[0-9]{1,2}=[[:print:]]{0,192}\&action_[0-9]{1,2}=(allow|deny)(\&del_[0-9]{1,2}=on)?){0,99}
+guard-rule			(\?page:[[:digit:]]{0,3}-[[:digit:]]{0,3})? (\&entry_[0-9]{1,2}=(old|anew|inew|move[[:digit:]]{1,3})\&policy_name_[0-9]{1,2}=[[:print:]]{0,192}\&operation_[0-9]{1,2}=(allow|deny)(\&del_[0-9]{1,2}=on)?){0,99}
 
 ip				nil (external_ip=[[:print:]]{0,45}\&external_mk=[[:print:]]{0,45}\&)internal_ip=[[:print:]]{0,45}\&internal_mk=[[:print:]]{0,45}(\&auxiliary_ip=[[:print:]]{0,45}\&auxiliary_mk=[[:print:]]{0,45}(\&internal_8021q_vlan_[0-9]{1,2}=[0-9]{1,4}\&internal_8021q_ip_[0-9]{1,2}=[[:print:]]{0,45}\&internal_8021q_mask_[0-9]{1,2}=[[:print:]]{0,45}){1,16})?
 
@@ -170,7 +174,7 @@ network-activity-auxiliary-dashboard (\?[[:digit:]]{0,16})?
 network-activity-external-dashboard (\?[[:digit:]]{0,16})?
 network-activity-internal-dashboard (\?[[:digit:]]{0,16})?
 
-network-utilities
+diagnostic-tools
 
 ntp				(\?page:[[:digit:]]{0,3}-[[:digit:]]{0,3})? (\&entry_[0-9]{1,2}=(old|anew)\&server_[0-9]{1,2}=[[:print:]]{0,192}(\&del_[0-9]{1,2}=on)?){0,7}
 
@@ -182,13 +186,13 @@ password-ldap			nil bind_password=[[:print:]]{0,192}
 
 password-login			nil (password=[[:print:]]{0,96}\&)?password1=[[:print:]]{0,96}\&password2=[[:print:]]{0,96}(gui=on)?
 
-password-kerberos		nil password1=[[:print:]]{0,96}\&password2=[[:print:]]{0,96}
+password-ad-account		nil password1=[[:print:]]{0,96}\&password2=[[:print:]]{0,96}
 
 password-snmp			nil password1=[[:print:]]{0,96}\&password2=[[:print:]]{0,96}
 
 peer-ha				(\?page:[[:digit:]]{0,3}-[[:digit:]]{0,3})? (\&entry_[0-9]{1,2}=(old|anew)\&ip_[0-9]{1,2}=[[:print:]]{0,45}\&qos_[0-9]{1,2}=[[:print:]]{0,12}(\&del_[0-9]{1,2}=on)?){0,99}
 
-peer-next			(\?page:[[:digit:]]{0,3}-[[:digit:]]{0,3})? (\&entry_[0-9]{1,2}=(old|anew)\&ip_[0-9]{1,2}=[[:print:]]{0,45}\&port_[0-9]{1,5}=[[:print:]]{0,15}(\&del_[0-9]{1,2}=on)?){0,99}
+peer-next			(\?page:[[:digit:]]{0,3}-[[:digit:]]{0,3})? (\&entry_[0-9]{1,2}=(old|anew)\&ip_[0-9]{1,2}=[[:print:]]{0,45}\&port_[0-9]{1,5}=[[:print:]]{0,15}\&qos_[0-9]{1,2}=[[:print:]]{0,12}(\&del_[0-9]{1,2}=on)?){0,99}
 
 peer-share			(\?page:[[:digit:]]{0,3}-[[:digit:]]{0,3})? (\&entry_[0-9]{1,2}=(old|anew)\&ip_[0-9]{1,2}=[[:print:]]{0,45}\&qos_[0-9]{1,2}=[[:print:]]{0,12}(\&del_[0-9]{1,2}=on)?){0,99}
 
@@ -196,7 +200,7 @@ peer-previous			(\?page:[[:digit:]]{0,3}-[[:digit:]]{0,3})? (\&entry_[0-9]{1,2}=
 
 port				nil port_wadmin=[[:print:]]{0,15}(\&port_proxy=[[:print:]]{0,15}\&port_thttp=[[:print:]]{0,15}\&port_thttps=[[:print:]]{0,15}\&port_antivirus=[[:print:]]{0,15}\&port_ocsp=[[:print:]]{0,15}\&port_isakmp=[[:print:]]{0,15}\&port_natt=[[:print:]]{0,15}\&port_http_peer=[[:print:]]{0,15}\&port_htcp_peer=[[:print:]]{0,15}\&port_dhcp=[[:print:]]{0,15}\&port_waudit=[[:print:]]{0,15})?
 
-power				nil action=(reboot|halt|ha-failover|ha-active)
+power				nil operation=(reboot|halt|ha-failover|ha-active)
 
 qos-bandwidth			nil internal_ingress=[[:print:]]{0,24}\&internal_egress=[[:print:]]{0,24}\&external_ingress=[[:print:]]{0,24}\&external_egress=[[:print:]]{0,24}\&auxiliary_ingress=[[:print:]]{0,24}\&auxiliary_egress=[[:print:]]{0,24}
 
@@ -204,11 +208,11 @@ qos-report			(\?diff)?
 
 qos-shape-gateway		nil web_internal_ingress=[[:print:]]{0,30}\&web_internal_egress=[[:print:]]{0,30}\&web_external_ingress=[[:print:]]{0,30}\&web_external_egress=[[:print:]]{0,30}\&web_auxiliary_ingress=[[:print:]]{0,30}\&web_auxiliary_egress=[[:print:]]{0,30}\&tweb_internal_ingress=[[:print:]]{0,30}\&tweb_internal_egress=[[:print:]]{0,30}\&tweb_auxiliary_ingress=[[:print:]]{0,30}\&tweb_auxiliary_egress=[[:print:]]{0,30}\&rweb_internal_ingress=[[:print:]]{0,30}\&rweb_internal_egress=[[:print:]]{0,30}\&rweb_external_ingress=[[:print:]]{0,30}\&rweb_external_egress=[[:print:]]{0,30}\&antivirus_internal_ingress=[[:print:]]{0,30}\&antivirus_internal_egress=[[:print:]]{0,30}\&antivirus_external_ingress=[[:print:]]{0,30}\&antivirus_external_egress=[[:print:]]{0,30}\&antivirus_auxiliary_ingress=[[:print:]]{0,30}\&antivirus_auxiliary_egress=[[:print:]]{0,30}\&file_internal_ingress=[[:print:]]{0,30}\&file_internal_egress=[[:print:]]{0,30}\&file_external_ingress=[[:print:]]{0,30}\&file_external_egress=[[:print:]]{0,30}\&file_auxiliary_ingress=[[:print:]]{0,30}\&file_auxiliary_egress=[[:print:]]{0,30}\&peer_internal_ingress=[[:print:]]{0,30}\&peer_internal_egress=[[:print:]]{0,30}\&vpnipsec_external_ingress=[[:print:]]{0,30}\&vpnipsec_external_egress=[[:print:]]{0,30}\&default_internal_ingress=[[:print:]]{0,30}\&default_internal_egress=[[:print:]]{0,30}\&default_external_ingress=[[:print:]]{0,30}\&default_external_egress=[[:print:]]{0,30}\&default_auxiliary_ingress=[[:print:]]{0,30}\&default_auxiliary_egress=[[:print:]]{0,30}
 				
-qos-shape-router		(\?page:[[:digit:]]{0,3}-[[:digit:]]{0,3})? (\&entry_[0-9]{1,4}=(old|anew|inew|move[[:digit:]]{1,3})\&rule_id_[0-9]{1,4}=[[:print:]]{0,192}\&dev_[0-9]{1,4}=(internal|external|auxiliary)\&protocol_[0-9]{1,4}=(any|udp|tcp)\&src_ip_[0-9]{1,4}=[[:print:]]{0,54}\&src_port_[0-9]{1,4}=[[:print:]]{0,15}\&ingress_qos_[0-9]{1,4}=[[:print:]]{0,30}\&dscp_[0-9]{1,4}=[[:print:]]{0,9}\&dst_ip_[0-9]{1,4}=[[:print:]]{0,54}\&dst_port_[0-9]{1,4}=[[:print:]]{0,15}\&egress_qos_[0-9]{1,4}=[[:print:]]{0,30}(\&del_[0-9]{1,4}=on)?)+
+qos-shape-router		(\?page:[[:digit:]]{0,3}-[[:digit:]]{0,3})? (\&entry_[0-9]{1,4}=(old|anew|inew|move[[:digit:]]{1,3})\&rule_id_[0-9]{1,4}=[[:print:]]{0,192}\&dev_[0-9]{1,4}=(external|web|rweb|admin|file|mon|antivirus|peer|auxiliary)\&protocol_[0-9]{1,4}=(any|udp|tcp)\&src_ip_[0-9]{1,4}=[[:print:]]{0,54}\&src_ports_[0-9]{1,4}=[[:print:]]{0,33}\&ingress_qos_[0-9]{1,4}=[[:print:]]{0,30}\&dscp_[0-9]{1,4}=[[:print:]]{0,9}\&dst_ip_[0-9]{1,4}=[[:print:]]{0,54}\&dst_ports_[0-9]{1,4}=[[:print:]]{0,33}\&egress_qos_[0-9]{1,4}=[[:print:]]{0,30}(\&del_[0-9]{1,4}=on)?)+
 
 qos-borrow			nil dummy=on(\&internal_ingress=on)?(\&internal_egress=on)?(\&external_ingress=on)?(\&external_egress=on)?(\&auxiliary_ingress=on)?(\&auxiliary_egress=on)?
 
-register			nil ((action=(register|unregister)\&os_key=[[:print:]]{0,192})|(mode=(new|old)\&email=[[:print:]]{0,192}&otp=[[:print:]]{0,192}))(\&accept=on)?
+register			nil ((operation=(register|unregister)\&os_key=[[:print:]]{0,192})|(mode=(new|old)\&email=[[:print:]]{0,192}&otp=[[:print:]]{0,192}))(\&accept=on)?
 
 rweb-balancer			(\?level:[1-9],key:[[:print:]]{0,275})? site_name=[a-zA-Z0-9\.\-]{0,64}\&method=(robin|traffic|pending)(\&sticky=on(\&mode=(insert|use)(\&cookie=[[:print:]]{0,48})?))?
 

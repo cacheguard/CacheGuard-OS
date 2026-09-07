@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -29,35 +28,6 @@ show-client-tls()
 
     shortcutMenuItem[0]="tls-ocsp-etc"
     shortcutMenuTitle[0]="OCSP Settings"
-
-    case ${APL_ROLE} in
-	gateway)
-	    ;;
-	manager)
-	    if gui-is-in-contextual-role ; then
-		local context_base=${GUI_CONTEXT/:*}
-		case ${context_base} in
-		    template)
-			local comment="Client certificates can't be created in a template context."
-
-			show-title "${title}" disabled "tls"
-			show-shortcuts-menu
-			echo "<div style='margin:0; margin-top:5px; padding:5px;'>"
-			echo "${comment}"
-			echo "</div>"
-			echo "<div style='clear:left;'></div>"
-			show-form "${width}" disabled
-
-			return 0
-			;;
-		    *)
-			;;
-		esac
-	    fi
-	    ;;
-	*)
-	    ;;
-    esac
 
     local get_args=${1}
     local page_ref=$(get-arg-value "${get_args}" page)
@@ -202,7 +172,6 @@ show-client-tls()
     local users_nb=$(gui-get-contextual-users-nb)
 
     show-title "${title}" "${state}" "tls"
-    show-shortcuts-menu
     show-list-form $[${users_nb} * ${TLS_NB_FACTOR}] ${width} "${page_ref}" '' '' ${add_state}
 }
 

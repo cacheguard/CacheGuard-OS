@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -24,23 +23,23 @@
 
 show-system-report-service()
 {
+    test -n "${1}" || return 1
     local display_time=${1}
-    local table_width=${2}
-    test -n "${table_width}" || table_width="405"
+    local compact=${2}
 
-    echo "<div class='core-form'>"
-    echo "<table class='highlight-list' width='${table_width}'>"
+    test -z "${compact}" || compact=' compact'
 
+    echo "<table class='highlight-list${compact}'>"
     echo "<thead>"
     echo "<tr>"
-    echo "<td width='80%' class='table-header indicator-table-header' align='center'>Service</td>"
-    echo "<td width='20%' class='table-header' align='center'>State</td>"
+    echo "<th class='table-header'>Service</th>"
+    echo "<th class='table-header'>State</th>"
     echo "</tr>"
     echo "</thead>"
 
     echo "<tbody>"
 
-    test -z "${display_time}" || display-appliance-time-row center
+    test ${display_time} != time || display-appliance-time-row
 
     local service flag
     local name
@@ -50,14 +49,14 @@ show-system-report-service()
 	do
 	    name=$(get-service-title ${service})
 	    test -n "${name}" || continue
-	    
+
             echo "<tr>"
-            echo "<td align='left'>${name}</td>"
-	    
+            echo "<td>${name}</td>"
+
             if test ${flag} -eq 0 ; then
-		echo "<td align='center'><img src='/image/ok.png' /></td>"
+		echo "<td><img class='small' src='/image/ok.png' /></td>"
             else
-		echo "<td align='center'><img src='/image/ko.png' title='KO' /></td>"
+		echo "<td><img class='small' src='/image/ko.png' title='KO' /></td>"
             fi
             echo "</tr>"
 	    
@@ -66,5 +65,4 @@ show-system-report-service()
 
     echo "</tbody>"
     echo "</table>"
-    echo "</div>"
 }

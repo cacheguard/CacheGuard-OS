@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -32,15 +31,11 @@ run()
     echo "<form name='mainform' id='mainform'></form>"
 
     echo "<div class='core-form'>"
-    refresh-buttons "update_avserver_log( 1 )" "margin-left:1px;"
-    echo "<div style='clear:left;'></div>"
-    echo "<p>"
+    refresh-buttons
     echo "<input id='sitename' type='hidden' value=''>"
     echo "<div id='${AUTO_REPORT_ID}' class='web-log'>"
     echo "</div>"
     echo "</div>"
-
-    show-scroll-top
 }
 
 run

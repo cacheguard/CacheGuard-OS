@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -67,11 +66,11 @@ set-host()
 		test -n "${weight}" || weight="50"
 		test -n "${qos}" || qos="100"
 
-		echo "rweb host ${name} add '${VALUES[${dev_pos}]}' '${VALUES[${protocol_pos}]}' '${VALUES[${ip_pos}]}' '${port}' '${weight}' '${qos}'" >> ${transaction}
+		echo "rweb host ${name} add ${VALUES[${dev_pos}]} ${VALUES[${protocol_pos}]} ${VALUES[${ip_pos}]} ${port} ${weight} ${qos}" >> ${transaction}
 	    fi
 	    pos=$[${pos} + 7]
 	else
-	    echo "rweb host ${name} del '${VALUES[${dev_pos}]}' '${VALUES[${protocol_pos}]}' '${VALUES[${ip_pos}]}' '${VALUES[${port_pos}]}'" >> ${transaction}
+	    echo "rweb host ${name} del ${VALUES[${dev_pos}]} ${VALUES[${protocol_pos}]} ${VALUES[${ip_pos}]} ${VALUES[${port_pos}]}" >> ${transaction}
 	    pos=$[${pos} + 8]
 	fi
     done

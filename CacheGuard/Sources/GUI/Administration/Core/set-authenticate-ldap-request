@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -26,16 +25,36 @@ set-ldap-request()
 {
     local transaction=/tmp/${TRANSACTION_FILE}.wadmin.${REMOTE_USER}.${$}
 
-    if test -n "${VALUES[4]}" ; then
-        echo "authenticate ldap request '${VALUES[0]}' '${VALUES[1]}' '${VALUES[2]}' '${VALUES[3]}' '${VALUES[4]}'" > ${transaction}
+    local base_dn=${VALUES[0]}
+    local login_attr=${VALUES[1]}
+    local password_attr=${VALUES[2]}
+    local filter=${VALUES[3]}
+    local group_dn=${VALUES[4]}
+
+    base_dn=${base_dn// /}
+    filter=${filter// /}
+    group_dn=${group_dn// /}
+
+    test -n "${password_attr}" || password_attr="''"
+
+    if test -n "${group_dn}" ; then
+        echo "authenticate ldap request '${base_dn}' ${login_attr} ${password_attr} '${filter}' '${group_dn}'" > ${transaction}
     else
-        echo "authenticate ldap request '${VALUES[0]}' '${VALUES[1]}' '${VALUES[2]}' '${VALUES[3]}'" > ${transaction}
+        echo "authenticate ldap request '${base_dn}' ${login_attr} ${password_attr} '${filter}'" > ${transaction}
     fi
 
     if test "${ATTRIBUTES[5]}" == 'bind_required' ; then
-	echo "authenticate ldap binddn '${VALUES[6]}' on '${VALUES[7]}'" >> ${transaction}
+
+	local bind_dn=${VALUES[6]}
+	local bind_password=${VALUES[7]}
+
+	bind_dn=${bind_dn// /}
+
+	echo "authenticate ldap binddn '${bind_dn}' on '${bind_password}'" >> ${transaction}
     else
-	echo "authenticate ldap binddn '${VALUES[5]}' off" >> ${transaction}
+	local bind_dn=${VALUES[5]}
+	bind_dn=${bind_dn// /}
+	echo "authenticate ldap binddn '${bind_dn}' off" >> ${transaction}
     fi
 
     execute-transaction ${transaction}

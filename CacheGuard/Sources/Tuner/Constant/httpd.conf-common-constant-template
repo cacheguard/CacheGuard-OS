@@ -1,0 +1,121 @@
+AcceptFilter http data
+AcceptFilter https data
+AcceptPathInfo Off
+AccessFileName .htaccess
+AddDefaultCharset Off
+AllowEncodedSlashes On
+ContentDigest Off
+DefaultType None
+EnableMMAP Off
+EnableSendfile Off
+ExtendedStatus Off
+FileETag None
+FlushMaxPipelined 5
+FlushMaxThreshold 65535
+Protocols h2 http/1.1
+ProtocolsHonorOrder On
+H2Direct Off
+H2ModernTLSOnly on
+H2Push Off
+H2SerializeHeaders off
+H2StreamMaxMemSize 65536
+H2TLSWarmUpSize 1048576
+H2WindowSize 65535
+Header unset ETag
+HostnameLookups Off
+KeepAlive On
+KeepAliveTimeout 2
+TimeOut 60
+MaxKeepAliveRequests 1000
+LimitInternalRecursion 10
+LimitRequestFields 128
+MaxRangeOverlaps None
+MaxRangeReversals None
+MaxRanges 5
+MergeSlashes On
+MergeTrailers Off
+QualifyRedirectURL Off
+ReadBufferSize 8192
+SeeRequestTail Off
+TraceEnable on
+UseCanonicalName Off
+UseCanonicalPhysicalPort Off
+
+Alias /_ErrorLocation_ "_Error_Dir_/share/errors"
+<Location /_ErrorLocation_>
+    Order allow,deny
+    Allow from all
+</Location>
+
+ErrorDocument 400 /_ErrorLocation_/HTTP_BAD_REQUEST.html
+ErrorDocument 401 /_ErrorLocation_/HTTP_UNAUTHORIZED.html
+ErrorDocument 402 /_ErrorLocation_/HTTP_PAYMENT_REQUIRED.html
+ErrorDocument 403 /_ErrorLocation_/HTTP_FORBIDDEN.html
+ErrorDocument 404 /_ErrorLocation_/HTTP_NOT_FOUND.html
+ErrorDocument 405 /_ErrorLocation_/HTTP_METHOD_NOT_ALLOWED.html
+ErrorDocument 406 /_ErrorLocation_/HTTP_NOT_ACCEPTABLE.html
+ErrorDocument 407 /_ErrorLocation_/HTTP_PROXY_AUTHENTICATION_REQUIRED.html
+ErrorDocument 408 /_ErrorLocation_/HTTP_REQUEST_TIME_OUT.html
+ErrorDocument 409 /_ErrorLocation_/HTTP_CONFLICT.html
+ErrorDocument 410 /_ErrorLocation_/HTTP_GONE.html
+ErrorDocument 411 /_ErrorLocation_/HTTP_LENGTH_REQUIRED.html
+ErrorDocument 412 /_ErrorLocation_/HTTP_PRECONDITION_FAILED.html
+ErrorDocument 413 /_ErrorLocation_/HTTP_REQUEST_ENTITY_TOO_LARGE.html
+ErrorDocument 414 /_ErrorLocation_/HTTP_REQUEST_URI_TOO_LARGE.html
+ErrorDocument 415 /_ErrorLocation_/HTTP_UNSUPPORTED_MEDIA_TYPE.html
+ErrorDocument 416 /_ErrorLocation_/HTTP_REQUESTED_RANGE_NOT_SATISFIABLE.html
+ErrorDocument 417 /_ErrorLocation_/HTTP_EXPECTATION_FAILED.html
+ErrorDocument 422 /_ErrorLocation_/HTTP_UNPROCESSABLE_ENTITY.html
+ErrorDocument 423 /_ErrorLocation_/HTTP_LOCKED.html
+ErrorDocument 424 /_ErrorLocation_/HTTP_FAILED_DEPENDENCY.html
+ErrorDocument 426 /_ErrorLocation_/HTTP_UPGRADE_REQUIRED.html
+
+ErrorDocument 500 /_ErrorLocation_/HTTP_INTERNAL_SERVER_ERROR.html
+ErrorDocument 501 /_ErrorLocation_/HTTP_NOT_IMPLEMENTED.html
+ErrorDocument 502 /_ErrorLocation_/HTTP_BAD_GATEWAY.html
+ErrorDocument 503 /_ErrorLocation_/HTTP_SERVICE_UNAVAILABLE.html
+ErrorDocument 504 /_ErrorLocation_/HTTP_GATEWAY_TIMEOUT.html
+ErrorDocument 505 /_ErrorLocation_/HTTP_VERSION_NOT_SUPPORTED.html
+ErrorDocument 506 /_ErrorLocation_/HTTP_VARIANT_ALSO_VARIES.html
+ErrorDocument 510 /_ErrorLocation_/HTTP_NOT_EXTENDED.html
+
+ServerTokens ProductOnly
+ServerSignature Off
+
+<Directory _Base_Dir_>
+    Options FollowSymLinks
+    AllowOverride None
+    Order deny,allow
+    Deny from all
+</Directory>
+
+<FilesMatch "^\.ht">
+    Order allow,deny
+    Deny from all
+</FilesMatch>
+
+TypesConfig _Web_Server_Dir_/etc/mime.types
+AddType application/x-ns-proxy-autoconfig .dat
+
+SetEnvIf Request_URI "^/squid-internal-dynamic/netdb$" SQUID_INTERNAL
+SetEnvIf Remote_Addr "^(.+)$" REAL_CLIENT_IP=$1
+SetEnvIf X-Forwarded-For "^(\d{1,3}+\.\d{1,3}+\.\d{1,3}+\.\d{1,3}+).*$" REAL_CLIENT_IP=$1
+
+LogFormat "%{%Y-%m-%dT%H:%M:%S}t.%{usec_frac}t%{%z}t %{REAL_CLIENT_IP}e %u \"%m http://%v%U%q %H\" %>s %b \"%{User-Agent}i\"" http-proxy
+LogFormat "%{%Y-%m-%dT%H:%M:%S}t.%{usec_frac}t%{%z}t %h %u \"%m https://%v%U%q %H\" %>s %b \"%{User-Agent}i\"" https-proxy
+LogFormat "%{%Y-%m-%dT%H:%M:%S}t.%{usec_frac}t%{%z}t %h %u \"%m https://%v%U%q %H\" %>s %b \"%{User-Agent}i\"" https-rweb
+LogFormat "%{%Y-%m-%dT%H:%M:%S}t.%{usec_frac}t%{%z}t %h %u \"%m http://%v%U%q %H\" %>s %b \"%{User-Agent}i\"" http-rweb
+
+LogFormat "%{REAL_CLIENT_IP}e %u \"%m http://%v%U%q %H\" %>s %b \"%{User-Agent}i\"" http-proxy-syslog
+LogFormat "%h %u \"%m https://%v%U%q %H\" %>s %b \"%{User-Agent}i\"" https-proxy-syslog
+LogFormat "%h %u \"%m https://%v%U%q %H\" %>s %b \"%{User-Agent}i\"" https-rweb-syslog
+LogFormat "%h %u \"%m http://%v%U%q %H\" %>s %b \"%{User-Agent}i\"" http-rweb-syslog
+
+ScriptAlias /cgi-bin/ "/share/cgi-bin/"
+
+<Directory "_Base_Dir_/share/cgi-bin">
+    AllowOverride None
+    Options None
+    Order allow,deny
+    Allow from all
+</Directory>

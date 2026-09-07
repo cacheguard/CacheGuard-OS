@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -27,8 +26,8 @@ source system-report-raid-common.${GUI_EXT_NAME}
 
 show-system-report-disk-dashboard()
 {
-    show-system-report-disk 'time'
-    show-system-report-raid
+    show-system-report-disk 'time' 'compact'
+    show-system-report-raid 'notime' 'compact'
     reset-gui-error-log
 }
 

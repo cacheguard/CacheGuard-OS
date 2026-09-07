@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       Configurator
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -22,120 +21,71 @@
 #
 ###########################################################################
 
-set-dhcp-parameters()
+set-dhcp-parameters1()
 {
-    if test ${DHCP_MODE} == True -a ${WEB_MODE} == True -a ${IP_WEB_IP} != "0.0.0.0" ; then
-	if test -z "${DHCP_FIXED_LIST}" -a -z "${DHCP_RANGE_LIST}" ; then
-	    export DHCP_IS_ACTIVE=False
-	else
-	    export DHCP_IS_ACTIVE=True
-	fi
-    else
-	export DHCP_IS_ACTIVE=False
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    test -n "${3}" || return 3
+    local dhcp_mode=${1}
+    local ip_web_ip=${2}
+    local ip_auxiliary_ip=${3}
+    local if_auxiliary=${4}
+    local dhcp_fixed_list=${5}
+    local dhcp_range_list=${6}
+
+    if test ${dhcp_mode} == False ; then
+	echo False
+	return 0
     fi
 
-    if test ${CURRENT_DHCP_MODE} == True -a ${CURRENT_WEB_MODE} == True -a ${CURRENT_IP_WEB_IP} != "0.0.0.0" ; then
-	if test -z "${CURRENT_DHCP_FIXED_LIST}" -a -z "${CURRENT_DHCP_RANGE_LIST}" ; then
-	    export CURRENT_DHCP_IS_ACTIVE=False
-	else
-	    export CURRENT_DHCP_IS_ACTIVE=True
-	fi
+    if test -z "${dhcp_fixed_list}" -a -z "${dhcp_range_list}" ; then
+	echo False
+	return 0
+    fi
+
+    if test ${ip_web_ip} != 0.0.0.0 ; then
+	echo True
+	return 0
+    fi
+
+    if test -n "${if_auxiliary}" -a ${ip_auxiliary_ip} != 0.0.0.0 ; then
+	echo True
     else
-	export CURRENT_DHCP_IS_ACTIVE=False
+	echo False
     fi
 }
 
-gen-dhcpd-range-conf()
+set-dhcp-parameters()
+{
+    DHCP_IS_ACTIVE=$(set-dhcp-parameters1 ${DHCP_MODE} ${IP_WEB_IP} ${IP_AUXILIARY_IP} ${IF_AUXILIARY} "${DHCP_FIXED_LIST}" "${DHCP_RANGE_LIST}")
+    CURRENT_DHCP_IS_ACTIVE=$(set-dhcp-parameters1 ${CURRENT_DHCP_MODE} ${CURRENT_IP_WEB_IP} ${CURRENT_IP_AUXILIARY_IP} ${CURRENT_IF_AUXILIARY} "${CURRENT_DHCP_FIXED_LIST}" "${CURRENT_DHCP_RANGE_LIST}")
+}
+
+gen-dhcpd-fixed-conf()
 {
     test -n "${1}" || return 1
-    test -n "${2}" || return 1
-    test -n "${3}" || return 1
-    test -n "${4}" || return 1
-    test -n "${5}" || return 1
+    local in_interface=${1}
 
-    local real_ip=${1}
-    local mask=${2}
-    local net=${3}
-    local brd=${4}
-    local vrrp_ip=${5}
-
-    local i=0 elt range
-    local hostname mac ip
-    local ip1 ip2
-
-    echo "subnet ${net} netmask ${mask} {"
-    echo -e "\toption subnet-mask ${mask};"
-    echo -e "\toption broadcast-address ${brd};"
-
-    if test ${HA_MODE} == True ; then
-	if test ${vrrp_ip} != 0.0.0.0 ; then
-	    echo -e "\toption routers ${vrrp_ip};"
-	    echo -e "\toption local-pac-server \"http://${vrrp_ip}/ha.pac\";"
-	fi
-    else
-	if test ${real_ip} != 0.0.0.0 ; then
-	    echo -e "\toption routers ${real_ip};"
-	    echo -e "\toption local-pac-server \"http://${real_ip}/ha.pac\";"
-	fi
-    fi
-
-    if test -n "${NAME_SERVER_LIST}" ; then
-	local ns null=1
-	for ns in ${NAME_SERVER_LIST}
-	do
-	    if test ${ns} == 127.0.0.1 ; then
-		if test ${DNS_MODE} == True ; then
-		    if test ${HA_MODE} == True ; then
-			if test ${vrrp_ip} != 0.0.0.0 ; then
-			    if test ${null} -eq 1 ; then
-				echo -ne "\toption domain-name-servers "
-			    else
-				echo -n ", "
-			    fi
-			    echo -n "${vrrp_ip}"
-			    null=0
-			fi
-		    else
-			if test ${real_ip} != 0.0.0.0 ; then
-			    if test ${null} -eq 1 ; then
-				echo -ne "\toption domain-name-servers "
-			    else
-				echo -n ", "
-			    fi
-			    echo -n "${real_ip}"
-			    null=0
-			fi
-		    fi
-		fi
-	    else
-		if test ${null} -eq 1 ; then
-		    echo -ne "\toption domain-name-servers "
-		else
-		    echo -n ", "
-		fi
-		echo -n "${ns}"
-		null=0
-	    fi
-	done
-	
-	test ${null} -eq 1 || echo ";"
-    fi
-
-    echo
+    local  elt range i=0
+    local interface hostname mac ip
 
     for elt in ${DHCP_FIXED_LIST}
     do
-	range=$[${i} % 3]
+	range=$[${i} % 4]
 	case ${range} in
 	    0)
 		hostname=${elt}
 		;;
 	    1)
-		mac=${elt}
+		interface=${elt}
 		;;
 	    2)
+		mac=${elt}
+		;;
+	    3)
 		ip=${elt}
-		echo -e "\thost ${hostname} {hardware ethernet ${mac}; fixed-address ${ip};}"
+		test ${interface} != ${in_interface} || \
+		    echo -e "\thost ${hostname} {hardware ethernet ${mac}; fixed-address ${ip};}"
 		;;
 	    *)
 		return 1
@@ -143,15 +93,46 @@ gen-dhcpd-range-conf()
 	esac
 	((i++))
     done
+}
 
-    test -z "${DHCP_FIXED_LIST}" || echo
+gen-dhcpd-range-conf()
+{
+    test -n "${1}" || return 1
+    local in_interface=${1}
 
-    i=0
+    local  elt range i=0
+    local ip1 ip2
+    local ranges
+
+    for elt in ${DHCP_RANGE_LIST}
+    do
+	range=$[${i} % 3]
+	case ${range} in
+	    0)
+		interface=${elt}
+		;;
+	    1)
+		ip1=${elt}
+		;;
+	    2)
+		ip2=${elt}
+		test ${interface} != ${in_interface} || ranges="${ranges} ${ip1} ${ip2}"
+		;;
+	    *)
+		return 1
+		;;
+	esac
+	((i++))
+    done
+    ranges=${ranges:1}
+
+    test -n "${ranges}" || return 0
+
     echo -e "\tpool {"
     test -z "${DHCP_PEER_LIST}" || echo -e "\t\tfailover peer \"${SHOSTNAME}\";"
     echo -e "\t\tdeny dynamic bootp clients;"
 
-    for elt in ${DHCP_RANGE_LIST}
+    for elt in ${ranges}
     do
 	range=$[${i} % 2]
 	case ${range} in
@@ -169,7 +150,81 @@ gen-dhcpd-range-conf()
 	((i++))
     done
     echo -e "\t}"
+}
 
+gen-dhcpd-range+fixed-conf()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    test -n "${3}" || return 3
+    test -n "${4}" || return 4
+    test -n "${5}" || return 5
+
+    local in_interface=${1}
+    local real_ip=${2}
+    local mask=${3}
+    local net=${4}
+    local brd=${5}
+    local vrrp_ip=${6}
+
+    echo
+    echo "subnet ${net} netmask ${mask} {"
+    echo -e "\toption subnet-mask ${mask};"
+    echo -e "\toption broadcast-address ${brd};"
+
+    if test ${HA_MODE} == True ; then
+	if test -n "${vrrp_ip}" -a "${vrrp_ip}" != 0.0.0.0 ; then
+	    echo -e "\toption routers ${vrrp_ip};"
+	    echo -e "\toption local-pac-server \"http://${vrrp_ip}/ha.pac\";"
+	fi
+    else
+	echo -e "\toption routers ${real_ip};"
+	echo -e "\toption local-pac-server \"http://${real_ip}/ha.pac\";"
+    fi
+
+    if test -n "${NAME_SERVER_LIST}" ; then
+	local ns null=1
+	for ns in ${NAME_SERVER_LIST}
+	do
+	    if test ${ns} == 127.0.0.1 ; then
+		if test ${DNS_MODE} == True ; then
+		    if test ${HA_MODE} == True ; then
+			if test -n "${vrrp_ip}" -a "${vrrp_ip}" != 0.0.0.0 ; then
+			    if test ${null} -eq 1 ; then
+				echo -ne "\toption domain-name-servers "
+			    else
+				echo -n ", "
+			    fi
+			    echo -n "${vrrp_ip}"
+			    null=0
+			fi
+		    else
+			if test ${null} -eq 1 ; then
+			    echo -ne "\toption domain-name-servers "
+			else
+			    echo -n ", "
+			fi
+			echo -n "${real_ip}"
+			null=0
+		    fi
+		fi
+	    else
+		if test ${null} -eq 1 ; then
+		    echo -ne "\toption domain-name-servers "
+		else
+		    echo -n ", "
+		fi
+		echo -n "${ns}"
+		null=0
+	    fi
+	done
+	
+	test ${null} -eq 1 || echo ";"
+    fi
+
+    gen-dhcpd-fixed-conf ${in_interface}
+    echo
+    gen-dhcpd-range-conf ${in_interface}
     echo -e "}"
 }
 
@@ -179,10 +234,6 @@ gen-dhcpd-conf()
     cat dhcpd.conf-tuned
     echo
     echo "option domain-name \"${DOMAIN_NAME}\";"
-
-    test ${IP_WEB_IP} == 0.0.0.0 || echo "local-address ${IP_WEB_IP};"
-    echo "server-identifier ${IP_WEB_IP};"
-    echo "option dhcp-server-identifier ${IP_WEB_IP};"
 
     echo "server-name ${SHOSTNAME};"
     if test ${HA_MODE} == True ; then
@@ -198,13 +249,12 @@ gen-dhcpd-conf()
 	echo "option ntp-servers ${ntp_servers};"
     fi
 
-    echo
-
     if test -n "${DHCP_PEER_LIST}" ; then
 	local role
 	role=${DHCP_PEER_LIST/ *}
 	ip=${DHCP_PEER_LIST#* }
 	ip=${ip/ *}
+	echo
 	echo -e "failover peer \"${SHOSTNAME}\" {"
 	case ${role} in
 	    master)
@@ -220,7 +270,7 @@ gen-dhcpd-conf()
 		;;
 	esac
 
-	echo -e "\taddress ${IP_WEB_IP};"
+	echo -e "\taddress ${IP_PEER_IP};"
 	echo -e "\tport ${DHCP_PEER_PORT};"
 	echo -e "\tpeer address ${ip};"
 	echo -e "\tpeer port ${DHCP_PEER_PORT};"
@@ -228,18 +278,30 @@ gen-dhcpd-conf()
 	echo -e "\tmax-unacked-updates 10;"
 	echo -e "\tload balance max seconds 3;"
 	echo -e "}"
-	echo
     fi
 
-    gen-dhcpd-range-conf ${IP_WEB_IP} ${IP_WEB_MASK} ${IP_WEB_NET} ${IP_WEB_BRD} ${VRRP_WEB_MASTER_IP}
+    test ${IP_WEB_IP} == 0.0.0.0 || \
+	gen-dhcpd-range+fixed-conf internal ${IP_WEB_IP} ${IP_WEB_MASK} ${IP_WEB_NET} ${IP_WEB_BRD} ${VRRP_WEB_MASTER_IP}
+
+    test -z "${IF_AUXILIARY}" -o ${IP_AUXILIARY_IP} == 0.0.0.0 || \
+	gen-dhcpd-range+fixed-conf auxiliary ${IP_AUXILIARY_IP} ${IP_AUXILIARY_MASK} ${IP_AUXILIARY_NET} ${IP_AUXILIARY_BRD} ${VRRP_AUXILIARY_MASTER_IP}
 }
 
 gen-sysconfig-dhcpd()
 {
-    echo "DHCPD_IF=\"${IF_WEB}\""
+    local dhcpd_ifs=${IF_WEB}
+    test -z "${IF_AUXILIARY}" || dhcpd_ifs="${dhcpd_ifs} ${IF_AUXILIARY}"
 
-    if test ${WEB_MODE} == True -a "${IP_WEB_IP}" != "0.0.0.0" ; then
-	test -z "${DHCP_FIXED_LIST}" -a -z "${DHCP_RANGE_LIST}" || echo "DHCPD_STATE=1"
+    echo "DHCPD_IFS=\"${dhcpd_ifs}\""
+
+    if test "${IP_WEB_IP}" != "0.0.0.0" -o "${IP_AUXILIARY_IP}" != "0.0.0.0" ; then
+	if test -n "${DHCP_FIXED_LIST}" -o -n "${DHCP_RANGE_LIST}" ; then
+	    echo "DHCPD_STATE=1"
+	else
+	    echo "DHCPD_STATE=0"
+	fi
+    else
+	echo "DHCPD_STATE=0"
     fi
 }
 

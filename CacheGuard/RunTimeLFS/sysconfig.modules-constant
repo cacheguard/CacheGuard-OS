@@ -17,7 +17,7 @@
 
 ipv6
 
-ifb numifbs=4
+ifb
 
 nf_conntrack_tftp
 nf_conntrack_ftp

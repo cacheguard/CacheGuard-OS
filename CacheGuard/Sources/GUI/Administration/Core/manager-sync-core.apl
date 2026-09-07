@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -31,7 +30,6 @@ show-manager-sync-form()
 {
     local in_role width=${DEFAULT_LIST_FORM_WIDTH}
     local ssh_key_title="Load from a File server"
-    local ssh_key_sz="20"
 
     itemWidth[0]=30
     itemWidth[1]=70
@@ -64,8 +62,8 @@ show-manager-sync-form()
 
     blankItemContent[0]=$(show-manager-sync-role ${in_role})
     blankItemContent[1]="type='text' size='15' maxlength='15' value='${MANAGER_SYNC_PEER_IP}'"
-    blankItemContent[2]="cols='50' rows='20'"
-    blankItemContent[3]="<a href='admin-ssh-key-load.${GUI_EXT_NAME}?key:${ssh_key_id}'><img style='height:${ssh_key_sz}px; width:${ssh_key_sz}px;' src='${IMAGE_DIR}/admin-ssh-key.png' alt='' title='${ssh_key_title}' /></a>"
+    blankItemContent[2]="cols='50' rows='20' maxlength='1000'"
+    blankItemContent[3]="<a href='admin-ssh-key-load.${GUI_EXT_NAME}?key:${ssh_key_id}'><img src='${IMAGE_DIR}/admin-ssh-key.png' alt='' title='${ssh_key_title}' /></a>"
 
     checkItem[1]=ip
     checkItem[2]=printable

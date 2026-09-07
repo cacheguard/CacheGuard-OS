@@ -4,7 +4,6 @@
 ###########################################################################
 #
 # MODULE:       VPN Subscription
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -592,8 +591,6 @@ function vpnsubscr_display_form( $subscriber )
 {
     $input_size = 28;
     $input_maxlength = 64;
-    $select_width = '140px';
-    $width = '140px';
 
     $data = $subscriber[DATA];
     $controls = $subscriber[CONTROLS];
@@ -678,7 +675,7 @@ function vpnsubscr_display_form( $subscriber )
     $service_id_html = "id='$service_id' name='$service_id'";
 
     $mandatory = "<font color='firebrick'> *</font>";
-    $new_button = "<div class='box-shortcut'><a href='subscriber.php'><input class='valid-button' type='submit' value='New' /></a></div>";
+    $new_button = "<div class='shortcut'><a href='subscriber.php'><input class='valid-button' type='submit' value='New' /></a></div>";
     $new = '';
 
     if ($method == 'POST' && !$errors) {
@@ -701,7 +698,7 @@ function vpnsubscr_display_form( $subscriber )
     else {
         switch ($operation) {
         case OPERATION_NEW:
-            $help_message = "Fill out the form below and validate to create a new subscriber account. Please note that usernames should be unique.";
+            $help_message = "Fill out the form below and submit it to create a new subscriber account. Please note that usernames must be unique.";
             break;
 
         case OPERATION_EDIT:
@@ -716,7 +713,7 @@ function vpnsubscr_display_form( $subscriber )
     }
     
     echo <<< EOT
-<div class="box-help">
+<div class="help">
 $help_message
 </div>
 
@@ -728,9 +725,7 @@ $new
 EOT;
     vpnsubscr_print_all_errors( $errors );
 
-    echo "<center>\n";
-    echo "<table class='box-form'>\n";
-
+    echo "<table class='highlight-form'>\n";
     echo "<tr><td>Username</td>";
     echo "<td>";
 
@@ -751,7 +746,7 @@ EOT;
     echo "<tr><td>Device OS</td>";
     echo "<td>";
     if ($operation == OPERATION_NEW) {
-        echo "<select style='width:$width;' value='$device' $device_id_html>";
+        echo "<select value='$device' $device_id_html>";
         vpnsubscr_print_device_options( $device );
         echo "</select>$mandatory";
     }
@@ -826,7 +821,7 @@ EOT;
 
             echo "<tr><td>Modify Status</td>";
             echo "<td>";
-            echo "<select style='width:$select_width;' value='$requested_status' $requested_status_id_html>";
+            echo "<select value='$requested_status' $requested_status_id_html>";
             vpnsubscr_print_status_options( $service, $requested_status );
             echo "</select>";
             echo "</td></tr>\n";
@@ -870,11 +865,10 @@ EOT;
     echo "</td></tr>\n";
 
     if ($method == 'POST' or !$errors) {
-        echo "<tr><td></td><td><input class='valid-button' style='width:$width;' type='submit' value='Validate' /></td></tr>\n";
+        echo "<tr><td></td><td><input class='valid-button' type='submit' value='Validate' /></td></tr>\n";
     }
     echo <<< EOT
 </table>
-</center>
 </form>
 
 EOT;
@@ -947,27 +941,11 @@ $SUBSCRIBER = vpnsubscr_get_subscriber( );
 ?>
 <!DOCTYPE html>
 <html>
-  <head>
-    <title><?php echo vpnsubscr_get_org_name( ); ?> Subscriber</title>
-    
-    <link rel="shortcut icon" type="image/x-image" href="/image/favicon.ico" />
-    <link rel="stylesheet" type="text/css" href="/chromestyle.css" />
-    <link rel="stylesheet" type="text/css" href="/style.css" />
-    
-    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
-    <meta name="robots" content="noindex, nofollow, noarchive, noarchive, nosnippet, noodp, noydir" >
-    <meta name="description" content="This page allows you to manage a VPN subscriber." />
-
-    <script type="text/javascript" src="/js/chrome.js"></script>
-    <script type="text/javascript" src="/js/vpnsubscr.js"></script>
-    <script type="text/javascript" src="/js/printmenu.js"></script>
-    <script type="text/javascript" src="/js/logout.js"></script>
-  </head>
-
+<?php vpnsubscr_display_html_header( "Reset Service" ); ?>
   <body>
     <?php vpnsubscr_display_header( ); ?>
-    <div class='box-centered-container'>
-      <div class='box-centered-nested'>
+    <div class='centered-container'>
+      <div class='centered-nested'>
 	<div class='page-title'>Subscribers &gt; <?php vpnsubscr_display_title( $SUBSCRIBER ); ?></div>
 	<?php vpnsubscr_display_form( $SUBSCRIBER ); ?>
       </div>

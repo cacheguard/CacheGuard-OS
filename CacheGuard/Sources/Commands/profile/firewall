@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       Commands
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -555,7 +554,7 @@ __complete-firewall()
 						    '')
 							case ${COMP_WORDS[5]} in
 							    tcp|udp|ftp_passive|ftp_active|ftp_trivial|sip)
-								COMPREPLY=('' '<RET>' '<dst-port>' any)
+								COMPREPLY=('' '<RET>' '<dst-port1>[:dst-port2]' any)
 								;;
 							    any|ah|esp|etherip|"fc"|gre|icmp|ipv6|igmp|mtp|ospfigp|tlsp|visa)
 								COMPREPLY=('' '<RET>' any)

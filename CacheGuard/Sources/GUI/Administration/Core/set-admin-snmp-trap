@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -54,7 +53,7 @@ set-snmp-trap()
 	case "${VALUES[${version_pos}]}" in
 	    v3)
 		if test ${shift_pos} -eq 0 ; then
-		    echo "admin snmp trap del '${VALUES[${version_pos}]}' '${VALUES[${server_pos}]}' '${VALUES[${port_pos}]}' '${VALUES[${user_pos}]}'" >> ${transaction}
+		    echo "admin snmp trap del ${VALUES[${version_pos}]} ${VALUES[${server_pos}]} ${VALUES[${port_pos}]} ${VALUES[${user_pos}]}" >> ${transaction}
 		    ((pos+=10))
 		else
 		    if test "${VALUES[${entry_pos}]}" == anew ; then
@@ -63,7 +62,7 @@ set-snmp-trap()
 			else
 			    port=162
 			fi
-			echo "admin snmp trap add '${VALUES[${version_pos}]}' '${VALUES[${server_pos}]}' '${port}' '${VALUES[${user_pos}]}' '${VALUES[${hash_pos}]}' '${VALUES[${enc_pos}]}' '${VALUES[${passwd_pos}]}' '${VALUES[${privacy_pos}]}'" >> ${transaction}
+			echo "admin snmp trap add ${VALUES[${version_pos}]} ${VALUES[${server_pos}]} ${port} ${VALUES[${user_pos}]} ${VALUES[${hash_pos}]} ${VALUES[${enc_pos}]} '${VALUES[${passwd_pos}]}' '${VALUES[${privacy_pos}]}'" >> ${transaction}
 		    fi
 		    ((pos+=9))
 		fi
@@ -71,7 +70,7 @@ set-snmp-trap()
 
 	    v1|v2c)
 		if test ${shift_pos} -eq 0 ; then
-		    echo "admin snmp trap del '${VALUES[${version_pos}]}' '${VALUES[${server_pos}]}' '${VALUES[${port_pos}]}'" >> ${transaction}
+		    echo "admin snmp trap del ${VALUES[${version_pos}]} ${VALUES[${server_pos}]} ${VALUES[${port_pos}]}" >> ${transaction}
 		    ((pos+=10))
 		else
 		    if test "${VALUES[${entry_pos}]}" == anew ; then
@@ -80,7 +79,7 @@ set-snmp-trap()
 			else
 			    port=162
 			fi
-			echo "admin snmp trap add '${VALUES[${version_pos}]}' '${VALUES[${server_pos}]}' '${port}' '${VALUES[${passwd_pos}]}'" >> ${transaction}
+			echo "admin snmp trap add ${VALUES[${version_pos}]} ${VALUES[${server_pos}]} ${port} '${VALUES[${passwd_pos}]}'" >> ${transaction}
 		    fi
 		    ((pos+=9))
 		fi

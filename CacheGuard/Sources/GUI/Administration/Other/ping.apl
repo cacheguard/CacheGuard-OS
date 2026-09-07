@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -28,16 +27,14 @@ source ${APPLIANCE_DIR}/lib/lib-check
 send-ping()
 {
     test -n "${1}" || return 1
-    test -n "${2}" || return 2
     local machine=${1}
-    local width=${2}
 
     if ! check-domainname "${machine}" ; then
-	echo "<div class='with-border' style='font-size:90%; font-style:italic; color:red; width:${width}px; margin-bottom:5px;'>This is not a valid machine name.</div>"
+	echo "<div class='diagnostic-tools-msg'>This is not a valid machine name.</div>"
 	return 3
     fi
 
-    echo "<div class='with-border' style='font-size:90%; font-style:italic; width:${width}px; margin-bottom:5px;'>"
+    echo "<div class='diagnostic-tools-msg'>"
     echo "<pre>"
     PATH=/bin ping -w 4 -c 3 -n ${machine} 2>&1
     echo "</pre>"

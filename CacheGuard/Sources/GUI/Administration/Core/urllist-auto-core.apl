@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -29,23 +28,14 @@ guard-auto-show-file-servers()
     test -n "${3}" || return 3
     local state=${1}
     local id=${2}
-    local height=${3}
-    local cb=${4}
-    local class=${5}
-    local in_server=${6}
+    local data=${3}
+    local class=${4}
+    local in_server=${5}
 
-    local readonly style="width:100%; height:${height}px;"
-
-    if test ${state} == off ; then
-	readonly=' readonly'
-	style="${style}; ${GUI_READONLY_STYLE}"
-    fi
-
-    test -z "${class}" || class=" class='${class}'"
-    test -z "${cb}" || cb=" onChange=\"${cb}\""
+    test ${data} == nil || data=" ${data}"
 
     if test -n "${ACCESS_FILE_LIST}" ; then
-	echo -n "<select id='${id}'${class} style='${style}'${readonly} name='${id}'${cb}>"
+	echo -n "<select id='${id}' class='urllist-auto ${class}' name='${id}'${data}>"
 	show-file-servers 'new' "${in_server}"
 	echo "</select>"
     else
@@ -58,15 +48,11 @@ guard-auto-show-protocols()
     test -n "${1}" || return 1
     test -n "${2}" || return 2
     test -n "${3}" || return 3
-    test -n "${4}" || return 4
     local id=${1}
-    local height=${2}
-    local cb=${3}
-    local protocols=${4}
+    local data=${2}
+    local protocols=${3}
 
-    test -z "${cb}" || cb=" onChange=\"${cb}\""
-
-    echo -n "<select id='${id}' class='table-form-action' style='width:100%; height:${height}px;' name='${id}'${cb}>"
+    echo -n "<select id='${id}' class='urllist-auto' name='${id}' ${data}>"
     show-file-protocol1 ftp "${protocols}"
     echo "</select>"
 }
@@ -75,19 +61,14 @@ urllist-auto-toggle()
 {
     test -n "${1}" || return 1
     test -n "${2}" || return 2
+    test -n "${3}" || return 3
+    test -n "${4}" || return 4
     local id=${1}
     local class=${2}
-    local in_list=${3}
+    local state1=${3}
+    local state2=${4}
 
-    local width=100% height=30px
-    local item list
-
-    for item in ${in_list}
-    do
-	list="${list}, '${item}'"
-    done
-
-    echo "<button id='${id}' class='${class}' style='width:${width}; height:${height};' type='button' onClick=\"toggleSelection( '${class}' ${list} );\">Toggle</button>"
+    echo "<button id='${id}' class='urllist-auto ${class}' type='button' data-action='toggle-selection' data-class='${class}' data-state1='${state1}' data-state2='${state2}'>Toggle</button>"
 }
 
 show-urllist-auto-load()
@@ -100,10 +81,9 @@ show-urllist-auto-load()
     local sel_create sel_update
     local sel_daily sel_weekly
 
-    local toggle_width=60
     local protocol_title=Proto
     local protocol_items="ftp sftp tftp" protocol_item selected
-    local push_method state readonly readonly_cb
+    local push_method state
     local protocol_id file_server_id filename_id
 
     local state_class="state"
@@ -113,6 +93,7 @@ show-urllist-auto-load()
     local protocol_class="protocol"
     local file_server_class="file-server"
     local filename_class="filename"
+    local state class
 
     case ${APL_ROLE} in
 	gateway)
@@ -130,50 +111,48 @@ show-urllist-auto-load()
 	protocol_items="${protocol_items} push"
     fi
 
-    echo "<table width='900' class='highlight-list'>"
+    echo "<table class='highlight-list'>"
 
     echo "<thead>"
-    echo "<tr style='height:50px;'>"
-    echo "<td width='15%' class='table-header'>URL List</td>"
-    echo "<td width='${toggle_width}' class='table-header'><center>State<br /></center></td>"
-    echo "<td width='${toggle_width}' class='table-header'><center>Verify<br /></center></td>"
-    echo "<td width='${toggle_width}' class='table-header'><center>Op<br /></center></td>"
-    echo "<td width='${toggle_width}' class='table-header'><center>Period</center></td>"
-    echo "<td class='table-header'><center>${protocol_title}</center></td>"
-    echo "<td class='table-header'>File Serve</td>"
-    echo "<td width='20%' class='table-header'>Filename</td>"
+    echo "<tr>"
+    echo "<th class='table-header'>URL List</th>"
+    echo "<th class='table-header'><center>State<br /></center></th>"
+    echo "<th class='table-header'><center>Verify<br /></center></th>"
+    echo "<th class='table-header'><center>Op<br /></center></th>"
+    echo "<th class='table-header'><center>Period</center></th>"
+    echo "<th class='table-header'><center>${protocol_title}</center></th>"
+    echo "<th class='table-header'>File Serve</th>"
+    echo "<th class='table-header'>Filename</th>"
     echo "</tr>"
     echo "</thead>"
 
-    
-
     echo "<tbody>"
-    echo "<tr style='height:40px;'>"
+    echo "<tr>"
 
     echo "<td></td>"
 
     echo "<td>"
-    urllist-auto-toggle 'toggle-state' ${state_class} "on off"
+    urllist-auto-toggle 'toggle-state' ${state_class} on off
     echo "</td>"
 
     echo "<td>"
-    urllist-auto-toggle 'toggle-load' ${load_class} "load vload"
+    urllist-auto-toggle 'toggle-load' ${load_class} load vload
     echo "</td>"
 
     echo "<td>"
-    urllist-auto-toggle 'toggle-operation' ${operation_class} "update create"
+    urllist-auto-toggle 'toggle-operation' ${operation_class} update create
     echo "</td>"
 
     echo "<td>"
-    urllist-auto-toggle 'toggle-period' ${period_class} "daily weekly"
+    urllist-auto-toggle 'toggle-period' ${period_class} daily weekly
     echo "</td>"
 
     echo "<td>"
-    guard-auto-show-protocols protocol 30 "selectURLListAutoAllProtocolCB( 'protocol', '${protocol_class}', '${file_server_class}', '${filename_class}' )" "${protocol_items}"
+    guard-auto-show-protocols protocol "data-action='select-url-list-auto-all-protocol' data-type='protocol' data-protocol-class='${protocol_class}' data-file-server-class='${file_server_class}' data-filename-class='${filename_class}'" "${protocol_items}"
     echo "</td>"
 
     echo "<td>"
-    guard-auto-show-file-servers on file-server 30 "selectAllTheSameCB( 'file-server', '${file_server_class}' )" table-form-action
+    guard-auto-show-file-servers on file-server "data-action='select-all-the-same' data-class='${file_server_class}'" ${file_server_class}
     echo "</td>"
 
     echo "<td></td>"
@@ -242,42 +221,39 @@ show-urllist-auto-load()
 
 	echo "<td><input name='urllist_${i}' value='${urllist}' type='hidden'><i>${urllist}</i></td>"
 
-	echo "<td><select name='state_${i}' class='${state_class}' style='width:100%;'>"
+	echo "<td><select name='state_${i}' class='urllist-auto ${state_class}'>"
 	echo -n "<option value='off' ${sel_off}>Off</option>"
 	echo -n "<option value='on' ${sel_on}>On</option>"
 	echo "</select></td>"
 
-	echo "<td><select name='load_${i}' class='${load_class}' style='width:100%;'>"
+	echo "<td><select name='load_${i}' class='urllist-auto ${load_class}'>"
 	echo -n "<option value='load' ${sel_load}>No</option>"
 	echo -n "<option value='vload' ${sel_vload}>Yes</option>"
 	echo "</select></td>"
 
-	echo "<td><select name='operation_${i}' class='${operation_class}' style='width:100%;'>"
+	echo "<td><select name='operation_${i}' class='urllist-auto ${operation_class}'>"
 	echo -n "<option value='update' ${sel_update}>Update</option>"
 	echo -n "<option value='create' ${sel_create}>Create</option>"
 	echo "</select></td>"
 
-	echo "<td><select name='period_${i}' class='${period_class}' style='width:100%;'>"
+	echo "<td><select name='period_${i}' class='urllist-auto ${period_class}'>"
 	echo -n "<option value='daily' ${sel_daily}>Daily</option>"
 	echo -n "<option value='weekly' ${sel_weekly}>Weekly</option>"
 	echo "</select></td>"
 
-	local state
 	if test "${protocol}" == 'push' ; then
 	    state=off
-	    readonly=' readonly'
-	    style=" style='${GUI_READONLY_STYLE}'"
+	    class=' read-only'
 	else
 	    state=on
-	    unset readonly style
+	    unset class
 	fi
 
 	protocol_id="protocol_${i}"
 	file_server_id="file_server_${i}"
 	filename_id="filename_${i}"
-	readonly_cb="selectURLListAutoProtocolCB( '${protocol_id}', '${file_server_id}', '${filename_id}' )"
 
-	echo "<td><select id='${protocol_id}' name='${protocol_id}' class='${protocol_class}' style='width:100%;' onChange=\"${readonly_cb}\">"
+	echo "<td><select id='${protocol_id}' name='${protocol_id}' class='urllist-auto ${protocol_class}' data-action='select-url-list-auto-protocol' data-file-server-id='${file_server_id}' data-filename-id='${filename_id}'>"
 
 	for protocol_item in ${protocol_items}
 	do
@@ -288,14 +264,14 @@ show-urllist-auto-load()
 
 	echo "<td>"
 	if test -n "${ACCESS_FILE_LIST}" ; then
-	    guard-auto-show-file-servers ${state} ${file_server_id} 30 '' ${file_server_class} ${server}
+	    guard-auto-show-file-servers ${state} ${file_server_id} nil ${file_server_class} ${server}
 	else
 	    echo "<a href='/${GUI_DIR_NAME}/access-file.${GUI_EXT_NAME}'>Add File Servers</a>"
 	fi
 	echo "</td>"
 
 	echo "<td>"
-	echo "<input id='filename_${i}'${readonly}${style} name='filename_${i}' class='${filename_class}' type='text' size='48' maxlength='128' value='${filename}' onblur=\"checkPrintable( 'filename_${i}' );\" onmouseout=\"checkPrintable( 'filename_${i}' );\">"
+	echo "<input id='filename_${i}' name='filename_${i}' class='${filename_class}${class}' type='text' size='48' maxlength='128' value='${filename}' data-action='check-input' data-check-function='checkPrintable'>"
 	echo "</td>"
 
 	    echo "</tr>"
@@ -309,7 +285,6 @@ show-urllist-auto-load()
 show-guard-auto-form()
 {
     local state
-    local length=8
     local full_show
 
     case ${APL_ROLE} in
@@ -343,10 +318,10 @@ show-guard-auto-form()
     fi
 
     show-title "Auto Load Contents" "${state}" "access guard password sslmediate urllist"
-    show-shortcuts-menu
 
     echo "<div class='core-form'>"
-    show-form-begin ${length}
+    show-shortcuts-menu
+    show-form-begin
     show-urllist-auto-load
     show-do ${state} ${state}
     show-form-end

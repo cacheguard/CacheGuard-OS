@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -28,55 +27,55 @@ set-firewall-dos()
     rm -f ${transaction}
 
     if test -n "${VALUES[0]}" ; then
-	echo "firewall dos tcpflood set '${VALUES[0]} ${VALUES[1]}'" >> ${transaction}
+	echo "firewall dos tcpflood set ${VALUES[0]} ${VALUES[1]}" >> ${transaction}
     else
 	echo "firewall dos tcpflood default" >> ${transaction}
     fi
 
     if test -n "${VALUES[2]}" ; then
-	echo "firewall dos udpflood set '${VALUES[2]} ${VALUES[3]}'" >> ${transaction}
+	echo "firewall dos udpflood set ${VALUES[2]} ${VALUES[3]}" >> ${transaction}
     else
 	echo "firewall dos udpflood default" >> ${transaction}
     fi
 
     if test -n "${VALUES[4]}" ; then
-	echo "firewall dos webflood set '${VALUES[4]} ${VALUES[5]}'" >> ${transaction}
+	echo "firewall dos webflood set ${VALUES[4]} ${VALUES[5]}" >> ${transaction}
     else
 	echo "firewall dos webflood default" >> ${transaction}
     fi
 
     if test -n "${VALUES[6]}" ; then
-	echo "firewall dos rwebflood set '${VALUES[6]} ${VALUES[7]}'" >> ${transaction}
+	echo "firewall dos rwebflood set ${VALUES[6]} ${VALUES[7]}" >> ${transaction}
     else
 	echo "firewall dos rwebflood default" >> ${transaction}
     fi
 
     if test -n "${VALUES[8]}" ; then
-	echo "firewall dos piptcp set '${VALUES[8]}'" >> ${transaction}
+	echo "firewall dos piptcp set ${VALUES[8]}" >> ${transaction}
     else
 	echo "firewall dos piptcp default" >> ${transaction}
     fi
 
     if test -n "${VALUES[9]}" ; then
-	echo "firewall dos pipweb set '${VALUES[9]}'" >> ${transaction}
+	echo "firewall dos pipweb set ${VALUES[9]}" >> ${transaction}
     else
 	echo "firewall dos pipweb default" >> ${transaction}
     fi
 
     if test -n "${VALUES[10]}" ; then
-	echo "firewall dos piprweb set '${VALUES[10]}'" >> ${transaction}
+	echo "firewall dos piprweb set ${VALUES[10]}" >> ${transaction}
     else
 	echo "firewall dos piprweb default" >> ${transaction}
     fi
 
     if test -n "${VALUES[11]}" ; then
-	echo "firewall dos pipdns set '${VALUES[11]}'" >> ${transaction}
+	echo "firewall dos pipdns set ${VALUES[11]}" >> ${transaction}
     else
 	echo "firewall dos pipdns default" >> ${transaction}
     fi
 
     if test -n "${VALUES[12]}" ; then
-	echo "firewall dos pipocsp set '${VALUES[12]}'" >> ${transaction}
+	echo "firewall dos pipocsp set ${VALUES[12]}" >> ${transaction}
     else
 	echo "firewall dos pipocsp default" >> ${transaction}
     fi

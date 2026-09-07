@@ -1,56 +1,90 @@
-.arrowlistmenu{
-line-height: 16px;
-width: 220px; /*width of accordion menu*/
-float:left;
-margin:0;
-padding:0;
-border-right: 1px solid #cccccc;
-clear:left;
+/*
+###########################################################################
+#
+# MODULE:       GUI
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+*/
+
+.arrowlistmenu {
+    line-height:16px;
+    width:var(--left-menu-width);
+    padding:0;
+    margin:0;
+    border-right:1px solid #cccccc;
 }
 
-.arrowlistmenu .menuheader{ /*CSS class for menu headers in general (expanding or not!)*/
-font: normal 14px Arial;
-color: white;
-background: var(--itembg);
-margin:0;
-margin-bottom: 1px; /*bottom spacing between header and rest of content*/
-padding: 0;
-padding: 7px 0 7px 10px; /*header text is indented 10px*/
-cursor: pointer;
-border: 1px solid #778;
+.arrowlistmenu .menuheader {
+    font:inherit;
+    font-weight:normal;
+    color:black;
+    background:var(--role-bg);
+    margin:0;
+    margin-bottom:2px;
+    padding:0;
+    padding:13px 0 14px 14px;
+    cursor:pointer;
+    border:none;
+    border-radius:5px;
 }
 
-.arrowlistmenu .openheader{ /*CSS class to apply to expandable header when it's expanded*/
-background: var(--itemactivebg);
+.arrowlistmenu .openheader {
+    background:var(--role-active-bg);
+    color:var(--panel-bg);
 }
 
-.arrowlistmenu ul{ /*CSS for UL of each sub menu*/
-list-style-type: none;
-margin: 0;
-padding: 0;
-margin-bottom: 2px; /*bottom spacing between each UL and rest of content*/
+.arrowlistmenu ul {
+    list-style-type:none;
+    margin:0;
+    padding:0;
 }
 
-.arrowlistmenu ul li{
-padding-bottom: 0; /*bottom spacing between menu items*/
+.arrowlistmenu ul li {
+    padding-bottom:0;
 }
 
-.arrowlistmenu ul li a{
-font: normal 14px Arial;
-color: var(--itemcolor);
-background: url(/image/arrowbullet-right.png) no-repeat center left; /*custom bullet list image*/
-display: block;
-padding: 7px 0;
-padding-left: 19px; /*link text is indented 19px*/
-text-decoration: none;
-border-bottom: 1px solid #dadada;
+.arrowlistmenu ul li a {
+    font:inherit;
+    color:var(--role-color);
+    background:url(/image/arrowbullet-right.png) no-repeat center left;
+    display:block;
+    padding:14px 0 14px 20px;
+    text-decoration:none;
+    border-bottom:1px solid var(--hover-bg);
 }
 
-.arrowlistmenu ul li a:visited{
-color: var(--itemcolor);
+.arrowlistmenu ul li a:visited {
+    color:var(--role-color);
 }
 
-.arrowlistmenu ul li a:hover{ /*hover state CSS*/
-color: var(--itemcolor);
-background-color: #cccccc;
+.arrowlistmenu ul li a:hover {
+    color:var(--role-color);
+    background-color:var(--hover-bg);
+}
+
+.submenu {
+    display:none;
+}
+
+ul.left-submenu-administration-items {
+    margin-left:15px;
+}
+
+a.hiddenajaxlink {
+    display:none;
 }

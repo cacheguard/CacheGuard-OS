@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -27,12 +26,12 @@ show-guard-filter-ip-form()
     local get_args=${1}
     local page_ref=$(get-arg-value "${get_args}" page)
 
-    local width=600
+    local width=${DEFAULT_LIST_FORM_WIDTH}
     local state
 
-    itemWidth[1]=30
-    itemWidth[3]=20
-    itemWidth[4]=20
+    itemWidth[1]=28
+    itemWidth[3]=21
+    itemWidth[4]=21
 
     itemTitle[0]=""
     itemTitle[1]="Name"

@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -42,11 +41,11 @@ set-kerberos-rweb()
 	    if test "${VALUES[${entry_pos}]}" == anew -a \
 		    -n "${VALUES[${site_name_pos}]}" -a \
 		    -n "${VALUES[${canonical_name_pos}]}" ; then
-		echo "authenticate kerberos rweb add '${VALUES[${site_name_pos}]}' '${VALUES[${canonical_name_pos}]}'" >> ${transaction}
+		echo "authenticate kerberos rweb add ${VALUES[${site_name_pos}]} ${VALUES[${canonical_name_pos}]}" >> ${transaction}
 	    fi
 	    ((pos+=3))
 	else
-	    echo "authenticate kerberos rweb del '${VALUES[${site_name_pos}]}'" >> ${transaction}
+	    echo "authenticate kerberos rweb del ${VALUES[${site_name_pos}]}" >> ${transaction}
 	    ((pos+=4))
 	fi
     done

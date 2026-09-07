@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -43,7 +42,7 @@ set-qos-shape-gateway()
 		    internal|external|auxiliary)
 			case ${gress} in
 			    ingress|egress)
-				echo "qos shape '${flow}' '${dev}' '${gress}' '${VALUES[${i}]}'" >> ${transaction}
+				echo "qos shape ${flow} ${dev} ${gress} ${VALUES[${i}]}" >> ${transaction}
 				;;
 			    *)
 				;;

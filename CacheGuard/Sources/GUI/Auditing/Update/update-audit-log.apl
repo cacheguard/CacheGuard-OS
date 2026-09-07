@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -61,11 +60,9 @@ show-log()
 	local protocol=" HTTP/1.1\" "
 	local uri_len rest_len protocol_len=${#protocol}
 
-	echo "<br />"
-	echo "<strong>Last requests</strong>"
-	echo "<div style='overflow:hidden;'>"
-	echo "<select size='10' id='request' style='width:750px; font-size:80%;' onChange='showAuditLog( \"${name}\", 1 );'>"
-
+	echo "<div class='table-title'>Last web requests</div>"
+	echo "<div class='mono-select-list'>"
+	echo "<select size='12' id='request' data-action='show-audit-log' data-site-name='${name}' data-force='1'>"
 
 	tail -${number} ${log} | while read -r site ip dummy1 dummy2 date1 date2 method rest
 	do
@@ -81,15 +78,11 @@ show-log()
 	echo "</select>"
 	echo "</div>"
 
-	echo "<p>"
-	
-	echo "<div id='audit'>"
-	echo "</div>"
+	echo "<div id='audit'></div>"
     else
 	echo "<input type='hidden' id='request' name='file' value=''>"
 	echo "<input type='hidden' id='audit'>"
-	echo-unavailable-message "The audit log is empty."
-	echo "<br />"
+	echo-unavailable-message "the audit log is empty."
     fi
 }
 

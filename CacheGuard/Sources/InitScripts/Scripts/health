@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       InitScript
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -37,8 +36,8 @@ PROG="health"
 
 start-hc()
 {
-    test ! -f ${RUN_DIR}/${HEALTH_STATE_FILENAME} || return 1
-    test ! -f /var/run/${PROG}.pid || return 3
+    test ! -f ${RUN_DIR}/${HEALTH_STATE_FILENAME} || return 11
+    test ! -f /var/run/${PROG}.pid || return 13
     /usr/local/bin/apl_healthd ${INTERVAL} > /dev/null 2>&1 &
     local retval=${?}
     echo ${!} > /var/run/${PROG}.pid
@@ -49,7 +48,7 @@ stop-hc()
 {
     local retval=0 i=0 retry=10
 
-    test -f /var/run/${PROG}.pid || return 1
+    test -f /var/run/${PROG}.pid || return 11
 
     local pid=$(cat /var/run/${PROG}.pid 2> /dev/null)
     ps -p ${pid} > /dev/null 2> /dev/null
@@ -78,6 +77,8 @@ stop-hc()
 	retval=${?}
 	usleep 300000
 	[ ${retval} -eq 0 ] && rm -f /var/lock/${PROG} && rm -f /var/run/${PROG}.pid
+
+	rm -f ${RUN_DIR}/${SUPERVISOR_CALLER}/${WAITING_PROCESS}.${pid}
     fi
 
     return ${retval}

@@ -3,7 +3,6 @@
 ############################################################################
 #
 # MODULE:       Install
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -2192,7 +2191,8 @@ mount-cdrom()
     local cdrom1=$(readlink -e /dev/cdrom 2> /dev/null)
     test -n "${cdrom1}" || return 13
 
-    local cdrom2=$(cat /proc/sys/dev/cdrom/info 2> /dev/null | grep "drive name:" 2> /dev/null | cut -f3)
+    local cdrom2=$(cat /proc/sys/dev/cdrom/info 2> /dev/null | grep "drive name:" 2> /dev/null)
+    cdrom2=$(get-nth-arg 3 ${cdrom2})
     test -n "${cdrom2}" || return 15
 
     test ${cdrom1} == /dev/${cdrom2} || return 17
@@ -2348,7 +2348,7 @@ dialog-install-model()
 
 dialog-install-os-3()
 {
-    dialog-manage-fs | ${DIALOG} --backtitle "${INSTALL_BACKTITLE} ${APL_ROLE^} Installation [Progression: ${PROGRESSION}%]" --title "File system management" --gauge "Initialization..." 8 40 0
+    dialog-manage-fs | ${DIALOG} --backtitle "${INSTALL_BACKTITLE} ${APL_ROLE^} Installation [Progression: ${PROGRESSION}%]" --title "File system management" --gauge "Initialisation..." 8 40 0
 
     export PROGRESSION=30
     
@@ -2372,7 +2372,7 @@ dialog-install-os-3()
 	    cd ${WORKING_DIR}
 	    ;;
 	iso)
-	    dialog-copy-os | ${DIALOG} --backtitle "${INSTALL_BACKTITLE} ${APL_ROLE^} Installation [Progression: ${PROGRESSION}%]" --title "Copying the OS Kernel" --gauge "Initialization..." 8 40 0
+	    dialog-copy-os | ${DIALOG} --backtitle "${INSTALL_BACKTITLE} ${APL_ROLE^} Installation [Progression: ${PROGRESSION}%]" --title "Copying the OS Kernel" --gauge "Initialisation..." 8 40 0
 	    ret=${PIPESTATUS[0]}
 	    if test ${ret} -ne 0 ; then
 		error ${ret}
@@ -2406,7 +2406,7 @@ dialog-install-os-3()
 
     export PROGRESSION=80
 
-    dialog-install-model | ${DIALOG} --backtitle "${INSTALL_BACKTITLE} ${APL_ROLE^} Installation [Progression: ${PROGRESSION}%]" --title "Model Installation" --gauge "Initialization..." 8 40 0
+    dialog-install-model | ${DIALOG} --backtitle "${INSTALL_BACKTITLE} ${APL_ROLE^} Installation [Progression: ${PROGRESSION}%]" --title "Model Installation" --gauge "Initialisation..." 8 40 0
 
     export PROGRESSION=85
 
@@ -2520,10 +2520,10 @@ dialog-congratulations()
 
     case "${INSTALL}" in
 	iso)
-	    message="${message} Remove the media and Reboot."
+	    message="${message} Remove the media and reboot."
 	    ;;
 	pxe)
-	    message="${message} Disconnect from the PXE server and Reboot."
+	    message="${message} Disconnect from the PXE server and reboot."
 	    ;;
 	*)
 	    ;;
@@ -2781,7 +2781,7 @@ dialog-format-disk-1()
 
 dialog-format-disk()
 {
-    dialog-format-disk-1 | ${DIALOG} --backtitle "${INSTALL_BACKTITLE} ${APL_ROLE^} Installation [Progression: ${PROGRESSION}%]" --title "Formatting Disks" --gauge "Initialization..." 8 40 0
+    dialog-format-disk-1 | ${DIALOG} --backtitle "${INSTALL_BACKTITLE} ${APL_ROLE^} Installation [Progression: ${PROGRESSION}%]" --title "Formatting Disks" --gauge "Initialisation..." 8 40 0
 
     local ret=${PIPESTATUS[0]}
     setenv-variable-from-file
@@ -2798,7 +2798,7 @@ dialog-install-os-1()
     dialog-make-initrd | ${DIALOG} --backtitle "${INSTALL_BACKTITLE} ${APL_ROLE^} Installation [Progression: ${PROGRESSION}%]" --title "Making InitRD" --gauge "Generating the Initial RAM Disk..." 8 40 0
     export PROGRESSION=90
 
-    dialog-finish-install | ${DIALOG} --backtitle "${INSTALL_BACKTITLE} ${APL_ROLE^} Installation [Progression: ${PROGRESSION}%]" --title "Finilizing the Installation" --gauge "Initialization..." 8 40 0
+    dialog-finish-install | ${DIALOG} --backtitle "${INSTALL_BACKTITLE} ${APL_ROLE^} Installation [Progression: ${PROGRESSION}%]" --title "Finilizing the Installation" --gauge "Initialisation..." 8 40 0
     export PROGRESSION=100
     dialog-congratulations
 }
@@ -3251,8 +3251,8 @@ gen-linuxrc()
 ############################################################################
 #
 # MODULE:       Install
-# AUTHOR(S):    CacheGuard Development Team
-# COPYRIGHT:    (C) ${YEARS} by CacheGuard Technologies Ltd
+# COPYRIGHT:    (C) ${YEARS} by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) ${YEARS} by CacheGuard Technologies SAS (FR)
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -3957,7 +3957,7 @@ dialog-read-gateway-persistency()
 
 	ret=${?}
 	if test ${ret} -eq ${DIALOG_HELP} ; then
-	    ${DIALOG} --backtitle "${INSTALL_BACKTITLE} Installation" --title "Persistency Features" --colors --msgbox "\nIf your disk(s) is (are) not large enough you can deactivate some features that require substantial storage space on your disk(s). The deactivation of those features allows you to install the OS on machines with low disk storage capacity. Please note that if you deactivate those features during the installation, you won't be able to activate them afterwards on a running OS. Below is a brief description of persistent data that you can deactivate:\n\n\Z4Web Caching:\Zn Web Caching allows you to persistently store Web contents on disk in order to reduce bandwidth usage and Web servers load (in reverse mode).\n\n\Z4Web access Logging:\Zn this mechanism allows you to persistently store on disk Web browsing activities.\n\n\Z4Reverse Web access Logging:\Zn this mechanism is similar to the previous one with the difference being that it stores traffic on cloaked (protected) Web servers managed by the reverse Web proxy." 0 0
+	    ${DIALOG} --backtitle "${INSTALL_BACKTITLE} Installation" --title "Persistency Features" --colors --msgbox "\nIf your disk(s) is (are) not large enough you can deactivate some features that require substantial storage space on your disk(s). The deactivation of those features allows you to install the OS on machines with low disk storage capacity. Note that if you deactivate those features during the installation, you won't be able to activate them afterwards on a running OS. Below is a brief description of persistent data that you can deactivate:\n\n\Z4Web Caching:\Zn Web Caching allows you to persistently store Web contents on disk in order to reduce bandwidth usage and Web servers load (in reverse mode).\n\n\Z4Web access Logging:\Zn this mechanism allows you to persistently store on disk Web browsing activities.\n\n\Z4Reverse Web access Logging:\Zn this mechanism is similar to the previous one with the difference being that it stores traffic on cloaked (protected) Web servers managed by the reverse Web proxy." 0 0
 	    continue
 	fi
 
@@ -4014,7 +4014,7 @@ dialog-read-gateway-capacities()
 
 	ret=${?}
 	if test ${ret} -eq ${DIALOG_HELP} ; then
-	    ${DIALOG} --backtitle "${INSTALL_BACKTITLE} ${APL_ROLE^} Installation" --title "Input values" --colors --msgbox "\nInput values here allow you to tune the installed appliance for a given capacity to support. Theses values should be compatible with your machine resource capacity so all entered values are verified during the installation for acceptance. Please note that entered values may be subject to usage allowance according to the licensing in force for this version during the installation. Below is a brief description of input values:\n\n\Z4Number of users in forwarding mode:\Zn the total number of end-users (not simultaneous) in forwarding or transparent mode to access the internet via this appliance. The simultaneous number of managed end-users in forwarding mode will be 20% of the total number of end-users given here. \Z1Caution: if you run CacheGuard beyond its installed users capacity, your network traffic can be slowed down or be blocked.\Zn\n\n\Z4Number of URLs in blacklists:\Zn the total number of domain names and URLs in blacklists.\n\n\Z4Number of simultaneous users in reverse mode:\Zn simultaneous number of users accessing your Web servers cloaked by the appliance in reverse mode. Please note that the simultaneous number of end-users are distinguished from concurrent end-users. We call simultaneous end-users, users that have an active connection with the appliance while concurrent users may be connected without producing any significant traffic. \Z1Caution: if you run CacheGuard beyond its installed users capacity, your network traffic can be slowed down or be blocked.\Zn\n\n\Z4Number of websites in reverse mode:\Zn the total number of protected/cloaked websites identified by their names.\n\n\Z4Cache size per reverse website (MB):\Zn reserved cache size (on disk) in Mega Bytes for each reverse website (rWeb). The rWeb cache is only used in particular configurations (WAF mode, sticky load balancing...). Otherwise reverse websites share the same cache as for end-users in forwarding mode. If your machine contains more the one disk, the rWeb cache is created on the largest one.\n\n\Z4Logs retention period:\Zn number of days for log reports retention in the system. This value should be greater than or equal to 1 and less than or equal to 31.\n\n\Z4Uploaded file maximum size (MB):\Zn because uploaded files to protected Web servers (in reverse mode) are streamed to disk, the maximum allowed size for uploaded files (Content-Type: multipart/form-data) should be specified here to reserve the required temporary space on disk. The reserved space is calculated according to the value given here and the simultaneous users capacity for reverse websites. This value should be greater than or equal to 1 MB and less than or equal to 1024 MB." 0 0
+	    ${DIALOG} --backtitle "${INSTALL_BACKTITLE} ${APL_ROLE^} Installation" --title "Input values" --colors --msgbox "\nInput values here allow you to tune the installed appliance for a given capacity to support. Theses values should be compatible with your machine resource capacity so all entered values are verified during the installation for acceptance. Note that entered values may be subject to usage allowance according to the licensing in force for this version during the installation. Below is a brief description of input values:\n\n\Z4Number of users in forwarding mode:\Zn the total number of end-users (not simultaneous) in forwarding or transparent mode to access the internet via this appliance. The simultaneous number of managed end-users in forwarding mode will be 20% of the total number of end-users given here. \Z1Caution: if you run CacheGuard beyond its installed users capacity, your network traffic can be slowed down or be blocked.\Zn\n\n\Z4Number of URLs in blacklists:\Zn the total number of domain names and URLs in blacklists.\n\n\Z4Number of simultaneous users in reverse mode:\Zn simultaneous number of users accessing your Web servers cloaked by the appliance in reverse mode. Note that the simultaneous number of end-users are distinguished from concurrent end-users. We call simultaneous end-users, users that have an active connection with the appliance while concurrent users may be connected without producing any significant traffic. \Z1Caution: if you run CacheGuard beyond its installed users capacity, your network traffic can be slowed down or be blocked.\Zn\n\n\Z4Number of websites in reverse mode:\Zn the total number of protected/cloaked websites identified by their names.\n\n\Z4Cache size per reverse website (MB):\Zn reserved cache size (on disk) in Mega Bytes for each reverse website (rWeb). The rWeb cache is only used in particular configurations (WAF mode, sticky load balancing...). Otherwise reverse websites share the same cache as for end-users in forwarding mode. If your machine contains more the one disk, the rWeb cache is created on the largest one.\n\n\Z4Logs retention period:\Zn number of days for log reports retention in the system. This value should be greater than or equal to 1 and less than or equal to 31.\n\n\Z4Uploaded file maximum size (MB):\Zn because uploaded files to protected Web servers (in reverse mode) are streamed to disk, the maximum allowed size for uploaded files (Content-Type: multipart/form-data) should be specified here to reserve the required temporary space on disk. The reserved space is calculated according to the value given here and the simultaneous users capacity for reverse websites. This value should be greater than or equal to 1 MB and less than or equal to 1024 MB." 0 0
 	    continue
 	fi
 
@@ -4073,7 +4073,7 @@ dialog-read-gateway-capacities()
 
 	    test ${level} -ne 0 || break
 
-	    ${DIALOG} --backtitle "${INSTALL_BACKTITLE} ${APL_ROLE^} Installation" --title "Commercial Configuration" --colors --yesno "\n\Z5Warning:\Zn the configuration you are about to install is not free (forward users > \Z4${LIC_USERS_NB_0}\Zn and/or reverse simultaneous users > \Z4${LIC_RUSERS_NB_0}\Zn).\n\nIf you choose to install this configuration, you will have the opportunity to evaluate the installed system for a trial period. Once this trial period has been exceeded, you should purchase a subscription in order to continue to use the installed system. \Z5Please note that underestimating the number of users would slowdown your network traffic\Zn.\n\nDo you want to install this configuration?" 18 60
+	    ${DIALOG} --backtitle "${INSTALL_BACKTITLE} ${APL_ROLE^} Installation" --title "Commercial Configuration" --colors --yesno "\n\Z5Warning:\Zn the configuration you are about to install is not free (forward users > \Z4${LIC_USERS_NB_0}\Zn and/or reverse simultaneous users > \Z4${LIC_RUSERS_NB_0}\Zn).\n\nIf you choose to install this configuration, you will have the opportunity to evaluate the installed system for a trial period. Once this trial period has been exceeded, you should purchase a subscription in order to continue to use the installed system. \Z5Note that underestimating the number of users would slowdown your network traffic\Zn.\n\nDo you want to install this configuration?" 18 60
 
 	    test ${?} -ne ${DIALOG_OK} || break
 	else
@@ -4099,7 +4099,7 @@ dialog-read-manager-capacities()
 
 	ret=${?}
 	if test ${ret} -eq ${DIALOG_HELP} ; then
-	    ${DIALOG} --backtitle "${INSTALL_BACKTITLE} ${APL_ROLE^} Installation" --title "Capacity Settings" --colors --msgbox "\nInput values here allow you to tune the installed appliance for a given capacity to support. Theses values should be compatible with your machine capacity so all entered values are verified during the installation for acceptance. Please note that entered values may be subject to usage allowance according to the licensing in force for this version during the installation. Below is a brief description of input values:\n\n\Z4Number of managed gateways:\Zn the number of Gateways to manage by the installed Manager appliance.\n\n\Z4Number of templates:\Zn the maximum number of Templates that can be created. A template is a set of configuration commands that can be specialized for each gateway. Templates are object oriented and are organized hierarchically as classes and sub classes.\n\n\Z4Total number of users in forwarding mode:\Zn the total number of end-users supported by all managed gateways.\n\n\Z4Total number of websites in reverse mode:\Zn the total number of websites in reverse mode supported by all managed gateways.\n\n\Z4URL blacklists per gateway:\Zn the maximum number of domain names and URLs in installed blacklists on a managed gateway." 0 0
+	    ${DIALOG} --backtitle "${INSTALL_BACKTITLE} ${APL_ROLE^} Installation" --title "Capacity Settings" --colors --msgbox "\nInput values here allow you to tune the installed appliance for a given capacity to support. Theses values should be compatible with your machine capacity so all entered values are verified during the installation for acceptance. Note that entered values may be subject to usage allowance according to the licensing in force for this version during the installation. Below is a brief description of input values:\n\n\Z4Number of managed gateways:\Zn the number of Gateways to manage by the installed Manager appliance.\n\n\Z4Number of templates:\Zn the maximum number of Templates that can be created. A template is a set of configuration commands that can be specialized for each gateway. Templates are object oriented and are organized hierarchically as classes and sub classes.\n\n\Z4Total number of users in forwarding mode:\Zn the total number of end-users supported by all managed gateways.\n\n\Z4Total number of websites in reverse mode:\Zn the total number of websites in reverse mode supported by all managed gateways.\n\n\Z4URL blacklists per gateway:\Zn the maximum number of domain names and URLs in installed blacklists on a managed gateway." 0 0
 	    continue
 	fi
 
@@ -4472,23 +4472,24 @@ if-debug-mode()
     echo "Generating the SSH daemon configuration..."
     rm -f \
        ${INSTALL_DIR}/install.ssh_host_rsa_key \
-       ${INSTALL_DIR}/install.ssh_host_dsa_key
+       ${INSTALL_DIR}/install.ssh_host_rsa_key.pub
+
     ssh-keygen -q -t rsa -f ${INSTALL_DIR}/install.ssh_host_rsa_key -C '' -N ''
-    ssh-keygen -q -t dsa -f ${INSTALL_DIR}/install.ssh_host_dsa_key -C '' -N ''
-    chmod 400 ${INSTALL_DIR}/install.ssh_host_rsa_key ${INSTALL_DIR}/install.ssh_host_dsa_key
-    chmod 444 ${INSTALL_DIR}/install.ssh_host_rsa_key.pub ${INSTALL_DIR}/install.ssh_host_dsa_key.pub
+    chmod 400 ${INSTALL_DIR}/install.ssh_host_rsa_key
+    chmod 444 ${INSTALL_DIR}/install.ssh_host_rsa_key.pub
 
     local sshd_config_file="${INSTALL_DIR}/install.sshd_config"
-    echo "PermitRootLogin yes" > ${sshd_config_file}
-    echo "PermitEmptyPasswords yes" >> ${sshd_config_file}
-    echo "HostKey ${INSTALL_DIR}/install.ssh_host_rsa_key" >> ${sshd_config_file}
-    echo "HostKey ${INSTALL_DIR}/install.ssh_host_dsa_key" >> ${sshd_config_file}
-
+    cat << EOF > ${sshd_config_file}
+PermitRootLogin yes
+PermitEmptyPasswords yes
+HostKey ${INSTALL_DIR}/install.ssh_host_rsa_key
+EOF
+    
     mkdir -p /dev/pts
     mount devpts /dev/pts -t devpts
 
     echo "Starting the SSH daemon..."
-    /sbin/sshd -f ${sshd_config_file} -u0
+    /sbin/sshd -f ${sshd_config_file} -4 -u0
 
     echo "Stopping the device manager..."
     stop-device-manager

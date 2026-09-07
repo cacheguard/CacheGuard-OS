@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       Commands
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -307,7 +306,6 @@ show-antivirus()
     echo-end-show
 }
 
-
 display-av-create-log()
 {
     supervisor-action "update-av-regular-downloaded-sz"
@@ -321,7 +319,6 @@ display-av-update-log()
 {
     case ${APL_ROLE} in
 	gateway)
-	    test ${CURRENT_AV_MODE} == True || return 0
 	    ;;
 	manager)
 	    is-av-extended-enabled cur || return 0

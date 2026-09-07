@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -34,13 +33,13 @@ show-tls-report-line()
     local end_date=$(printf "%(%Y/%m/%d - %H:%M:%S)T" ${end_epoch} 2>/dev/null)
 
     echo "<tr>"
-    echo "<td align='left'>${id}</td>"
-    echo "<td align='left'>${end_date}</td>"
+    echo "<td>${id}</td>"
+    echo "<td>${end_date}</td>"
 
     if test "${state}" == OK ; then
-        echo "<td align='center'><img src='/image/ok.png' /></td>"
+        echo "<td align='center'><img class='small' src='/image/ok.png' /></td>"
     else
-        echo "<td align='center'><img src='/image/ko.png' title='KO' /></td>"
+        echo "<td align='center'><img class='small' src='/image/ko.png' title='KO' /></td>"
     fi
 
     echo "</tr>"
@@ -48,17 +47,14 @@ show-tls-report-line()
 
 show-tls-report()
 {
-    local table_width=${1}
-    test -n "${table_width}" || table_width="405"
-
     echo "<div class='core-form'>"
-    echo "<table class='highlight-list' width='${table_width}'>"
+    echo "<table class='highlight-list'>"
 
     echo "<thead>"
     echo "<tr>"
-    echo "<td class='table-header indicator-table-header' align='center'>TLS ID</td>"
-    echo "<td class='table-header' width='130' align='center'>Expiry Date</td>"
-    echo "<td class='table-header' width='40' align='center'>State</td>"
+    echo "<th class='table-header' align='center'>TLS ID</th>"
+    echo "<th class='table-header' align='center'>Expiry Date</th>"
+    echo "<th class='table-header' align='center'>State</th>"
     echo "</tr>"
     echo "</thead>"
 
@@ -105,7 +101,7 @@ tls-report()
 {
     show-title "TLS Certificates Health" "disabled" "tls"
     execute-command "tls report"
-    show-tls-report 500
+    show-tls-report
 }
 
 # Main()

@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -38,8 +37,8 @@ print-fw-devs()
     local in_rset=${1}
 
     local rset list="any"
-    
-    for rset in external auxiliary web rweb admin mon file peer antivirus vpnipsec
+
+    for rset in external web rweb admin file mon antivirus peer vpnipsec auxiliary
     do
 	test ${rset} != ${in_rset} || continue
 	list="${list} ${rset}"
@@ -56,7 +55,7 @@ show-firewall-form()
 
     local page_ref=$(get-arg-value "${get_args}" page)
 
-    local width=${LIST_FORM_WIDTH_A}
+    local width=${LIST_FORM_WIDTH_100}
     local state title
 
     itemWidth[0]=ordered
@@ -112,11 +111,8 @@ show-firewall-form()
     blankItemContent[16]="type='text' size='15' maxlength='15'"
     blankItemContent[17]="type='text' size='5' maxlength='5'"
 
-    itemFormSelectCBFunction[3]="firewallSelectCB"
-    itemFormSelectCBArgs[3]="action protocol dst_ports src_nat_ip dst_nat_ip dst_pat_port"
-
-    itemFormSelectCBFunction[4]=${itemFormSelectCBFunction[3]}
-    itemFormSelectCBArgs[4]=${itemFormSelectCBArgs[3]}
+    itemData[3]="data-action='firewall-select' data-action-prefix-id='action' data-protocol-prefix-id='protocol' data-dst-ports-prefix-id='dst_ports' data-src-nat-ip-prefix-id='src_nat_ip' data-dst-nat-ip-prefix-id='dst_nat_ip' data-dst-pat-port-prefix-id='dst_pat_port'"
+    itemData[4]=${itemData[3]}
 
     checkItem[1]=identifier
     checkItem[5]=ippx
@@ -194,5 +190,5 @@ show-firewall-form()
     test -n "${listContent}" || state=disabled
 
     show-title "${title} Interface Firewall Rules" "${state}" "firewall"
-    show-list-form ${MAX_FW_RULES_NB} "${width}" "${page_ref}" "" insert
+    show-list-form ${MAX_FW_RULES_NB} "${width}" "${page_ref}" '' insert
 }

@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       Commands
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -30,19 +29,36 @@ transaction-exec-command()
     local apl_command=${ARGS[0]}
 
     if test "${log}" == log ; then
-	local tag i
+	local tag arg i
 
 	if test ${TERM} == ${WADMIN_TERM} ; then
 	    tag="${COMMAND_TAG} "
-	    ARGS[0]="<a href='/doc/command/${apl_command}.html' target='_blank'>${apl_command}</a>"
+	    ARGS[0]=$(get-html-bold-command ${apl_command})
 	fi
 
 	case ${apl_command} in
+	    access)
+		case ${ARGS[1]} in
+		    manager)
+			case ${ARGS[2]} in
+			    add)
+				echo "${tag}${ARGS[0]} ${ARGS[1]} ${ARGS[2]} ${ARGS[3]} ${ARGS[4]} ${ARGS[5]} '${ARGS[6]}'" >&2
+				;;
+			    *)
+				echo "${tag}${ARGS[@]}" >&2
+				;;
+			esac
+			;;
+		    *)
+			echo "${tag}${ARGS[@]}" >&2
+			;;
+		esac
+		;;
 	    admin)
 		case ${ARGS[1]} in
 		    snmp)
 			case ${ARGS[2]} in
-			    "trap")
+			    'trap')
 				case ${ARGS[3]} in
 				    add)
 					case ${ARGS[4]} in
@@ -61,6 +77,34 @@ transaction-exec-command()
 					;;
 				esac
 				;;
+			    community|privacy)
+				echo "${tag}${ARGS[0]} ${ARGS[1]} ${ARGS[2]} ..." >&2
+				;;
+			    *)
+				echo "${tag}${ARGS[@]}" >&2
+				;;
+			esac
+			;;
+		    ssh)
+			case ${ARGS[2]} in
+			    key)
+				case ${ARGS[3]} in
+				    'set')
+					echo "${tag}${ARGS[0]} ${ARGS[1]} ${ARGS[2]} ${ARGS[3]} ${ARGS[4]} '${ARGS[5]}'" >&2
+					;;
+				    *)
+					;;
+				esac
+				;;
+			    *)
+				;;
+			esac
+			;;
+		    user)
+			case ${ARGS[2]} in
+			    add)
+				echo "${tag}${ARGS[0]} ${ARGS[1]} ${ARGS[2]} ${ARGS[3]} ..." >&2
+				;;
 			    *)
 				echo "${tag}${ARGS[@]}" >&2
 				;;
@@ -76,12 +120,9 @@ transaction-exec-command()
 		    ldap)
 			case ${ARGS[2]} in
 			    request)
-				echo -n "${tag}${ARGS[0]} ${ARGS[1]} ${ARGS[2]}" >&2
-				for ((i=3 ; i<ARGS_NB ; i++))
-				do
-				    echo -n " '${ARGS[${i}]}'" >&2
-				done
-				echo >&2
+				arg=${ARGS[5]}
+				test -n "${arg}" || arg="''"
+				echo "${tag}${ARGS[0]} ${ARGS[1]} ${ARGS[2]} '${ARGS[3]}' ${ARGS[4]} ${arg} '${ARGS[6]}' ..." >&2
 				;;
 			    binddn)
 				echo "${tag}${ARGS[0]} ${ARGS[1]} ${ARGS[2]} '${ARGS[3]}' ${ARGS[4]} ..." >&2
@@ -91,11 +132,14 @@ transaction-exec-command()
 				;;
 			esac
 			;;
-		    kerberos)
+		    ad)
 			case ${ARGS[2]} in
-			    hapassword)
-				echo "${tag}${ARGS[0]} ${ARGS[1]} ${ARGS[2]} ..." >&2
+			    account)
+				echo "${tag}${ARGS[0]} ${ARGS[1]} ${ARGS[2]} ${ARGS[3]} ..." >&2
 				;;
+			    rdn)
+				echo "${tag}${ARGS[0]} ${ARGS[1]} ${ARGS[2]} '${ARGS[3]}'" >&2
+				;;				
 			    *)
 				echo "${tag}${ARGS[@]}" >&2
 				;;
@@ -107,17 +151,59 @@ transaction-exec-command()
 			;;
 		esac
 		;;
+	    dynamicdns)
+		case ${ARGS[1]} in
+		    on)
+			case ${ARGS[2]} in
+			    changeip|myonlineportal|noip)
+				echo "${tag}${ARGS[0]} ${ARGS[1]} ${ARGS[2]} ${ARGS[3]} ${ARGS[4]} ..." >&2
+				;;
+			    *)
+				echo "${tag}${ARGS[0]} ${ARGS[1]} ${ARGS[2]} ${ARGS[3]} ..." >&2
+				;;
+			esac
+			;;
+		    *)
+			echo "${tag}${ARGS[@]}" >&2
+			;;
+		esac
+		;;
+	    email)
+		case ${ARGS[1]} in
+		    account)
+			echo "${tag}${ARGS[0]} ${ARGS[1]} ${ARGS[2]} ${ARGS[3]} ${ARGS[4]} ..." >&2
+			;;
+		    admin)
+			echo "${tag}${ARGS[0]} ${ARGS[1]} ${ARGS[2]} '${ARGS[3]}'" >&2
+			;;
+		    *)
+			echo "${tag}${ARGS[@]}" >&2
+			;;
+		esac
+		;;
 	    guard)
 		case ${ARGS[1]} in
 		    filter)
 			case ${ARGS[2]} in
 			    ldap)
-				echo -n "${tag}${ARGS[0]} ${ARGS[1]} ${ARGS[2]} ${ARGS[3]} ${ARGS[4]}" >&2
-				for ((i=5 ; i<ARGS_NB ; i++))
-				do
-				    echo -n " '${ARGS[${i}]}'" >&2
-				done
-				echo >&2
+				echo "${tag}${ARGS[0]} ${ARGS[1]} ${ARGS[2]} ${ARGS[3]} ${ARGS[4]} '${ARGS[5]}' ${ARGS[6]} '${ARGS[7]}'" >&2
+				;;
+			    *)
+				echo "${tag}${ARGS[@]}" >&2
+				;;
+			esac
+			;;
+		    *)
+			echo "${tag}${ARGS[@]}" >&2
+			;;
+		esac
+		;;
+	    manager)
+		case ${ARGS[1]} in
+		    sync)
+			case ${ARGS[2]} in
+			    peer)
+				echo "${tag}${ARGS[0]} ${ARGS[1]} ${ARGS[2]} ${ARGS[3]} '${ARGS[4]}'" >&2
 				;;
 			    *)
 				echo "${tag}${ARGS[@]}" >&2
@@ -134,11 +220,11 @@ transaction-exec-command()
 		    console)
 			echo "${tag}${ARGS[0]} ${ARGS[1]}" >&2
 			;;
-		    ldap|wadmin|login|kerberos)
+		    ldap|wadmin|login|ad)
 			echo "${tag}${ARGS[0]} ${ARGS[1]} ..." >&2
 			;;
 		    email)
-			echo "${tag}${ARGS[0]} ${ARGS[1]} ${ARGS[2]} ${ARGS[3]} ${ARGS[4]} ..." >&2
+			echo "${tag}${ARGS[0]} ${ARGS[1]} ..." >&2
 			;;
 		    file)
 			case ${ARGS[2]} in
@@ -150,30 +236,52 @@ transaction-exec-command()
 				;;
 			esac
 			;;
-		    *)
-			echo "${tag}${ARGS[@]}" >&2
-			;;
-		esac
-		;;
-	    email)
-		case ${ARGS[1]} in
-		    account)
-			echo "${tag}${ARGS[0]} ${ARGS[1]} ${ARGS[2]} ${ARGS[3]} ${ARGS[4]} ..." >&2
-			;;
-		    *)
-			echo "${tag}${ARGS[@]}" >&2
-			;;
-		esac
-		;;
-	    dynamicdns)
-		case ${ARGS[1]} in
-		    on)
+		    snmp)
 			case ${ARGS[2]} in
-			    changeip|myonlineportal|noip)
-				echo "${tag}${ARGS[0]} ${ARGS[1]} ${ARGS[2]} ${ARGS[3]} ${ARGS[4]} ..." >&2
+			    community|privacy)
+				echo "${tag}${ARGS[0]} ${ARGS[1]} ${ARGS[2]} ..." >&2
 				;;
 			    *)
-				echo "${tag}${ARGS[0]} ${ARGS[1]} ${ARGS[2]} ${ARGS[3]} ..." >&2
+				echo "${tag}${ARGS[@]}" >&2
+				;;
+			esac
+			;;
+		    *)
+			echo "${tag}${ARGS[@]}" >&2
+			;;
+		esac
+		;;
+	    vpnipsec)
+		case ${ARGS[1]} in
+		    access)
+			case ${ARGS[2]} in
+			    access)
+				arg=${ARGS[4]}
+ 				if test "${arg//=}" == "${arg}" ; then
+				    echo "${tag}${ARGS[0]} ${ARGS[1]} ${ARGS[2]} ${ARGS[3]} ${arg}" >&2
+				else
+				    echo "${tag}${ARGS[0]} ${ARGS[1]} ${ARGS[2]} ${ARGS[3]} '${arg}'" >&2
+				fi
+				;;
+			    *)
+				echo "${tag}${ARGS[@]}" >&2
+				;;
+			esac
+			;;
+		    site)
+			case ${ARGS[5]} in
+			    tls)
+				case ${ARGS[6]} in
+				    dn)
+					echo "${tag}${ARGS[0]} ${ARGS[1]} ${ARGS[2]} ${ARGS[3]} ${ARGS[4]} ${ARGS[5]} ${ARGS[6]} '${ARGS[7]}'" >&2
+					;;
+				    *)
+					echo "${tag}${ARGS[@]}" >&2
+					;;
+				esac
+				;;
+			    *)
+				echo "${tag}${ARGS[@]}" >&2
 				;;
 			esac
 			;;
@@ -219,28 +327,27 @@ run()
     test -z "${TRANSACTION}" || return 106
     ! is-in-manager-exec-context || return 234
 
-    local apl_command line
-    unset ARGS
-    export ARGS
+    local line apl_command apl_args
 
-    init-env-variables ${MANAGER_CONTEXT_ENV}
     local transaction_file=${TMP_DIR}/${TRANSACTION_FILE}.${USER}
     local action=${1}
+
+    init-env-variables ${MANAGER_CONTEXT_ENV}
 
     case "${action}" in
 	open)
 	    test ! -f ${transaction_file} || return 107
-	    while read apl_command line
+	    while read apl_command apl_args
 	    do
 		test -n "${apl_command}" || continue
 		test "${apl_command:0:1}" != "#" || continue
 		test "${apl_command}" != "." || break
 
 		if test "${apl_command}" == "transaction" ; then
-		    test "${line}" !=  "close" || break
+		    test "${apl_args}" !=  "close" || break
 		    continue
 		fi
-		echo ${apl_command} ${line}
+		echo ${apl_command} ${apl_args}
 	    done > ${transaction_file}
 	    ;;
 	close)
@@ -257,27 +364,78 @@ run()
 	    test -f ${transaction_file} || return 0
 
 	    initialise ${MANAGER_CONTEXT_ENV}
+
 	    export TRANSACTION=yes
 
-	    while read line
+	    local args
+	    declare -a args
+
+	    local word c escaped quoted i
+
+	    while IFS= read -r line
 	    do
-		unset ARGS
-		export ARGS
+		test -n "${line}" || continue
+		test "${line:0:1}" != "#" || continue
+		test "${line}" != "." || break
 
-		eval "set -- ${line}"
-		apl_command=${0}
-		push-args-1 "${@}"
+		apl_command=${line%%[[:space:]]*}
+		test -x ${LOCAL_DIR}/${TECHNICAL_NAME}/bin/${apl_command} || continue
 
-		test -n "${apl_command}" || continue
-		test "${apl_command:0:1}" != "#" || continue
-		test "${apl_command}" != "." || break
+		if test "${apl_command}" == "${line}" ; then
+		    apl_args=""
+		else
+		    apl_args=${line#*[[:space:]]}
+		    apl_args=${apl_args#"${apl_args%%[![:space:]]*}"}
+		fi
 
 		if test "${apl_command}" == "transaction" ; then
-		    test "${line}" !=  "close" || break
+		    test "${apl_args/ *}" !=  "close" || break
 		    continue
 		fi
 
-		test -x ${apl_command} || continue
+		case ${apl_command} in
+		    password|access|admin|authenticate|dynamicdns|email|manager|vpnipsec|waf)
+			args=("${apl_command}")
+			word=""
+			quoted=0
+			escaped=0
+
+			for ((i=0; i<${#apl_args}; i++))
+			do
+			    c="${apl_args:i:1}"
+			    if test "${quoted}" -eq 1 ; then
+				if test "${escaped}" -eq 1 ; then
+				    word="${word}${c}"
+				    escaped=0
+				elif test "${c}" = '\' ; then
+				    escaped=1
+				elif test "${c}" = "'" ; then
+				    quoted=0
+				else
+				    word="${word}${c}"
+				fi
+			    else
+				if test "${c}" = "'" ; then
+				    quoted=1
+				elif test "${c}" = " " || test "${c}" = "$(printf '\t')" ; then
+				    args+=("${word}")
+				    word=""
+				else
+				    word="${word}${c}"
+				fi
+			    fi
+			done
+
+			if test -n "${word}" ; then
+			    args+=("${word}")
+			fi
+			;;
+		    *)
+			read -a args <<< "${apl_command} ${apl_args}"
+			;;
+		esac
+
+		push-args-1 "${args[@]}"
                 transaction-exec-command ${log}
 
 	    done < ${transaction_file}

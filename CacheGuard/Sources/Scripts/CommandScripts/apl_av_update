@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       Scripts
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -36,9 +35,11 @@ av-update-log()
 {
     test -n "${1}" || return 1
     local message=${1}
+    local tag=${2}
+    test -n "${tag}" || tag=0
 
     local date=$(date +"%Y/%m/%d-%T")
-    echo -n "0 ${date} ${message}" >> ${AV_UPDATE_LOG}
+    echo -n "${tag} ${date} ${message}" >> ${AV_UPDATE_LOG}
 }
 
 av-update-log-abort()
@@ -63,8 +64,7 @@ apl-av-update()
     local pid ret1 ret2
 
     reset-av-update-log
-
-    av-update-log "Beginig the Antivirus signatures DB explicit updating"
+    av-update-log "Beginig the manual updating"
     av-update-log-ret ${?}
 
     if test ${APL_ROLE} == 'gateway' ; then
@@ -72,7 +72,7 @@ apl-av-update()
 	/etc/rc.d/init.d/health stop > /dev/null 2>&1
 	av-update-log-ret ${?}
 
-	av-update-log "Starting the main signatures DB updating in background"
+	av-update-log "Regular SDB updating" ${LOG_TAG_AV_REGULAR}
 	/etc/rc.d/init.d/freshclam update > /dev/null 2>&1 & pid=${!}
 	av-update-log-ret ${?}
     fi
@@ -93,11 +93,11 @@ apl-av-update()
 	ret1=0
     fi
 
-    av-update-log "Terminating signatures DB updates"
+    av-update-log "Terminating regular SDB updates"
     av-update-log-ret ${ret1}
 
     if test "${CURRENT_AV_EXTENDED_MODE}" == True ; then
-	av-update-log "Terminating extended signatures DB updates"
+	av-update-log "Terminating extended SDB updates"
 	av-update-log-ret ${ret2}
     fi
 
@@ -106,7 +106,7 @@ apl-av-update()
 	local clamd_state=${?}
 
 	if test ${clamd_state} -eq 0 ; then
-	    av-update-log "Reloading the Antivirus signatures..."
+	    av-update-log "Reloading the SDB"
 	    /etc/rc.d/init.d/clamd reload > /dev/null 2>&1
 	    av-update-log-ret ${?}
 	fi
@@ -116,7 +116,7 @@ apl-av-update()
 	av-update-log-ret ${?}
     fi
 
-    av-update-log "Ending the Antivirus explicit update"
+    av-update-log "Ending the manual updating"
     av-update-log-ret ${?}
 }
 
@@ -128,7 +128,7 @@ clean-exit()
     wait 2> /dev/null
     manage-appliance-unlock
     av-update-log-abort
-    av-update-log "Aborting the Antivirus Update operation"
+    av-update-log "Aborting the update operation"
     av-update-log-ret ${?}
 
     exit ${code}

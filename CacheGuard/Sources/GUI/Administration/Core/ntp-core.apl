@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -44,13 +43,12 @@ show-ntp-form()
     checkItem[0]=
     checkItem[1]=ipdomainname
     
-    shortcutMenuItem[0]="network-utilities"
+    shortcutMenuItem[0]="diagnostic-tools"
     shortcutMenuTitle[0]="Synchronise Time"
 
     listContent=${NTP_SERVER_LIST}
     test -n "${listContent}" || state=disabled    
     show-title "NTP Servers" "${state}" "clock ntp"
-    test -z "${CURRENT_NTP_SERVER_LIST}" || show-shortcuts-menu
     show-list-form ${MAX_NTP_SERVER_NB} "${width}" "${page_ref}"
 }
 

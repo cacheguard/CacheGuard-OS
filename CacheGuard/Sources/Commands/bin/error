@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       Commands
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -35,7 +34,7 @@ run()
     if test -n "${code}" ; then
 	check-digit ${code} || return 1
 	description=${Errors[${code}]}
-	test -n "${description}" || return 255
+	test -n "${description}" || return 0
 	echo-begin-show
 	echo Error ${code} - ${description}
 	echo-end-show

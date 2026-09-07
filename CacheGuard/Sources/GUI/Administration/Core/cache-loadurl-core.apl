@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -24,22 +23,17 @@
 
 show-cache-loadurl-form()
 {
-
-    local left=20
-    local right=80
-    local length=2
-
     local selected
 
     show-title "Cache Load URL" "enabled" "cache"
 
     echo "<div class='core-form'>"
-    show-form-begin ${length}
+    show-form-begin
 
     echo "<table class='highlight-form'>"
     echo "<tr>"
-    echo "<td width='${left}%'>Protocol</td>"
-    echo "<td width='${right}%'>"
+    echo "<td>Protocol</td>"
+    echo "<td>"
     echo "<select name='protocol'>"
     for proto in http ftp
     do
@@ -52,7 +46,7 @@ show-cache-loadurl-form()
     echo "<tr>"
     echo "<td>Location</td>"
     echo "<td>"
-    echo "<input name='uri' id='uri' value='${VALUES[1]}' type='text' size='48' maxlength='$[${MAX_LEN} * 3]' onblur=\"checkPrintable( 'uri' );\" />"
+    echo "<input name='uri' id='uri' value='${VALUES[1]}' type='text' size='48' maxlength='$[${MAX_LEN} * 3]' data-action='check-input' data-check-function='checkPrintable' />"
     echo "</td></tr>"
 
     echo "</table>"

@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -22,23 +21,31 @@
 #
 ###########################################################################
 
+show-site-select()
+{
+    local site_name=${1}
+    local id='site_name'
+
+    echo "<select name='${id}' id='${id}' data-action='ajax-update-deny-url'>"    
+    show-site-select1 any "${site_name}"
+    echo "</select>"
+}
+
 show-filter-rweb-denyurl-form()
 {
     local left=20
     local right=80
-    local length=3
 
     local state
     test -n "${RWEB_SITE_LIST}" || state=disabled
 
+    shortcutMenuItem[0]="rweb-site"
+    shortcutMenuTitle[0]="Add rWeb"
+
     show-title "WAF Deny URL" "${state}" "waf"
-
     echo "<div class='core-form'>"
-
-    echo "<span class='shortcut-menu-item' style='display:inline;'><a href='rweb-site.${GUI_EXT_NAME}'>Add rWeb</a></span>"
-    echo "<div style='clear:left;'></div>"
-
-    show-form-begin ${length}
+    show-shortcuts-menu
+    show-form-begin
     echo "<table class='highlight-form'>"
 
     echo "<tr>"
@@ -51,7 +58,7 @@ show-filter-rweb-denyurl-form()
         local site_name=${GET_ARGS}
     fi
 
-    show-site-select any "AJAX_updateDenyURL( 'site_name' );" ${site_name}
+    show-site-select ${site_name}
     echo "</td></tr>"
 
     echo "<tr>"

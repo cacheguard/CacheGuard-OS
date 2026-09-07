@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       Commands
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -110,8 +109,8 @@ __complete-transparent()
 	    case ${COMP_WORDS[1]} in
 		add)
 		    case ${COMP_WORDS[2]} in
-			internal|auxiliary|vpnipsec)
-			    COMPREPLY=('' '<RET>' '<qos>')
+			internal|auxiliary)
+			    COMPREPLY=('' '<RET>' '<qos%>')
 			    ;;
 			*)
 			    COMPREPLY=()

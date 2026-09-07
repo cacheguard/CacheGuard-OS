@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       Commands
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -38,8 +37,14 @@ __complete-access()
 		an|ant|anti|antiv|antivi|antivir|antiviru|antivirus)
 		    COMPREPLY=(antivirus)		    
 		    ;;
-		f|'fi'|fil|file)
+		f)
+		    COMPREPLY=(file fweb)
+		    ;;
+		'fi'|fil|file)
 		    COMPREPLY=(file)
+		    ;;
+		fw|fwe|fweb)
+		    COMPREPLY=(fweb)
 		    ;;
 		m)
 		    COMPREPLY=('' manager mon)
@@ -54,7 +59,7 @@ __complete-access()
 		    COMPREPLY=(web)
 		    ;;
 		'')
-		    COMPREPLY=('' '<RET>' admin antivirus file mon manager web)
+		    COMPREPLY=('' '<RET>' admin antivirus file fweb mon manager web)
 		    ;;
 		*)
 		    COMPREPLY=()
@@ -63,7 +68,7 @@ __complete-access()
 	    ;;
 	2)
 	    case ${COMP_WORDS[1]} in
-		admin|antivirus|file|mon|manager|web)
+		admin|antivirus|file|fweb|mon|manager|web)
 		    case ${COMP_WORDS[2]} in
 			r|ra|raz)
 			    COMPREPLY=(raz)
@@ -153,6 +158,9 @@ __complete-access()
 				    ;;
 			    esac
 			    ;;
+			fweb)
+			    COMPREPLY=('' '<RET>' '<network-ip>')
+			    ;;
 			manager)
 			    case ${COMP_WORDS[3]} in
 				m|ma|mas|mast|maste|master)
@@ -209,6 +217,9 @@ __complete-access()
 				    COMPREPLY=()
 				    ;;
 			    esac
+			    ;;
+			fweb)
+			    COMPREPLY=('' '<RET>' '<network-mask>')
 			    ;;
 			manager)
 			    if test ${COMP_WORDS[2]} == add ; then
@@ -348,7 +359,11 @@ __complete-access()
 					    esac
 					    ;;
 					antivirus)
-					    COMPREPLY=('' '<RET>' '<qos%>')
+					    if test ${COMP_WORDS[3]} == vpnipsec ; then
+						COMPREPLY=()
+					    else
+						COMPREPLY=('' '<RET>' '<qos%>')
+					    fi
 					    ;;
 					*)
 					    COMPREPLY=()
@@ -362,7 +377,7 @@ __complete-access()
 			    ;;
 			web)
 			    case ${COMP_WORDS[3]} in
-				internal|auxiliary|vpnipsec|admin|antivirus|file|mon|rweb|web)
+				internal|auxiliary|admin|antivirus|file|mon|rweb|web)
 				    COMPREPLY=('' '<RET>' '<qos%>')
 				    ;;
 				*)

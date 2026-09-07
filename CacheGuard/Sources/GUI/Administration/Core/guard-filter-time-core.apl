@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -45,8 +44,8 @@ show-guard-filter-time-form()
     blankItemContent[0]=""
     blankItemContent[1]="type='text' size='${MAX_NAME_LEN}' maxlength='${MAX_NAME_LEN}'"
     blankItemContent[2]="slot frame date"
-    blankItemContent[3]="type='text' size='22' maxlength='22' onMouseOver='showTimeToolTip( this.id );' onMouseOut='hideTimeToolTip( );'"
-    
+
+    blankItemContent[3]="type='text' size='22' maxlength='22' data-action='show-time-tooltip'"
     checkItem[1]=guard
     checkItem[3]=time
     
@@ -55,7 +54,6 @@ show-guard-filter-time-form()
     listContent=${GUARD_FILTER_TIME_LIST}
     test -n "${listContent}" || state=disabled
 
-    call-js-function "hideTimeToolTip( )"
     show-title "Time Filters" "${state}" "guard"
     show-list-form ${MAX_GUARD_FILTERS_NB} "${width}" "${page_ref}"
 }

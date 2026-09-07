@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       Scripts
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -29,25 +28,7 @@ CACHEGUARD_DIR=/etc/sysconfig/cacheguard
 source ${CACHEGUARD_DIR}/constant
 source ${APPLIANCE_DIR}/etc/role
 
-clean-exit()
-{
-    trap "" USR1 INT QUIT TERM
-    
-    local code=${1}
-
-    rm -f /var/lock/apl_ip_neighbour
-    rm -f ${RUN_DIR}/${WAITING_PROCESS}.${CALLER_PID}
-
-    exit ${code}
-}
-
-init-clean-end-trap()
-{
-    trap "clean-exit 1" USR1 INT QUIT TERM
-    touch ${RUN_DIR}/${WAITING_PROCESS}.${CALLER_PID}
-}
-
-show-ip-neighbour()
+set-environment()
 {
     if test -n "${1}" ; then
 	CALLER_PID=${1}
@@ -55,10 +36,38 @@ show-ip-neighbour()
 	CALLER_PID=${$}
     fi
 
-    init-clean-end-trap
+    TMP_WAITING_PROCESS=/tmp/${WAITING_PROCESS}.${CALLER_PID}
 
+    trap "clean-exit 1" USR1 INT QUIT TERM
+}
+
+clean-exit()
+{
+    trap "" USR1 INT QUIT TERM
+    
+    local code=${1}
+
+    rm -f \
+       /var/lock/apl_ip_neighbour \
+       ${TMP_WAITING_PROCESS}
+
+    exit ${code}
+}
+
+signal-process-termination()
+{
+    touch ${TMP_WAITING_PROCESS}
+    install -m 664 -o ${ADMIN_NAME} -g ${GROUP_NAME} ${TMP_WAITING_PROCESS} \
+	    ${RUN_DIR}/${SUPERVISOR_CALLER}/${WAITING_PROCESS}.${CALLER_PID}
+    rm -f ${TMP_WAITING_PROCESS}
+}
+
+main()
+{
     local ip dummy dev itype mac state
     local tmp_file=/tmp/ip.neighbour.${$}
+
+    set-environment "${@}"
 
     ip neighbour > ${tmp_file} 2> /dev/null
 
@@ -70,9 +79,11 @@ show-ip-neighbour()
     done < ${tmp_file} > ${RUN_DIR}/${IP_NEIGHBOUR_FILENAME}
 
     rm -f ${tmp_file}
+
+    signal-process-termination
     clean-exit 0
 }
 
 # Main()
 
-show-ip-neighbour "${@}"
+main "${@}"

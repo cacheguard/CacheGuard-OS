@@ -1,25 +1,22 @@
 Load, save or clear all files related to the configuration
 .SH SYNOPSIS
-
 [1] \fBfile\fR \fBload\fR (\fBftp\fR | \fBsftp\fR | \fBtftp\fR) \fI<file-server>\fR [\fI<directory-path>\fR] [(\fI<exclusion>\fR)*]]
-
+.sp
 [2] \fBfile\fR \fBsave\fR (\fBftp\fR | \fBsftp\fR | \fBtftp\fR) \fI<file-server>\fR [[\fI<directory-path>\fR] [(\fI<exclusion>\fR)*]]
-
+.sp
 [3] \fBfile\fR (\fBclear\fR [(\fI<exclusion>\fR)*] | \fBreport\fR | \fBexchange\fR)
-
+.sp
 [4] \fBfile\fR \fBdel\fR (\fBftp\fR | \fBsftp\fR) \fI<file-server>\fR [\fI<file-path>\fR]
 
 .SH DESCRIPTION
 
-When you load or save a logical configuration using the \fBconf\fR command, files related to that configuration such as TLS certificates are not loaded or saved. Normally, you will have to load or save them one by one using appropriate commands. For instance the \fBtls\fR command should be used to load or save TLS certificates. In some situation, it can be helpful to load or save all those files using a single command. That's the main purpose of the \fBfile\fR command. The \fBfile\fR command allows you to load or save all files related to the configuration in a one operation. To this end, the \fBfile\fR command automatically executes all appropriates commands to load or save files related to the configuration. To make this work, files located on remote file servers should be named using a naming policy described in the\fBFILE NAMING POLICY\fR section below.
+When you load or save a logical configuration using the \fBconf\fR command, files related to that configuration such as TLS certificates are not loaded or saved. Normally, you will have to load or save them one by one using appropriate commands. For instance the \fBtls\fR command should be used to load or save TLS certificates. In some situation, it can be helpful to load or save all those files using a single command. This is the main purpose of the \fBfile\fR command. The \fBfile\fR command allows you to load or save all files related to the configuration in a one operation. To this end, the \fBfile\fR command automatically executes all appropriates commands to load or save files related to the configuration. To make this work, files located on remote file servers should be named using a naming policy described in the \fBFILE NAMING POLICY\fR section below.
 
-The first [1] usage form allows you to load all files related to the configuration from a remote file server. Only trusted file servers are allowed. Trusted file servers are defined with the \fBaccess\fR command. This usage form requires 2 mandatory arguments. The first argument is the protocol name (\fBftp\fR, \fBsftp\fR, or \fBtftp\fR) and the second argument is the name or IP address of the file server. The optional third argument is the directory name on the file server from which files should be downloaded (see the\fBFILE NAMING POLICY\fR section below). If no directory name is specified, the default '/' directory is used.
+The first [1] usage form allows you to load all files related to the configuration from a remote file server. Only trusted file servers are allowed. Trusted file servers are defined with the \fBaccess\fR command. This usage form requires 2 mandatory arguments. The first argument is the protocol name (\fBftp\fR, \fBsftp\fR, or \fBtftp\fR) and the second argument is the name or IP address of the file server. The optional third argument is the directory name on the file server from which files should be downloaded (see the \fBFILE NAMING POLICY\fR section below). If no directory name is specified, the default '/' directory is used.
 
 The second [2] usage form allows you to save all files related to the configuration on a remote trusted file server. The save usage form requires the same arguments described for the load usage form. Concerned files are those that are installed and active in the system (after using the \fBapply\fR command). Files that are loaded into the system and not yet activated by the \fBapply\fR command are not saved.
 
 Loaded or saved file types are given below. For each file type, the executed command is specified.
-
-\(bu Administrator public SSH keys: \fBadmin ssh key load\fR \fI<key-id>\fR ...
 
 \(bu SNMP client certificate: \fBadmin snmp certificate add\fR ...
 
@@ -27,7 +24,7 @@ Loaded or saved file types are given below. For each file type, the executed com
 
 \(bu Manager SSH public key: \fBmanager ssh public\fR ...
 
-\(bu Manager SSH public key: \fBmanager ssh private\fR ...
+\(bu Manager SSH private key: \fBmanager ssh private\fR ...
 
 \(bu Server TLS certificates: \fBtls server\fR (\fBload\fR | \fBsave\fR) \fI<tls-id>\fR \fBcertificate\fR ...
 
@@ -51,9 +48,7 @@ Loaded or saved file types are given below. For each file type, the executed com
 
 \(bu Antivirus white list signatures: \fBantivirus whitelist signature\fR ...
 
-Please note that there are some limitations when using the \fBfile\fR command. Limitations are as follows:
-
-\(bu Administrator public SSH keys can only be loaded.
+Note that there are some limitations when using the \fBfile\fR command. Limitations are as follows:
 
 \(bu SNMP client certificates can only be loaded.
  
@@ -79,8 +74,6 @@ When loading, saving or clearing files, you can optionally specify file types th
 
 \(bu \fBadmin.snmp.certificate\fR: SNMP client certificates.
 
-\(bu \fBadmin.ssh.key\fR: administrator public SSH keys.
-
 \(bu \fBtls.ca.system\fR: system CA certificate and private key.
 
 \(bu \fBtls.ca.third\fR: third party CA certificates.
@@ -94,26 +87,16 @@ When loading, saving or clearing files, you can optionally specify file types th
 The fourth [4] usage form allows to delete a file on a file server when the used protocol supports it. This usage form can be very helpful to delete critical files such as client certificate passwords on a file server.
 
 .SH FILE NAMING POLICY
-As no file names are specified when loading or saving files, a simple naming rule is used to identify loaded or saved files . The rule is this: each file is named using the sequence of the command name, keywords and the identifier that are normally used to load or save that file separated by the dot (".") character. For instance the pkcs12 file associated to a Client TLS identified by the \fImyId\fR identifier is named: \fItls.client.pkcs12.myId\fR. In the same way the system CA private key is named \fItls.ca.system.key\fR.
+As no file names are specified when loading or saving files, a simple naming rule is used to identify loaded or saved files . The rule is this: each file is named using the sequence of the command name, keywords and the identifier that are normally used to load or save that file separated by the dot (".") character. For instance the pkcs12 file associated with a Client TLS identified by the \fImyId\fR identifier is named: \fItls.client.pkcs12.myId\fR. In the same way the system CA private key is named \fItls.ca.system.key\fR.
 
 .SH SEE ALSO
-.B apply
-(1)
-.B access
-(1)
-.B admin
-(1)
-.B antivirus
-(1)
-.B conf
-(1)
-.B job
-(1)
-.B system
-(1)
-.B tls
-(1)
-.B urllist
-(1)
-.B waf
-(1)
+.BR apply (1),
+.BR access (1),
+.BR admin (1),
+.BR antivirus (1),
+.BR conf (1),
+.BR job (1),
+.BR system (1),
+.BR tls (1),
+.BR urllist (1),
+.BR waf (1)

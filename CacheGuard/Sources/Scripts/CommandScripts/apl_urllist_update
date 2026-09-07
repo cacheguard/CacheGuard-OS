@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       Scripts
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -404,7 +403,6 @@ main()
 
     manage-appliance-lock
 
-    set-proxy2-parameters-cur
     set-rweb-name-qos-list-cur
 
     begin-urllist-auto-load "${@}"

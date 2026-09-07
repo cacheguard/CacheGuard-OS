@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -47,7 +46,7 @@ show-waf-rweb-bypass-rule-form()
 
     blankItemContent[0]=""
     blankItemContent[1]=$(show-uniq-rweb-sites)
-    blankItemContent[2]="rows='2' cols='42'"
+    blankItemContent[2]="rows='2' cols='42' maxlength='250'"
 
     checkItem[0]=
     checkItem[1]=
@@ -85,7 +84,6 @@ show-waf-rweb-bypass-rule-form()
     shortcutMenuTitle[0]="Add Websites"
 
     show-title "Bypass WAF Rules" "${state}" "admin waf"
-    show-shortcuts-menu
     show-list-form ${nb} "${width}" "${page_ref}"
 }
 

@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -26,12 +25,9 @@ source functions
 
 ntp-synchronise()
 {
-    test -n "${1}" || return 1
-    local width=${1}
-
     execute-command "ntp update"
 
-    echo "<div class='with-border' style='font-size:90%; font-style:italic; width:${width}px; margin-bottom:5px;'>The system time is synchronising with configured time servers. Please wait for the synchronisation.<br /><br /><span class='shortcut-menu-item'><a href='time.${GUI_EXT_NAME}'>Synchronisation Check</a>.</span></div>"
+    echo "<div class='diagnostic-tools-msg'>The system time is synchronising with configured time servers. Please wait for the synchronisation.<br /><br /><span class='shortcut-menu-item'><a href='time.${GUI_EXT_NAME}'>Synchronisation Check</a>.</span></div>"
 }
 
 LOG=/dev/null

@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -86,7 +85,7 @@ show-rweb-host-form()
 
     local color='SeaGreen'
     show-title "Backend Web Servers" "${disabled}" "rweb qos vlan vpnipsec"
-    show-list-form ${MAX_RWEB_HOST_NB} "${width}" "${page_ref}" "<br /><div style='color:${color};'>${name}</div>"
+    show-list-form ${MAX_RWEB_HOST_NB} "${width}" "${page_ref}" "${name}"
 }
 
 # Main()

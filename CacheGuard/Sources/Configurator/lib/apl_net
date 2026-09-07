@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       Configurator
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -118,7 +117,9 @@ nic-exist()
     test "${nic:0:4}" != bond || return 0
     test "${nic:0:3}" != ifb || return 0
 
-    member "${NETWORK_DEVICES}" ${nic} || return 11
+    local parent_nic=${nic%.*}
+
+    member "${NETWORK_DEVICES}" ${parent_nic} || return 11
 }
 
 gen-network-interfaces-file()
@@ -312,8 +313,7 @@ set-rweb-ip()
     local http_name_list http_name_ip_list https_name_ip_list
     local rweb_site_ip_list
 
-    local rweb_http=False
-    local rweb_https=False
+    local rweb_site_https=False
 
     case ${state} in
 	new)
@@ -373,7 +373,7 @@ set-rweb-ip()
 			    https_name_ip_list="${https_name_ip_list} ${name} ${ip}"
 			fi
 
-			rweb_https=True
+			rweb_site_https=True
 			;;
 
 		    http)
@@ -382,7 +382,6 @@ set-rweb-ip()
 			    http_name_list="${http_name_list} ${name}"
 			    http_name_ip_list="${http_name_ip_list} ${name} ${ip}"
 			fi
-			rweb_http=True
 			;;
 		    *)
 			;;
@@ -407,9 +406,7 @@ set-rweb-ip()
 
     case ${state} in
 	new)
-	    export RWEB_HTTPS_MODE=${rweb_https}
-	    export RWEB_HTTP_MODE=${rweb_http}
-
+	    export RWEB_SITE_HTTPS_MODE=${rweb_site_https}
 	    export RWEB_HTTP_NAME_IP_LIST=${http_name_ip_list}
 	    export RWEB_HTTPS_NAME_IP_LIST=${https_name_ip_list}
 	    export RWEB_HTTPS_IP_LIST=${https_ip_list}
@@ -420,9 +417,7 @@ set-rweb-ip()
 	    export RWEB_SITE_IP_LIST=${rweb_site_ip_list}
 	    ;;
 	cur)
-	    export CURRENT_RWEB_HTTPS_MODE=${rweb_https}
-	    export CURRENT_RWEB_HTTP_MODE=${rweb_http}
-
+	    export CURRENT_RWEB_SITE_HTTPS_MODE=${rweb_site_https}
 	    export CURRENT_RWEB_HTTP_NAME_IP_LIST=${http_name_ip_list}
 	    export CURRENT_RWEB_HTTPS_NAME_IP_LIST=${https_name_ip_list}
 	    export CURRENT_RWEB_HTTPS_IP_LIST=${https_ip_list}
@@ -474,7 +469,7 @@ set-admin-access-list-parameters()
 			fi
 			;;
 		    auxiliary)
-			if test -z "${IF_AUXILIARY}" -o ${IP_AUXILIARY_IP} == 0.0.0.0 -o ${ADMIN_AUXILIARY} == False ; then
+			if test -z "${AUXILIARY_IS_ACTIVE}" -o ${ADMIN_AUXILIARY} == False ; then
 			    ((i++))
 			    continue
 			fi
@@ -511,8 +506,8 @@ set-web-access-list-parameters()
     local elt i=0 range
     local interface ip mk qos px
 
-    local access_if_ip_px_web_list
-    local access_if_ip_mk_web_list
+    local access_web_if_ip_px_list
+    local access_web_if_ip_mk_list
 
     for elt in ${ACCESS_WEB_LIST}
     do
@@ -534,7 +529,7 @@ set-web-access-list-parameters()
 		    internal|admin|rweb|web|antivirus|file|mon)
 			;;
 		    auxiliary)
-			if test -z "${IF_AUXILIARY}" -o ${IP_AUXILIARY_IP} == 0.0.0.0 ; then
+			if test -z "${AUXILIARY_IS_ACTIVE}" ; then
 			    ((i++))
 			    continue
 			fi
@@ -551,8 +546,8 @@ set-web-access-list-parameters()
 
 		px=$(ipcalc -s ${ip} ${mk} -p)
 		px=${px/PREFIX=/}
-		access_if_ip_px_web_list="${access_if_ip_px_web_list} ${interface} ${ip} ${px} ${qos}"
-		access_if_ip_mk_web_list="${access_if_ip_mk_web_list} ${interface} ${ip} ${mk} ${qos}"
+		access_web_if_ip_px_list="${access_web_if_ip_px_list} ${interface} ${ip} ${px} ${qos}"
+		access_web_if_ip_mk_list="${access_web_if_ip_mk_list} ${interface} ${ip} ${mk} ${qos}"
 		;;
 	    *)
 		return 1
@@ -561,8 +556,8 @@ set-web-access-list-parameters()
 	((i++))
     done
 
-    ACCESS_IF_IP_PX_WEB_LIST="${access_if_ip_px_web_list:1}"
-    ACCESS_IF_IP_MK_WEB_LIST="${access_if_ip_mk_web_list:1}"
+    ACCESS_WEB_IF_IP_PX_LIST="${access_web_if_ip_px_list:1}"
+    ACCESS_WEB_IF_IP_MK_LIST="${access_web_if_ip_mk_list:1}"
 }
 
 set-tweb-access-list-parameters()
@@ -603,7 +598,7 @@ set-tweb-access-list-parameters()
 			;;
 
 		    auxiliary)
-			if test -z "${IF_AUXILIARY}" -o ${IP_AUXILIARY_IP} == 0.0.0.0 -o ${AV_AUXILIARY} == False ; then
+			if test -z "${AUXILIARY_IS_ACTIVE}" -o ${AV_AUXILIARY} == False ; then
 			    ((i++))
 			    continue
 			fi
@@ -661,7 +656,7 @@ set-av-access-list-parameters()
 		    internal|external)
 			;;
 		    auxiliary)
-			if test -z "${IF_AUXILIARY}" -o ${IP_AUXILIARY_IP} == 0.0.0.0 ; then
+			if test -z "${AUXILIARY_IS_ACTIVE}" ; then
 			    ((i++))
 			    continue
 			fi
@@ -775,14 +770,15 @@ replace-access-rweb-list-elt()
 	((i++))
     done
 
-    echo "${out_list:1}"
+    echo "${out_list}"
 }
 
 set-rweb-access-list-parameters()
 {
     local elt range i=0
     local hosts host
-    local name dev ip port qos qos1 qos2
+    local name dev protocol ip port qos qos1 qos2
+    local rweb_host_https=False
 
     unset ACCESS_RWEB_LIST
 
@@ -800,10 +796,10 @@ set-rweb-access-list-parameters()
 		do
 		    host=${host//_/ }
 
+		    dev=$(get-nth-arg 1 ${host})
+		    protocol=$(get-nth-arg 2 ${host})
 		    ip=$(get-nth-arg 3 ${host})
 		    port=$(get-nth-arg 4 ${host})
-
-		    dev=$(get-nth-arg 1 ${host})
 		    qos1=$(get-nth-arg 6 ${host})
 
 		    qos2=$(get-qos-rweb-hosts ${ip} ${port})
@@ -816,6 +812,8 @@ set-rweb-access-list-parameters()
 		    else
 			ACCESS_RWEB_LIST="${ACCESS_RWEB_LIST} ${dev} ${ip} ${port} ${qos1}"
 		    fi
+
+		    test ${protocol} != 'https' || rweb_host_https=True
 		done
 		;;
 	    *)
@@ -825,6 +823,8 @@ set-rweb-access-list-parameters()
 	((i++))
     done
     ACCESS_RWEB_LIST="${ACCESS_RWEB_LIST:1}"
+
+    RWEB_HOST_HTTPS_MODE=${rweb_host_https}
 }
 
 set-access-list-parameters()
@@ -981,35 +981,64 @@ set-network-if-parameters()
 
     # QOS IFs
 
-    export IFB_INTERNAL_INGRESS=0
-    export IFB_EXTERNAL_INGRESS=1
-    export IFB_AUXILIARY_INGRESS=2
-    export IFB_INTERNAL_EGRESS=3
+    export IF_QOS_WEB_EGRESS=${IF_WEB}
+    export IF_QOS_RWEB_EGRESS=${IF_RWEB}
+    export IF_QOS_AV_EGRESS=${IF_AV}
+    export IF_QOS_PEER_EGRESS=${IF_PEER}
+    export IF_QOS_FILE_EGRESS=${IF_FILE}
+    export IF_QOS_ADMIN_EGRESS=${IF_ADMIN}
+    export IF_QOS_MON_EGRESS=${IF_MON}
 
-    export IF_QOS_INTERNAL_INGRESS=ifb${IFB_INTERNAL_INGRESS}
+    export CURRENT_IF_QOS_WEB_EGRESS=${CURRENT_IF_WEB}
+    export CURRENT_IF_QOS_RWEB_EGRESS=${CURRENT_IF_RWEB}
+    export CURRENT_IF_QOS_AV_EGRESS=${CURRENT_IF_AV}
+    export CURRENT_IF_QOS_PEER_EGRESS=${CURRENT_IF_PEER}
+    export CURRENT_IF_QOS_FILE_EGRESS=${CURRENT_IF_FILE}
+    export CURRENT_IF_QOS_ADMIN_EGRESS=${CURRENT_IF_ADMIN}
+    export CURRENT_IF_QOS_MON_EGRESS=${CURRENT_IF_MON}
+
+    case ${APL_ROLE} in
+	gateway)
+	    export IFB_EXTERNAL_INGRESS=0
+	    export IFB_INTERNAL_INGRESS=1
+	    ;;
+	manager)
+	    export IFB_INTERNAL_INGRESS=0
+	    export IFB_EXTERNAL_INGRESS=1
+	    ;;
+	*)
+	    export IFB_EXTERNAL_INGRESS=0
+	    export IFB_INTERNAL_INGRESS=1
+	    ;;
+    esac
+
+    export IFB_AUXILIARY_INGRESS=2
+
     export IF_QOS_EXTERNAL_INGRESS=ifb${IFB_EXTERNAL_INGRESS}
-    export CURRENT_IF_QOS_INTERNAL_INGRESS=ifb${IFB_INTERNAL_INGRESS}
+    export IF_QOS_INTERNAL_INGRESS=ifb${IFB_INTERNAL_INGRESS}
     export CURRENT_IF_QOS_EXTERNAL_INGRESS=ifb${IFB_EXTERNAL_INGRESS}
+    export CURRENT_IF_QOS_INTERNAL_INGRESS=ifb${IFB_INTERNAL_INGRESS}
 
     test -z "${IF_AUXILIARY}" || export IF_QOS_AUXILIARY_INGRESS=ifb${IFB_AUXILIARY_INGRESS}	    
     test -z "${CURRENT_IF_AUXILIARY}" || export CURRENT_IF_QOS_AUXILIARY_INGRESS=ifb${IFB_AUXILIARY_INGRESS}
 
-    if test ${VLAN_MODE} == True ; then
-	export IF_QOS_INTERNAL_EGRESS=ifb${IFB_INTERNAL_EGRESS}
-    else
-	export IF_QOS_INTERNAL_EGRESS=${IF_INTERNAL}
-    fi
-
-    if test ${CURRENT_VLAN_MODE} == True ; then
-	export CURRENT_IF_QOS_INTERNAL_EGRESS=ifb${IFB_INTERNAL_EGRESS}
-    else
-	export CURRENT_IF_QOS_INTERNAL_EGRESS=${CURRENT_IF_INTERNAL}
-    fi
-
     export IF_QOS_EXTERNAL_EGRESS=${IF_EXTERNAL}
     export IF_QOS_AUXILIARY_EGRESS=${IF_AUXILIARY}
+
     export CURRENT_IF_QOS_EXTERNAL_EGRESS=${CURRENT_IF_EXTERNAL}
     export CURRENT_IF_QOS_AUXILIARY_EGRESS=${CURRENT_IF_AUXILIARY}
+
+    if test -z "${IF_AUXILIARY}" -o ${IP_AUXILIARY_IP} == 0.0.0.0 ; then
+	unset AUXILIARY_IS_ACTIVE
+    else
+	AUXILIARY_IS_ACTIVE=yes
+    fi
+
+    if test -z "${CURRENT_IF_AUXILIARY}" -o ${CURRENT_IP_AUXILIARY_IP} == 0.0.0.0 ; then
+	unset CURRENT_AUXILIARY_IS_ACTIVE
+    else
+	CURRENT_AUXILIARY_IS_ACTIVE=yes
+    fi
 }
 
 get-broadcast-address()
@@ -1045,6 +1074,47 @@ set-network-ip-native-parameters()
     export CURRENT_IP_AUXILIARY_NET=$(ipcalc -s ${CURRENT_IP_AUXILIARY_IP} ${CURRENT_IP_AUXILIARY_MASK} -n) ; CURRENT_IP_AUXILIARY_NET=${CURRENT_IP_AUXILIARY_NET/NETWORK=}
     export CURRENT_IP_AUXILIARY_PRF=$(ipcalc -s ${CURRENT_IP_AUXILIARY_IP} ${CURRENT_IP_AUXILIARY_MASK} -p) ; CURRENT_IP_AUXILIARY_PRF=${CURRENT_IP_AUXILIARY_PRF/PREFIX=}
     export CURRENT_IP_AUXILIARY_BRD=$(get-broadcast-address ${CURRENT_IP_AUXILIARY_IP} ${CURRENT_IP_AUXILIARY_MASK})
+}
+
+set-ip-prefix-broadcast-etc()
+{
+    local vlan ip netmask prefix network broadcast
+    local elt range i=0
+
+    local vlan_ip_mask_prefix_network_broadcast_list
+    local ip_vlan_local_ip_list
+    local device_802_1q_list
+
+    for elt in ${IP_VLAN_LIST}
+    do
+	range=$[${i} % 3]
+	case ${range} in
+	    0)
+		vlan=${elt}
+		device_802_1q_list="${device_802_1q_list} ${IF_INTERNAL}.${vlan}"
+		;;
+	    1)
+		ip=${elt}
+		ip_vlan_local_ip_list="${ip_vlan_local_ip_list} ${ip}"
+		;;
+	    2)
+		netmask=${elt}
+		prefix=$(ipcalc -s ${ip} ${netmask} -p) ; prefix=${prefix/PREFIX=}
+		network=$(ipcalc -s ${ip} ${netmask} -n) ; network=${network/NETWORK=}
+		broadcast=$(get-broadcast-address ${ip} ${netmask})
+
+		vlan_ip_mask_prefix_network_broadcast_list="${vlan_ip_mask_prefix_network_broadcast_list} ${vlan} ${ip} ${netmask} ${prefix} ${network} ${broadcast}"
+		;;
+	    *)
+		return 1
+		;;
+	esac
+	((i++))
+    done
+
+    DEVICE_802_1Q_LIST=${device_802_1q_list:1}
+    IP_VLAN_LOCAL_IP_LIST=${ip_vlan_local_ip_list:1}
+    VLAN_IP_MASK_PREFIX_NETWORK_BROADCAST_list=${vlan_ip_mask_prefix_network_broadcast_list:1}
 }
 
 set-network-ip-vlan-parameters()
@@ -1111,6 +1181,7 @@ set-network-ip-vlan-parameters()
 	export CURRENT_IP_ADMIN_MASK=${CURRENT_IP_INTERNAL_MASK}
 	export CURRENT_IP_FILE_MASK=${CURRENT_IP_INTERNAL_MASK}
 	export CURRENT_IP_MON_MASK=${CURRENT_IP_INTERNAL_MASK}
+	export INTERNAL_DEVICE_LIST=${IF_INTERNAL}
     else
 	local ip_netmask ip netmask netwrok broadcast prefix
 
@@ -1285,9 +1356,11 @@ set-network-ip-vlan-parameters()
 	export CURRENT_IP_MON_NET=${network}
 	export CURRENT_IP_MON_PRF=${prefix}
 	export CURRENT_IP_MON_BRD=${broadcast}
+
+	export INTERNAL_DEVICE_LIST=${DEVICE_802_1Q_LIST}
     fi
 
-    IP_LOCAL_IP_LIST=${ip_local_ip_list}
+    export IP_LOCAL_IP_LIST=${ip_local_ip_list}
 }
 
 set-network-ip-parameters()
@@ -1326,19 +1399,22 @@ set-ports-nb()
     export SFTP_PORT=22
     export WWW_PORT=80
     export KERBEROS_PORT=88
+    export KPASSWD_PORT=464
+    export KERBEROS_ADM_PORT=749
     export NTP_PORT=123
     export SNMP_PORT=161
     export SNMP_TRAP_PORT=162
     export LDAP_PORT=389
     export HTTPS_PORT=443
-    export KPASSWD_PORT=464
     export SNMP_TLS_PORT=10161
     export SNMP_TLS_TRAP_PORT=10162
     export WEB_PORTS="${WWW_PORT},${HTTPS_PORT}"
+    export TWEB_PORTS="${THTTP_PORT},${THTTPS_PORT}"
     export SAFE_PORTS="1024:49151"
     export CLOUD_AZURE_PORT="32526"
     export CLOUD_AZURE_PORTS="${WEB_PORTS},${CLOUD_AZURE_PORT}"
     export EMAIL_PORT=25
+    export NETWORK_MTU=1500
 }
 
 set-net-constant()
@@ -1433,11 +1509,6 @@ set-network-routes-parameters()
     export CURRENT_IP_ROUTE_GW_WT_PG_LIST=$(get-multi-gateways-route-list "${CURRENT_IP_ROUTE_LIST}")
     export IP_ROUTE_GW_WT_PG_LIST=$(get-multi-gateways-route-list "${IP_ROUTE_LIST}")
 
-    export EXTERNAL_ROUTE_TABLE_PNAME=external
-    export STICKY_DEFAULT_ROUTE_TABLE_PNAME=sdefault
-
-    export ROUTE_INIT_TABLE=101
-
     set-gateway-weights cur "${CURRENT_IP_ROUTE_GW_WT_PG_LIST}"
     set-gateway-weights new "${IP_ROUTE_GW_WT_PG_LIST}"
 
@@ -1530,47 +1601,6 @@ get-connected-if()
 	    fi
 	fi
     fi
-}
-
-set-ip-prefix-broadcast-etc()
-{
-    local vlan ip netmask prefix network broadcast
-    local i=0 elt range
-
-    local vlan_ip_mask_prefix_network_broadcast_list
-    local ip_vlan_local_ip_list
-
-    for elt in ${IP_VLAN_LIST}
-    do
-	range=$[${i} % 3]
-	case ${range} in
-	    0)
-		vlan=${elt}
-		;;
-	    1)
-		ip=${elt}
-		ip_vlan_local_ip_list="${ip_vlan_local_ip_list} ${ip}"
-		;;
-	    2)
-		netmask=${elt}
-		prefix=$(ipcalc -s ${ip} ${netmask} -p) ; prefix=${prefix/PREFIX=}
-		network=$(ipcalc -s ${ip} ${netmask} -n) ; network=${network/NETWORK=}
-		broadcast=$(get-broadcast-address ${ip} ${netmask})
-
-		vlan_ip_mask_prefix_network_broadcast_list="${vlan_ip_mask_prefix_network_broadcast_list} ${vlan} ${ip} ${netmask} ${prefix} ${network} ${broadcast}"
-		;;
-	    *)
-		return 1
-		;;
-	esac
-	((i++))
-    done
-
-    vlan_ip_mask_prefix_network_broadcast_list=${vlan_ip_mask_prefix_network_broadcast_list:1}
-    ip_vlan_local_ip_list=${ip_vlan_local_ip_list:1}
-
-    VLAN_IP_MASK_PREFIX_NETWORK_BROADCAST_list=${vlan_ip_mask_prefix_network_broadcast_list}
-    IP_VLAN_LOCAL_IP_LIST=${ip_vlan_local_ip_list}
 }
 
 gen-network()
@@ -1973,7 +2003,7 @@ set-arp-ignore()
     set-arp-ignore-1 ${IF_EXTERNAL} ${IP_EXTERNAL_IP} ${IP_EXTERNAL_MASK} ${val}
     set-arp-ignore-1 ${IF_WEB} ${IP_WEB_IP} ${IP_WEB_MASK} ${val}
     set-arp-ignore-1 ${IF_AV} ${IP_AV_IP} ${IP_AV_MASK} ${val}
-    test -z "${IF_AUXILIARY}" -o ${IP_AUXILIARY_IP} == 0.0.0.0 || set-arp-ignore-1 ${IF_AUXILIARY} ${IP_AUXILIARY_IP} ${IP_AUXILIARY_MASK} ${val}
+    test -z "${AUXILIARY_IS_ACTIVE}" || set-arp-ignore-1 ${IF_AUXILIARY} ${IP_AUXILIARY_IP} ${IP_AUXILIARY_MASK} ${val}
 }
 
 check-admin-ip-modified()
@@ -2188,7 +2218,7 @@ gen-network-static-route-conf()
     local ip=${1}
     local mk=${2}
     local gw_wt_pg_list=${3}
-    local table=${4}
+    local tname=${4}
 
     local rtype device
 
@@ -2205,7 +2235,7 @@ gen-network-static-route-conf()
     echo "ONBOOT=yes"
     echo "SERVICE=ipv4-static-route"
     echo "TYPE=${rtype}"
-    test -z "${table}" || echo "TABLE=${table}"
+    test -z "${tname}" || echo "TABLE=${tname}"
 
     if test ${gw_wt_pg_list:0:5} = local ; then
 	device=${gw_wt_pg_list:6}
@@ -2403,31 +2433,32 @@ safe-generate-network-static-route-ipsec()
 
 safe-generate-network-static-route-multi-gateways()
 {
-    ROUTE_TABLE=${ROUTE_INIT_TABLE}
-    local gw_wt gw table_nb=1
+    ROUTE_TABLE=${ROUTE_INIT_TABLE_NB}
+
+    local gw_wt gw index=${ROUTE_INIT_TABLE_INDEX}
 
     if is-multi-external-gateways new ; then
 	for gw_wt in ${EXTERNAL_GATEWAY_WEIGHTS}
 	do
 	    gw=${gw_wt/:*}
-	    gen-network-static-route-conf 0.0.0.0 0.0.0.0 ${gw} ${EXTERNAL_ROUTE_TABLE_PNAME}${table_nb} > ifconfig.route${ROUTE_NB}.work
+	    gen-network-static-route-conf 0.0.0.0 0.0.0.0 ${gw} ${EXTERNAL_ROUTE_TABLE_PNAME}${index} > ifconfig.route${ROUTE_NB}.work
 	    mv -f ifconfig.route${ROUTE_NB}.work ifconfig.route${ROUTE_NB}.new
 	    ((ROUTE_NB++))
 	    ((ROUTE_TABLE++))
-	    ((table_nb++))
+	    ((index++))
 	done
     fi
 
     if is-multi-default-gateways new ; then
-	table_nb=1
+	index=${ROUTE_INIT_TABLE_INDEX}
 	for gw_wt in ${DEFAULT_NOSTANDBY_GATEWAY_WEIGHTS}
 	do
 	    gw=${gw_wt/:*}
-	    gen-network-static-route-conf 0.0.0.0 0.0.0.0 ${gw} ${STICKY_DEFAULT_ROUTE_TABLE_PNAME}${table_nb} > ifconfig.route${ROUTE_NB}.work
+	    gen-network-static-route-conf 0.0.0.0 0.0.0.0 ${gw} ${STICKY_DEFAULT_ROUTE_TABLE_PNAME}${index} > ifconfig.route${ROUTE_NB}.work
 	    mv -f ifconfig.route${ROUTE_NB}.work ifconfig.route${ROUTE_NB}.new
 	    ((ROUTE_NB++))
 	    ((ROUTE_TABLE++))
-	    ((table_nb++))
+	    ((index++))
 	done
     fi
 }
@@ -2492,7 +2523,7 @@ gen-network-route-rule()
     test -n "${3}" || return 3
     local gw=${1}
     local mark=${2}
-    local table=${3}
+    local tname=${3}
 
     local fwmark=${mark}
     let "fwmark <<= ${ROUTE_MARK_SHIFT}"
@@ -2503,7 +2534,7 @@ gen-network-route-rule()
     echo "TYPE=fwmark"
     echo "FWMARK=${fwmark}/${ROUTE_MARK_MASK}"
     echo "PRIORITY=${ROUTE_PRIORITY}"
-    echo "TABLE=${table}"
+    echo "TABLE=${tname}"
 
     ((ROUTE_PRIORITY++))
     ((ROUTE_TABLE++))
@@ -2523,7 +2554,7 @@ safe-generate-network-route-rule()
 {
     local rule_nb=0
 
-    echo "# mangle_type gateway_ip gateway_weight table_prefix_name table_prefix_range mangle_mark" > ${IPTABLES_RUNTIME_MANGLE_INDEX}.work
+    echo "# mangle_type gateway_ip gateway_weight table_prefix_name table_prefix_index mangle_mark" > ${IPTABLES_RUNTIME_MANGLE_INDEX}.work
 
     cd ${CONF_DIR}
 
@@ -2535,39 +2566,39 @@ safe-generate-network-route-rule()
 
     local mark=${ROUTE_INIT_MARK}
 
-    ROUTE_TABLE=${ROUTE_INIT_TABLE}
+    ROUTE_TABLE=${ROUTE_INIT_TABLE_NB}
     ROUTE_PRIORITY=${ROUTE_INIT_PRIORITY}
 
-    local gw_wt gw wt table_nb
+    local gw_wt gw wt
 
     if is-multi-external-gateways new ; then
-	table_nb=1
+	index=${ROUTE_INIT_TABLE_INDEX}
 	for gw_wt in ${EXTERNAL_GATEWAY_WEIGHTS}
 	do
 	    gw=${gw_wt/:*}
 	    wt=${gw_wt/*:}
-	    gen-network-route-rule ${gw} ${mark} ${EXTERNAL_ROUTE_TABLE_PNAME}${table_nb} > ifconfig.rule${rule_nb}.work
+	    gen-network-route-rule ${gw} ${mark} ${EXTERNAL_ROUTE_TABLE_PNAME}${index} > ifconfig.rule${rule_nb}.work
 	    mv -f ifconfig.rule${rule_nb}.work ifconfig.rule${rule_nb}.new
-	    echo route ${gw} ${wt} ${EXTERNAL_ROUTE_TABLE_PNAME} ${table_nb} ${mark} >> ${IPTABLES_RUNTIME_MANGLE_INDEX}.work
+	    echo route ${gw} ${wt} ${EXTERNAL_ROUTE_TABLE_PNAME} ${index} ${mark} >> ${IPTABLES_RUNTIME_MANGLE_INDEX}.work
 	    ((mark++))
 	    ((rule_nb++))
-	    ((table_nb++))
+	    ((index++))
 	done
 	gws=${gws:1}
     fi
 
     if is-multi-default-gateways new ; then
-	table_nb=1
+	index=${ROUTE_INIT_TABLE_INDEX}
 	for gw_wt in ${DEFAULT_NOSTANDBY_GATEWAY_WEIGHTS}
 	do
 	    gw=${gw_wt/:*}
 	    wt=${gw_wt/*:}
-	    gen-network-route-rule ${gw} ${mark} ${STICKY_DEFAULT_ROUTE_TABLE_PNAME}${table_nb} > ifconfig.rule${rule_nb}.work
+	    gen-network-route-rule ${gw} ${mark} ${STICKY_DEFAULT_ROUTE_TABLE_PNAME}${index} > ifconfig.rule${rule_nb}.work
 	    mv -f ifconfig.rule${rule_nb}.work ifconfig.rule${rule_nb}.new
-	    echo route ${gw} ${wt} ${STICKY_DEFAULT_ROUTE_TABLE_PNAME} ${table_nb} ${mark} >> ${IPTABLES_RUNTIME_MANGLE_INDEX}.work
+	    echo route ${gw} ${wt} ${STICKY_DEFAULT_ROUTE_TABLE_PNAME} ${index} ${mark} >> ${IPTABLES_RUNTIME_MANGLE_INDEX}.work
 	    ((mark++))
 	    ((rule_nb++))
-	    ((table_nb++))
+	    ((index++))
 	done
     fi
 
@@ -2661,6 +2692,7 @@ set-net-names-list()
     local access_mon_if_ip_list access_mon_if_dn_list
     local syslog_server_ip_list syslog_server_dn_list
     local snmp_trap_server_ip_list snmp_trap_server_dn_list
+    local ldap_server_ip_list ldap_server_dn_list
     local kerberos_server_ip_list kerberos_server_dn_list
     local host_ip
 
@@ -2749,7 +2781,7 @@ set-net-names-list()
 			fi
 			;;
 		    auxiliary)
-			if test -z "${IF_AUXILIARY}" -o ${IP_AUXILIARY_IP} == 0.0.0.0 -o ${ADMIN_AUXILIARY} == False ; then
+			if test -z "${AUXILIARY_IS_ACTIVE}" -o ${ADMIN_AUXILIARY} == False ; then
 			    ((i++))
 			    continue
 			fi
@@ -2852,6 +2884,34 @@ set-net-names-list()
 	((i++))
     done
 
+    i=0
+    for elt in ${LDAP_SERVER_LIST}
+    do
+	range=$[${i} % 3]
+	case ${range} in
+	    0)
+		protocol=${elt}
+		;;
+	    1)
+		ip=${elt}
+		;;
+	    2)
+		port=${elt}
+
+		host_ip=$(get-ip-from-ip-name-list ${ip})
+
+		if test ${?} -eq 0 ; then
+		    ldap_server_ip_list="${ldap_server_ip_list} ${protocol} ${host_ip} ${port}"
+		else
+		    ldap_server_dn_list="${ldap_server_dn_list} ${protocol} ${ip} ${port}"
+		fi
+		;;
+	    *)
+		;;
+	esac
+	((i++))
+    done
+
     for ip in ${KERBEROS_SERVER_LIST}
     do
 	if check-expr-ip ${ip} ; then
@@ -2879,33 +2939,36 @@ set-net-names-list()
     SNMP_TRAP_SERVER_IP_LIST=${snmp_trap_server_ip_list:1}
     SNMP_TRAP_SERVER_DN_LIST=${snmp_trap_server_dn_list:1}
 
+    LDAP_SERVER_IP_LIST=${ldap_server_ip_list:1}
+    LDAP_SERVER_DN_LIST=${ldap_server_dn_list:1}
+
     KERBEROS_SERVER_IP_LIST=${kerberos_server_ip_list:1}
     KERBEROS_SERVER_DN_LIST=${kerberos_server_dn_list:1}
 }
 
 gen-route-table-names()
 {
-    local table=${ROUTE_INIT_TABLE}
-    local gw_wt nb=1
+    local table=${ROUTE_INIT_TABLE_NB}
+    local gw_wt index=${ROUTE_INIT_TABLE_INDEX}
 
     cat rt_tables-constant
 
-    test ${TPROXY_MODE} == False || echo ${TPROXY_ROUTE_TABLE_NB} ${TPROXY_ROUTE_TABLE_NAME}
-    echo ${TRANSPARENT_ROUTE_TABLE_NB} ${TRANSPARENT_ROUTE_TABLE_NAME}
+    echo "${TRANSPARENT_ROUTE_TABLE_NB} ${TRANSPARENT_ROUTE_TABLE_NAME}"
+    echo "${IPSEC_ROUTE_TABLE_NB} ${IPSEC_ROUTE_TABLE_NAME}"
 
     for gw_wt in ${EXTERNAL_GATEWAY_WEIGHTS}
     do
-	echo ${table} ${EXTERNAL_ROUTE_TABLE_PNAME}${nb}
+	echo "${table} ${EXTERNAL_ROUTE_TABLE_PNAME}${index}"
 	((table++))
-	((nb++))
+	((index++))
     done
 
-    nb=1
+    index=${ROUTE_INIT_TABLE_INDEX}
     for gw_wt in ${DEFAULT_NOSTANDBY_GATEWAY_WEIGHTS}
     do
-	echo ${table} ${STICKY_DEFAULT_ROUTE_TABLE_PNAME}${nb}
+	echo "${table} ${STICKY_DEFAULT_ROUTE_TABLE_PNAME}${index}"
 	((table++))
-	((nb++))
+	((index++)) || true
     done
 }
 

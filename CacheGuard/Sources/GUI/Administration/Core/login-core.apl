@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -30,7 +29,6 @@ show-login-form()
 
     local user_id='user'
     local password_id='password'
-    local focus_id
 
     itemWidth[0]=40
     itemWidth[1]=60
@@ -61,13 +59,11 @@ show-login-form()
 	    itemID[1]=${user_id}
 	    itemID[2]=${password_id}
 
-	    blankItemContent[1]="type='text' size='24' maxlength='${MAX_USER_LEN}' value='' autocomplete='off'"
+	    blankItemContent[1]="type='text' size='24' maxlength='${MAX_USER_LEN}' value='' autocomplete='off' autofocus"
 	    blankItemContent[2]="type='password' size='${password_len}' maxlength='32' value=''"
     
 	    checkItem[1]=printable
 	    checkItem[2]=printable
-
-	    focus_id=${user_id}
 	    ;;
 	2fa)
 	    itemForm[1]="hidden"
@@ -82,11 +78,9 @@ show-login-form()
 
 	    blankItemContent[1]="value='${user}'"
 	    blankItemContent[2]=${user}
-	    blankItemContent[3]="type='text' size='${password_len}' maxlength='32' value='' autocomplete='off'"
+	    blankItemContent[3]="type='text' size='${password_len}' maxlength='32' value='' autocomplete='off' autofocus"
 
 	    checkItem[3]=printable
-
-	    focus_id=${password_id}
 	    ;;
 	*)
 	    ;;
@@ -95,8 +89,6 @@ show-login-form()
     process-main-action ${action}
     show-title-login
     show-form "${width}" enabled
-
-    echo "<script type='text/javascript'>document.getElementById( '${focus_id}' ).focus( );</script>"
 }
 
 # Main()

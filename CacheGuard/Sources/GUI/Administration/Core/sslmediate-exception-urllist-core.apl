@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -62,20 +61,19 @@ show-sslmediate-exception-urllist-form()
     shortcutMenuTitle[1]="URL Lists"
 
     show-title "SSL Mediation URL List Exceptions" "${state}" "sslmediate urllist"
-    show-shortcuts-menu
-    local style="style='margin:5px;'"
 
+    echo "<div class='core-form'>"
     case "${SSLMEDIATE_POLICY}" in
 	allow)
-	    echo "<div class='table-title' ${style}><strong>Policy</strong>: mediate SSL connections for the following domain names only.</div>"
+	    echo "<div class='table-title'><strong>Policy</strong>: mediate SSL traffic for the following domain names only.</div>"
 	    ;;
 	deny)
-	    echo "<div class='table-title' ${style}><strong>Policy</strong>: exclude the SSL Mediation for the following domain names.</div>"
+	    echo "<div class='table-title'><strong>Policy</strong>: exclude the SSL Mediation for the following domain names.</div>"
 	    ;;
 	*)
 	    ;;
     esac
-
+    echo "</div>"
     show-list-form ${MAX_URLLIST_NB} "${width}" "${page_ref}" "" "" "${add_state}"
 }
 

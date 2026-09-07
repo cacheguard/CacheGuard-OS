@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       Commands
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -156,14 +155,13 @@ show-conf()
 	echo antivirus			>> ${transaction_file}
 	echo antivirus whitelist domainname	>> ${transaction_file}
 	echo sslmediate			>> ${transaction_file}
-	echo sslmediate transparent	>> ${transaction_file}
-	echo sslmediate policy		>> ${transaction_file}
-	echo sslmediate exception	>> ${transaction_file}
 	echo authenticate		>> ${transaction_file}
 	echo authenticate ldap 		>> ${transaction_file}
 	echo authenticate ldaps ca 	>> ${transaction_file}
 	echo authenticate kerberos 	>> ${transaction_file}
 	echo authenticate ad 		>> ${transaction_file}
+	echo authenticate ad rdn 	>> ${transaction_file}
+	echo authenticate ad account	>> ${transaction_file}
     fi
 
     if contextual-command-is-allowed ; then
@@ -415,14 +413,15 @@ show-diff()
     test "${NTP_SERVER_LIST}" == "${CURRENT_NTP_SERVER_LIST}" || echo ntp >> ${transaction_file}
     test "${PEER_SHARE_LIST}" == "${CURRENT_PEER_SHARE_LIST}" || echo peer share >> ${transaction_file}
     test "${PEER_HA_LIST}" == "${CURRENT_PEER_HA_LIST}" || echo peer ha >> ${transaction_file}
-    test "${PEER_NEXT_LIST}" == "${CURRENT_PEER_NEXT_LIST}" || echo peer next >> ${transaction_file}
     test "${PEER_PREVIOUS_LIST}" == "${CURRENT_PEER_PREVIOUS_LIST}" || echo peer previous >> ${transaction_file}
+    test "${PEER_NEXT_LIST}" == "${CURRENT_PEER_NEXT_LIST}" || echo peer next >> ${transaction_file}
     test "${TRANSPARENT_WEB_LIST}" == "${CURRENT_TRANSPARENT_WEB_LIST}" || echo transparent >> ${transaction_file}
     test "${ACCESS_WEB_LIST}" == "${CURRENT_ACCESS_WEB_LIST}" || echo access web >> ${transaction_file}
     test "${ACCESS_AV_LIST}" == "${CURRENT_ACCESS_AV_LIST}" || echo access antivirus >> ${transaction_file}
     test "${ACCESS_FILE_LIST}" == "${CURRENT_ACCESS_FILE_LIST}" || echo access file >> ${transaction_file}
     test "${ACCESS_ADMIN_LIST}" == "${CURRENT_ACCESS_ADMIN_LIST}" || echo access admin >> ${transaction_file}
     test "${ACCESS_MON_LIST}" == "${CURRENT_ACCESS_MON_LIST}" || echo access mon >> ${transaction_file}
+    test "${ACCESS_FORWARDED_WEB_LIST}" == "${CURRENT_ACCESS_FORWARDED_WEB_LIST}" || echo access fweb >> ${transaction_file}
     test "${ACCESS_MANAGER_LIST}" == "${CURRENT_ACCESS_MANAGER_LIST}" || echo access manager >> ${transaction_file}
 
     test "${MANAGER_SYNC_ROLE}" == "${CURRENT_MANAGER_SYNC_ROLE}" || echo manager sync role >> ${transaction_file}
@@ -612,12 +611,16 @@ show-diff()
 
     test "${LDAP_SERVER_LIST}" == "${CURRENT_LDAP_SERVER_LIST}" || echo authenticate ldap server >> ${transaction_file}
     test "${LDAPS_CA}" == "${CURRENT_LDAPS_CA}" || echo authenticate ldaps ca >> ${transaction_file}
-    test "${KERBEROS_ENCRYPT_TYPE}" == "${CURRENT_KERBEROS_ENCRYPT_TYPE}" || echo authenticate kerberos encrypt >> ${transaction_file}
     test "${KERBEROS_SERVICE_NAME}" == "${CURRENT_KERBEROS_SERVICE_NAME}" || echo authenticate kerberos web >> ${transaction_file}
-    test "${KERBEROS_HA_SHARED_PASSWORD}" == "${CURRENT_KERBEROS_HA_SHARED_PASSWORD}" || echo authenticate kerberos hapassword:show >> ${transaction_file}
     test "${KERBEROS_SERVER_LIST}" == "${CURRENT_KERBEROS_SERVER_LIST}" || echo authenticate kerberos server >> ${transaction_file}
     test "${KERBEROS_RWEB_LIST}" == "${CURRENT_KERBEROS_RWEB_LIST}" || echo authenticate kerberos rweb >> ${transaction_file}
+
+    test "${AUTHENTICATE_AD_MODE}" == "${CURRENT_AUTHENTICATE_AD_MODE}" || echo authenticate ad >> ${transaction_file}
     test "${AD_WEBGATEWAY_RDN}" == "${CURRENT_AD_WEBGATEWAY_RDN}" || echo authenticate ad rdn >> ${transaction_file}
+    test "${AD_WEBGATEWAY_LOGIN}" == "${CURRENT_AD_WEBGATEWAY_LOGIN}" -a \
+	 "${AD_WEBGATEWAY_PASSWORD}" == "${CURRENT_AD_WEBGATEWAY_PASSWORD}" || \
+	echo authenticate ad account >> ${transaction_file}
+
     test "${FILE_SERVER_PASSWORD_LIST}" == "${CURRENT_FILE_SERVER_PASSWORD_LIST}" || echo password file >> ${transaction_file}
 
     test \
@@ -627,6 +630,7 @@ show-diff()
 	echo embedded ${EMBEDDED_VPNSUBSCR_COMMERCIAL_NAME,,} >> ${transaction_file}
 
     transaction close
+
     if test -s ${transaction_file} ; then
 	transaction open < ${transaction_file}
 	transaction commit
@@ -701,6 +705,7 @@ inject-conf()
 
 	test -n "${cg_command}" || continue
 	test ${cg_command:0:1} != "#" || continue
+
 	case ${cg_command} in
 	    apply|countrylist|cancel|conf|'exit'|file|halt|'help'|'history'|license|reboot|ping|quit|register|setup|timezonelist|transaction)
 		continue
@@ -733,11 +738,12 @@ inject-conf()
 		esac
 		;;
 	    *)
+		test -x ${APPLIANCE_DIR}/bin/${cg_command} || continue
 		;;
 	esac
 
-	echo ${args[*]} >> ${transaction_file}
-	
+	echo "${args[@]}" >> ${transaction_file}
+
     done < ${conf_file}
 
     transaction close
@@ -783,6 +789,8 @@ load-conf()
 	return 153
     fi
 
+    sed -ie "s/\"/'/g" ${conf_file}
+
     inject-conf ${conf_file}
     ret=${?}
     rm -f ${conf_file}
@@ -815,7 +823,11 @@ create-vpnipsec-whitelist-conf()
 
     while read id
     do
-	echo "vpnipsec access access add ${id}"
+	if test "${id//=}" == "${id}" ; then
+	    echo "vpnipsec access access add ${id}"
+	else
+	    echo "vpnipsec access access add '${id}'"
+	fi
     done < ${whitelist_file}
 }
 
@@ -859,6 +871,8 @@ create-conf()
     local dir templates domain uuid
     local diff_id
 
+    local ipsec_authenticate_psk_file configuration_db_name
+
     local apl_role=$(get-contextual-role)
 
     case ${in_state} in
@@ -866,15 +880,15 @@ create-conf()
 	    current=CURRENT_
 	    ext=.current
 	    qos_state=" current"
-	    local _IPSEC_AUTHENTICATE_PSK_FILE=${VPN_IPSEC_DIR}/${IPSEC_AUTHENTICATE_PSK_FILENAME}.current
-	    local _CONFIGURATION_DB_NAME=${CONFIGURATION_CURRENT_DB_NAME}
+	    ipsec_authenticate_psk_file=${VPN_IPSEC_DIR}/${IPSEC_AUTHENTICATE_PSK_FILENAME}.current
+	    configuration_db_name=${CONFIGURATION_CURRENT_DB_NAME}
 	    ;;
 	new)
-	    local _IPSEC_AUTHENTICATE_PSK_FILE=${VPN_IPSEC_DIR}/${IPSEC_AUTHENTICATE_PSK_FILENAME}
-	    local _CONFIGURATION_DB_NAME=${CONFIGURATION_DB_NAME}
+	    ipsec_authenticate_psk_file=${VPN_IPSEC_DIR}/${IPSEC_AUTHENTICATE_PSK_FILENAME}
+	    configuration_db_name=${CONFIGURATION_DB_NAME}
 	    ;;
 	*)
-	    return 1
+	    return 255
 	    ;;
     esac
 
@@ -897,7 +911,7 @@ create-conf()
 	if test -z "${_ADMINISTRATOR_NAME}" ; then
 	    echo "email admin ${_ADMINISTRATOR_EMAIL}"
 	else
-	    echo "email admin ${_ADMINISTRATOR_EMAIL} \"${_ADMINISTRATOR_NAME}\""
+	    echo "email admin ${_ADMINISTRATOR_EMAIL} '${_ADMINISTRATOR_NAME}'"
 	fi
 
 	password=$(encrypt-password "clear:${_EMAIL_ACCOUNT_PASSWORD}" "${EMAIL_PASSWD}")
@@ -1039,9 +1053,38 @@ create-conf()
     fi
 
     echo "admin ssh key raz"
+
     for id in ${_SSH_KEY_LIST}
     do
+	case ${in_state} in
+	    current)
+		if test -f ${SSH_PUBLIC_KEY_DIR}/${id} ; then
+		    ssh_key_file=${SSH_PUBLIC_KEY_DIR}/${id}
+		else
+		    unset ssh_key_file
+		fi
+		;;
+	    new)
+		if test -f ${TMP_DIR}/${LOADED}.${SSH_KEY}.${id} ; then
+		    ssh_key_file=${TMP_DIR}/${LOADED}.${SSH_KEY}.${id}
+		elif test -f ${SSH_PUBLIC_KEY_DIR}/${id} ; then
+		    ssh_key_file=${SSH_PUBLIC_KEY_DIR}/${id}
+		else
+		    unset ssh_key_file
+		fi
+		;;
+	    *)
+		;;
+	esac
+
+	if test -n "${ssh_key_file}" ; then
+	    ssh_key=$(cat ${ssh_key_file} 2> /dev/null)
+	else
+	    unset ssh_key
+	fi
+
 	echo "admin ssh key add ${id}"
+	test -z "${ssh_key}" || echo "admin ssh key set ${id} '${ssh_key}'"
     done
 
     password=$(encrypt-password "clear:${_SNMP_COMMUNITY}" "${SNMP_PASSWD}")
@@ -1516,7 +1559,7 @@ create-conf()
     if contextual-command-is-allowed ; then    
 
 	if test ${_VPN_IPSEC_AUTHENTICATE:0:3} == 'psk' ; then
-	    password=$(cat ${_IPSEC_AUTHENTICATE_PSK_FILE} 2> /dev/null)
+	    password=$(cat ${ipsec_authenticate_psk_file} 2> /dev/null)
 	    password=${password/encrypted:}
 	    echo "vpnipsec authenticate psk:encrypted ${password}"
 	else
@@ -1582,7 +1625,6 @@ create-conf()
 		fi
 		;;
 	    *)
-		return 1
 		;;
 	esac
 
@@ -1885,17 +1927,20 @@ create-conf()
 	i=0
 	for elt in ${_DHCP_FIXED_LIST}
 	do
-	    range=$[${i} % 3]
+	    range=$[${i} % 4]
 	    case ${range} in
 		0)
 		    name=${elt}
 		    ;;
 		1)
-		    mac=${elt}
+		    interface=${elt}
 		    ;;
 		2)
+		    mac=${elt}
+		    ;;
+		3)
 		    ip=${elt}
-		    echo "dhcp fixed add ${name} ${mac} ${ip}"
+		    echo "dhcp fixed add ${name} ${interface} ${mac} ${ip}"
 		    ;;
 		*)
 		    return 1
@@ -1909,14 +1954,17 @@ create-conf()
 	i=0
 	for elt in ${_DHCP_RANGE_LIST}
 	do
-	    range=$[${i} % 2]
+	    range=$[${i} % 3]
 	    case ${range} in
 		0)
-		    ip1=${elt}
+		    interface=${elt}
 		    ;;
 		1)
+		    ip1=${elt}
+		    ;;
+		2)
 		    ip2=${elt}
-		    echo "dhcp range add ${ip1} ${ip2}"
+		    echo "dhcp range add ${interface} ${ip1} ${ip2}"
 		    ;;
 		*)
 		    return 1
@@ -1999,29 +2047,6 @@ create-conf()
 	done
 
 	i=0
-	for elt in ${_PEER_NEXT_LIST}
-	do
-	    range=$[${i} % 2]
-	    case ${range} in
-		0)
-		    ip=${elt}
-		    ;;
-		1)
-		    port=${elt}
-		    if test "${port}" == nil ; then
-			echo "peer next add ${ip}"
-		    else
-			echo "peer next add ${ip} ${port}"
-		    fi
-		    ;;
-		*)
-		    return 1
-		    ;;
-	    esac
-	    ((i++))
-	done
-
-	i=0
 	for elt in ${_PEER_PREVIOUS_LIST}
 	do
 	    range=$[${i} % 2]
@@ -2039,6 +2064,29 @@ create-conf()
 	    esac
 	    ((i++))
 	done
+
+	i=0
+	for elt in ${_PEER_NEXT_LIST}
+	do
+	    range=$[${i} % 3]
+	    case ${range} in
+		0)
+		    ip=${elt}
+		    ;;
+		1)
+		    port=${elt}
+		    ;;
+		2)
+		    qos=${elt}
+		    echo "peer next add ${ip} ${port} ${qos}"
+		    ;;
+		*)
+		    return 1
+		    ;;
+	    esac
+	    ((i++))
+	done
+
 	echo
     fi
 
@@ -2353,7 +2401,15 @@ create-conf()
 		    ;;
 		3)
 		    qos=${elt}
-		    echo "transparent add ${interface} ${ip} ${netmask} ${qos}"
+
+		    case ${interface} in
+			vpnipsec)
+			    echo "transparent add ${interface} ${ip} ${netmask}"
+			    ;;
+			*)
+			    echo "transparent add ${interface} ${ip} ${netmask} ${qos}"
+			    ;;
+		    esac
 		    ;;
 		*)
 		    return 1
@@ -2400,7 +2456,14 @@ create-conf()
 		    qos=${elt}
 		    case ${access_type} in
 			web|antivirus)
-			    echo "access ${access_type} add ${interface} ${ip} ${netmask} ${qos}"
+			    case ${interface} in
+				vpnipsec)
+				    echo "access ${access_type} add ${interface} ${ip} ${netmask}"
+				    ;;
+				*)
+				    echo "access ${access_type} add ${interface} ${ip} ${netmask} ${qos}"
+				    ;;
+			    esac
 			    ;;
 			admin)
 			    echo "access ${access_type} add ${interface} ${ip} ${netmask}"
@@ -2419,8 +2482,9 @@ create-conf()
     done
 
     if contextual-command-is-allowed ; then
-	echo "access manager raz"
 	i=0
+	echo
+	echo "access manager raz"
 	for elt in ${_ACCESS_MANAGER_LIST}
 	do
 	    range=$[${i} % 3]
@@ -2449,10 +2513,33 @@ create-conf()
 		    ssh_key=$(cat ${ssh_key_file} 2> /dev/null)
 
 		    if test -n "${ssh_key}" ; then
-			echo "access manager add master ${interface} ${ip} \"${ssh_key}\""
+			echo "access manager add master ${interface} ${ip} '${ssh_key}'"
 		    else
 			echo "access manager add master ${interface} ${ip}"
 		    fi
+		    ;;
+		*)
+		    return 255
+		    ;;
+	    esac
+	    ((i++))
+	done
+    fi
+
+    if contextual-command-is-allowed ; then
+	i=0
+	echo
+	echo "access fweb raz"
+	for elt in ${_ACCESS_FORWARDED_WEB_LIST}
+	do
+	    range=$[${i} % 2]
+	    case ${range} in
+		0)
+		    ip=${elt}
+		    ;;
+		1)
+		    netmask=${elt}
+		    echo "access fweb add ${ip} ${netmask}"
 		    ;;
 		*)
 		    return 255
@@ -2867,7 +2954,7 @@ create-conf()
 	echo
 	echo "waf reputation country raz"
 
-	local waf_reputation_countries=$(sqlite3 ${USERENV_DIR}/${_CONFIGURATION_DB_NAME} \
+	local waf_reputation_countries=$(sqlite3 ${USERENV_DIR}/${configuration_db_name} \
 						 "SELECT country FROM waf_reputation_country WHERE reputation = TRUE;")
 	for elt in ${waf_reputation_countries}
 	do
@@ -3115,7 +3202,7 @@ create-conf()
 	i=0
 	for elt in ${_LDAP_SERVER_LIST}
 	do
-	    range=$[${i} % 4]
+	    range=$[${i} % 3]
 	    case ${range} in
 		0)
 		    protocol=${elt}
@@ -3124,11 +3211,8 @@ create-conf()
 		    name=${elt}
 		    ;;
 		2)
-		    ip=${elt}
-		    ;;
-		3)
 		    port=${elt}
-		    echo "authenticate ldap server add ${protocol} ${name} ${ip} ${port}"
+		    echo "authenticate ldap server add ${protocol} ${name} ${port}"
 		    ;;
 		*)
 		    return 1
@@ -3145,20 +3229,13 @@ create-conf()
 
 	echo
 
-	echo "authenticate kerberos encrypt ${_KERBEROS_ENCRYPT_TYPE}"
-	echo "authenticate kerberos web ${_KERBEROS_SERVICE_NAME}"
-
-	password=$(encrypt-password "clear:${_KERBEROS_HA_SHARED_PASSWORD}" "${KERBEROS_SHARED_PASSWD}")
-	password=${password/encrypted:}
-	test -z "${password}" || password=" ${password}"
-	echo "authenticate kerberos hapassword:encrypted${password}"
-
 	echo "authenticate kerberos server raz"
 	for name in ${_KERBEROS_SERVER_LIST}
 	do
 	    echo "authenticate kerberos server add ${name}"
 	done
-	echo "authenticate ad rdn ${_AD_WEBGATEWAY_RDN}"
+
+	echo "authenticate kerberos web ${_KERBEROS_SERVICE_NAME}"
 
 	i=0
 	echo "authenticate kerberos rweb raz"
@@ -3179,6 +3256,17 @@ create-conf()
 	    esac
 	    ((i++))
 	done
+
+	echo
+
+	echo -n "authenticate ad "
+	external-form ${_AUTHENTICATE_AD_MODE}
+	echo
+	echo "authenticate ad rdn '${_AD_WEBGATEWAY_RDN}'"
+	password=$(encrypt-password "clear:${_AD_WEBGATEWAY_PASSWORD}" "${AD_WEBGATEWAY_PASSWD}")
+	password=${password/encrypted:}
+	test -z "${password}" || password=" ${password}"
+	echo "authenticate ad account:encrypted ${_AD_WEBGATEWAY_LOGIN}${password}"
     fi
 
     if test ${apl_role} == manager ; then
@@ -3220,7 +3308,7 @@ create-conf()
 	echo "manager sync role ${_MANAGER_SYNC_ROLE}"
 
 	if test -n "${ssh_key}" ; then
-	    echo "manager sync peer ${_MANAGER_SYNC_PEER_IP} \"${ssh_key}\""
+	    echo "manager sync peer ${_MANAGER_SYNC_PEER_IP} '${ssh_key}'"
 	else
 	    echo "manager sync peer ${_MANAGER_SYNC_PEER_IP}"
 	fi
@@ -3510,11 +3598,6 @@ conf-manager()
 
     local old_destination=${ADMIN_TMP_DIR}/gateway.${id}.old.${$}
 
-    if test ${context} == gateway ; then
-	cp -rf ${destination_dir}/${id}/${HARD_DIR_NAME} ${ADMIN_TMP_DIR}/gateway.hard.${id}.${$} || return 104
-	cp -rf ${destination_dir}/${id}/${SSL_CLIENT_RDIR} ${ADMIN_TMP_DIR}/ssl.client.${id}.${$} || return 104
-    fi
-
     cp -f ${destination_dir}/${id}/${VPN_IPSEC_RDIR}/${IPSEC_AUTHENTICATE_PSK_FILENAME} ${old_destination}.${IPSEC_AUTHENTICATE_PSK_FILENAME}
     cp -f ${destination_dir}/${id}/${ENV_NAME} ${old_destination}.${ENV_NAME}
 
@@ -3590,17 +3673,6 @@ conf-manager()
     cp -f ${old_destination}.${IPSEC_AUTHENTICATE_PSK_FILENAME} ${destination_dir}/${id}.${$}/${VPN_IPSEC_RDIR}/${IPSEC_AUTHENTICATE_PSK_FILENAME}
     mv -f ${destination_dir}/${id}.${$} ${destination_dir}/${id}
 
-    if test ${context} == gateway ; then
-
-	rm -rf ${destination_dir}/${id}/${HARD_DIR_NAME} || return 104
-	cp -rf ${ADMIN_TMP_DIR}/gateway.hard.${id}.${$} ${destination_dir}/${id}/${HARD_DIR_NAME} || return 104
-	rm -rf ${ADMIN_TMP_DIR}/gateway.hard.${id}.${$}
-
-	rm -rf ${destination_dir}/${id}/${SSL_CLIENT_RDIR}
-	cp -rf ${ADMIN_TMP_DIR}/ssl.client.${id}.${$} ${destination_dir}/${id}/${SSL_CLIENT_RDIR} || return 104
-	rm -rf ${ADMIN_TMP_DIR}/ssl.client.${id}.${$}
-    fi
-
     generate-current-env-file-from-env ${destination_dir}/${id}/${ENV_NAME} > ${destination_dir}/${id}/${ENV_CURRENT_NAME} &&
 	cp -f ${destination_dir}/${id}/${ENV_NAME} ${destination_dir}/${id}/${ENV_CANCEL_NAME} &&
 	cp -f ${destination_dir}/${id}/${VPN_IPSEC_RDIR}/${IPSEC_AUTHENTICATE_PSK_FILENAME} ${destination_dir}/${id}/${VPN_IPSEC_RDIR}/${IPSEC_AUTHENTICATE_PSK_FILENAME}.current
@@ -3624,7 +3696,7 @@ run()
 	    show-diff
 	    return ${?}
 	    ;;
-	
+
 	factoryreset)
 	    user-has-admin-rights || return 31
 	    factory-reset
@@ -3650,7 +3722,7 @@ run()
 
 	    return ${?}
 	    ;;
-	
+
 	inject)
 	    user-has-admin-rights || return 31
 	    test -n "${ARGS[2]}" || return 1

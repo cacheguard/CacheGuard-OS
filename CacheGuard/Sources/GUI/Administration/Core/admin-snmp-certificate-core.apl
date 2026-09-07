@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -26,23 +25,21 @@ show-admin-snmp-certificate()
 {
     local certificate_file state
 
-    echo "<div style='clear:left;'></div><br />"
-
     if test -f ${TMP_DIR}/${LOADED}.${SNMP_SSL}.certificate ; then
 	certificate_file=${TMP_DIR}/${LOADED}.${SNMP_SSL}.certificate
-	state="<span style='color:FireBrick;'>[loaded]</span>"
+	state="<u>[loaded]</u>"
     elif test -f ${SSL_SNMP_DIR}/${SNMP_SSL}.crt ; then
 	certificate_file=${SSL_SNMP_DIR}/${SNMP_SSL}.crt
 	if test ${SNMP_CLIENT_CERTIFICATE} == True ; then
 	    state='[active]'
 	else
-	    state="<span style='color:FireBrick;'>[erased]</span>"
+	    state="<u>[erased]</u>"
 	fi
     else
 	state='[empty]'
     fi
 
-    echo "<div class='table-title' style='width:100%;'>SNMP Client Certificate ${state}</div>"
+    echo "<div class='table-title'>SNMP Client Certificate ${state}</div>"
     echo "<table class='report' width='100%'><tr><td>"
 
     if test -n "${certificate_file}" ; then
@@ -113,13 +110,12 @@ admin-snmp-certificate()
     itemForm[1]="select"
     itemForm[2]="select"
 
-    itemFormSelectCB[0]="adminSNMPCertificateSelectCB( '${operation_id}', '${protocol_id}', '${server_id}', '${filename_id}' );"
+    itemData[0]="data-action='admin-snmp-certificate' data-operation-id='${operation_id}' data-protocol-id='${protocol_id}' data-server-id='${server_id}' data-filename-id='${filename_id}'"
 
     shortcutMenuItem[0]="access-file"
     shortcutMenuTitle[0]="File Servers"
 
     show-title "SNMP Client Certificate" "${state}" "access admin"
-    show-shortcuts-menu
     show-form "${width}" "${state}" "show-admin-snmp-certificate"
 }
 

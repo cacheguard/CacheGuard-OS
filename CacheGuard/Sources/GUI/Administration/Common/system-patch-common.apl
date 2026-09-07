@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -62,15 +61,18 @@ show-system-patch-form()
 
     test ${state} == disabled || accept_value=" checked"
 
-    itemTitle[0]="<div><a href='#' onClick='getLatestVersion( \"/${GUI_DIR_NAME}/system-soft-check.${GUI_EXT_NAME}\", \"${check_id}-insider\" )'>Check for Updates</a></div>"
+    local upgrade_title="Check OS Upgrade"
+
+    itemTitle[0]="<div><a href='#' data-action='get-latest-version' data-url='/${GUI_DIR_NAME}/system-soft-check.${GUI_EXT_NAME}' data-target-id='${check_id}-insider'>${upgrade_title}</a></div>"
     itemTitle[1]="Download progress"
     itemTitle[2]="Automatic Load"
     itemTitle[3]="Protocol"
     itemTitle[4]="File Server"
     itemTitle[5]="File Path"
-    itemTitle[6]="I agree to terms of the <a href='${LICENSE_URL}' target='_blank'>Latest ${COMMERCIAL_NAME}-OS License</a>"
+    itemTitle[6]="I agree to the terms of the<br /><a href='${LICENSE_URL}' target='_blank'>Latest ${COMMERCIAL_NAME}-OS License</a>"
     itemTitle[7]=''
 
+    itemTdClass[0]='information-notice'
     itemID[0]="${check_id}"
     itemID[1]="${progress_id}"
     itemID[2]="aload"
@@ -81,12 +83,12 @@ show-system-patch-form()
     itemID[7]="${patch_id}"
 
     local file_servers=$(show-file-servers 'cur' ${VALUES[${pos}+2]})
-    blankItemContent[0]="<span style='line-height:10px; margin:0; padding:0;' id='${check_id}-insider'><i>&lt;not yet checked&gt;</i></span>"
-    blankItemContent[2]="type='checkbox'${checked_aload}"
+    blankItemContent[0]="<span id='${check_id}-insider'><a href='#' data-action='get-latest-version' data-url='/${GUI_DIR_NAME}/system-soft-check.${GUI_EXT_NAME}' data-target-id='${check_id}-insider'><img src='${IMAGE_DIR}/system-patch.png' alt='${upgrade_title}' title='${upgrade_title}' /></a></span>"
+    blankItemContent[2]="${checked_aload}"
     blankItemContent[3]=$(show-file-protocol1 ${VALUES[${pos}+1]:1})
     blankItemContent[4]=${file_servers}
-    blankItemContent[5]="type='text' size='48' maxlength='128' value='${VALUES[${pos}+3]}'"
-    blankItemContent[6]="type='checkbox'${accept_value} onClick='agreeLicense(\"${accept_id}\")'"
+    blankItemContent[5]="type='text' size='32' maxlength='128' value='${VALUES[${pos}+3]}'"
+    blankItemContent[6]="${accept_value} data-action='agree-license' data-value='${accept_id}'"
     blankItemContent[7]="value=''"
 
     checkItem[2]=printable
@@ -103,18 +105,16 @@ show-system-patch-form()
     itemState[4]=${field_state}
     itemState[5]=${field_state}
 
-    itemFormCheckCB[2]="patchOperationAutoLoadCB( 'aload', 'protocol', 'server', 'filename' );"
+    itemData[2]="data-action='patch-operation-auto-load' data-protocol-id='protocol' data-server-id='server' data-filename-id='filename'"
 
     shortcutMenuItem[0]="access-file"
     shortcutMenuItem[1]="password-file"
     shortcutMenuTitle[0]="File Servers"
     shortcutMenuTitle[1]="Accounts"
 
+    local progression=$(echo-patch-download-percent)
+
     show-title "Load OS Patch" "${state}" "access password system"
-    show-shortcuts-menu
-
-    local progression=$(echo-patch-download-percent)	
-
     show-form "${width}" ${state}
 
     init-refresh-exchnage-file-progress-bar ${patch_id} ${progress_id} ${progression} "patch-download-percentage"

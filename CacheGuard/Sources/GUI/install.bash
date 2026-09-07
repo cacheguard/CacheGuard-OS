@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       Build
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -32,6 +31,8 @@ make-generated-directories()
     mkdir -p ${FULL_GENERATED_DIR}
     ln -sf ${FULL_GENERATED_DIR}
 
+    rm -f ${GENERATED_DIR}/*
+
     local module
 
     for module in Administration Auditing
@@ -41,20 +42,9 @@ make-generated-directories()
 	mkdir -p ${BASE_GENERATED_DIR}/${module}/${CGI_GENERATED_DIR}
 	ln -sf ${BASE_GENERATED_DIR}/${module}/${GENERATED_DIR}
 	ln -sf ${BASE_GENERATED_DIR}/${module}/${CGI_GENERATED_DIR}
+	rm -f ${GENERATED_DIR}/*
 	cd ..
     done
-}
-
-file-basename()
-{
-    test -n "${1}" || return 1
-    local name=${1}
-
-    local base=${name##*/}
-    if test -n "${2}" ; then
-	base=${base/${2}/}
-    fi
-    echo ${base}
 }
 
 gen-js-constant()
@@ -72,6 +62,8 @@ gen-js-constant()
     echo "var GUI_COOKIE_AUTH_NAME = '${GUI_COOKIE_AUTH_NAME}';"
     echo "var GUI_COOKIE_LEFT_MENU_NAME = '${GUI_COOKIE_LEFT_MENU_NAME}';"
     echo "var GUI_COOKIE_TOP_MENU_NAME = '${GUI_COOKIE_TOP_MENU_NAME}';"
+    echo
+    cat JS/apl-constant.js-constant-tail
 }
 
 gen-js-mosaic-constant()
@@ -185,34 +177,35 @@ gen-firewall-rules()
 gen-doc-rules()
 {
     local doc_dir=../Documentation
-    
-    local html name
+    local name file
 
     for name in ${doc_dir}/JS/*.js
     do
-	name=$(file-basename ${name})
+	name=$(file-basename ${name} .js)
 	name=${name//\./\\\.}
 	echo
 	echo "SecRule REQUEST_METHOD \"^GET$\" id:${WAF_RULE_ID},severity:6,allow,chain"
-	echo "SecRule REQUEST_URI \"^/${DOC_DIR_NAME}/${JS_DIR_NAME}/${name}$\""
+	echo "SecRule REQUEST_URI \"^/${DOC_DIR_NAME}/${JS_DIR_NAME}/${name}-${GUI_FE_VERSION_REGEXP}\.js$\""
 	((WAF_RULE_ID++))
     done
 
-    for html in ${doc_dir}/UsersGuide/HTMLGenerated/*.html
+    for file in ${doc_dir}/UsersGuide/HTMLGenerated/*.html
     do
-	name=$(file-basename ${html} .html)
+	name=$(file-basename ${file} .html)
+	name=${name//\./\\\.}
 	echo
 	echo "SecRule REQUEST_METHOD \"^GET$\" id:${WAF_RULE_ID},severity:6,allow,chain"
 	echo "SecRule REQUEST_URI \"^/${DOC_DIR_NAME}/${DOC_GUIDE_DIR_NAME}/${name}\.html$\""
 	((WAF_RULE_ID++))
     done
 
-    for html in ${doc_dir}/*.css
+    for file in ${doc_dir}/CSS/*.css
     do
-	name=$(file-basename ${html} .css)
+	name=$(file-basename ${file} .css)
+	name=${name//\./\\\.}
 	echo
 	echo "SecRule REQUEST_METHOD \"^GET$\" id:${WAF_RULE_ID},severity:6,allow,chain"
-	echo "SecRule REQUEST_URI \"^/${DOC_DIR_NAME}/${name}\.css$\""
+	echo "SecRule REQUEST_URI \"^/${DOC_DIR_NAME}/${name}-${GUI_FE_VERSION_REGEXP}\.css$\""
 	((WAF_RULE_ID++))
     done
 
@@ -226,9 +219,10 @@ gen-doc-rules()
 	((WAF_RULE_ID++))
     done
 
-    for html in ${doc_dir}/OnlineCommands/Generated/*.html
+    for file in ${doc_dir}/OnlineCommands/Generated/*.html
     do
-	name=$(file-basename ${html} .html)
+	name=$(file-basename ${file} .html)
+	name=${name//\./\\\.}
 	echo
 	echo "SecRule REQUEST_METHOD \"^GET$\" id:${WAF_RULE_ID},severity:6,allow,chain"
 	echo "SecRule REQUEST_URI \"^/${DOC_DIR_NAME}/${DOC_COMMAND_DIR_NAME}/${name}\.html$\""
@@ -260,18 +254,20 @@ gen-waf-rules-constant()
     local gui=${1}
     local module=${2}
 
-    local css file role cgi query post name
+    local files file role cgi query post name
 
     cat ${RULE_DIR}/exception.rules
     echo
     cat ${module}/${RULE_DIR}/exception.rules
 
     if test ${module} == 'Administration' ; then
-	for file in ${module}/${UPDATE_DIR}/*.${GUI_EXT_NAME}
+	files=$(ls -1 ${module}/${UPDATE_DIR}/*.${GUI_EXT_NAME} 2> /dev/null)
+	for file in ${files}
 	do
 	    name=$(file-basename ${file} .${GUI_EXT_NAME})
 	    test ${name} != 'update-vpnipsec-report' || continue
-
+	    name=${name//\./\\\.}
+	    echo
 	    echo "SecRule REQUEST_METHOD \"^GET$\" id:${WAF_RULE_ID},log,auditlog,severity:5,allow,chain"
 	    echo "SecRule REQUEST_URI \"^/gui/${name}\.${GUI_EXT_NAME}$\""
 
@@ -279,16 +275,19 @@ gen-waf-rules-constant()
 	done
     fi
 
-    for css in ${CSS_DIR}/*.css
+    files=$(ls -1 ${CSS_DIR}/*.css ${module}/${CSS_DIR}/*.css 2> /dev/null)
+    for file in ${files}
     do
-	name=$(file-basename ${css})
+	name=$(file-basename ${file} .css)
+	name=${name//\./\\\.}
 	echo
 	echo "SecRule REQUEST_METHOD \"^GET$\" id:${WAF_RULE_ID},log,auditlog,severity:6,allow,chain"
-	echo "SecRule REQUEST_URI \"^/${name}$\""
+	echo "SecRule REQUEST_URI \"^/${name}-${GUI_FE_VERSION_REGEXP}\.css$\""
 	((WAF_RULE_ID++))
     done
 
-    for file in Images/* Icons/* ${module}/Icons/*
+    files=$(ls -1 Images/* Icons/* ${module}/Icons/* 2> /dev/null)
+    for file in ${files}
     do
 	name=$(file-basename ${file})
 	name=${name//./\\.}
@@ -298,31 +297,32 @@ gen-waf-rules-constant()
 	((WAF_RULE_ID++))
     done
 
-    for file in JS/*.js ${module}/JS/*.js ${GENERATED_DIR}/*.js ${module}/${GENERATED_DIR}/*.js
+    files=$(ls -1 JS/*.js ${module}/JS/*.js ${GENERATED_DIR}/*.js ${module}/${GENERATED_DIR}/*.js 2> /dev/null)
+    for file in ${files}
     do
-	name=$(file-basename ${file})
+	name=$(file-basename ${file} .js)
 	name=${name//./\\.}
 	echo
 	echo "SecRule REQUEST_METHOD \"^GET$\" id:${WAF_RULE_ID},severity:6,allow,chain"
-	echo "SecRule REQUEST_URI \"^/${JS_DIR_NAME}/${name}\$\""
+	echo "SecRule REQUEST_URI \"^/${JS_DIR_NAME}/${name}-${GUI_FE_VERSION_REGEXP}\.js\$\""
 	((WAF_RULE_ID++))
     done
 
     echo
     echo "SecRule REQUEST_METHOD \"^GET$\" id:${WAF_RULE_ID},severity:6,allow,chain"
-    echo "SecRule REQUEST_URI \"^/${JS_DIR_NAME}//board-menu\.js\$\""
+    echo "SecRule REQUEST_URI \"^/${JS_DIR_NAME}//board-menu-${GUI_FE_VERSION_REGEXP}\.js\$\""
     ((WAF_RULE_ID++))
 
     for role in gateway manager
     do
 	echo
 	echo "SecRule REQUEST_METHOD \"^GET$\" id:${WAF_RULE_ID},severity:6,allow,chain"
-	echo "SecRule REQUEST_URI \"^/${JS_DIR_NAME}//board-menu.${role}\.js\$\""
+	echo "SecRule REQUEST_URI \"^/${JS_DIR_NAME}//board-menu.${role}-${GUI_FE_VERSION_REGEXP}\.js\$\""
 	((WAF_RULE_ID++))
     done
 
     echo "SecRule REQUEST_METHOD \"^GET$\" id:${WAF_RULE_ID},severity:6,allow,chain"
-    echo "SecRule REQUEST_URI \"^/${JS_DIR_NAME}/scrolltopcontrol\.js\?_=[[:digit:]]{0,16}\$\""
+    echo "SecRule REQUEST_URI \"^/${JS_DIR_NAME}/scrolltopcontrol-${GUI_FE_VERSION_REGEXP}\.js\?_=[[:digit:]]{0,16}\$\""
     ((WAF_RULE_ID++))
 
     while read -r cgi query post
@@ -537,7 +537,7 @@ get-menu-item()
 	    item_out="<li><a href='link' class='${prefix}-submenu-${module,,}-${role}'>${item_in}</a>"
 	    ;;
 	4)
-	    item_out="<ul class='${prefix}-submenu-${module,,}-items' style='margin-left:15px;'>"
+	    item_out="<ul class='${prefix}-submenu-${module,,}-items'>"
 	    ;;
 	*)
 	    ;;
@@ -756,6 +756,7 @@ gen-menu()
     test -n "${1}" || return 1
     local module=${1}
 
+    local speed=400 board_class='panel-board'
     MENU_NB=0
     MANAGER_MENU_NB=0
     GATEWAY_MENU_NB=0
@@ -839,8 +840,8 @@ gen-menu()
 		    echo-top-menu ${module} ${apl_roles} ${ctx_roles} "<li><a href='/${GUI_DIR_NAME}/${GUI_HOME_PAGE}.${GUI_EXT_NAME}?expanddiv=board-${i}'>${f2//_/ }</a>"
 		    echo-top-menu ${module} ${apl_roles} ${ctx_roles} "<ul>"
 
-		    echo-board-js ${apl_roles} ${ctx_roles} "animatedcollapse.addDiv('board-${i}', 'fade=1,speed=400,group=board,persist=${persist},hide=${hide}');"
-		    echo-board-menu ${apl_roles} ${ctx_roles} 0 "<li><a href=\"javascript:animatedcollapse.show('board-${i}')\">${f2//_/ }</a></li>"
+		    echo-board-js ${apl_roles} ${ctx_roles} "animatedcollapse.addDiv('board-${i}', 'fade=1,speed=${speed},group=board,persist=${persist},hide=${hide}','${board_class}');"
+		    echo-board-menu ${apl_roles} ${ctx_roles} 0 "<li><a class='animatedcollapse' data-board='board-${i}' href='#'>${f2//_/ }</a></li>"
 		    echo-board-icon ${apl_roles} ${ctx_roles} "<div id='board-${i}'>"
 		    echo-board-icon ${apl_roles} ${ctx_roles} "<div class='icon-board-title'>${f2//_/ }</div>"
 
@@ -927,9 +928,9 @@ gen-menu()
 
     echo-top-menu ${module} 3 3 "</ul>"
 
-    echo-board-js 3 3 "animatedcollapse.addDiv('board-99', 'fade=1,speed=400,group=board,persist=${persist},hide=1');"
+    echo-board-js 3 3 "animatedcollapse.addDiv('board-99', 'fade=1,speed=${speed},group=board,persist=${persist},hide=1','${board_class}');"
     echo-board-js 3 3 "animatedcollapse.init( );"
-    echo-board-icon 3 3 "<div id='board-99'><div class='icon-board-title'><br /><div class='main-message'><br />${COMMERCIAL_NAME} Appliance<br />Select a menu item</div></div><br /></div>"
+    echo-board-icon 3 3 "<div id='board-99'><div class='icon-board-title'>Empty Board</div></div>"
 
     if test -f ${module}/${GENERATED_DIR}/${GUI_PAGES_HIERARCHY_FILENAME}.menu ; then
 	local extra_page_links_fn="${module}/${MENU_DIR}/menu.extra-pages-hierarchy"
@@ -1032,82 +1033,77 @@ install-gui()
     sudo install -m 644 -o root -g root ${gui_rdir}/${GENERATED_DIR}/${gui_name}.rules-constant ${APL}${CONF_DIR}    
     sudo install -m 644 -o root -g root favicon.ico ${www_dir}
 
-    local file files role
+    local file base name files role
 
-    files=$(ls Images/* Icons/* ${gui_rdir}/Icons/* 2> /dev/null)
+    sudo install -m 644 -o root -g root ${gui_rdir}/${GENERATED_DIR}/menu.env ${etc_dir}
+
+    files=$(ls -1 Images/* Icons/* ${gui_rdir}/Icons/* 2> /dev/null)
     for file in ${files}
     do
 	sudo install -m 644 -o root -g root ${file} ${image_dir}
     done
 
-    sudo install -m 644 -o root -g root ${gui_rdir}/${GENERATED_DIR}/menu.env ${etc_dir}
-
-    test ! -f ${gui_rdir}/${GENERATED_DIR}/top-menu.html || \
-	sudo install -m 644 -o root -g root ${gui_rdir}/${GENERATED_DIR}/top-menu.html ${etc_html_dir}
-
-    test ! -f ${gui_rdir}/${GENERATED_DIR}/left-menu.html || \
-	sudo install -m 644 -o root -g root ${gui_rdir}/${GENERATED_DIR}/left-menu.html ${etc_html_dir}
-
-    test ! -f ${gui_rdir}/${GENERATED_DIR}/board-menu.html || \
-	sudo install -m 644 -o root -g root ${gui_rdir}/${GENERATED_DIR}/board-menu.html ${etc_html_dir}
-
-    test ! -f ${gui_rdir}/${GENERATED_DIR}/board-icon.html || \
-	sudo install -m 644 -o root -g root ${gui_rdir}/${GENERATED_DIR}/board-icon.html ${etc_html_dir}
-
-    test ! -f ${gui_rdir}/${GENERATED_DIR}/board-menu.js || \
-	sudo install -m 644 -o root -g root ${gui_rdir}/${GENERATED_DIR}/board-menu.js ${js_dir}
-
-    for role in gateway manager
+    files=$(ls -1 ${HTML_DIR}/*.html.template 2> /dev/null)
+    for file in ${files}
     do
-	sudo install -m 644 -o root -g root ${gui_rdir}/${GENERATED_DIR}/menu.${role}.env ${etc_dir}
-
-	test ! -f ${gui_rdir}/${GENERATED_DIR}/top-menu.${role}.html || \
-	     sudo install -m 644 -o root -g root ${gui_rdir}/${GENERATED_DIR}/top-menu.${role}.html ${etc_html_dir}
-
-	test ! -f ${gui_rdir}/${GENERATED_DIR}/left-menu.${role}.html || \
-	    sudo install -m 644 -o root -g root ${gui_rdir}/${GENERATED_DIR}/left-menu.${role}.html ${etc_html_dir}
-
-	test ! -f ${gui_rdir}/${GENERATED_DIR}/board-menu.${role}.html || \
-	    sudo install -m 644 -o root -g root ${gui_rdir}/${GENERATED_DIR}/board-menu.${role}.html ${etc_html_dir}
-
-	test ! -f ${gui_rdir}/${GENERATED_DIR}/board-icon.${role}.html || \
-	     sudo install -m 644 -o root -g root ${gui_rdir}/${GENERATED_DIR}/board-icon.${role}.html ${etc_html_dir}
-
-	test ! -f ${gui_rdir}/${GENERATED_DIR}/board-menu.${role}.js || \
-	    sudo install -m 644 -o root -g root ${gui_rdir}/${GENERATED_DIR}/board-menu.${role}.js ${js_dir}
+	base=$(file-basename ${file} .html.template)
+	sed -e "s/@GUI_FE_VERSION@/${GUI_FE_VERSION}/g" ${file} > ${gui_rdir}/${GENERATED_DIR}/${base}.html
     done
 
-    files=$(ls ${HTML_DIR}/*.html ${gui_rdir}/${HTML_DIR}/*.html 2> /dev/null)
+    files=$(ls -1 ${gui_rdir}/${HTML_DIR}/*.html.template 2> /dev/null)
+    for file in ${files}
+    do
+	base=$(file-basename ${file} .html.template)
+	for role in gateway manager
+	do
+	    sed -e "s/@ROLE@/${role}/g" -e "s/@GUI_FE_VERSION@/${GUI_FE_VERSION}/g" ${file} > ${gui_rdir}/${GENERATED_DIR}/${base}.${role}.html
+	done
+    done
+
+    files=$(ls -1 ${gui_rdir}/${GENERATED_DIR}/*.html 2> /dev/null)
     for file in ${files}
     do
 	sudo install -m 644 -o root -g root ${file} ${etc_html_dir}
     done
 
-    test ! -f ${gui_rdir}/${GENERATED_DIR}/${GUI_PAGES_HIERARCHY_FILENAME} || \
-	sudo install -m 644 -o root -g root ${gui_rdir}/${GENERATED_DIR}/${GUI_PAGES_HIERARCHY_FILENAME} ${etc_dir}
-
-    files=$(ls JS/*.js ${gui_rdir}/JS/*.js ${gui_rdir}/${GENERATED_DIR}/*.js 2> /dev/null)
-    for file in ${files}
+    for role in gateway manager
     do
-	sudo install -m 644 -o root -g root ${file} ${js_dir}
+	sudo install -m 644 -o root -g root ${gui_rdir}/${GENERATED_DIR}/menu.${role}.env ${etc_dir}
+	sudo install -m 644 -o root -g root ${gui_rdir}/${GENERATED_DIR}/board-menu.${role}.js ${js_dir}/board-menu.${role}-${GUI_FE_VERSION}.js
     done
 
-    files=$(ls lib/*.${GUI_EXT_NAME} ${gui_rdir}/${COMMON_DIR}/*.${GUI_EXT_NAME} 2> /dev/null)
+    files=$(ls -1 ${HTML_DIR}/*.html ${gui_rdir}/${HTML_DIR}/*.html 2> /dev/null)
+    for file in ${files}
+    do
+	sudo install -m 644 -o root -g root ${file} ${etc_html_dir}
+    done
+
+    sudo install -m 644 -o root -g root ${gui_rdir}/${GENERATED_DIR}/${GUI_PAGES_HIERARCHY_FILENAME} ${etc_dir}
+
+    files=$(ls -1 JS/*.js ${gui_rdir}/JS/*.js ${gui_rdir}/${GENERATED_DIR}/*.js 2> /dev/null)
+    for file in ${files}
+    do
+	name=$(file-basename ${file} .js)
+	sudo install -m 644 -o root -g root ${file} ${js_dir}/${name}-${GUI_FE_VERSION}.js
+    done
+
+    files=$(ls -1 lib/*.${GUI_EXT_NAME} ${gui_rdir}/${COMMON_DIR}/*.${GUI_EXT_NAME} 2> /dev/null)
     for file in ${files}
     do
 	sudo install -m 644 -o root -g root ${file} ${cgi_dir}
     done
 
-    files=$(ls ${gui_rdir}/Update/*.${GUI_EXT_NAME} ${gui_rdir}/Other/*.${GUI_EXT_NAME} 2> /dev/null)
+    files=$(ls -1 ${gui_rdir}/Update/*.${GUI_EXT_NAME} ${gui_rdir}/Other/*.${GUI_EXT_NAME} 2> /dev/null)
     for file in ${files}
     do
 	sudo install -m 645 -o root -g root ${file} ${cgi_dir}
     done
 
-    files=$(ls ${CSS_DIR}/*.css 2> /dev/null)
+    files=$(ls -1 ${CSS_DIR}/*.css ${gui_rdir}/${CSS_DIR}/*.css 2> /dev/null)
     for file in ${files}
     do
-	sudo install -m 644 -o root -g root ${file} ${www_dir}
+	name=$(file-basename ${file} .css)
+	sudo install -m 644 -o root -g root ${file} ${www_dir}/${name}-${GUI_FE_VERSION}.css
     done
 }
 
@@ -1156,7 +1152,7 @@ make-generated-directories
 
 gen-js-constant Administration > Administration/${GENERATED_DIR}/apl-constant.js
 gen-js-constant Auditing > Auditing/${GENERATED_DIR}/apl-constant.js
-gen-js-mosaic-constant > Administration/${GENERATED_DIR}/mosaic-constant.js
+gen-js-mosaic-constant > Administration/${GENERATED_DIR}/apl-mosaic-constant.js
 gen-license-core > Administration/${GENERATED_DIR}/license.html
 gen-menu Administration
 gen-menu Auditing

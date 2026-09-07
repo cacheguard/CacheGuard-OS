@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -62,39 +61,34 @@ show-waf-rweb-generic-form()
 	return 0
     fi
 
-    local length=8 width=300
+    local dclass checked
 
     show-title "Configuring a Specific WAF Filter" "enabled" "waf"
 
     local filters=$(get-filters ${name})
     test -n "${filters}" || filters=${WAF_GENERIC}
+
     if test ${filters} == ${WAF_GENERIC} ; then
-        local checked=checked
-        local hide=1
-        local display=none
+        checked=checked
+        dclass='item-not-displayed'
     else
-        local hide=0
-        local display=inline
+        dclass='item-displayed'
     fi
 
     echo "<div class='core-form'>"
-    show-form-begin ${length}
-    echo "<table style='margin:0; margin-bottom:5px;'>"
+    show-form-begin
+    echo "<table class='highlight-form'>"
     echo "<tr>"
-    echo "<td width='20'>"
-    echo "<input name='site_name' type='hidden' value='${name}' />"
-    echo "<input id='waf_inherit' name='waf_inherit' valign='middle' type='checkbox' ${checked} onClick=\"collapseCheckZone( 'waf_inherit', 'genericfilters', 1 )\"></td> <td valign='middle'><span class='table-title'>[${name}] Same as Default</span>"
-    echo "</td>"
+    echo "<th class='table-header'><label for='waf_inherit'>[${name}] Same as Default</label></th>"
+    echo "<th class='table-header'><input name='site_name' type='hidden' value='${name}' /><input id='waf_inherit' name='waf_inherit' type='checkbox' ${checked} data-action='collapse-check-zone' data-zone-id='genericfilters'></th>"
     echo "</tr>"
     echo "</table>"
-    echo "<div id='genericfilters' style='float:left;display:${display};'>"
-    echo "<table class='highlight-form' width='${width}'>"
+    echo "<div id='genericfilters' class='${dclass}'>"
+    echo "<table class='highlight-form'>"
     show-generic-waf ${filters}
     echo "</table>"
     echo "</div>"
-    echo "<div style='clear:left;'></div>"
     show-do enabled disabled
-    echo "<div style='clear:left;'></div>"
     show-form-end
     echo "</div>"
 }

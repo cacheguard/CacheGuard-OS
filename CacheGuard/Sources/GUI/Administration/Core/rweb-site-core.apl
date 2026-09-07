@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -33,7 +32,6 @@ show-rweb-site-form()
     local ip1=$(ipcalc -s ${IP_EXTERNAL_IP} ${IP_EXTERNAL_MASK} -n) ; ip1=${ip1/NETWORK=}
     local ip2=$(ipcalc -s ${IP_EXTERNAL_IP} ${IP_EXTERNAL_MASK} -b) ; ip2=${ip2/BROADCAST=}
     local ip_tip="${ip1} < IP < ${ip2}"
-    local ip_tip_width=260
 
     itemWidth[1]=40
     itemWidth[2]=10
@@ -52,7 +50,7 @@ show-rweb-site-form()
     blankItemContent[0]=""
     blankItemContent[1]="type='text' size='24' maxlength='${MAX_LEN}'"
     blankItemContent[2]="http https"
-    blankItemContent[3]="type='text' size='15' maxlength='15' onMouseOver='ddrivetip( \\\"${ip_tip}\\\", ${ip_tip_width} );' onMouseOut='hideddrivetip( );'"
+    blankItemContent[3]="type='text' size='15' maxlength='15' data-action='show-tooltip' data-tip='${ip_tip}'"
     
     checkItem[1]=domainname
     checkItem[3]=ip
@@ -72,7 +70,6 @@ show-rweb-site-form()
     test -n "${listContent}" || state=disabled
     local rweb_nb=$(gui-get-contextual-rweb-nb)
 
-    call-js-function "hideddrivetip( )"
     show-title "Cloaked Reverse Websites" "${state}" "dynamicdns rweb tls"
     show-list-form ${rweb_nb} "${width}" "${page_ref}"
 }

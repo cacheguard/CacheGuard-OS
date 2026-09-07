@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -52,22 +51,24 @@ show-manager-template-form()
     local templates=$(ls -1 ${ADMIN_DIR}/${dir} 2> /dev/null) template i=0
     unset listContent
 
+    test -z "${templates}" || source_list="${source_list} __group_begin:Templates"
     for template in ${templates}
     do
 	template=$(file-basename ${template})
 	listContent="${listContent} ${template} nil"
-	source_list="${source_list} TEMPLATE&nbsp;>&nbsp;${template}"
+	source_list="${source_list} [T]${template}"
     done
     listContent=${listContent:1}
+    test -z "${templates}" || source_list="${source_list} __group_end"
 
     if test -s ${ADMIN_DIR}/${MANAGER_GATEWAY_INDEX} ; then
-
 	local uuid domain id ip
-
+	source_list="${source_list} __group_begin:Gateways"
 	while read uuid domain id ip
 	do
-	    source_list="${source_list} GATEWAY&nbsp;>&nbsp;${id}"
+	    source_list="${source_list} [G]${id}"
 	done < ${ADMIN_DIR}/${MANAGER_GATEWAY_INDEX}
+	source_list="${source_list} __group_end"
     fi
     source_list=${source_list:1}
 

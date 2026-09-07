@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       Commands
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -556,7 +555,7 @@ run()
 	    export DNS_MODE=${bool}
 	    ;;
 	cache)
-	    cli-is-in-template-context || test ${bool} == False -o ${PERSISTENT_CACHE} == True || return 167
+	    test ${bool} == False -o ${PERSISTENT_CACHE} == True || return 167
 	    export CACHE_MODE=${bool}
 	    ;;
 	ftppassive)

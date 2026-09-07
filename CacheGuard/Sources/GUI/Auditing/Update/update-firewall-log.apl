@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -33,29 +32,30 @@ show-log()
     test ${number} -le 1000 || return 3
 
     local log=/var/log/${FIREWALL_LOG}
-    local style="style='word-wrap:break-word;'"
     local len=${#FW_LOG_TAG} ; ((len++))
     local i=0
 
     if test ! -s "${log}" ; then
-	echo "<div style='font-style:italic;'>&lt;The IP firewall log is empty&gt;</div>"
+	echo-unavailable-message "the firewall log is empty."
 	return 0
     fi
 
     local rfc3339_time hostname kernel log_prefix input output rest
+    local date_time date time
     local src_ip dst_ip proto dst_port reason
 
-    echo "<table class='highlight-list' width:100%;'>"
+    echo "<table class='highlight-log'>"
     echo "<thead>"
     echo "<tr>"
-    echo "<td class='table-header'><strong>Date</strong></td>"
-    echo "<td class='table-header'><strong>Protocol</strong></td>"
-    echo "<td class='table-header'><strong>Src IP</strong></td>"
-    echo "<td class='table-header'><strong>Input NIC</strong></td>"
-    echo "<td class='table-header'><strong>Output NIC</strong></td>"
-    echo "<td class='table-header'><strong>Dst IP</strong></td>"
-    echo "<td class='table-header'><strong>Dst Port</strong></td>"
-    echo "<td class='table-header'><strong>Reason</strong></td>"
+    echo "<th class='table-header'><strong>Date</strong></th>"
+    echo "<th class='table-header'><strong>Time</strong></th>"
+    echo "<th class='table-header'><strong>Protocol</strong></th>"
+    echo "<th class='table-header'><strong>Src IP</strong></th>"
+    echo "<th class='table-header'><strong>Input NIC</strong></th>"
+    echo "<th class='table-header'><strong>Output NIC</strong></th>"
+    echo "<th class='table-header'><strong>Dst IP</strong></th>"
+    echo "<th class='table-header'><strong>Dst Port</strong></th>"
+    echo "<th class='table-header'><strong>Reason</strong></th>"
     echo "</tr>"
     echo "</thead>"
     echo "<tbody>"
@@ -64,7 +64,11 @@ show-log()
     do
 	test ${i} -lt ${number} || break
 	test ${log_prefix:0:${len}} == "${FW_LOG_TAG}:" || continue
-	
+
+	date_time=$(gui-get-date-time "${rfc3339_time}")
+	date=${date_time/@*}
+	time=${date_time/*@}
+
 	reason=${log_prefix:${len}}
 	input=${input/IN=}
 	output=${output/OUT=}
@@ -130,14 +134,15 @@ show-log()
 		;;
 	esac
 	echo "<tr>"
-	echo "<td><span ${style}>${rfc3339_time}</span></td>"
-	echo "<td><span ${style}>${proto}</span></td>"
-	echo "<td><span ${style}>${src_ip}</span></td>"
-	echo "<td><span ${style}>${input}</span></td>"
-	echo "<td><span ${style}>${output}</span></td>"
-	echo "<td><span ${style}>${dst_ip}</span></td>"
-	echo "<td><span ${style}>${dst_port}</span></td>"
-	echo "<td><span ${style}>${reason}</span></td>"
+	echo "<td><span>${date}</span></td>"
+	echo "<td><span>${time}</span></td>"
+	echo "<td><span>${proto}</span></td>"
+	echo "<td><span>${src_ip}</span></td>"
+	echo "<td><span>${input}</span></td>"
+	echo "<td><span>${output}</span></td>"
+	echo "<td><span>${dst_ip}</span></td>"
+	echo "<td><span>${dst_port}</span></td>"
+	echo "<td><span>${reason}</span></td>"
 	echo "</tr>"
 	((i++))
     done

@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -33,10 +32,10 @@ print-rules()
 
     if test -f ${rule} ; then
         local key value action method
-        echo "<table class='highlight-list'>"
+        echo "<table class='highlight-report'>"
         echo "<thead>"
         echo "<tr>"
-        echo "<td class='table-header' width='10%'>Reference</td><td class='table-header' width='10%'>Action</td><td class='table-header' width='10%'>Method<hr />Attribute</td><td class='table-header' width='70%'>Regular Expression</td>"
+        echo "<th class='table-header'>Reference</th><th class='table-header'>Action</th><th class='table-header'>Method<hr />Attribute</th><th class='table-header'>Regular Expression</th>"
         echo "</tr>"
         echo "</thead>"
         echo "<tbody>"
@@ -59,10 +58,9 @@ print-rules()
         echo "</tbody>"
         echo '</table>'
     else
-        echo "<div class='with-border unavailable-message'>&lt;No custom rules&gt;</div>"
+        echo "<div class='unavailable-message'>No custom rules</div>"
     fi
 }
 
 gui-run-authentication
 print-rules "${@}"
-

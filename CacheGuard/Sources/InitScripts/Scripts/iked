@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       InitScript
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -38,7 +37,7 @@ FPROG=${LOCAL_DIR}/sbin/${PROG}
 [ -f ${LOCAL_DIR}/etc/${PROG}.conf ] || exit 0
 
 RETVAL=0
-SERV="IPsec"
+SERV="IPsecVPN"
 
 update-whitelist()
 {

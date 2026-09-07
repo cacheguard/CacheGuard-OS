@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -45,13 +44,13 @@ show-waf-limit-form()
     itemID[5]="arguments"
     itemID[6]="files"
 
-    blankItemContent[0]="type='text' size='8' maxlength='8' value='${WAF_RESPONSE_BODY}' onMouseOver=showMinMaxToolTip(1,1048576); onMouseOut=hideMinMaxToolTip();"
-    blankItemContent[1]="type='text' size='8' maxlength='8' value='${WAF_REQUEST_BODY}' onMouseOver=showMinMaxToolTip(1,1048576); onMouseOut=hideMinMaxToolTip();"
-    blankItemContent[2]="type='text' size='8' maxlength='8' value='${WAF_NUM_ARG}' onMouseOver=showMinMaxToolTip(0,8192); onMouseOut=hideMinMaxToolTip();"
-    blankItemContent[3]="type='text' size='8' maxlength='8' value='${WAF_ARG_NAME_LENGTH}' onMouseOver=showMinMaxToolTip(0,1024); onMouseOut=hideMinMaxToolTip();"
-    blankItemContent[4]="type='text' size='8' maxlength='8' value='${WAF_ARG_LENGTH}' onMouseOver=showMinMaxToolTip(0,1048576); onMouseOut=hideMinMaxToolTip();"
-    blankItemContent[5]="type='text' size='8' maxlength='8' value='${WAF_TOTAL_ARG_LENGTH}' onMouseOver=showMinMaxToolTip(0,1048576); onMouseOut=hideMinMaxToolTip();"
-    blankItemContent[6]="type='text' size='8' maxlength='8' value='${WAF_FILES_SIZE}' onMouseOver=showMinMaxToolTip(1,${MAX_UPLOAD_FILE_SZ}); onMouseOut=hideMinMaxToolTip();"
+    blankItemContent[0]="type='text' size='8' maxlength='8' value='${WAF_RESPONSE_BODY}' data-action='show-min-max-tooltip' data-min='1' data-max='1048576'"
+    blankItemContent[1]="type='text' size='8' maxlength='8' value='${WAF_REQUEST_BODY}' data-action='show-min-max-tooltip' data-min='1' data-max='1048576'"
+    blankItemContent[2]="type='text' size='8' maxlength='8' value='${WAF_NUM_ARG}' data-action='show-min-max-tooltip' data-min='(0' data-max='8192'"
+    blankItemContent[3]="type='text' size='8' maxlength='8' value='${WAF_ARG_NAME_LENGTH}' data-action='show-min-max-tooltip' data-min='0' data-max='1024'"
+    blankItemContent[4]="type='text' size='8' maxlength='8' value='${WAF_ARG_LENGTH}' data-action='show-min-max-tooltip' data-min='0' data-max='1048576'"
+    blankItemContent[5]="type='text' size='8' maxlength='8' value='${WAF_TOTAL_ARG_LENGTH}' data-action='show-min-max-tooltip' data-min='0' data-max='1048576'"
+    blankItemContent[6]="type='text' size='8' maxlength='8' value='${WAF_FILES_SIZE}' data-action='show-min-max-tooltip' data-min='1' data-max='${MAX_UPLOAD_FILE_SZ}'"
 
     checkItem[0]=digit
     checkItem[1]=digit
@@ -61,7 +60,6 @@ show-waf-limit-form()
     checkItem[5]=digit
     checkItem[6]=digit
 
-    call-js-function "hideMinMaxToolTip( )"
     show-title "WAF Size Limits" "enabled" "waf"
     show-form "${width}"
 }

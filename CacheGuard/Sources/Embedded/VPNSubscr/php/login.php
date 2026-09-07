@@ -4,7 +4,6 @@
 ###########################################################################
 #
 # MODULE:       VPN Subscription
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -249,13 +248,13 @@ function vpnsubscr_display_login( $login_record )
         break;
 
     default:
-        echo "<div class='box-error'>\n";
+        echo "<div class='error'>\n";
         vpnsubscr_print_error( $login_record['state'], $login_record['message'] );
         echo "</div>\n";
         break;
     }
 
-    echo "<table>\n";
+    echo "<table class='highlight-form'>\n";
 
     switch ($login_record['state']) {
 
@@ -274,7 +273,7 @@ EOT;
         echo <<< EOT
 	  <tr>
 	    <td>Username</td>
-	    <td><input name='username' type='text' id='$focus_id' size='24' maxlength='48' value='' autocomplete='off' /></td>
+	    <td><input name='username' type='text' id='$focus_id' size='24' maxlength='48' value='' autocomplete='off' autofocus /></td>
 	  </tr>
 	  <tr>
 	    <td>Password</td>
@@ -291,7 +290,6 @@ EOT;
 	    <td><input class='valid-button' type='submit' name='submit' value="Login" /></td>
 	  </tr>
     </table>
-    <script type='text/javascript'>document.getElementById( '{$focus_id}' ).focus( );</script>
 EOT;
 }
 
@@ -300,32 +298,16 @@ $login_record = vpnsubscr_login( );
 ?>
 <!DOCTYPE html>
 <html>
-  <head>
-    <title>Login to <?php echo vpnsubscr_get_org_name( ); ?></title>
-
-    <link rel="shortcut icon" type="image/x-image" href="/image/favicon.ico" />
-    <link rel="stylesheet" type="text/css" href="/chromestyle.css" />
-    <link rel="stylesheet" type="text/css" href="/style.css" />
-
-    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
-    <meta name="robots" content="noindex, nofollow, noarchive, noarchive, nosnippet, noodp, noydir" />
-    <meta name="description" content="This page allows you to login to the VPN management application." />
-
-    <?php
-      if (GOOGLE_RECAPTCHA_PRIVATE_KEY != '' and GOOGLE_RECAPTCHA_PUBLIC_KEY != '') {
-          echo "    <script type='text/javascript' src='https://www.google.com/recaptcha/api.js'></script>";
-      }
-    ?>
-    <script type="text/javascript" src="/js/chrome.js"></script>
-  </head>
-
-  <body>
-    <?php vpnsubscr_display_header( false ); ?>
-    <form name='login' method='post' action="login.php">
-    <center>
-    <?php vpnsubscr_display_login( $login_record ); ?>
-    </center>
-    </form>
+<?php vpnsubscr_display_html_header( "Login" ); ?>
+ <body>
+   <?php vpnsubscr_display_header( false ); ?>
+    <div class='centered-container'>
+      <div class='centered-nested'>
+	<form name='login' method='post' action="login.php">
+	  <?php vpnsubscr_display_login( $login_record ); ?>
+     </form>
+      </div>
+    </div>
     <?php vpnsubscr_display_footer( ); ?>
   </body>
 </html>

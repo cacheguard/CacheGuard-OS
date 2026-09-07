@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -24,33 +23,28 @@
 
 show-system-report-gateway()
 {
+    test -n "${1}" || return 1
     local display_time=${1}
-    local table_width=${2}
-    test -n "${table_width}" || table_width="405"
+    local compact=${2}
 
     if test ! -s ${RUN_DIR}/${GATEWAYS_STATE_FILENAME} ; then
 	echo "<div class='core-form'>"
-	echo-content-unavailable ${table_width} "The gateway health monitoring is not yet available."
+	echo-unavailable-message "the gateway health monitoring is not yet available."
         echo "</div>"
 	return 0
     fi
 
-    echo "<div class='core-form'>"
+    test ${display_time} != time || display-appliance-time-table ${compact}
+    test -z "${compact}" || compact=' compact'
 
-    if test -n "${display_time}" ; then
-       echo "<table class='highlight-form' style='margin-bottom:5px; ' width='${table_width}'>"
-       display-appliance-time-row right
-       echo "</table>"
-    fi
-
-    echo "<table class='highlight-list' width='${table_width}'>"
+    echo "<table class='highlight-list${compact}'>"
 
     echo "<thead>"
     echo "<tr>"
-    echo "<td class='table-header indicator-table-header' width='30%' align='center'>Gateway</td>"
-    echo "<td class='table-header' width='15%' align='center'>NIC</td>"
-    echo "<td class='table-header' width='35%' align='center'>Pinged</td>"
-    echo "<td width='20%' class='table-header' align='center'>State</td>"
+    echo "<th class='table-header' align='center'>Gateway</th>"
+    echo "<th class='table-header' align='center'>NIC</th>"
+    echo "<th class='table-header' align='center'>Pinged</th>"
+    echo "<th class='table-header' align='center'>State</th>"
     echo "</tr>"
     echo "</thead>"
 
@@ -74,9 +68,9 @@ show-system-report-gateway()
         echo "<td align='left'>${health}</td>"
 
         if test "${state}" == OK ; then
-            echo "<td align='center'><img src='/image/ok.png' /></td>"
+            echo "<td align='center'><img class='small' src='/image/ok.png' /></td>"
         else
-            echo "<td align='center'><img src='/image/ko.png' title='Unreachable' /></td>"
+            echo "<td align='center'><img class='small' src='/image/ko.png' title='Unreachable' /></td>"
         fi
 
         echo "</tr>"
@@ -85,5 +79,4 @@ show-system-report-gateway()
 
     echo "</tbody>"
     echo "</table>"
-    echo "</div>"
 }

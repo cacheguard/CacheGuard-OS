@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -49,11 +48,10 @@ show-tls-component()
     local ocsp_id=${5}
     local content_id=${6}
 
-    echo "<div style='clear:left;'></div><br />"
     echo "<div class='table-title'>The TLS object</div>"
     echo "<div id='${content_id}'></div>"
 
-    call-js-function "TLSComponentSelectCB( '${component_id}', '${operation_id}', '${days_id}', '${ocsp_id}', '/${GUI_DIR_NAME}/tls-print.${GUI_EXT_NAME}?server:${tls}', '${content_id}' )"
+    echo "<div data-init-tls-component-select data-component-id='${component_id}' data-operation-id='${operation_id}' data-days-id='${days_id}' data-ocsp-id='${ocsp_id}' data-page='/${GUI_DIR_NAME}/tls-print.${GUI_EXT_NAME}?server:${tls}' data-content-id='${content_id}' hidden></div>"
 }
 
 show-tls-manage-form()
@@ -107,12 +105,12 @@ show-tls-manage-form()
     test -n "${file_servers}" || state=disabled
 
     blankItemContent[0]="value='${tls}'"
-    blankItemContent[1]="${tls}"
+    blankItemContent[1]="<a href='/${GUI_DIR_NAME}/tls-server-generate.${GUI_EXT_NAME}?key:${tls}'><img  src='${IMAGE_DIR}/tls-server-generate.png' title='Regenerate the Certificate' /> ${tls}</a>"
     blankItemContent[2]="$(show-tls-component-list ${VALUES[1]})"
     blankItemContent[3]="$(show-file-operation "${VALUES[2]}")"
     blankItemContent[4]="$(show-file-protocol1 ${VALUES[3]:1})"
     blankItemContent[5]=${file_servers}
-    blankItemContent[6]="type='text' size='48' maxlength='128' value='${VALUES[5]}'"
+    blankItemContent[6]="type='text' size='32' maxlength='128' value='${VALUES[5]}'"
     blankItemContent[7]="type='text' size='8' maxlength='8' value='${VALUES[6]}'"
     blankItemContent[8]="type='checkbox'${ocsp}"
 
@@ -126,8 +124,8 @@ show-tls-manage-form()
     itemForm[4]="select"
     itemForm[5]="select"
 
-    itemFormSelectCB[2]="TLSComponentSelectCB( '${component_id}', '${operation_id}', '${days_id}', '${ocsp_id}', '/${GUI_DIR_NAME}/tls-print.${GUI_EXT_NAME}?server:${tls}', '${content_id}' );"
-    itemFormSelectCB[3]="TLSOperationSelectCB( '${component_id}', '${operation_id}', '${days_id}', '${ocsp_id}' );"
+    itemData[2]="data-action='tls-component' data-component-id='${component_id}' data-operation-id='${operation_id}' data-days-id='${days_id}' data-ocsp-id='${ocsp_id}' data-url='/${GUI_DIR_NAME}/tls-print.${GUI_EXT_NAME}?server:${tls}' data-content-id='${content_id}'"
+    itemData[3]="data-action='tls-operation' data-component-id='${component_id}' data-operation-id='${operation_id}' data-days-id='${days_id}' data-ocsp-id='${ocsp_id}'"
 
     shortcutMenuItem[0]="access-file"
     shortcutMenuItem[1]="password-file"
@@ -135,8 +133,6 @@ show-tls-manage-form()
     shortcutMenuTitle[1]="Accounts"
 
     show-title "Load/Save Server TLS" "${state}" "access password rweb tls"
-    show-shortcuts-menu
-
     show-form "${width}" "${state}" "show-tls-component ${tls} ${component_id} ${operation_id} ${days_id} ${ocsp_id} ${content_id}"
 }
 

@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -94,7 +93,6 @@ show-embedded-bevypn-form()
     fi
 
     show-title "${EMBEDDED_VPNSUBSCR_COMMERCIAL_NAME} Embedded Application" "${state}" "embedded register tls"
-    show-shortcuts-menu
     show-form "${width}"
 }
 

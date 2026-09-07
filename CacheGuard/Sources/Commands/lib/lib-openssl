@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       Commands
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -224,7 +223,10 @@ check-tls-cert-signed-by-ca()
     openssl x509 -in ${cert_file} -text -noout > ${tmp_x509_cert_file} 2> /dev/null
 
     ca_issuer=$(grep 'Issuer: ' ${tmp_x509_ca_file} 2> /dev/null)
+    ca_issuer=${ca_issuer//\"/\\\"}
+
     issuer=$(grep 'Issuer: ' ${tmp_x509_cert_file} 2> /dev/null)
+    issuer=${issuer//\"/\\\"}
 
     if test "${issuer}" != "${ca_issuer}" ; then
 	rm -f ${tmp_x509_ca_file} ${tmp_x509_cert_file}
@@ -282,9 +284,11 @@ check-tls-cert-self-signed()
 
     issuer=$(grep 'Issuer: ' ${tmp_x509_cert_file} 2> /dev/null)
     issuer=${issuer/Issuer: }
+    issuer=${issuer//\"/\\\"}
 
     subject=$(grep 'Subject: ' ${tmp_x509_cert_file} 2> /dev/null)
     subject=${subject/Subject: }
+    subject=${subject//\"/\\\"}
 
     rm -f ${tmp_x509_cert_file}
 
@@ -515,6 +519,8 @@ gen-tls-cnf()
 
     while read var val
     do
+	val=${val//\'/\\\'}
+	val=${val//\"/\\\"}
 	var_t[${i}]=${var}
 	val_t[${i}]=${val}
 	((i++))

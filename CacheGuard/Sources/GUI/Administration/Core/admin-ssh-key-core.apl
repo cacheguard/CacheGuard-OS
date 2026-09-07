@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -35,7 +34,7 @@ show-ssh-key()
     local key_id key_state
     local state width=${DEFAULT_LIST_FORM_WIDTH_2}
 
-    itemWidth[1]=70
+    itemWidth[1]=50
 
     itemTitle[0]=""
     itemTitle[1]="SSH Key Id"
@@ -54,6 +53,9 @@ show-ssh-key()
 
     editColumnPage[0]="admin-ssh-key-load"
     editColumnTitle[0]="Load"
+
+    editColumnPage[1]="admin-ssh-key-set"
+    editColumnTitle[1]="Set"
 
     unset listContent
 

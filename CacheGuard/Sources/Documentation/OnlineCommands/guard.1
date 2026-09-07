@@ -1,22 +1,21 @@
 Manage the URL guarding (filtering)
 .SH SYNOPSIS
-
-[1] \fBguard [filter\fR [\fBip\fR [\fBadd\fR \fI<filter-name>\fR (\fBrange\fR \fI<ip1>\fR [\fI<ip2>\fR] | \fBnetwork\fR \fI<ip>\fR [\fI<network-mask>\fR]) | \fBdel\fR \fI<filter-name>\fR | \fBraz\fR]]]
-
-[2] \fBguard [filter [time\fR [\fBadd\fR \fI<filter-name>\fR (\fBslot\fR \fI<[w-]hh:mm-hh:mm>\fR | \fBframe\fR \fI<yyyy/mm/dd-yyyy/mm/dd>\fR | \fBdate\fR \fI<[yyyy]/[mm]/[dd][-hh:mm-hh:mm]>\fR) | \fBdel\fR \fI<filter-name>\fR | \fBraz\fR]]]
-
-[3] \fBguard [filter [ldap\fR [\fBadd\fR \fI<filter-name>\fR '\fI<base-dn>\fR' \fI<login-attr>\fR '\fI<ldap-filter>\fR' | \fBdel\fR \fI<filter-name>\fR | \fBraz\fR]]]
-
-[4] \fBguard [policy\fR [\fBadd\fR \fI<policy-name>\fR ((\fBip\fR | \fBtime\fR | \fBldap\fR) \fI<filter-name>\fR)* | \fBdel\fR \fI<policy-name>\fR | \fBraz\fR]]
-
-[5] \fBguard [rule\fR [(\fBadd\fR | \fBupdate\fR | \fBadd:\fR\fI<policy-name>\fR | \fBinsert:\fR\fI<policy-name>\fR) (\fI<policy-name>\fR | \fBdefault\fR) (\fBdeny\fR | \fBallow\fR) (\fI<urllist-name>\fR)+ | \fBdel\fR (\fI<policy-name>\fR | \fBdefault\fR) | \fBraz\fR]]
-
-[6] \fBguard [rule\fR [\fBmove:(\fB-\fR|\fB+\fR)\fI<policy-name>\fR \fI<policy-name>\fR | \fBmove:\fI<position>\fR]]
-
-[7] \fBguard [ip\fR [(\fBon\fR | \fBoff\fR)]]
+[1] \fBguard\fR [\fBfilter\fR [\fBip\fR [\fBadd\fR \fI<filter-name>\fR (\fBrange\fR \fI<ip1>\fR [\fI<ip2>\fR] | \fBnetwork\fR \fI<ip>\fR [\fI<network-mask>\fR]) | \fBdel\fR \fI<filter-name>\fR | \fBraz\fR]]]
+.sp
+[2] \fBguard\fR [\fBfilter\fR [\fBtime\fR [\fBadd\fR \fI<filter-name>\fR (\fBslot\fR \fI<[w-]hh:mm-hh:mm>\fR | \fBframe\fR \fI<yyyy/mm/dd-yyyy/mm/dd>\fR | \fBdate\fR \fI<[yyyy]/[mm]/[dd][-hh:mm-hh:mm]>\fR) | \fBdel\fR \fI<filter-name>\fR | \fBraz\fR]]]
+.sp
+[3] \fBguard\fR [\fBfilter\fR [\fBldap\fR [\fBadd\fR \fI<filter-name>\fR '\fI<base-dn>\fR' \fI<login-attr>\fR '\fI<ldap-filter>\fR' | \fBdel\fR \fI<filter-name>\fR | \fBraz\fR]]]
+.sp
+[4] \fBguard\fR [\fBpolicy\fR [\fBadd\fR \fI<policy-name>\fR ((\fBip\fR | \fBtime\fR | \fBldap\fR) \fI<filter-name>\fR)* | \fBdel\fR \fI<policy-name>\fR | \fBraz\fR]]
+.sp
+[5] \fBguard\fR [\fBrule\fR [(\fBadd\fR | \fBupdate\fR | \fBadd:\fR\fI<policy-name>\fR | \fBinsert:\fR\fI<policy-name>\fR) (\fI<policy-name>\fR | \fBdefault\fR) (\fBdeny\fR | \fBallow\fR) (\fI<urllist-name>\fR)+ | \fBdel\fR (\fI<policy-name>\fR | \fBdefault\fR) | \fBraz\fR]]
+.sp
+[6] \fBguard\fR [\fBrule\fR [\fBmove:\fR(\fB-\fR|\fB+\fR)\fI<policy-name>\fR \fI<policy-name>\fR | \fBmove:\fR\fI<position>\fR]]
+.sp
+[7] \fBguard\fR [\fBip\fR [(\fBon\fR | \fBoff\fR)]]
 
 .SH DESCRIPTION
-The URL guarding (or filtering) allows you to have control over the Web browsing in your organisation. Two guarding methods are available: the blacklist guarding and the white list guarding. Guarding with blacklists denies access to predefined URL lists, allowing access to all other URLs. Guarding with white lists permits access to predefined URL lists only, blocking all other URLs.
+The URL guarding (or filtering) allows you to have control over the web browsing in your organisation. Two guarding methods are available: the blacklist guarding and the white list guarding. Guarding with blacklists denies access to predefined URL lists, allowing access to all other URLs. Guarding with white lists permits access to predefined URL lists only, blocking all other URLs.
 
 The URL Filtering can be based on the source IP address, the access time and an LDAP request. To define a guard rule you need to create policies and filters first. A policy is the combination of several filters. A guard rule defines who (policies) can access what (URL lists).
 
@@ -34,9 +33,9 @@ Filter and policy names must begin with an alpha character and may contains alph
 
 Finally you can define a guarding rule based on policies (who) and URL lists (what). Usage forms [5] and [6] allow you to manage guarding rules. To add a rule at the end of all rules use the keywords \fBrule add\fR followed by a policy name, the keyword \fBallow\fR or \fBdeny\fR (depending on whether you want to create a blacklist guard or a white list guard) and a list of URL list name separated by a blank. A rule can be deleted using the keyword \fBdel\fR followed by the associated policy name. Using the keyword \fBraz\fR allows you to erase all rules.
 
-Please note that the order of guard rules is important as the system matches the first matching rule to allow or deny a URL for a client. To add a rule after a given rule, use the keyword \fBadd:\fR  followed by the rule name after which the new rule have to be inserted. To insert a rule before a given rule, use the keyword \fBinsert:\fR followed by the rule name before which the new rule have to be inserted. Finally the keyword \fBupdate\fR allows you to modify a rule without changing its place in the rule list.
+Note that the order of guard rules is important as the system matches the first matching rule to allow or deny a URL for a client. To add a rule after a given rule, use the keyword \fBadd:\fR  followed by the rule name after which the new rule have to be inserted. To insert a rule before a given rule, use the keyword \fBinsert:\fR followed by the rule name before which the new rule have to be inserted. Finally the keyword \fBupdate\fR allows you to modify a rule without changing its place in the rule list.
 
-As an example completing the following commands allows you to define a policy applied to users with an IP address ranging from 172.18.2.10 to 172.18.2.100 who use the Web between 8:00AM and 5:00PM and belong the LDAP group "cn=worker,ou=groups,dc=example,dc=com". A guard URL list named WebMail is created to group sites that offer web-based email service. Then the defined policy is used to create a rule to deny the access to WebMail sites for those users.
+As an example completing the following commands allows you to define a policy applied to users with an IP address ranging from 172.18.2.10 to 172.18.2.100 who use the web between 8:00AM and 5:00PM and belong the LDAP group "cn=worker,ou=groups,dc=example,dc=com". A guard URL list named WebMail is created to group sites that offer web-based email service. Then the defined policy is used to create a rule to deny the access to WebMail sites for those users.
 
 \fBguard filter add ip\fR myNetwork \fBrange\fR 172.18.2.10 172.18.2.100
 
@@ -54,18 +53,14 @@ As an example completing the following commands allows you to define a policy ap
 
 \fBapply\fR
 
-Note that in this example the ftp server "ftp.cacheguard.net" should have been defined as a trusted file server previously with the command\fBaccess\fR. Also that FTP server requires login/passowrd credentials that should be configured using the command \fBpassword\fR.
+Note that in this example the ftp server "ftp.cacheguard.net" should have been defined as a trusted file server previously with the command \fBaccess\fR. Also that FTP server requires login/password credentials that should be configured using the command \fBpassword\fR.
 
-The sixth [6] usage form allows you to move a guard rule from one position to another in the list of guard rules. To move a rule before or after another denoted rule use the keyword \fBmove:\fR followed by the sign \fB-\fR (for before) or \fB+\fR (for after), the rule name of the denoted rule and the rule name of the rule to move. Please note that white spaces are not allowed between the keyword \fBmove:\fR, the signs \fB-\fR or \fB+\fR and the rule name of the denoted rule. To move a rule to an absolute position use the \fBmove:\fR followed by the position number and the rule name of the rule to move (the first position is the position number 1). Please note that white spaces are not allowed between the keyword \fBmove:\fR and the position number.
+The sixth [6] usage form allows you to move a guard rule from one position to another in the list of guard rules. To move a rule before or after another denoted rule use the keyword \fBmove:\fR followed by the sign \fB-\fR (for before) or \fB+\fR (for after), the rule name of the denoted rule and the rule name of the rule to move. Note that white spaces are not allowed between the keyword \fBmove:\fR, the signs \fB-\fR or \fB+\fR and the rule name of the denoted rule. To move a rule to an absolute position use the \fBmove:\fR followed by the position number and the rule name of the rule to move (the first position is the position number 1). Note that white spaces are not allowed between the keyword \fBmove:\fR and the position number.
 
-The seventh [7] usage form allow you to activate or deactivate the usage of IP addresses instead of a domain name by Web users (clients). To allow the usage of IP addresses, turn the guard IP off. To disallow the usage of IP addresses, turn the guard IP on. Please note that by disallowing the usage of IP address in URLs you can block the usage of networks such as TOR.
+The seventh [7] usage form allow you to activate or deactivate the usage of IP addresses instead of a domain name by web users (clients). To allow the usage of IP addresses, turn the guard IP off. To disallow the usage of IP addresses, turn the guard IP on. Note that by disallowing the usage of IP address in URLs you can block the usage of networks such as TOR.
 
 .SH SEE ALSO
-.B apply
-(1)
-.B authenticate
-(1)
-.B mode
-(1)
-.B urllist
-(1)
+.BR apply (1),
+.BR authenticate (1),
+.BR mode (1),
+.BR urllist (1)

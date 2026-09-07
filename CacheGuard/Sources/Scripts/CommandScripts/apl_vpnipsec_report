@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       Scripts
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -38,14 +37,20 @@ set-environment()
 
     TMP_IPSEC_STATUS=/tmp/ipsec.status.${$}
     TMP_IPSEC_REPORT=/tmp/ipsec.report.${$}
+    TMP_WAITING_PROCESS=/tmp/${WAITING_PROCESS}.${CALLER_PID}
+
+    rm -f ${TMP_IPSEC_REPORT}
+
     trap "clean-exit 1" INT QUIT TERM
-    touch ${RUN_DIR}/${WAITING_PROCESS}.${CALLER_PID}    
+
 }
 
 clean-environment()
 {
-    rm -f ${RUN_DIR}/${WAITING_PROCESS}.${CALLER_PID}
-    rm -f ${TMP_IPSEC_STATUS} ${TMP_IPSEC_REPORT}
+    rm -f \
+       ${TMP_IPSEC_STATUS} \
+       ${TMP_IPSEC_REPORT} \
+       ${TMP_WAITING_PROCESS}
 }
 
 clean-exit()
@@ -55,6 +60,14 @@ clean-exit()
     local code=${1}
     clean-environment
     exit ${code}
+}
+
+signal-process-termination()
+{
+    touch ${TMP_WAITING_PROCESS}
+    install -m 664 -o ${ADMIN_NAME} -g ${GROUP_NAME} ${TMP_WAITING_PROCESS} \
+	    ${RUN_DIR}/${SUPERVISOR_CALLER}/${WAITING_PROCESS}.${CALLER_PID}
+    rm -f ${TMP_WAITING_PROCESS}
 }
 
 vpnipsec-site-report()
@@ -366,7 +379,7 @@ vpnipsec-access-report()
 
 main()
 {
-    rm -f ${TMP_IPSEC_REPORT}
+    set-environment "${@}"
 
     if test ${CURRENT_VPN_IPSEC_MODE} == True ; then
 	if test "${CURRENT_VPN_IPSEC_ACCESS/ *}" == 'off' ; then
@@ -379,11 +392,10 @@ main()
     test -f ${TMP_IPSEC_REPORT} || echo -n > ${TMP_IPSEC_REPORT}
     mv -f ${TMP_IPSEC_REPORT} ${RUN_DIR}/${VPN_IPSEC_STATUS_FILENAME}
 
-    clean-exit ${?}
+    signal-process-termination
+    clean-exit 0
 }
 
 # Main()
 
-set-environment "${@}"
 main "${@}"
-clean-environment "${@}"

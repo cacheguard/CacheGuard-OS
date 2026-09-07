@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -77,28 +76,29 @@ show-network-activity()
 {
     test -n "${1}" || return 1
     test -n "${2}" || return 2
-    test -n "${3}" || return 3
     local nic_name=${1}
-    local graph_width=${2}
-    local index=${3}
-    local devs=${4}
+    local index=${2}
+    local devs=${3}
+    local compact=${4}
 
     local precision_time=60
-    local graph_height=300
+    local graph_width graph_height=300
     local step=$[${precision_time} / ${STATISTICS_INTERVAL}]
     local nic
 
+    if test -z "${compact}" ; then
+	graph_width=700
+    else
+	graph_width=${DASHBOARD_WINDOW_WIDTH}
+    fi
+
     if test -z ${devs} ; then
-        echo "<div class='core-form'>"
-	echo-content-unavailable ${graph_width} "This network interface is not in use"
-        echo "</div>"
+	echo-unavailable-message "This network interface is not currently in use."
 	return 11
     fi
     
     if test ${step} -lt 1 ; then
-        echo "<div class='core-form'>"
-	echo-content-unavailable ${graph_width} "The time precision is less than the interval"
-        echo "</div>"
+	echo-unavailable-message "The time precision is lower than the interval."
 	return 13
     fi
 
@@ -111,9 +111,7 @@ show-network-activity()
     local stat_file=${RUN_DIR}/${NETWORK_STATISTICS_FILENAME}.${nic}
 
     if test ! -f ${stat_file} ; then
-        echo "<div class='core-form'>"
-	echo-content-unavailable ${graph_width} "This activity representation is temporarily unavailable"
-        echo "</div>"
+	echo-unavailable-message "This network activity representation is temporarily unavailable."
 	return 15
     fi
 
@@ -152,11 +150,9 @@ show-network-activity()
 
     local nb=${i}
 
-    if test ${nb} -lt 2 ; then
-        echo "<div class='core-form'>"
-	echo-content-unavailable ${graph_width} "There is no enough data to draw a chart"
-        echo "</div>"
-	return 17
+    if test ${nb} -le ${step} ; then
+	echo-unavailable-message "There is not enough data to draw a chart."
+	return 15
     fi
 
     for ((i=1 ; i<nb ; i++))
@@ -192,121 +188,124 @@ show-network-activity()
 	y_unit=1000
     fi	
 
-    echo "<div class='core-form'>"
-    echo "<div id='${graph_id}' style='height:${graph_height}px; width:${graph_width}px; margin:0; padding:0;'></div>"
+    echo "<div id='${graph_id}' class='graph-line-report'></div>"
 
     local average range stotal
     local rest=$[${step} - 1]
 
-    echo "<script type='text/javascript'>"
-
-    echo "var graph_${nic_name} = c3.generate ( {"
-    echo "bindto: '#${graph_id}',"
-    echo "data: {"
-    echo "x: 'date',"
-    echo "xFormat : '%s',"
-    echo "columns: ["
-
-    stotal=0
-    echo -n "['date'"
-    for ((i=0 ; i<nb ; i++))
-    do
-	range=$[${i} % ${step}]
-	stotal=$[${stotal} + ${bw_date_table[${i}]}]
-	if test ${range} -eq ${rest} ; then
-	    average=$[${stotal} / ${step}]
-	    stotal=0
-	    echo -n ", ${average}"
-	fi
-    done
-    echo    "],"
+    cat << EOT
+<script type='application/json' data-init-graph-chart>
+{
+EOT
+    echo "\"bindto\": \"#${graph_id}\","
+    echo "\"data\": {"
+    echo "\"x\": \"date\","
+    echo "\"xFormat\": \"%s\","
+    echo "\"columns\": ["
 
     stotal=0
-    echo -n "['${rx_name}'"
+    printf "[\"date\""
     for ((i=0 ; i<nb ; i++))
     do
-	range=$[${i} % ${step}]
-	stotal=$[${stotal} + ${bw_rx_table[${i}]}]
-	if test ${range} -eq ${rest} ; then
-	    average=$[${stotal} / ${step}]
+	range=$((i % step))
+	stotal=$((stotal + bw_date_table[i]))
+
+	if test ${range} -eq ${rest}; then
+	    average=$((stotal / step))
 	    stotal=0
-	    echo -n ", ${average}"
+	    printf ", %s" "${average}"
 	fi
     done
     echo "],"
 
     stotal=0
-    echo -n "['${tx_name}'"
+    printf "[\"${rx_name}\""
     for ((i=0 ; i<nb ; i++))
     do
-	range=$[${i} % ${step}]
-	stotal=$[${stotal} + ${bw_tx_table[${i}]}]
-	if test ${range} -eq ${rest} ; then
-	    average=$[${stotal} / ${step}]
+	range=$((i % step))
+	stotal=$((stotal + bw_rx_table[i]))
+
+	if test ${range} -eq ${rest}; then
+	    average=$((stotal / step))
 	    stotal=0
-	    echo -n ", ${average}"
+	    printf ", %s" "${average}"
+	fi
+    done
+    echo "],"
+
+    stotal=0
+    printf "[\"${tx_name}\""
+    for ((i=0 ; i<nb ; i++))
+    do
+	range=$((i % step))
+	stotal=$((stotal + bw_tx_table[i]))
+
+	if test ${range} -eq ${rest}; then
+	    average=$((stotal / step))
+	    stotal=0
+	    printf ", %s" "${average}"
 	fi
     done
     echo "]"
 
     echo "],"
-    echo "type: 'line',"
-    echo "colors: {"
-    echo "'${rx_name}': '${rx_color}',"
-    echo "'${tx_name}': '${tx_color}'"
-    echo "},"
-    echo "onclick: function( d, element ) { console.log( 'onclick', d, element ); },"
-    echo "onmouseover: function( d ) { console.log( 'onmouseover', d ); },"
-    echo "onmouseout: function( d ) { console.log( 'onmouseout', d ); }"
-    echo "},"
-
-    echo "axis: {"
-    echo "x: {"
-    echo "label: '${x_unit_label}',"
-    echo "type:'timeseries',"
-    echo "tick: {"
-    echo "format: '%H:%M'"
-    echo "},"
-    echo "localtime: true"
-    echo "},"
-    echo "y: {"
-    echo "label: '${y_unit_label}'"
+    echo "\"type\": \"line\","
+    echo "\"colors\": {"
+    echo "\"${rx_name}\": \"${rx_color}\","
+    echo "\"${tx_name}\": \"${tx_color}\""
     echo "}"
+    echo "},"
+    echo "\"axis\": {"
+    echo "\"x\": {"
+    echo "\"label\": \"${x_unit_label}\","
+    echo "\"type\": \"timeseries\","
+    echo "\"tick\": {"
+    echo "\"format\": \"%H:%M\""
+    echo "},"
+    echo "\"localtime\": true"
+    echo "},"
+    echo "\"y\": {"
+    echo "\"label\": \"${y_unit_label}\""
+    echo "}"
+    echo "},"
+    echo "\"size\": {"
+    echo "\"height\": ${graph_height},"
+    echo "\"width\": ${graph_width}"
     echo "}"
 
-    echo "} );"
-
-    echo "</script>"
-    echo "</div>"	
+    cat << EOT
+}
+</script>
+EOT
 }
 
 show-network-activity-external()
 {
-    test -n "${1}" || return 1
-    local width=${1}
+    local compact=${1}
+    test -z "${compact}" || compact=" ${compact}"
 
     local dyndns_report=$(gui-get-dynamic-dns-report external)
 
-    echo "<div class='indicator-title'>External [${CURRENT_BOND_EXTERNALS}]${dyndns_report}</div>"
-    show-network-activity external ${width} 1 "${CURRENT_BOND_EXTERNALS}"
+    echo "<div class='table-title${compact}'><strong>External</strong> [${CURRENT_BOND_EXTERNALS}]${dyndns_report}</div>"
+    show-network-activity external 1 "${CURRENT_BOND_EXTERNALS}"${compact}
 }
 
 show-network-activity-internal()
 {
-    test -n "${1}" || return 1
-    local width=${1}
+    local compact=${1}
+    test -z "${compact}" || compact=" ${compact}"
 
     local dyndns_report=$(gui-get-dynamic-dns-report internal)
 
-    echo "<div class='indicator-title'>Internal [${CURRENT_BOND_INTERNALS}]${dyndns_report}</div>"
-    show-network-activity internal ${width} 0 "${CURRENT_BOND_INTERNALS}"
+    echo "<div class='table-title${compact}'><strong>Internal</strong> [${CURRENT_BOND_INTERNALS}]${dyndns_report}</div>"
+    show-network-activity internal 0 "${CURRENT_BOND_INTERNALS}"${compact}
 }
 
 show-network-activity-auxiliary()
 {
-    test -n "${1}" || return 1
-    local width=${1}
+    local compact=${1}
+    test -z "${compact}" || compact=" ${compact}"
 
-    echo "<div class='indicator-title'>Auxiliary [${CURRENT_BOND_AUXILIARIES}]</div>"
-    show-network-activity auxiliary ${width} 2 "${CURRENT_BOND_AUXILIARIES}"
+    echo "<div class='table-title${compact}'><strong>Auxiliary</strong> [${CURRENT_BOND_AUXILIARIES}]</div>"
+    show-network-activity auxiliary 2 "${CURRENT_BOND_AUXILIARIES}"${compact}
 }

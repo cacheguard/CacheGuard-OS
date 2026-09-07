@@ -22,7 +22,7 @@
 3 2 _ITEM_  REPORTS HEALTH_DASHBOARD /gui/system-report.apl
 
 3 2 _BEGIN_ REPORTS Health_Reports
-3 2 _ITEM_  REPORTS Health_Reports CPU_&_IO_Load /gui/system-report-load.apl
+3 2 _ITEM_  REPORTS Health_Reports CPU_&_System_Load /gui/system-report-load.apl
 3 2 _ITEM_  REPORTS Health_Reports Disk_Activity /gui/system-report-disk.apl
 3 2 _ITEM_  REPORTS Health_Reports Gateway_Health /gui/system-report-gateway.apl
 3 2 _ITEM_  REPORTS Health_Reports HA_&_Links_Health /gui/system-report-link.apl
@@ -40,11 +40,13 @@
 1 1 _ITEM_  REPORTS Other_Reports DHCP_Leases_Report /gui/dhcp-report.apl
 3 2 _ITEM_  REPORTS Other_Reports Exchanged_Files /gui/file-exchange.apl
 1 1 _ITEM_  REPORTS Other_Reports Network_Connections /gui/system-report-connection.apl
-1 1 _ITEM_  REPORTS Other_Reports QoS_Shaping_Report /gui/qos-report.apl
+1 1 _ITEM_  REPORTS Other_Reports QoS_Traffic_Report /gui/qos-report.apl
 1 1 _ITEM_  REPORTS Other_Reports Traffic_Counters_Report /gui/system-report-counter.apl
 1 1 _ITEM_  REPORTS Other_Reports VPN_IPsec_Access_Report /gui/vpnipsec-report.apl?access
 1 1 _ITEM_  REPORTS Other_Reports Web_Cache_Report /gui/cache-report.apl
 3 2 _END_   REPORTS Other_Reports
+
+3 2 _ITEM_  REPORTS Diagnostic_Tools /gui/diagnostic-tools.apl
 3 2 _END_   REPORTS
 
 3 3 _BEGIN_ GENERAL
@@ -63,8 +65,8 @@
 3 1 _END_   GENERAL Embedded_Applications
 
 3 1 _BEGIN_ GENERAL Peer_Web_Proxies
-3 1 _ITEM_  GENERAL Peer_Web_Proxies Forwarding_Next_Peers /gui/peer-next.apl
 3 1 _ITEM_  GENERAL Peer_Web_Proxies HA_Cache_Peers /gui/peer-ha.apl
+3 1 _ITEM_  GENERAL Peer_Web_Proxies Next_Peers /gui/peer-next.apl
 3 1 _ITEM_  GENERAL Peer_Web_Proxies Previsous_Peers /gui/peer-previous.apl
 3 1 _ITEM_  GENERAL Peer_Web_Proxies Shared_Cache_Peers /gui/peer-share.apl
 3 1 _END_   GENERAL Peer_Web_Proxies
@@ -99,7 +101,7 @@
 3 3 _BEGIN_ GENERAL Whole_Configuration
 3 3 _ITEM_  GENERAL Whole_Configuration Apply_New_Configuration /gui/apply.apl
 3 3 _ITEM_  GENERAL Whole_Configuration Cancel_New_Configuration /gui/cancel.apl
-2 1 _ITEM_  GENERAL Whole_Configuration Configure_by_Template /gui/conf-manager.apl
+2 1 _ITEM_  GENERAL Whole_Configuration Configure_by_Inheritance /gui/conf-manager.apl
 3 3 _ITEM_  GENERAL Whole_Configuration Factory_Reset /gui/conf-factoryreset.apl
 3 3 _ITEM_  GENERAL Whole_Configuration File_Operations /gui/file-operation.apl
 3 3 _ITEM_  GENERAL Whole_Configuration Load_&_Save_Configuration /gui/conf-load-save.apl
@@ -113,8 +115,6 @@
 3 1 _ITEM_  NETWORK DHCP_Configuration DHCP_Fixed_IP /gui/dhcp-fixed.apl
 3 1 _ITEM_  NETWORK DHCP_Configuration DHCP_IP_Ranges /gui/dhcp-range.apl
 3 1 _END_   NETWORK DHCP_Configuration
-
-3 2 _ITEM_  NETWORK Diagnostic_Tools /gui/network-utilities.apl
 
 3 1 _BEGIN_ NETWORK High_Availability
 3 1 _ITEM_  NETWORK High_Availability Antivirus_VLAN_VRRP /gui/vrrp-antivirus.apl
@@ -175,7 +175,8 @@
 3 3 _ITEM_  SECURITY Appliance_Access Remote_Administrators /gui/access-admin.apl
 3 3 _ITEM_  SECURITY Appliance_Access SNMP_Managers /gui/access-mon.apl
 3 3 _ITEM_  SECURITY Appliance_Access Trusted_File_Servers /gui/access-file.apl
-3 1 _ITEM_  SECURITY Appliance_Access Web_Proxy_Clients /gui/access-web.apl
+3 1 _ITEM_  SECURITY Appliance_Access Web_Proxy_Direct /gui/access-web.apl
+3 1 _ITEM_  SECURITY Appliance_Access Web_Proxy_Forwarded /gui/access-fweb.apl
 3 3 _END_   SECURITY Appliance_Access
 
 3 1 _ITEM_  SECURITY Firewall_DoS_Limits /gui/firewall-dos.apl
@@ -193,10 +194,10 @@
 3 1 _END_   SECURITY Firewall_Rules
 
 3 3 _BEGIN_ SECURITY Passwords
+3 1 _ITEM_  SECURITY Passwords AD_Account_Password /gui/password-ad-account.apl
 3 2 _ITEM_  SECURITY Passwords Administrator_Password /gui/password-login.apl
 3 2 _ITEM_  SECURITY Passwords Email_Password /gui/password-email.apl
 3 3 _ITEM_  SECURITY Passwords File_Server_Accounts /gui/password-file.apl
-3 1 _ITEM_  SECURITY Passwords Kerberos_Password /gui/password-kerberos.apl
 3 1 _ITEM_  SECURITY Passwords LDAP_Bind_Password /gui/password-ldap.apl
 3 3 _ITEM_  SECURITY Passwords SNMP_Agent_Password /gui/password-snmp.apl
 3 3 _END_   SECURITY Passwords
@@ -239,20 +240,20 @@
 3 1 _ITEM_  SECURITY VPN_IPsec Site_to_Site_VPNs /gui/vpnipsec-site.apl
 3 1 _END_   SECURITY VPN_IPsec
 
-3 1 _BEGIN_ SECURITY WAF_[Web_Application_Firewall]
-3 1 _ITEM_  SECURITY WAF_[Web_Application_Firewall] Auditing_rWeb_Traffic /gui/waf-rweb-audit.apl
-3 1 _ITEM_  SECURITY WAF_[Web_Application_Firewall] By_rWeb_Filters /gui/waf-rweb-generic-select.apl
-3 1 _ITEM_  SECURITY WAF_[Web_Application_Firewall] Bypass_Application /gui/waf-rweb-bypass-application.apl
-3 1 _ITEM_  SECURITY WAF_[Web_Application_Firewall] Bypass_Rules /gui/waf-rweb-bypass-rule.apl
-3 1 _ITEM_  SECURITY WAF_[Web_Application_Firewall] Country_Reputation /gui/waf-reputation-country.apl
-3 1 _ITEM_  SECURITY WAF_[Web_Application_Firewall] Custom_Rules /gui/waf-rweb-custom.apl
-3 1 _ITEM_  SECURITY WAF_[Web_Application_Firewall] Default_Filters /gui/waf-generic.apl
-3 1 _ITEM_  SECURITY WAF_[Web_Application_Firewall] Deny_URL /gui/waf-rweb-denyurl.apl
-3 1 _ITEM_  SECURITY WAF_[Web_Application_Firewall] Denial_of_Service /gui/waf-dos.apl
-3 1 _ITEM_  SECURITY WAF_[Web_Application_Firewall] Other_Settings /gui/waf-settings.apl
-3 1 _ITEM_  SECURITY WAF_[Web_Application_Firewall] HTTP_Errors /gui/waf-rweb-errors.apl
-3 1 _ITEM_  SECURITY WAF_[Web_Application_Firewall] Size_Limits /gui/waf-limit.apl
-3 1 _END_   SECURITY WAF_[Web_Application_Firewall]
+3 1 _BEGIN_ SECURITY Web_Application_Firewall
+3 1 _ITEM_  SECURITY Web_Application_Firewall Auditing_rWeb_Traffic /gui/waf-rweb-audit.apl
+3 1 _ITEM_  SECURITY Web_Application_Firewall By_rWeb_Filters /gui/waf-rweb-generic-select.apl
+3 1 _ITEM_  SECURITY Web_Application_Firewall Bypass_Application /gui/waf-rweb-bypass-application.apl
+3 1 _ITEM_  SECURITY Web_Application_Firewall Bypass_Rules /gui/waf-rweb-bypass-rule.apl
+3 1 _ITEM_  SECURITY Web_Application_Firewall Country_Reputation /gui/waf-reputation-country.apl
+3 1 _ITEM_  SECURITY Web_Application_Firewall Custom_Rules /gui/waf-rweb-custom.apl
+3 1 _ITEM_  SECURITY Web_Application_Firewall Default_Filters /gui/waf-generic.apl
+3 1 _ITEM_  SECURITY Web_Application_Firewall Deny_URL /gui/waf-rweb-denyurl.apl
+3 1 _ITEM_  SECURITY Web_Application_Firewall Denial_of_Service /gui/waf-dos.apl
+3 1 _ITEM_  SECURITY Web_Application_Firewall Other_Settings /gui/waf-settings.apl
+3 1 _ITEM_  SECURITY Web_Application_Firewall HTTP_Errors /gui/waf-rweb-errors.apl
+3 1 _ITEM_  SECURITY Web_Application_Firewall Size_Limits /gui/waf-limit.apl
+3 1 _END_   SECURITY Web_Application_Firewall
 
 3 1 _BEGIN_ SECURITY Web_Access_Authentication
 3 1 _ITEM_  SECURITY Web_Access_Authentication MAIN_SETTINGS /gui/authenticate.apl

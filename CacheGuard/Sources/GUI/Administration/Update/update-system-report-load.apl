@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -28,4 +27,4 @@ source system-report-load-common.${GUI_EXT_NAME}
 # Main()
 
 gui-run-authentication
-show-system-report-load time
+show-system-report-load 'time'

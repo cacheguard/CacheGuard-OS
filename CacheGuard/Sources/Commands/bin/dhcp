@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       Commands
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -38,6 +37,20 @@ check-dhcp()
     esac
 }
 
+check-dhcp-interface()
+{
+    test -n "${1}" || return 1
+
+    case "${1}" in
+	internal|auxiliary)
+	    return 0
+	    ;;
+	*)
+	    return 1
+	    ;;
+    esac
+}
+
 check-dhcp-peer-role()
 {
     test -n "${1}" || return 1
@@ -52,7 +65,26 @@ check-dhcp-peer-role()
     esac
 }
 
-show-fixed-ips1() {
+check-dhcp-fixed-nb()
+{
+    local len=$(record4-length-list "${DHCP_FIXED_LIST}")
+    test ${len} -le ${MAX_DHCP_FIXED_NB}
+}
+
+check-dhcp-range-nb()
+{
+    local len=$(record3-length-list "${DHCP_RANGE_LIST}")
+    test ${len} -lt ${MAX_DHCP_RANGE_NB}
+}
+
+check-dhcp-peer-nb()
+{
+    local len
+    len=$(length-list "${DHCP_PEER_LIST}")
+    test ${len} -lt ${MAX_DHCP_PEER_NB}
+}
+
+show-fixed1() {
 
     local new
     local ranges=${2}
@@ -67,23 +99,26 @@ show-fixed-ips1() {
     if test -z "${ranges}" ; then
 	echo-value-null
     else
-	local hostname mac ip
+	local interface hostname mac ip
 	local i=0 n=0 elt range
 
 	for elt in ${ranges}
 	do
-	    range=$[${i} % 3]
+	    range=$[${i} % 4]
 	    case ${range} in
 		0)
 		    hostname=${elt}
 		    ;;
 		1)
-		    mac=${elt}
+		    interface=${elt}
 		    ;;
 		2)
+		    mac=${elt}
+		    ;;
+		3)
 		    ip=${elt}
 		    test ${n} -eq 0 || echo-blank-command
-		    echo-value "${hostname} ${mac} ${ip}"
+		    echo-value "${hostname} ${interface} ${mac} ${ip}"
 		    ((n++))
 		    ;;
 		*)
@@ -96,19 +131,13 @@ show-fixed-ips1() {
     fi
 }
 
-show-fixed-ips()
+show-fixed()
 {
-    show-fixed-ips1 'cur' "${CURRENT_DHCP_FIXED_LIST}"
-    test "${DHCP_FIXED_LIST}" == "${CURRENT_DHCP_FIXED_LIST}" || show-fixed-ips1 'new' "${DHCP_FIXED_LIST}"
+    show-fixed1 'cur' "${CURRENT_DHCP_FIXED_LIST}"
+    test "${DHCP_FIXED_LIST}" == "${CURRENT_DHCP_FIXED_LIST}" || show-fixed1 'new' "${DHCP_FIXED_LIST}"
 }
 
-check-range-nb()
-{
-    local len=$(record2-length-list "${DHCP_RANGE_LIST}")
-    test ${len} -lt ${MAX_DHCP_RANGE_NB}
-}
-
-show-ranges1() {
+show-range1() {
 
     local new
     local ranges=${2}
@@ -125,20 +154,23 @@ show-ranges1() {
 	echo-value-null
     else
 
-	local ip1 ip2
+	local interface ip1 ip2
 	local i=0 n=0 elt range
 
 	for elt in ${ranges}
 	do
-	    range=$[${i} % 2]
+	    range=$[${i} % 3]
 	    case ${range} in
 		0)
-		    ip1=${elt}
+		    interface=${elt}
 		    ;;
 		1)
+		    ip1=${elt}
+		    ;;
+		2)
 		    ip2=${elt}
 		    test ${n} -eq 0 || echo-blank-command
-		    echo-value "${ip1} ${ip2}"
+		    echo-value "${interface} ${ip1} ${ip2}"
 		    ((n++))
 		    ;;
 		*)
@@ -150,33 +182,38 @@ show-ranges1() {
     fi
 }
 
-show-ranges()
+show-range()
 {
-    show-ranges1 'cur' "${CURRENT_DHCP_RANGE_LIST}"
-    test "${DHCP_RANGE_LIST}" == "${CURRENT_DHCP_RANGE_LIST}" || show-ranges1 'new' "${DHCP_RANGE_LIST}"
+    show-range1 'cur' "${CURRENT_DHCP_RANGE_LIST}"
+    test "${DHCP_RANGE_LIST}" == "${CURRENT_DHCP_RANGE_LIST}" || show-range1 'new' "${DHCP_RANGE_LIST}"
 }
 
 range-remove()
 {
     test -n "${1}" || return 1
     test -n "${2}" || return 2
-    local in_ip1=${1}
-    local in_ip2=${2}
+    test -n "${3}" || return 3
+    local in_interface=${1}
+    local in_ip1=${2}
+    local in_ip2=${3}
 
     local out_list
-    local ip1 ip2
+    local interface ip1 ip2
     local elt i=0 range
 
     for elt in ${DHCP_RANGE_LIST}
     do
-	range=$[${i} % 2]
+	range=$[${i} % 3]
 	case ${range} in
 	    0)
-		ip1=${elt}
+		interface=${elt}
 		;;
 	    1)
+		ip1=${elt}
+		;;
+	    2)
 		ip2=${elt}
-		test "${ip1} ${ip2}" == "${in_ip1} ${in_ip2}" || out_list="${out_list} ${ip1} ${ip2}"
+		test "${interface} ${ip1} ${ip2}" == "${in_interface} ${in_ip1} ${in_ip2}" || out_list="${out_list} ${interface} ${ip1} ${ip2}"
 		;;
 	    *)
 		return 1
@@ -184,19 +221,11 @@ range-remove()
 	esac
 	((i++))
     done
-    out_list="${out_list:1}"
-    echo -n "${out_list}"
-    return 0
+
+    echo "${out_list:1}"
 }
 
-check-peer-nb()
-{
-    local len
-    len=$(length-list "${DHCP_PEER_LIST}")
-    test ${len} -lt ${MAX_DHCP_PEER_NB}
-}
-
-show-peers1()
+show-peer1()
 {
     local new
 
@@ -237,10 +266,10 @@ show-peers1()
     fi
 }
 
-show-peers()
+show-peer()
 {
-    show-peers1 'cur' "${CURRENT_DHCP_PEER_LIST}"
-    test "${CURRENT_DHCP_PEER_LIST}" == "${DHCP_PEER_LIST}" || show-peers1 'new' "${DHCP_PEER_LIST}"
+    show-peer1 'cur' "${CURRENT_DHCP_PEER_LIST}"
+    test "${CURRENT_DHCP_PEER_LIST}" == "${DHCP_PEER_LIST}" || show-peer1 'new' "${DHCP_PEER_LIST}"
 }
 
 peer-remove()
@@ -250,7 +279,7 @@ peer-remove()
     local in_role=${1}
     local in_ip=${2}
 
-    local out_list=""
+    local out_list
     local role ip
     local elt i=0 range
     
@@ -263,18 +292,17 @@ peer-remove()
 		;;
 	    1)
 		ip=${elt}
-		if test "${role} ${ip}" != "${in_role} ${in_ip}" ; then
+		test "${role} ${ip}" == "${in_role} ${in_ip}" || \
 		    out_list="${out_list} ${role} ${ip}"
-		fi
 		;;
 	    *)
 		return 1
 		;;
 	esac
-	i=$[${i} + 1]
+	((i++))
     done
-    echo "${out_list}"
-    return 0
+
+    echo "${out_list:1}"
 }
 
 show-dhcp()
@@ -282,21 +310,21 @@ show-dhcp()
     echo-begin-show
     case "${1}" in
 	fixed)
-	    show-fixed-ips
+	    show-fixed
 	    ;;
 	range)
-	    show-ranges
+	    show-range
 	    ;;
 	peer)
-	    show-peers
+	    show-peer
 	    ;;
 	leases)
 	    show-dhcp-leases
 	    ;;
-	"")
-	    show-fixed-ips
-	    show-ranges
-	    show-peers
+	'')
+	    show-fixed
+	    show-range
+	    show-peer
 	    ;;
 	*)
 	    error 255
@@ -367,11 +395,15 @@ run()
 		    ;;
 		range)
 		    test -n "${ARGS[3]}" || return 1
-		    local ip1=${ARGS[3]}
+		    local interface=${ARGS[3]}
+		    check-dhcp-interface ${interface} || return 115
+
+		    test -n "${ARGS[4]}" || return 1
+		    local ip1=${ARGS[4]}
 		    check-ip ${ip1} || return 12
 		    
-		    test -n "${ARGS[4]}" || return 1
-		    local ip2=${ARGS[4]}
+		    test -n "${ARGS[5]}" || return 1
+		    local ip2=${ARGS[5]}
 		    check-ip ${ip2} || return 12
 		    ;;
 		peer)
@@ -392,23 +424,26 @@ run()
 		case ${dt} in
 		    fixed)
 			test -n "${ARGS[4]}" || return 1
-			local mac=${ARGS[4]}
-			check-mac ${mac} || return 189
+			local interface=${ARGS[4]}
+			check-dhcp-interface ${interface} || return 115
 
 			test -n "${ARGS[5]}" || return 1
-			local ip=${ARGS[5]}
-			check-ip ${ip} || return 12
-			local len=$(record3-length-list "${DHCP_FIXED_LIST}")
-			test ${len} -le ${MAX_DHCP_FIXED_NB} || return 90
+			local mac=${ARGS[5]}
+			check-mac ${mac} || return 189
 
+			test -n "${ARGS[6]}" || return 1
+			local ip=${ARGS[6]}
+			check-ip ${ip} || return 12
+
+			check-dhcp-fixed-nb || return 90
 			mac=${mac^^}
 			;;
 		    range)
-			check-range-nb || return 90
+			check-dhcp-range-nb || return 90
 			test ${ip1} == ${ip2} || ip-lt ${ip1} ${ip2} || return 68
 			;;
 		    peer)
-			check-peer-nb || return 90
+			check-dhcp-peer-nb || return 90
 			;;
 		    *)
 			error 255
@@ -418,10 +453,10 @@ run()
 	    
 	    case ${dt} in
 		fixed)
-		    test ${act} != del || DHCP_FIXED_LIST=$(remove-record-from-list 3 1 "${hostname}" "${DHCP_FIXED_LIST}")
+		    test ${act} != del || DHCP_FIXED_LIST=$(remove-record-from-list 4 1 "${hostname}" "${DHCP_FIXED_LIST}")
 		    ;;
 		range)
-		    export DHCP_RANGE_LIST=$(range-remove ${ip1} ${ip2})
+		    export DHCP_RANGE_LIST=$(range-remove ${interface} ${ip1} ${ip2})
 		    ;;
 		peer)
 		    export DHCP_PEER_LIST=$(peer-remove ${role} ${ip1})
@@ -430,17 +465,27 @@ run()
 		    error 255
 		    ::
 	    esac
-	    
+
 	    if test ${act} == add ; then
 		case ${dt} in
 		    fixed)
-			DHCP_FIXED_LIST=$(insert-record-in-slist 3 1 "${hostname} ${mac} ${ip}" "${DHCP_FIXED_LIST}")
+			DHCP_FIXED_LIST=$(insert-record-in-list 4 1 "${hostname} ${interface} ${mac} ${ip}" "${DHCP_FIXED_LIST}")
+			DHCP_FIXED_LIST=$(sort-list 4 "--key=2,2 --key=4,4V" "${DHCP_FIXED_LIST}")
 			;;
 		    range)
-			DHCP_RANGE_LIST="${DHCP_RANGE_LIST} ${ip1} ${ip2}"
+			if test -z "${DHCP_RANGE_LIST}" ; then
+			    DHCP_RANGE_LIST="${interface} ${ip1} ${ip2}"
+			else
+			    DHCP_RANGE_LIST="${DHCP_RANGE_LIST} ${interface} ${ip1} ${ip2}"
+			fi
+			DHCP_RANGE_LIST=$(sort-list 3 "--key=1,1 --key=2,2V" "${DHCP_RANGE_LIST}")
 			;;
 		    peer)
-			DHCP_PEER_LIST="${DHCP_PEER_LIST} ${role} ${ip1}"
+			if test -z "${DHCP_PEER_LIST}" ; then
+			    DHCP_PEER_LIST="${role} ${ip1}"
+			else
+			    DHCP_PEER_LIST="${DHCP_PEER_LIST} ${role} ${ip1}"
+			fi
 			;;
 		    *)
 			error 255
@@ -452,7 +497,7 @@ run()
 	    error 255
 	    ;;
     esac
-    
+
     SAVENV=1
 }
 

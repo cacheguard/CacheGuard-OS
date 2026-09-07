@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -26,10 +25,9 @@ source system-backup-common.${GUI_EXT_NAME}
 
 show-file-exchange-log()
 {
-    echo "<div class='core-form' style='margin-top:0;'>"
-    refresh-buttons "update_file_operation( 1 )"
-    echo "<div style='clear:left;'></div><br />"
-    echo "<span class='table-title'>Last file exchange report&nbsp;</span>"
+    echo "<div class='core-form'>"
+    refresh-buttons
+    echo "<div class='table-title'>Last file exchange report</div>"
     echo "<div id='${AUTO_REPORT_ID}' class='log-report'></div>"
     echo "</div>"
 }
@@ -71,7 +69,6 @@ show-file-operation-form()
     local title_id='path_title'
 
     local admin_snmp_certificate=False
-    local admin_ssh_key=False
     local tls_ca_third=False
     local tls_server=False
     local tls_ca_system=False
@@ -136,11 +133,10 @@ show-file-operation-form()
 
     itemTitle[${i}]="Directory Path"
     itemTitleId[${i}]=${title_id}
-    itemFormSelectCB[0]="fileOperationSelectCB( '${operation_id}', '${protocol_id}', '${server_id}', '${directory_id}', '${title_id}' );"
+    itemData[0]="data-action='file-operation' data-operation-id='${operation_id}' data-protocol-id='${protocol_id}' data-server-id='${server_id}' data-directory-id='${directory_id}' data-title-id='${title_id}'"
     ((i++))
 
     itemTitle[${i}]="Exclude SNMP Client Certificates" ; ((i++))
-    itemTitle[${i}]="Exclude Administrator SSH keys" ; ((i++))
     itemTitle[${i}]="Exclude TLS Third party CAs" ; ((i++))
     itemTitle[${i}]="Exclude TLS Server objects" ; ((i++))
 
@@ -150,7 +146,6 @@ show-file-operation-form()
     itemID[${i}]="${server_id}" ; ((i++))
     itemID[${i}]="${directory_id}" ; ((i++))
     itemID[${i}]="admin_snmp_certificate" ; ((i++))
-    itemID[${i}]="admin_ssh_key" ; ((i++))
     itemID[${i}]="tls_ca_third" ; ((i++))
     itemID[${i}]="tls_server" ; ((i++))
 
@@ -160,7 +155,6 @@ show-file-operation-form()
     blankItemContent[${i}]=${file_servers} ; ((i++))
     blankItemContent[${i}]="type='text' size='48' maxlength='128' value='${VALUES[3]}'" ; ((i++))
     blankItemContent[${i}]="type='checkbox'$(checked ${admin_snmp_certificate})" ; ((i++))
-    blankItemContent[${i}]="type='checkbox'$(checked ${admin_ssh_key})" ; ((i++))
     blankItemContent[${i}]="type='checkbox'$(checked ${tls_ca_third})" ; ((i++))
     blankItemContent[${i}]="type='checkbox'$(checked ${tls_server})" ; ((i++))
 
@@ -213,7 +207,6 @@ show-file-operation-form()
     shortcutMenuTitle[1]="Accounts"
 
     show-title "File Operations" "${submit}" "antivirus admin conf file tls urllist waf"
-    show-shortcuts-menu
     show-form "${width}" "enabled" show-file-exchange-log
 }
 

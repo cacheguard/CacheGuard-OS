@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -26,12 +25,12 @@ set-qos-bw()
 {
     local transaction=/tmp/${TRANSACTION_FILE}.wadmin.${REMOTE_USER}.${$}
 
-    echo "qos bandwidth internal ingress '${VALUES[0]}'"   > ${transaction}
-    echo "qos bandwidth internal egress '${VALUES[1]}'"   >> ${transaction}
-    echo "qos bandwidth external ingress '${VALUES[2]}'"  >> ${transaction}
-    echo "qos bandwidth external egress '${VALUES[3]}'"   >> ${transaction}
-    echo "qos bandwidth auxiliary ingress '${VALUES[4]}'" >> ${transaction}
-    echo "qos bandwidth auxiliary egress '${VALUES[5]}'"  >> ${transaction}
+    echo "qos bandwidth internal ingress ${VALUES[0]}"   > ${transaction}
+    echo "qos bandwidth internal egress ${VALUES[1]}"   >> ${transaction}
+    echo "qos bandwidth external ingress ${VALUES[2]}"  >> ${transaction}
+    echo "qos bandwidth external egress ${VALUES[3]}"   >> ${transaction}
+    echo "qos bandwidth auxiliary ingress ${VALUES[4]}" >> ${transaction}
+    echo "qos bandwidth auxiliary egress ${VALUES[5]}"  >> ${transaction}
 
     execute-transaction ${transaction}
 }

@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -26,8 +25,8 @@ set-vpnipsec-access()
 {
     local transaction=/tmp/${TRANSACTION_FILE}.wadmin.${REMOTE_USER}.${$}
 
-    echo "vpnipsec access '${VALUES[0]}' '${VALUES[1]}' '${VALUES[2]}' '${VALUES[3]}' '${VALUES[4]}' '${VALUES[5]}'" > ${transaction}
-    echo "vpnipsec access authenticate '${VALUES[6]}'" >> ${transaction}
+    echo "vpnipsec access ${VALUES[0]} ${VALUES[1]} ${VALUES[2]} ${VALUES[3]} ${VALUES[4]} ${VALUES[5]}" > ${transaction}
+    echo "vpnipsec access authenticate ${VALUES[6]}" >> ${transaction}
     execute-transaction ${transaction}
 }
 

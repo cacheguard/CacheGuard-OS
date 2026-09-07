@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       Commands
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -324,11 +323,11 @@ manage-log-type()
 
     case ${log_type} in
 	web)
-	    cli-is-in-template-context || test ${bool1} == False -o ${PERSISTENT_WEB_LOG} == True || return 167
+	    test ${bool1} == False -o ${PERSISTENT_WEB_LOG} == True || return 167
 	    export LOG_TYPE_WEB=${bool1}:${bool2}
 	    ;;
 	rweb)
-	    cli-is-in-template-context || test ${bool1} == False -o ${PERSISTENT_RWEB_LOG} == True || return 167
+	    test ${bool1} == False -o ${PERSISTENT_RWEB_LOG} == True || return 167
 	    export LOG_TYPE_RWEB=${bool1}:${bool2}
 	    ;;
 	guard)

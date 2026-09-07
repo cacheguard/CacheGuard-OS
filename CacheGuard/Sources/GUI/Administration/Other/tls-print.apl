@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -203,8 +202,8 @@ print-tls-ca-system-component()
 		local sha1=$(openssl x509 -noout -fingerprint -sha1 -in ${file} 2> /dev/null)
 		local sha256=$(openssl x509 -noout -fingerprint -sha256 -in ${file} 2> /dev/null)
 
-		sha1=${sha1/SHA1 Fingerprint=}
-		sha256=${sha256/SHA256 Fingerprint=}
+		sha1=${sha1/sha1 Fingerprint=}
+		sha256=${sha256/sha256 Fingerprint=}
 
 		echo "Fingerprints of this certificate are as follows:"
 		echo

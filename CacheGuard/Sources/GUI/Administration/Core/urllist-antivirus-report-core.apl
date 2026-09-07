@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -25,12 +24,9 @@
 urllist-antivirus-report()
 {
     show-title "URL Lists & AV Updates" "enabled" "guard antivirus"
-
-    echo "<div class='core-form' style='margin-top:0;'>"
-    refresh-buttons "update_urllist_antivirus_report( 1 )"
-    echo "<div style='clear:left;'></div>"
+    echo "<div class='core-form'>"
+    refresh-buttons
     echo "<div id='${AUTO_REPORT_ID}'></div>"
-    show-scroll-top
     echo "</div>"
 }
 

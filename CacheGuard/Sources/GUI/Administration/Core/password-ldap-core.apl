@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -36,7 +35,7 @@ show-password-ldap-form()
     itemID[1]="bind_password"
     
     blankItemContent[0]="${LDAP_BIND_DN}"
-    blankItemContent[1]="type='password' size='32' maxlength='64'"
+    blankItemContent[1]="type='password' size='32' maxlength='${MAX_LEN}'"
 
     checkItem[1]=printable
 
@@ -46,7 +45,6 @@ show-password-ldap-form()
     shortcutMenuTitle[0]="Bind DN"
 
     show-title "LDAP Bind Password" "enabled" "authenticate password"
-    show-shortcuts-menu
     show-form "${width}"
 }
 

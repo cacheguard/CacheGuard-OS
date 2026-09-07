@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -27,8 +26,8 @@ set-names()
     local transaction=/tmp/${TRANSACTION_FILE}.wadmin.${REMOTE_USER}.${$}
     rm -f ${transaction}
 
-    test -z "${VALUES[0]}" || echo "hostname '${VALUES[0]}'" >> ${transaction}
-    test -z "${VALUES[1]}" || echo "domainname  '${VALUES[1]}'" >> ${transaction}
+    test -z "${VALUES[0]}" || echo "hostname ${VALUES[0]}" >> ${transaction}
+    test -z "${VALUES[1]}" || echo "domainname  ${VALUES[1]}" >> ${transaction}
 
     execute-transaction ${transaction}
 }

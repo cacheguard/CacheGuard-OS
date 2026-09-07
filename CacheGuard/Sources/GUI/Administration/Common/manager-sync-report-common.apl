@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -24,24 +23,21 @@
 
 show-manager-sync-report()
 {
-    local table_width=${1}
-    test -n "${table_width}" || table_width="405"
-
-    echo "<div class='core-form'>"
+    local compact=${1}
 
     case ${APL_ROLE} in
 	gateway)
-	    echo-content-unavailable ${table_width} "<i>This report is not available on a Gateway system.</i>"
+	    echo-unavailable-message "this report is not available on a Gateway system."
 	    return 0
 	    ;;
 	manager)
 	    case ${CURRENT_MANAGER_SYNC_ROLE} in
 		alone)
-		    echo-content-unavailable ${table_width} "<i>This report is not available on a stand alone Manager system.</i>"
+		    echo-unavailable-message "this report is not available on a stand alone Manager system."
 		    return 0
 		    ;;
 		slave)
-		    echo-content-unavailable ${table_width} "<i>This report is not available on a slave Manager system.</i>"
+		    echo-unavailable-message "this report is not available on a slave Manager system."
 		    return 0
 		    ;;
 		master)
@@ -56,12 +52,14 @@ show-manager-sync-report()
 	    ;;
     esac
 
-    echo "<table class='highlight-list' width='${table_width}'>"
+    test -z "${compact}" || compact=' compact'
+
+    echo "<table class='highlight-list${compact}'>"
 
     echo "<thead>"
     echo "<tr>"
-    echo "<td width='80%' class='table-header indicator-table-header' align='center'>Service</td>"
-    echo "<td width='20%' class='table-header' align='center'>State</td>"
+    echo "<th class='table-header' align='center'>Service</th>"
+    echo "<th class='table-header' align='center'>State</th>"
     echo "</tr>"
     echo "</thead>"
 
@@ -76,7 +74,7 @@ show-manager-sync-report()
 	seconds=$(date +"%s" 2> /dev/null)
 	date=$(get-date-from-epoch-seconds ${seconds})
 	status="OK"
-	show-log-line 0 ${date} No data to Synchronise with the Peer manager[${status}]
+	show-log-line 0 ${date} No data to synchronise with the peer manager[${status}]
 
     else
 	local update_file
@@ -107,5 +105,4 @@ show-manager-sync-report()
 
     echo "</tbody>"
     echo "</table>"
-    echo "</div>"
 }

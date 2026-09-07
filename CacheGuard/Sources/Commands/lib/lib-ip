@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       Commands
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -136,45 +135,6 @@ ip-lt()
     test -n "${dip2}" || dip2=0
 
     test ${dip1} -lt ${dip2}
-}
-
-remove-ip_vlan_list_vlan()
-{
-    test -n "${1}" || return 0
-    if test -z "${2}" ; then
-	echo "${1}"
-	return 0
-    fi
-
-    local in_list=${1}
-    local in_vlan=${2}
-    
-    local i=0 out_list
-    local elt range
-    local vlan ip netmask
-    
-    for elt in ${in_list}
-    do
-	range=$[${i} % 3]
-	case ${range} in
-	    0)
-		vlan=${elt}
-		;;
-	    1)
-		ip=${elt}
-		;;
-	    2)
-		netmask=${elt}
-		test "${vlan}" == "${in_vlan}" || out_list="${out_list} ${vlan} ${ip} ${netmask}"
-		;;
-	    *)
-		return 1
-		;;
-	esac
-	((i++))
-    done
-    echo ${out_list}
-    return 0
 }
 
 get-prefered-vrrp-ip()

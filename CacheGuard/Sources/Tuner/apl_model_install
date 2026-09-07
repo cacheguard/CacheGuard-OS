@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       Tuner
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -60,9 +59,10 @@ install-complete-conf()
 	    ;;
     esac
 
+    install -m 644 -o root -g root ${GENERATED_DIR}/model.conf				${APL}${HARD_DIR}/model.conf
+
     test ${INSTALL_TYPE} != retune || return 0
 
-    install -m 644 -o root -g root ${GENERATED_DIR}/model.conf				${APL}${HARD_DIR}/model.conf
     install -m 644 -o root -g root ${GENERATED_DIR}/fs-info				${APL}/etc/fs-info
     install -m 644 -o root -g root ${GENERATED_DIR}/etc.fstab.uuid			${APL}/etc/fstab
     install -m 644 -o root -g root ${GENERATED_DIR}/grub.cfg				${APL}/boot/grub/grub.cfg
@@ -75,9 +75,10 @@ install-partial-conf()
     install -m 400 -o root -g root ${GENERATED_DIR}/named.conf-tuned			${APL}${CONF_DIR}/named.conf-tuned
     install -m 400 -o root -g root ${GENERATED_DIR}/dhcpd.conf-tuned			${APL}${CONF_DIR}/dhcpd.conf-tuned
     install -m 400 -o root -g root ${GENERATED_DIR}/${WADMIND_NAME}.conf-tuned		${APL}${CONF_DIR}/${WADMIND_NAME}.conf-tuned
-    install -m 400 -o root -g root ${GENERATED_DIR}/httpd-noproxy.conf-tuned		${APL}${CONF_DIR}/httpd-noproxy.conf-tuned
-    install -m 400 -o root -g root ${GENERATED_DIR}/httpd-proxy.conf-tuned		${APL}${CONF_DIR}/httpd-proxy.conf-tuned
-    install -m 400 -o root -g root ${GENERATED_DIR}/httpd-proxy.conf-cache-tuned	${APL}${CONF_DIR}/httpd-proxy.conf-cache-tuned
+    install -m 400 -o root -g root ${GENERATED_DIR}/httpd-simple.conf-tuned		${APL}${CONF_DIR}/httpd-simple.conf-tuned
+    install -m 400 -o root -g root ${GENERATED_DIR}/httpd-guard.conf-tuned		${APL}${CONF_DIR}/httpd-guard.conf-tuned
+    install -m 400 -o root -g root ${GENERATED_DIR}/httpd-rproxy.conf-tuned		${APL}${CONF_DIR}/httpd-rproxy.conf-tuned
+    install -m 400 -o root -g root ${GENERATED_DIR}/httpd-rproxy.conf-cache-tuned	${APL}${CONF_DIR}/httpd-rproxy.conf-cache-tuned
     install -m 400 -o root -g root ${GENERATED_DIR}/slapd.conf-tuned			${APL}${CONF_DIR}/slapd.conf-tuned
     install -m 400 -o root -g root ${GENERATED_DIR}/squid.conf-tuned			${APL}${CONF_DIR}/squid.conf-tuned
     install -m 400 -o root -g root ${GENERATED_DIR}/c-icap.conf-tuned			${APL}${CONF_DIR}/c-icap.conf-tuned

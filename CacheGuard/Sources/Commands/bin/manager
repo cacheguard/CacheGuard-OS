@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       Commands
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -389,51 +388,15 @@ create-manager-context()
 	secret=$(encrypt-password "clear:${secret}" "${IPSEC_PASSWD}")
 	echo "${secret}" > ${template_dir}/${id}/${VPN_IPSEC_RDIR}/${IPSEC_AUTHENTICATE_PSK_FILENAME}
 	cp -f ${template_dir}/${id}/${VPN_IPSEC_RDIR}/${IPSEC_AUTHENTICATE_PSK_FILENAME} ${template_dir}/${id}/${VPN_IPSEC_RDIR}/${IPSEC_AUTHENTICATE_PSK_FILENAME}.current
+	test ${context} != template || cp -rf /${HARD_DIR_NAME} ${template_dir}/${id} || return 104
     else
-	test -n "${source_id}" || return 255
+	test ${context} == template || return 255
+	test -n "${source_context}" || return 255
+
 	local source_dir=$(get-manager-context-rdir ${source_context})
+
 	test -d ${source_dir}/${source_id} || return 255
 	cp -rf ${source_dir}/${source_id} ${template_dir}/${id} || return 104
-
-	if test ${source_context} == gateway ; then
-
-	    local ssl_client_dir_name=$(file-basename ${SSL_CLIENT_RDIR})
-	    local tmp_index_file=${ADMIN_TMP_DIR}.openssl.index.${$}
-
-	    local state expiration serial unknown fdn
-	    local revoke ssl_dir_name
-
-	    rm -rf ${template_dir}/${id}/hard || return 104
-	    rm -rf ${template_dir}/${id}/${SSL_CLIENT_RDIR}/* || return 104
-
-	    while read state expiration serial unknown fdn
-	    do
-		if test ${state} == R ; then
-		    revoke=${serial}
-		    serial=${unknown}
-		    fdn=${fdn#unknown*\/}
-		    fdn=/${fdn}
-		fi
-
-		ssl_dir_name=$(readlink ${template_dir}/${id}/${SSL_CTL_RDIR}/${serial}.pem 2> /dev/null)
-		ssl_dir_name=${ssl_dir_name/\.\.\/}
-		ssl_dir_name=${ssl_dir_name/\/*}
-
-		if test ${ssl_dir_name} == ${ssl_client_dir_name} ; then
-		    rm -f ${template_dir}/${id}/${SSL_CTL_RDIR}/${serial}.pem
-		else
-		    if test ${state} == R ; then
-			echo -e "${state}\t${expiration}\t${revoke}\t${serial}\t${unknown}\t${fdn}"
-		    else
-			echo -e "${state}\t${expiration}\t\t${serial}\t${unknown}\t${fdn}"
-		    fi
-		fi
-	    done < ${template_dir}/${id}/${SSL_CTL_RDIR}/index.txt > ${tmp_index_file}
-
-	    cp -a ${tmp_index_file} ${template_dir}/${id}/${SSL_CTL_RDIR}/index.txt
-	    cp -a ${tmp_index_file} ${template_dir}/${id}/${SSL_CTL_RDIR}/index.txt.old
-	    rm -f ${tmp_index_file}
-	fi
     fi
 
     local tmp_base_dir=$(get-manager-context-tmp-dir ${context})
@@ -859,7 +822,10 @@ manager-gateway-conf-pull()
     fi
 
     local-log ${MANAGER_PULL_OPERATION_LOG}.${id} "Downloading '${id}' configuration (1/2)"
-    scp -4BCpqOr ${ip}:${ENV_RDIR} ${tmp_dir} > /dev/null 2>&1
+
+    mkdir -p ${tmp_dir} &&
+	ssh ${ip} "system internal packconf" | \
+	    tar --extract --gunzip --strip-components=1 --file - --directory=${tmp_dir} 2> /dev/null
     ret=${?}
     if test ${ret} -eq 0 ; then
 	local-log-result ${MANAGER_PULL_OPERATION_LOG}.${id} 0
@@ -870,6 +836,7 @@ manager-gateway-conf-pull()
     fi
 
     local-log ${MANAGER_PULL_OPERATION_LOG}.${id} "Downloading '${id}' configuration (2/2)"
+
     mkdir -p ${tmp_dir}/${SSH_PUBLIC_KEY_RDIR} &&
 	scp -4BCpqOr ${ip}:${SSH_PUBLIC_KEY_RDIR} ${tmp_dir}/.ssh > /dev/null 2>&1
     ret=${?}
@@ -882,6 +849,7 @@ manager-gateway-conf-pull()
     fi
 
     local-log ${MANAGER_PULL_OPERATION_LOG}.${id} "Purging '${id}' local configuration"
+
     manager-gateway-conf-purge ${id}
     if test ${?} -eq 0 ; then
 	local-log-result ${MANAGER_PULL_OPERATION_LOG}.${id} 0
@@ -1155,6 +1123,7 @@ manager-gateway-conf-push()
 
     cd ${pushed_dir}
     local-log ${MANAGER_PUSH_OPERATION_LOG}.${id} "Uploading the configuration to '${id}'"
+
     scp -4BCpqOr * ${ip}:/ > /dev/null 2>&1
     ret=${?}
     cd ..

@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -33,7 +32,7 @@ show-ldap-attributes-form()
     itemTitle[1]="Login attribute"
     itemTitle[2]="Password attribute"
     itemTitle[3]="Filter"
-    itemTitle[4]="Group DN"
+    itemTitle[4]="Group Membership DN"
     itemTitle[5]="Bind Required"
     itemTitle[6]="Bind DN"
     itemTitle[7]="Bind Password"
@@ -52,9 +51,9 @@ show-ldap-attributes-form()
     blankItemContent[2]="type='text' size='24' maxlength='64' value='${LDAP_PASSWORD}'"
     blankItemContent[3]="type='text' size='64' maxlength='384' value='${LDAP_FILTER}'"
     blankItemContent[4]="type='text' size='64' maxlength='256' value='${LDAP_GROUP_DN}'"
-    blankItemContent[5]="type='checkbox'$(checked ${LDAP_BIND_MODE})"
+    blankItemContent[5]="$(checked ${LDAP_BIND_MODE})"
     blankItemContent[6]="type='text' size='48' maxlength='256' value='${LDAP_BIND_DN}'"
-    blankItemContent[7]="type='password' size='32' maxlength='64' value=''"
+    blankItemContent[7]="type='password' size='32' maxlength='${MAX_LEN}' value=''"
 
     itemForm[5]="check"
 
@@ -66,17 +65,12 @@ show-ldap-attributes-form()
     checkItem[6]=dn
     checkItem[7]=printable
 
-    shortcutMenuItem[0]="network-utilities"
+    shortcutMenuItem[0]="diagnostic-tools"
     shortcutMenuTitle[0]="Test Authentication"
-
+    shortcutMenuItem[1]="tls-ocsp-etc"
+    shortcutMenuTitle[1]="TLS Settings"
+    
     show-title "LDAP Authentication Settings" "enabled" "authenticate"
-
-    test \
-	-z "${CURRENT_LDAP_SERVER_LIST}" -o \
-	"${CURRENT_AUTHENTICATE_MODE}" == False -o \
-	"${CURRENT_AUTHENTICATE_LDAP}" == False \
-	|| show-shortcuts-menu
-
     show-form "${width}"
 }
 

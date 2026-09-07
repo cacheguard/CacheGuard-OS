@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       Configurator
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -232,7 +231,7 @@ alive-check()
 
     local curl_command=$(get-curl-command)
 
-    ${curl_command} --connect-timeout 7 --max-time 15 --data "alive=${phrase}&check=${encrypted}&sn=${sn}&mac0=${mac0}&level=${level}&trial=${trial}" --url ${ALIVE_CHECK_URL} 
+    ${curl_command} --connect-timeout 7 --max-time 15 --data "alive=${phrase}&check=${encrypted}&sn=${sn}&mac0=${mac0}&level=${level}&trial=${trial}" --url ${ALIVE_CHECK_URL}
 }
 
 LIB_APL_REGISTER=Yes

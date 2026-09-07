@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -64,7 +63,7 @@ show-ip-route-form()
     checkItem[4]=weight
     checkItem[5]=ipdomainname
     
-    shortcutMenuItem[0]="network-utilities"
+    shortcutMenuItem[0]="diagnostic-tools"
     shortcutMenuTitle[0]="Send Pings"
 
     listContent=${IP_ROUTE_LIST}
@@ -72,7 +71,6 @@ show-ip-route-form()
     test -n "${listContent}" || state=disabled
 
     show-title "Static IP Routes" "${state}" "ip"
-    show-shortcuts-menu
     show-list-form ${MAX_IP_ROUTES_NB} "${width}" "${page_ref}" "" insert
 }
 

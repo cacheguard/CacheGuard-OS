@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -30,18 +29,16 @@ send-traceroute()
 {
     test -n "${1}" || return 1
     test -n "${2}" || return 2
-    test -n "${3}" || return 3
     local machine=${1}
     local protocol=${2}
-    local width=${3}
 
     local port=33434
 
     if ! check-domainname "${machine}" ; then
-	echo "<div class='with-border' style='font-size:90%; font-style:italic; color:red; width:${width}px; margin-bottom:5px;'>This is not a valid machine name!</div>"
+	echo "<div class='diagnostic-tools-msg'>This is not a valid machine name!</div>"
 	return 3
     fi
-    echo "<div class='with-border' style='font-size:90%; font-style:italic; width:${width}px; margin-bottom:5px;'>"
+    echo "<div class='diagnostic-tools-msg'>"
     echo "<pre>"
 
     local tmp_file=/tmp/traceroute.${$}

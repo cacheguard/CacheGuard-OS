@@ -1,9 +1,9 @@
+
 #!/bin/bash
 
 ###########################################################################
 #
 # MODULE:       Configurator
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -72,7 +72,7 @@ gen-web-server-conf()
     echo "AllowOverride None"
     echo "Order allow,deny"
     
-    if test -z "${ACCESS_IF_IP_MK_WEB_LIST}" -o -z "${TRANSPARENT_IF_IP_MK_LIST}" ; then
+    if test -z "${ACCESS_WEB_IF_IP_MK_LIST}" -o -z "${TRANSPARENT_IF_IP_MK_LIST}" ; then
 	echo "Allow from all"
     else
 	i=0
@@ -100,7 +100,7 @@ gen-web-server-conf()
 	    ((i++))
 	done
 
-	for elt in ${ACCESS_IF_IP_MK_WEB_LIST}
+	for elt in ${ACCESS_WEB_IF_IP_MK_LIST}
 	do
 	    range=$[${i} % 4]
 	    case ${range} in
@@ -143,16 +143,22 @@ gen-web-server-conf()
 	    test "${ip}" ==  "0.0.0.0" || ip_list="${ip_list} ${ip}"
 	done
     fi
-    
+
     for ip in ${ip_list}
     do
 	echo "Listen ${ip}:${WWW_PORT}"
 	echo "<VirtualHost ${ip}:${WWW_PORT}>"
 	echo "DocumentRoot /${WWW_DIR_NAME}"
-	echo "DirectoryIndex /${WEB_GATEWAY_URI}?email=${name}<${email}>"
+	echo "DirectoryIndex /${WEB_GATEWAY_URI}?email=${name}%20<${email}>"
 	echo "ServerAdmin ${ADMINISTRATOR_EMAIL}"
-	echo "ServerName ${SHOSTNAME}.${DOMAIN_NAME}:${WWW_PORT}"	
+	echo "ServerName ${SHOSTNAME}.${DOMAIN_NAME}:${WWW_PORT}"
 
+	cat << EOT
+Header set X-Content-Type-Options "nosniff"
+Header set Content-Security-Policy "${CSP_HEADER}"
+Header set X-Frame-Options "DENY"
+Header set Strict-Transport-Security "max-age=63072000; includeSubDomains"
+EOT
 	gen-waf-rules webserver
 
 	echo "</VirtualHost>"
@@ -161,17 +167,20 @@ gen-web-server-conf()
 
 gen-web-server-ssl-conf()
 {
-    test ${RWEB_HTTPS_MODE} == True -a ${RWEB_MODE} == True -a ${PROXY2_MODE} == True -o ${ADMIN_WAUDIT} == True || return 0
+    local condition=0
 
-    echo "Mutex file:${WEB_SERVER_DIR}/var/run"
-    echo "SSLProtocol TLSv1.3 TLSv1.2"
-    echo "SSLPassPhraseDialog builtin"
-    echo "SSLSessionCacheTimeout 4500"
-    echo "SSLCipherSuite \"ALL:+HIGH:!ADH:!EXP:!SSLv2:!SSLv3:!MEDIUM:!LOW:!NULL:!aNULL\""
-    echo "SSLHonorCipherOrder on"
-    echo "SSLRandomSeed startup file:/dev/urandom 512"
-    echo "SSLRandomSeed connect builtin"
-    echo "SSLSessionCache shmcb:${WEB_SERVER_DIR}/var/run/ssl_scache(524288)"
+    if test ${RWEB_MODE} == True ; then
+	test ${RWEB_SITE_HTTPS_MODE} == False -a ${RWEB_HOST_HTTPS_MODE} == False || condition=1
+    fi
+    test ${ADMIN_WAUDIT} == False || condition=1
+
+    test ${condition} -eq 1 || return 0
+
+    cat << EOT
+Mutex file:${WEB_SERVER_DIR}/var/run
+SSLSessionCache shmcb:${WEB_SERVER_DIR}/var/run/ssl_scache(524288)
+EOT
+    cat httpd-ssl.conf-constant
 }
 
 gen-web-server-waudit-conf()
@@ -189,11 +198,6 @@ gen-web-server-waudit-conf()
 
     test "${IP_EXTERNAL_IP}" == "0.0.0.0" || test ${ADMIN_EXTERNAL} == False || gen-rweb-audit-vhost ${IP_EXTERNAL_IP}
     test -z "${IF_AUXILIARY}" || test "${IP_AUXILIARY_IP}" == "0.0.0.0" || test ${ADMIN_AUXILIARY} == False || gen-rweb-audit-vhost ${IP_AUXILIARY_IP}
-}
-
-gen-httpd-noproxy-conf()
-{
-    cat httpd-noproxy.conf-tuned
 }
 
 gen-httpd-hosts()
@@ -214,8 +218,7 @@ gen-httpd-hosts()
     echo "${IP_WEB_IP} internal-side.gateway"
     echo "${IP_EXTERNAL_IP} external-side.gateway"
 
-    test ${PROXY2_MODE} == False || gen-rweb-hosts
-    gen-ldap-ip-name
+    test ${RWEB_MODE} == False || gen-rweb-hosts
     gen-name-ip-hosts
 
     echo
@@ -260,7 +263,7 @@ gen-httpd-load-modules()
 
     cat httpd-modules.conf-constant
 
-    if test ${PROXY2_MODE} == True ; then
+    if test ${RWEB_MODE} == True ; then
 
         echo "LoadModule proxy_module ${WEB_SERVER_DIR}/libexec/mod_proxy.so"
 	echo "LoadModule proxy_http_module ${WEB_SERVER_DIR}/libexec/mod_proxy_http.so"
@@ -297,19 +300,13 @@ gen-httpd-load-modules()
 	fi
     fi
 
-    if test ${RWEB_HTTPS_MODE} == True -a ${RWEB_MODE} == True -a ${PROXY2_MODE} == True ; then
-	echo "LoadModule proxy_connect_module ${WEB_SERVER_DIR}/libexec/mod_proxy_connect.so"
-	condition=1
-    else
-	if test ${ADMIN_WAUDIT} == True ; then
-	    condition=1
-	fi
+    if test ${RWEB_MODE} == True ; then
+	test ${RWEB_SITE_HTTPS_MODE} == False || echo "LoadModule proxy_connect_module ${WEB_SERVER_DIR}/libexec/mod_proxy_connect.so"
+	test ${RWEB_SITE_HTTPS_MODE} == False -a ${RWEB_HOST_HTTPS_MODE} == False || condition=1
     fi
+    test ${ADMIN_WAUDIT} == False || condition=1
 
-    if test ${condition} -eq 1 ; then
-	echo "LoadModule ssl_module ${WEB_SERVER_DIR}/libexec/mod_ssl.so"
-    fi
-
+    test ${condition} -eq 0 || echo "LoadModule ssl_module ${WEB_SERVER_DIR}/libexec/mod_ssl.so"
     test "${GUARD_MODE}" == False -a "${AV_MODE}" == False || echo "LoadModule env_module ${WEB_SERVER_DIR}/libexec/mod_env.so"
 
     echo "LoadFile /usr/lib/libxml2.so"
@@ -332,10 +329,15 @@ gen-httpd-conf()
     gen-web-server-ssl-conf
     gen-web-server-waudit-conf
 
-    if test ${PROXY2_MODE} == True ; then
-	gen-httpd-proxy-conf
+    if test ${RWEB_MODE} == True ; then
+	cat httpd-rproxy.conf-tuned
+	gen-rweb-conf
     else
-	gen-httpd-noproxy-conf
+	if test "${GUARD_MODE}" == True ; then
+	    cat httpd-guard.conf-tuned
+	else
+	    cat httpd-simple.conf-tuned
+	fi
     fi
 
     echo "ServerName ${SHOSTNAME}.${DOMAIN_NAME}"
@@ -357,8 +359,14 @@ AddType application/x-httpd-php .php
 </IfModule>
 
 <VirtualHost ${EMBEDDED_APPLICATION_IP}:${EMBEDDED_VPNSUBSCR_PORT}>
-ServerName ${EMBEDDED_VPNSUBSCR_RWEB_SITE_NAME}:${EMBEDDED_VPNSUBSCR_PORT}
 DocumentRoot /${EMBEDDED_APPLICATIONS_NAME}/${EMBEDDED_VPNSUBSCR_NAME}
+ServerName ${EMBEDDED_VPNSUBSCR_RWEB_SITE_NAME}:${EMBEDDED_VPNSUBSCR_PORT}
+
+Header set X-Content-Type-Options "nosniff"
+Header set Content-Security-Policy "${CSP_HEADER}"
+Header set X-Frame-Options "DENY"
+Header set Strict-Transport-Security "max-age=63072000; includeSubDomains"
+
 DirectoryIndex /index.php
 
 <Directory /${EMBEDDED_APPLICATIONS_NAME}/${EMBEDDED_VPNSUBSCR_NAME}${IMAGE_DIR}>
@@ -436,6 +444,7 @@ define( 'OS_GENERATION', '${OS_GENERATION}' );
 define( 'OS_CUR_VERSION', '${cur_os_version}' );
 define( 'OS_NEW_VERSION', '${new_os_version}' );
 define( 'OS_UPGRADE_LINK', '${appliance_link}${GUI_DIR_NAME}/system-patch.${GUI_EXT_NAME}' );
+define( 'GUI_FE_VERSION', '${GUI_FE_VERSION}' );
 
 if (!EMBEDDED_VPNSUBSCR) exit( 0 );
 

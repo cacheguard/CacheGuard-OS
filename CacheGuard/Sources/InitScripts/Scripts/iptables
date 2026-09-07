@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       InitScript
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -37,7 +36,7 @@ test -L /usr/sbin/iptables-save || exit 7
 test -L ${IPTABLES_CONFIG} || exit 9
 
 IPTABLES=iptables
-IPTABLES_RESTOR=iptables-restore
+IPTABLES_RESTORE=iptables-restore
 IPTABLES_SAVE=iptables-save
 SERV=Firewall
 
@@ -55,8 +54,7 @@ case "${1}" in
 	    for table in ${tables}; do ${IPTABLES} -t ${table} -F; done && \
 	    for table in ${tables}; do ${IPTABLES} -t ${table} -X; done && \
 	    for table in ${tables}; do ${IPTABLES} -t ${table} -Z; done && \
-	    grep -v "^[[:space:]]*#" ${IPTABLES_CONFIG} | \
-	    grep -v '^[[:space:]]*$' | ${IPTABLES_RESTOR} -c &&
+	    cat ${IPTABLES_CONFIG} | ${IPTABLES_RESTORE} --counters --wait &&
 	RETVAL=0 || RETVAL=1
 	evaluate_retval
 	exit ${RETVAL}

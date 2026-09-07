@@ -4,7 +4,6 @@
 ###########################################################################
 #
 # MODULE:       VPN Subscription
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -736,7 +735,6 @@ function vpnsubscr_display_form( $setup )
 {
     $input_size = 28;
     $input_maxlength = 32;
-    $select_width = '306px';
 
     $method = $setup[METHOD];
     $errors = $setup[ERRORS];
@@ -772,11 +770,8 @@ function vpnsubscr_display_form( $setup )
     echo "<form name='submit-vpnsubscr-form' id='submit-vpnsubscr-form' action='/setup.php' method='POST'>\n";
     vpnsubscr_print_all_errors( $errors );
 
-    echo "<center>\n";
-    echo "<table class='box-form'>\n";
-
+    echo "<table class='highlight-form'>\n";
     echo "<tr class='separator'><td><strong>Service Identity</strong></td><td></td></tr>\n";
-
     echo "<tr><td>Service State</td><td>";
 
     switch ($service_state) {
@@ -872,7 +867,7 @@ function vpnsubscr_display_form( $setup )
     case SETUP_STATE_INIT_FAILED:
         if ($method == 'GET' or $errors) {
             echo "<input maxlength='15' size='$input_size' value='$vpn_address' $vpn_address_id_html />\n";
-            echo "<div class='box-comment'>Leave blank to use your public IP address.</div>\n";
+            echo "<div class='comment'>Leave blank to use your public IP address.</div>\n";
         }
         elseif ($method == 'POST') {
             echo $hidden;
@@ -897,7 +892,7 @@ function vpnsubscr_display_form( $setup )
 
     default:
         if ($method == 'GET' or $errors) {
-            echo "<select style='width:$select_width;' value='$timezone' $timezone_id_html>";
+            echo "<select value='$timezone' $timezone_id_html>";
             vpnsubscr_print_timezones( $timezone );
             echo "</select>$mandatory";
         }
@@ -938,7 +933,6 @@ function vpnsubscr_display_form( $setup )
 
     echo <<< EOT
 </table>
-</center>
 
 EOT;
     switch ($service_state) {
@@ -959,27 +953,11 @@ $SETUP = vpnsubscr_get_setup( );
 ?>
 <!DOCTYPE html>
 <html>
-  <head>
-    <title><?php echo vpnsubscr_get_org_name( ); ?> General Setup</title>
-
-    <link rel="shortcut icon" type="image/x-image" href="/image/favicon.ico" />
-    <link rel="stylesheet" type="text/css" href="/chromestyle.css" />
-    <link rel="stylesheet" type="text/css" href="/style.css" />
-
-    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
-    <meta name="robots" content="noindex, nofollow, noarchive, noarchive, nosnippet, noodp, noydir" />
-    <meta name="description" content="This page allows you to manage VPN subscribers." />
-
-    <script type="text/javascript" src="/js/chrome.js"></script>
-    <script type="text/javascript" src="/js/vpnsubscr.js"></script>
-    <script type="text/javascript" src="/js/printmenu.js"></script>
-    <script type="text/javascript" src="/js/logout.js"></script>
-  </head>
-
+<?php vpnsubscr_display_html_header( "General Setup" ); ?>
   <body>
     <?php vpnsubscr_display_header( ); ?>
-    <div class='box-centered-container'>
-      <div class='box-centered-nested'>
+    <div class='centered-container'>
+      <div class='centered-nested'>
 	<div class='page-title'>Setup &gt; <?php vpnsubscr_display_title( ); ?></div>
 	<?php vpnsubscr_display_form( $SETUP ); ?>
       </div>

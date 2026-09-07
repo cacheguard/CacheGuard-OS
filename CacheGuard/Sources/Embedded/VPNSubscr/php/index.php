@@ -4,7 +4,6 @@
 ###########################################################################
 #
 # MODULE:       VPN Subscription
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -55,35 +54,19 @@ function vpnsubscr_display_welcome( )
         break;
     }
 
-    echo "<div class='box-highlight'>$welcome_msg</div>";
+    echo "\n    <div class='highlight'>$welcome_msg</div>";
 }
 
 ?>
 <!DOCTYPE html>
 <html>
-  <head>
-    <title><?php echo vpnsubscr_get_org_name( ); ?></title>
-    
-    <link rel="shortcut icon" type="image/x-image" href="/image/favicon.ico" />
-    <link rel="stylesheet" type="text/css" href="/chromestyle.css" />
-    <link rel="stylesheet" type="text/css" href="/style.css" />
-
-    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
-    <meta name="robots" content="noindex, nofollow, noarchive, noarchive, nosnippet, noodp, noydir" />
-    <meta name="description" content="This page allows you to administrate your VPN application." />
-
-    <script type="text/javascript" src="/js/chrome.js"></script>
-    <script type="text/javascript" src="/js/vpnsubscr.js"></script>
-    <script type="text/javascript" src="/js/printmenu.js"></script>
-    <script type="text/javascript" src="/js/logout.js"></script>
-  </head>
-
+<?php vpnsubscr_display_html_header( ); ?>
   <body>
     <?php vpnsubscr_display_header( ); ?>
   	<?php vpnsubscr_display_welcome( ); ?>
-    <div class='box-centered-container'>
-      <div class='box-centered-nested'>
-	<center><div class='box-diagram'><img src='/image/BeVyPN-Network-Architecture.png' width='100%' /></div></center>
+    <div class='centered-container'>
+      <div class='centered-nested'>
+	<div class='diagram'><img src='/image/BeVyPN-Network-Architecture.png' width='100%' /></div>
       </div>
     </div>
     <?php vpnsubscr_display_footer( ); ?>

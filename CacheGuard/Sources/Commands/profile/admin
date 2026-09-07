@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       Commands
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -342,11 +341,17 @@ __complete-admin()
 				l|lo|loa|load)
 				    COMPREPLY=(load)
 				    ;;
+				s)
+				    COMPREPLY=(show set)
+				    ;;
 				s|sh|sho|show)
 				    COMPREPLY=(show)
 				    ;;
+				s|se|'set')
+				    COMPREPLY=(set)
+				    ;;
 				'')
-				    COMPREPLY=('' '<RET>' raz add del load show)
+				    COMPREPLY=('' '<RET>' raz add del load show set)
 				    ;;
 				*)
 				    COMPREPLY=()
@@ -424,7 +429,7 @@ __complete-admin()
 		    case ${COMP_WORDS[2]} in
 			key)
 			    case ${COMP_WORDS[3]} in
-				add|del|load|show)
+				add|del|load|show|'set')
 				    COMPREPLY=('' '<key-id>')
 				    ;;
 				*)
@@ -537,6 +542,9 @@ __complete-admin()
 					    COMPREPLY=()
 					    ;;
 				    esac
+				    ;;
+				'set')
+				    COMPREPLY=('' '<ssh-public-key>')
 				    ;;
 				*)
 				    COMPREPLY=()

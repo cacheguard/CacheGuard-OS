@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -57,12 +56,16 @@ show-sslmediate-policy-form()
     itemID[4]="selfsigned"
 
     blankItemContent[0]="$(show-sslmediate-policies ${SSLMEDIATE_POLICY})"
-    blankItemContent[1]="type=checkbox$(checked ${SSLMEDIATE_TRANSPARENT})"
-    blankItemContent[2]="type=checkbox$(checked ${SSLMEDIATE_EXPIRED})"
-    blankItemContent[3]="type=checkbox$(checked ${SSLMEDIATE_PREMATURE})"
-    blankItemContent[4]="type=checkbox$(checked ${SSLMEDIATE_SELFSIGNED})"
+    blankItemContent[1]="$(checked ${SSLMEDIATE_TRANSPARENT})"
+    blankItemContent[2]="$(checked ${SSLMEDIATE_EXPIRED})"
+    blankItemContent[3]="$(checked ${SSLMEDIATE_PREMATURE})"
+    blankItemContent[4]="$(checked ${SSLMEDIATE_SELFSIGNED})"
 
     itemForm[0]="select"
+    itemForm[1]="check"
+    itemForm[2]="check"
+    itemForm[3]="check"
+    itemForm[4]="check"
 
     shortcutMenuItem[0]="sslmediate-exception-domainname"
     shortcutMenuItem[1]="sslmediate-exception-urllist"
@@ -70,7 +73,6 @@ show-sslmediate-policy-form()
     shortcutMenuTitle[1]="URL List Exceptions"
 
     show-title "SSL Mediation General Settings" "enabled" "sslmediate"
-    show-shortcuts-menu
     show-form "${width}"
 }
 

@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Blocked by CacheGuard</title>
+    
+    <link rel="shortcut icon" type="image/x-image" href="/image/favicon.ico" />
+    <link rel="stylesheet" type="text/css" href="/style-@VERSION@.css" />
+
+    <meta charset="UTF-8" />
+    <meta name="robots" content="noindex, nofollow, noarchive, noarchive, nosnippet, noodp, noydir">
+    <meta name="description" content="This page warns you about a non authorised Web request." />
+  </head>
+
+  <body>
+    <div class="top-header">
+      <div class="top-title"><a href="/"><img src='/image/bevypn-logo.png' />CacheGuard BeVyPN</a></div>
+    </div>
+      <div class='help'>Your request has been blocked because it has been evaluated as a threat!<p>
+	<a href='/'>Return to the Application</a>
+      </div>
+    <p>
+    <footer>
+     <div class='copyright'>
+       Copyright (C) 2024 CacheGuard Technologies - All rights reserved
+     </div>
+   </footer>
+  </body>
+</html>

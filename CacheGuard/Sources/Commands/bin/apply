@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       Commands
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -99,7 +98,18 @@ member-ip-vlan-list-ip()
 
 check-port-integrity()
 {
+    local domain_port=53
+    local snmp_port=161
+
     local ports="${PROXY_PORT} ${THTTP_PORT} ${THTTPS_PORT} ${AV_PORT} ${OCSP_PORT} ${ISAKMP_PORT} ${NATT_PORT} ${PEER_HTTP_PORT} ${PEER_HTCP_PORT} ${DHCP_PEER_PORT} ${WADMIN_PORT} ${WAUDIT_PORT}"
+
+    if test ${DNS_MODE} == True ; then
+	ports="${ports} ${domain_port}"
+    else
+	! member "${NAME_SERVER_LIST}" 127.0.0.1 || ports="${ports} ${domain_port}"
+    fi
+
+    test ${ADMIN_SNMP} == False || ports="${ports} ${snmp_port}"
 
     local port1 port2 i1=0 i2=0
 
@@ -154,10 +164,9 @@ check-ntp-integrity()
 
 check-peer-integrity-ip()
 {
-    local i elt range
+    local elt range i=0
     local ip
 
-    i=0
     for elt in ${PEER_SHARE_LIST} ${PEER_HA_LIST} ${PEER_NEXT_LIST} ${PEER_PREVIOUS_LIST}
     do
 	range=$[${i} % 2]
@@ -822,12 +831,12 @@ check-if-integrity-disjunctive()
 	! member "${BOND_INTERNALS}" ${dev} || return 1
 	! member "${BOND_AUXILIARIES}" ${dev} || return 2
     done
-    return 0
 
     for dev in ${BOND_INTERNALS}
     do
 	! member "${BOND_AUXILIARIES}" ${dev} || return 3
     done
+
     return 0
 }
 
@@ -868,25 +877,93 @@ check-fw-integrity()
     return 0
 }
 
+is-content-unique-in-file()
+{
+    test -n "${1}" || return 1
+    local file=${1}
+    test -f ${file} || return 0
+
+    sort ${file} > ${file}.sorted
+    uniq ${file}.sorted > ${file}.sorted.uniq
+
+    diff --brief ${file}.sorted ${file}.sorted.uniq > /dev/null
+    local ret=${?}
+
+    rm -f \
+       ${file}.sorted \
+       ${file}.sorted.uniq
+
+    return ${ret}
+}
+
 check-dhcp-fixed-net-integrity()
 {
     test ${DHCP_MODE} == True || return 0
 
-    local ip
+    local interface mac ip
+    local net brd
     local elt range i=0
+
+    local tmp_internal_netdev_file=/tmp/internal.netdev.${$}
+    local tmp_auxiliary_netdev_file=/tmp/auxiliary.netdev.${$}
+
+    rm -f \
+       ${tmp_internal_netdev_file}.mac \
+       ${tmp_internal_netdev_file}.ip \
+       ${tmp_auxiliary_netdev_file}.mac \
+       ${tmp_auxiliary_netdev_file}.ip
 
     for elt in ${DHCP_FIXED_LIST}
     do
-	range=$[${i} % 3]
+	range=$[${i} % 4]
 	case ${range} in
-	    0|1)
+	    0)
+	        ;;
+	    1)
+		interface=${elt}
 		;;
 	    2)
+		mac=${elt}
+		;;
+	    3)
 		ip=${elt}
 
 		working-sign
 
-		ip-lt ${_WEB_NET} ${ip} && ip-lt ${ip} ${_WEB_BRD} || return 1
+		case ${interface} in
+		    internal)
+			net=${_WEB_NET}
+			brd=${_WEB_BRD}
+			echo ${mac} >> ${tmp_internal_netdev_file}.mac
+			echo ${ip} >> ${tmp_internal_netdev_file}.ip
+			;;
+		    auxiliary)
+			if test -n "${BOND_AUXILIARIES}" ; then
+			    net=${_AUX_NET}
+			    brd=${_AUX_BRD}
+			    echo ${mac} >> ${tmp_auxiliary_netdev_file}.mac
+			    echo ${ip} >> ${tmp_auxiliary_netdev_file}.ip
+			else
+			    unset net brd
+			fi
+			;;
+		    *)
+			return 255
+			;;
+		esac
+
+		if test -n "${net}" -a -n "${brd}" ; then
+		    ip-lt ${net} ${ip} && ip-lt ${ip} ${brd}
+		    if test ${?} -ne 0 ; then
+			rm -f \
+			   ${tmp_internal_netdev_file}.mac \
+			   ${tmp_internal_netdev_file}.ip \
+			   ${tmp_auxiliary_netdev_file}.mac \
+			   ${tmp_auxiliary_netdev_file}.ip
+			ERROR=296
+			return 11
+		    fi
+		fi
 		;;
 	    *)
 		return 255
@@ -894,7 +971,57 @@ check-dhcp-fixed-net-integrity()
 	esac
 	((i++))
     done
-    
+
+    if ! is-content-unique-in-file ${tmp_internal_netdev_file}.mac ; then
+	rm -f \
+	   ${tmp_internal_netdev_file}.ip \
+	   ${tmp_internal_netdev_file}.mac \
+	   ${tmp_auxiliary_netdev_file}.ip \
+	   ${tmp_auxiliary_netdev_file}.mac
+
+	ERROR=332
+	return 21
+    fi
+
+    if ! is-content-unique-in-file ${tmp_internal_netdev_file}.ip ; then
+	rm -f \
+	   ${tmp_internal_netdev_file}.ip \
+	   ${tmp_internal_netdev_file}.mac \
+	   ${tmp_auxiliary_netdev_file}.ip \
+	   ${tmp_auxiliary_netdev_file}.mac
+
+	ERROR=346
+	return 23
+    fi
+
+    rm -f \
+       ${tmp_internal_netdev_file}.ip \
+       ${tmp_internal_netdev_file}.mac
+
+    if test -n "${BOND_AUXILIARIES}" ; then
+	if ! is-content-unique-in-file ${tmp_auxiliary_netdev_file}.mac ; then
+	    rm -f \
+	       ${tmp_auxiliary_netdev_file}.ip \
+	       ${tmp_auxiliary_netdev_file}.mac
+
+	    ERROR=332
+	    return 25
+	fi
+
+	if ! is-content-unique-in-file ${tmp_auxiliary_netdev_file}.ip ; then
+	    rm -f \
+	       ${tmp_auxiliary_netdev_file}.ip \
+	       ${tmp_auxiliary_netdev_file}.mac
+
+	    ERROR=346
+	    return 27
+	fi
+    fi
+
+    rm -f \
+       ${tmp_auxiliary_netdev_file}.ip \
+       ${tmp_auxiliary_netdev_file}.mac
+
     return 0
 }
 
@@ -902,23 +1029,46 @@ check-dhcp-range-net-integrity()
 {
     test ${DHCP_MODE} == True || return 0
 
-    local ip1 ip2
+    local interface ip1 ip2
+    local net brd
     local elt range i=0
 
     for elt in ${DHCP_RANGE_LIST}
     do
-	range=$[${i} % 2]
+	range=$[${i} % 3]
 	case ${range} in
 	    0)
-		ip1=${elt}
+		interface=${elt}
 		;;
 	    1)
+		ip1=${elt}
+		;;
+	    2)
 		ip2=${elt}
-		
 		working-sign
-		
-		ip-lt ${_WEB_NET} ${ip1} && ip-lt ${ip1} ${_WEB_BRD} || return 1
-		ip-lt ${_WEB_NET} ${ip2} && ip-lt ${ip2} ${_WEB_BRD} || return 2
+
+		case ${interface} in
+		    internal)
+			net=${_WEB_NET}
+			brd=${_WEB_BRD}
+			;;
+		    auxiliary)
+			if test -n "${BOND_AUXILIARIES}" ; then
+			    net=${_AUX_NET}
+			    brd=${_AUX_BRD}
+			else
+			    unset net brd
+			fi
+			;;
+		    *)
+			return 255
+			;;
+		esac
+
+		if test -n "${net}" -a -n "${brd}" ; then
+		    ip-lt ${net} ${ip1} && ip-lt ${ip1} ${brd} || return 1
+		    ip-lt ${net} ${ip2} && ip-lt ${ip2} ${brd} || return 2
+		fi
 		;;
 	    *)
 		return 255
@@ -933,30 +1083,35 @@ check-dhcp-range-net-integrity()
 disjunctive-dhcp-range()
 {
     test -n "${1}" || return 1
-    test -n "${2}" || return 1
-    test -n "${3}" || return 1
+    test -n "${2}" || return 2
+    test -n "${3}" || return 3
+    test -n "${4}" || return 4
 
     local in_nb=${1}
-    local in_ip1=${2}
-    local in_ip2=${3}
+    local in_interface=${2}
+    local in_ip1=${3}
+    local in_ip2=${4}
 
     local elt range i=0 nb=0
-    local ip1 ip2
+    local interface ip1 ip2
 
     for elt in ${DHCP_RANGE_LIST}
     do
-	range=$[${i} % 2]
+	range=$[${i} % 3]
 	case ${range} in
 	    0)
-		ip1=${elt}
+		interface=${elt}
 		;;
 	    1)
+		ip1=${elt}
+		;;
+	    2)
 		ip2=${elt}
 		
 		working-sign
 		((nb++))
-		
-		if test ${in_nb} -lt ${nb} ; then
+
+		if test ${interface} == ${in_interface} -a ${in_nb} -lt ${nb} ; then
 		    ip-lt ${in_ip2} ${ip1} || ip-lt ${ip2} ${in_ip1} || return 11
 		fi
 		;;
@@ -966,7 +1121,7 @@ disjunctive-dhcp-range()
 	esac
 	((i++))
     done
-    
+
     return 0
 }
 
@@ -974,20 +1129,24 @@ check-dhcp-range-integrity()
 {
     test ${DHCP_MODE} == True || return 0
 
-    local elt range i=0 ip1 ip2 nb=0
+    local interface ip1 ip2
+    local elt range i=0 nb=0
 
     for elt in ${DHCP_RANGE_LIST}
     do
-	range=$[${i} % 2]
+	range=$[${i} % 3]
 	case ${range} in
 	    0)
-		ip1=${elt}
+		interface=${elt}
 		;;
 	    1)
+		ip1=${elt}
+		;;
+	    2)
 		ip2=${elt}
 		((nb++))
-		
-		disjunctive-dhcp-range ${nb} ${ip1} ${ip2} || return 11
+
+		disjunctive-dhcp-range ${nb} ${interface} ${ip1} ${ip2} || return 11
 		;;
 	    *)
 		return 255
@@ -1032,25 +1191,24 @@ check-dhcp-peer-integrity()
 check-dhcp-null-integrity()
 {
     test ${DHCP_MODE} == True || return 0
-    test -n "${DHCP_FIXED_LIST}" -o -n "${DHCP_RANGE_LIST}" || return 1
-    return 0
+    test -n "${DHCP_FIXED_LIST}" -o -n "${DHCP_RANGE_LIST}"
 }
 
 check-dhcp-null-ip-integrity()
 {
     test ${DHCP_MODE} == True || return 0
-    test "${_WEB_IP}" != 0.0.0.0 || return 1
-    return 0
+    test "${_WEB_IP}" != 0.0.0.0 -o "${IP_AUXILIARY_IP}" != 0.0.0.0
 }
 
 check-dhcp-fixed-nb-integrity()
 {
     test ${DHCP_MODE} == True || return 0
 
-    local len=$(record3-length-list "${DHCP_FIXED_LIST}")
+    local len=$(record4-length-list "${DHCP_FIXED_LIST}")
     local users_nb=$(get-contextual-users-nb)
+    local max=$((users_nb * 4))
 
-    test ${len} -le ${users_nb}
+    test ${len} -le ${max}
 }
 
 check-dhcp-range-lease-nb-integrity()
@@ -1058,19 +1216,22 @@ check-dhcp-range-lease-nb-integrity()
     test ${DHCP_MODE} == True || return 0
 
     local users_nb=$(get-contextual-users-nb)
-    local max=${users_nb}
+    local max=$((users_nb * 4))
+
     local elt range i=0
     local ip1 ip2
     local dip1 dip2 lease_nb=0
 
     for elt in ${DHCP_RANGE_LIST}
     do
-	range=$[${i} % 2]
+	range=$[${i} % 3]
 	case ${range} in
 	    0)
-		ip1=${elt}
 		;;
 	    1)
+		ip1=${elt}
+		;;
+	    2)
 		ip2=${elt}
 		
 		working-sign
@@ -1693,9 +1854,9 @@ check-vpn-ipsec-route-integrity()
     return 0
 }
 
-check-peer-next-rweb-integrity()
+check-available-275-integrity()
 {
-    test ${RWEB_MODE} == False -o -z "${PEER_NEXT_LIST}"
+    return 0
 }
 
 rweb-site-hosted()
@@ -1921,7 +2082,7 @@ check-all-sldap()
 
     for elt in ${LDAP_SERVER_LIST}
     do
-	range=$[${i} % 4]
+	range=$[${i} % 3]
 	case ${range} in
 	    0)
 		proto=${elt}
@@ -1941,7 +2102,7 @@ check-all-sldap()
     i=0
     for elt in ${LDAP_SERVER_LIST}
     do
-	range=$[${i} % 4]
+	range=$[${i} % 3]
 	case ${range} in
 	    0)
 		proto=${elt}
@@ -2353,14 +2514,14 @@ check-qos-integrity()
 		if test ${ingress_qos:${len}} != '%' ; then
 
 		    case ${dev} in
-			internal)
-			    test ${ingress_qos} -le ${QOS_BW_INTERNAL_INGRESS} || return 1
+			web|rweb|antivirus|admin|mon|file|peer)
+			    test ${ingress_qos} -le ${QOS_BW_INTERNAL_INGRESS} || return 11
 			    ;;
 			external)
-			    test ${ingress_qos} -le ${QOS_BW_EXTERNAL_INGRESS} || return 1
+			    test ${ingress_qos} -le ${QOS_BW_EXTERNAL_INGRESS} || return 13
 			    ;;
 			auxiliary)
-			    test ${ingress_qos} -le ${QOS_BW_AUXILIARY_INGRESS} || return 1
+			    test ${ingress_qos} -le ${QOS_BW_AUXILIARY_INGRESS} || return 15
 			    ;;
 			*)
 			    return 255
@@ -2375,14 +2536,14 @@ check-qos-integrity()
 		if test ${egress_qos:${len}} != '%' ; then
 
 		    case ${dev} in
-			internal)
-			    test ${egress_qos} -le ${QOS_BW_INTERNAL_EGRESS} || return 1
+			web|rweb|antivirus|admin|mon|file|peer)
+			    test ${egress_qos} -le ${QOS_BW_INTERNAL_EGRESS} || return 21
 			    ;;
 			external)
-			    test ${egress_qos} -le ${QOS_BW_EXTERNAL_EGRESS} || return 1
+			    test ${egress_qos} -le ${QOS_BW_EXTERNAL_EGRESS} || return 23
 			    ;;
 			auxiliary)
-			    test ${egress_qos} -le ${QOS_BW_AUXILIARY_EGRESS} || return 1
+			    test ${egress_qos} -le ${QOS_BW_AUXILIARY_EGRESS} || return 25
 			    ;;
 			*)
 			    return 255
@@ -3205,7 +3366,6 @@ check-loaded-tls-server-integrity()
 
 check-free-memory()
 {
-    set-new-proxy2-mode
     set-new-self-ns
 
     local total_memory_sz free_memory_sz
@@ -3433,7 +3593,7 @@ check-integrity()
     check-dhcp-null-ip-integrity		|| errors="${errors} 272"
     check-dhcp-range-lease-nb-integrity		|| errors="${errors} 273"
     check-guard-proxy-integrity			|| errors="${errors} 274"
-    check-peer-next-rweb-integrity		|| errors="${errors} 275"
+    check-available-275-integrity		|| errors="${errors} 275"
     check-urllist-auto-load-access		|| errors="${errors} 276"
     check-rweb-names				|| errors="${errors} ${ERROR}"
     check-admin-topology			|| errors="${errors} 278"
@@ -3454,7 +3614,7 @@ check-integrity()
     check-kerberos-integrity			|| errors="${errors} 293"
     check-kerberos-domainname-integrity		|| errors="${errors} 294"
     check-guard-ldap-filter-integrity		|| errors="${errors} 295"
-    check-dhcp-fixed-net-integrity		|| errors="${errors} 296"
+    check-dhcp-fixed-net-integrity		|| errors="${errors} ${ERROR}"
     check-dhcp-fixed-nb-integrity 		|| errors="${errors} 297"
     check-waf-rweb-integrity			|| errors="${errors} 298"
     check-transparent-integrity			|| errors="${errors} 299"
@@ -3533,27 +3693,9 @@ check-integrity()
     fi
 }
 
-check-warning-integrity-compress()
-{
-    test ${COMPRESS_MODE} == False -o ${AV_MODE} == False -o ${WEB_MODE} == False
-}
-
-check-warning-integrity-ssl-sni()
-{
-    test ${RWEB_MODE} == True -a ${WAF_MODE} == False || return 0
-    local len=$(length-list "${_RWEB_HTTPS_IP_LIST}")
-    test ${len} -gt 1 || return 0
-    local uniq_ips=$(uniq-elt ${_RWEB_HTTPS_IP_LIST})
-    test "${uniq_ips}" != "${_RWEB_HTTPS_IP_LIST}" || return 0
-    return 11
-}
-
 check-warning-integrity()
 {
     local warning
-
-    check-warning-integrity-compress || warning 3
-    check-warning-integrity-ssl-sni || warning 4
 
     for warning in ${WARNINGS:1}
     do

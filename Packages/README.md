@@ -60,13 +60,13 @@ Modifications introduced by CacheGuard Technologies are provided as patch files 
 - bind-9.20.5.tar.xz
 - brotli-1.0.9.tar.xz
 - cgic-2.05.tar.bz2
-- cgi-message-3.0.tar.bz2
+- cgi-message-3.1.tar.bz2
 - c_icap-0.5.13.tar.gz
 - c_icap_modules-0.5.7.tar.gz
-- clamav-1.4.3-cg.patch.bz2
-- clamav-1.4.3.tar.gz
+- clamav-1.5.2-cg.patch.bz2
+- clamav-1.5.2.tar.gz
 - constant_time_encoding-3.0.0.tar.gz
-- coreruleset-3.3.7.tar.gz
+- coreruleset-3.3.9.tar.gz
 - crontabs-1.10-7.tar.bz2
 - cyrus-sasl-2.1.28.tar.gz
 - db-4.6.21.tar.gz
@@ -87,7 +87,7 @@ Modifications introduced by CacheGuard Technologies are provided as patch files 
 - glib-2.70.5.tar.xz
 - google-authenticator-libpam-1.11.tar.gz
 - gss-1.0.3.tar.gz
-- httpd-2.4.66.tar.bz2
+- httpd-2.4.67.tar.bz2
 - inotify-tools-3.22.6.0.tar.gz
 - ipcalc-1.0-cg.patch.bz2
 - ipcalc-1.0.tar.bz2
@@ -115,8 +115,8 @@ Modifications introduced by CacheGuard Technologies are provided as patch files 
 - mdadm-4.1.tar.bz2
 - mhash-0.9.9.9.tar.bz2
 - mod_auth_gssapi-1.6.3.tar.gz
-- modsecurity-2.9.8-cg.patch.bz2
-- modsecurity-2.9.8.tar.gz
+- modsecurity-2.9.13-cg.patch.bz2
+- modsecurity-2.9.13.tar.gz
 - msktutil-1.2.tar.bz2
 - nasm-2.15.05.tar.xz
 - netcat-0.7.1.tar.bz2
@@ -144,7 +144,7 @@ Modifications introduced by CacheGuard Technologies are provided as patch files 
 - sendmail-8.17.1.tar.gz
 - smartmontools-7.2.tar.gz
 - sqlite-src-3470000.tar.gz
-- squid-7.4.tar.bz2
+- squid-7.6.tar.gz
 - squid-dummy-auth-1.0.tar.bz2
 - squid-ecap-gzip-master-1.3-cg.patch.bz2
 - squid-ecap-gzip-master-1.3.tar.bz2
@@ -152,7 +152,7 @@ Modifications introduced by CacheGuard Technologies are provided as patch files 
 - squidGuard-1.4.tar.bz2
 - sshfs-3.7.3.tar.xz
 - ssmtp-2.64.tar.bz2
-- strongswan-6.0.4.tar.bz2
+- strongswan-6.0.6.tar.bz2
 - sudo-1.9.9.tar.gz
 - sysfsutils-2.1.0.tar.gz
 - syslinux-6.04-pre1.tar.xz

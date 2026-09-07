@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -46,10 +45,8 @@ vpnipsec-report()
     esac
 
     show-title "IPsec VPN ${labels[${label_index}]} Report" disabled "vpnipsec" '' enable
-
-    echo "<div class='core-form' style='margin-top:0;'>"
-    refresh-buttons "update_vpnipsec_report( 1, \"${report_type}\" )"
-    echo "<div style='clear:left;'></div>"
+    echo "<div class='core-form'>"
+    refresh-buttons Page ${report_type}
     echo "<div id='${AUTO_REPORT_ID}'></div>"
     echo "</div>"
 }

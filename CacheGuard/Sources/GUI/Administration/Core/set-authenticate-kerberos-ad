@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -25,22 +24,47 @@
 set-kerberos-dc()
 {
     local transaction=/tmp/${TRANSACTION_FILE}.wadmin.${REMOTE_USER}.${$}
-    
-    test -z "${VALUES[0]}" || echo "authenticate kerberos encrypt '${VALUES[0]}'" > ${transaction}
-    test -z "${VALUES[1]}" || echo "authenticate ad rdn '${VALUES[1]}'" >> ${transaction}
-    test -z "${VALUES[2]}" || echo "authenticate kerberos web '${VALUES[2]}'" >> ${transaction}
 
-    if test -n "${VALUES[3]}" -a -n "${VALUES[4]}" ; then
-	if test "${VALUES[3]}" == "${VALUES[4]}" ; then
-	    echo "authenticate kerberos hapassword '${VALUES[3]}'" >> ${transaction}
+    local service_name=${VALUES[0]}
+    local ad_state=${VALUES[1]}
+
+    test -n "${service_name}" || service_name=${SHOSTNAME}
+
+    echo "authenticate kerberos web ${service_name}" > ${transaction}
+
+
+
+    case ${ad_state} in
+	off)
+	    echo "authenticate ad ${ad_state}" >> ${transaction}
 	    execute-transaction ${transaction}
-	else
-	    execute-transaction ${transaction}
-	    gen-gui-error 4
-	fi
-    else
-	execute-transaction ${transaction}
-    fi
+	    ;;
+	on)
+	    local rdn=${VALUES[2]}
+	    local login=${VALUES[3]}
+
+	    if test -n "${rdn}" ; then
+		rdn=${rdn// /}
+	    else
+		rdn=$(get-domain-controller-chain ${DOMAIN_NAME})
+	    fi
+
+	    test -n "${login}" || login=${service_name}
+
+	    echo "authenticate ad ${ad_state}" >> ${transaction} 
+	    echo "authenticate ad rdn '${rdn}'" >> ${transaction}
+
+	    if test "${VALUES[4]}" == "${VALUES[5]}" ; then
+		echo "authenticate ad account ${login} '${VALUES[4]}'" >> ${transaction}
+		execute-transaction ${transaction}
+	    else
+		execute-transaction ${transaction}
+		gen-gui-error 4
+	    fi
+	    ;;
+	*)
+	    ;;
+    esac
 }
 
 set-kerberos-dc

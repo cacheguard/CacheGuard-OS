@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -22,7 +21,7 @@
 #
 ###########################################################################
 
-source apl-js-var.apl
+source apl-var.apl
 
 GUIErrors[1]="Empty password is not allowed."
 GUIErrors[2]="Empty entry is not allowed."
@@ -50,23 +49,18 @@ GUIErrors[23]="Empty email address is not allowed."
 GUIErrors[24]="Please specify a remote TLS identifier for certificate-based authentication."
 GUIErrors[25]="Please specify a DN for DN-based identifier authentication."
 GUIErrors[26]="Please specify an FQDN for FQDN-based identifier authentication."
+GUIErrors[27]="You are not authorised to submit this request."
+GUIErrors[28]="Entered SNMP communities/passwords do not match."
+GUIErrors[29]="Entered SNMP privacy encryption passwords do not match."
 
-GUIInformation[1]=""
+GUIInformation[1]=''
 
-GATEWAY_HEAD_COLOR='White'
-GATEWAY_TITLE_COLOR='FireBrick'
-
-MANAGER_HEAD_COLOR='White'
-MANAGER_TITLE_COLOR='DarkGreen'
-
-EMPTY_COLOR='WhiteSmoke'
+EMPTY_COLOR='whitesmoke'
 
 SUBMIT_ID="submit"
 RESET_ID="reset"
 AUOTO_UPDATE_ID="auto-update-log"
 GUI_LOGOUT_TOKEN="logout,logout,logout,logout"
-BUTTON_MARGIN_TOP='3px'
-BUTTON_MARGIN_BOTTOM='5px'
 
 MULTIPART_CONTENT_TYPE_HEADER_1="Content-Type: application/octet-stream"
 MULTIPART_CONTENT_TYPE_HEADER_2="Content-Type: text/plain"
@@ -85,10 +79,8 @@ declare -a checkItem
 declare -a itemTitle
 declare -a itemTitleId
 declare -a itemForm
-declare -a itemFormSelectCB
-declare -a itemFormSelectCBFunction
-declare -a itemFormSelectCBArgs
-declare -a itemFormCheckCB
+declare -a itemData
+declare -a itemTdClass
 
 declare -a blankItemContent
 declare -a shortcutMenuItem
@@ -240,14 +232,15 @@ get-full-page()
 perform-set-page()
 {
     check-csrf-cookie || return 1
-
     local page=$(get-page "${@}")
     source set-${page}
 }
 
 echo-unavailable-message()
 {
-    echo "<span class='unavailable-message'>&lt;${1}&gt;</span>"
+    test -n "${1}" || return 1
+    local msg=${1}
+    echo "<div class='unavailable-message'><img src='${IMAGE_DIR}/information.png' alt='' title='' />  ${msg^}</div>"
 }
 
 gui-set-context()
@@ -419,21 +412,6 @@ gui-get-contextual-rweb-nb()
     echo ${rweb_nb}
 }
 
-call-js-function()
-{
-    test -n "${1}" || return 1
-    local js_function="${1}"
-
-    echo "<script type='text/javascript'>${js_function};</script>"
-}
-
-perform-js-code()
-{
-    echo "<script type='text/javascript'>"
-    echo "${@}"
-    echo "</script>"
-}
-
 get-full-menu-path()
 {
     test -n "${1}" || return 1
@@ -456,7 +434,7 @@ get-full-menu-path()
     echo "${full_path}"
 }
 
-echo-http-header()
+echo-http-header-nonl()
 {
     local content_type=${1}
     test -n "${content_type}" || content_type="text/html; charset=utf-8"
@@ -466,19 +444,29 @@ echo-http-header()
     case "${GUI_AUTH_TOKEN}" in
 
 	${GUI_LOGOUT_TOKEN})
-	    echo -e "Set-Cookie: ${GUI_COOKIE_AUTH_NAME}=; ${options};"
+	    echo "Set-Cookie: ${GUI_COOKIE_AUTH_NAME}=; ${options}"
 	    ;;
 	"")
 	    ;;
 	*)
-	    echo -e "Set-Cookie: ${GUI_COOKIE_AUTH_NAME}=${GUI_AUTH_TOKEN}; ${options}"
+	    echo "Set-Cookie: ${GUI_COOKIE_AUTH_NAME}=${GUI_AUTH_TOKEN}; ${options}"
 	    ;;
     esac
 
     test ${APL_ROLE} != manager || \
-	echo -e "Set-Cookie: ${GUI_COOKIE_CONTEXT_NAME}=${GUI_CONTEXT}; ${options}"
+	echo "Set-Cookie: ${GUI_COOKIE_CONTEXT_NAME}=${GUI_CONTEXT}; ${options}"
 
-    echo -e "Content-type: ${content_type}\n"
+    echo "Content-Type: ${content_type}"
+    echo "X-Content-Type-Options: nosniff"
+    echo "Content-Security-Policy: ${CSP_HEADER}"
+    echo "X-Frame-Options: DENY"
+    echo "Strict-Transport-Security: max-age=63072000; includeSubDomains"
+}
+
+echo-http-header()
+{
+    echo-http-header-nonl "${@}"
+    echo
 }
 
 redirect-page()
@@ -489,15 +477,13 @@ redirect-page()
 
     test -z "${args}" || args="?${args}"
 
-    echo "<script type='text/javascript'>"
-    echo "location.href = '/${GUI_DIR_NAME}/${page}.${GUI_EXT_NAME}${args}'"
-    echo "</script>"
+    echo "<div data-redirect=\"/${GUI_DIR_NAME}/${page}.${GUI_EXT_NAME}${args}\"></div>"
 }
 
 logout-page()
 {
     echo-http-header
-    redirect-page "login" "logout"
+    redirect-page 'login' 'logout'
 }
 
 unset-post-data()
@@ -773,11 +759,21 @@ echo-body-top()
 {
     test -n "${1}" || return 1
     local id=${1}
-    local style=${2}
+    local class=${2}
 
-    test -z "${style}" || style=" style='${style}'"
+    local role=$(gui-get-contextual-role)
 
-    echo "<body id='${id}'${style}>"
+    test -z "${class}" || class=" class='${class}'"
+    local auto_logout
+
+    test ${AUTH_STATE} -ne 0 || auto_logout=" data-auto-logout='yes'"
+
+    echo -n "<body id='${id}'${class}"
+    echo -n " data-left-menu-cookie='${GUI_COOKIE_LEFT_MENU_NAME}${GUI_MODULE_NAME}'"
+    echo -n " data-top-menu-cookie='${GUI_COOKIE_TOP_MENU_NAME}${GUI_MODULE_NAME}'"
+    echo -n " data-apl-context-role='${role}'"
+    echo "${auto_logout}>"
+
     echo "<a name='top' href='#'></a>"
 }
 
@@ -829,32 +825,13 @@ log-command()
     local cmd=${1}
     local args=${2}
 
+    cmd=$(get-html-bold-command ${cmd})
+
     if test -n "${args}" ; then
-	echo "${COMMAND_TAG} <a href='/doc/command/${cmd}.html' target='_blank'>${cmd}</a> ${args}" >> ${LOG}
+	echo "${COMMAND_TAG} ${cmd} ${args}" >> ${LOG}
     else
-	echo "${COMMAND_TAG} <a href='/doc/command/${cmd}.html' target='_blank'>${cmd}</a>" >> ${LOG}
+	echo "${COMMAND_TAG} ${cmd}" >> ${LOG}
     fi
-}
-
-refresh-buttons()
-{
-    test -n "${1}" || return 0
-    local refresh_js_func=${1}
-    local refresh_css=${2}
-
-    local title='Toggle Auto Refresh'
-    local check_sz='24px'
-
-    echo "<span style='float:left; margin:0; margin-top:${BUTTON_MARGIN_TOP}; margin-bottom:${BUTTON_MARGIN_BOTTOM};'>"
-
-    echo "<button id='refresh' type='submit' class='submit' style='${refresh_css}' onClick='${refresh_js_func};'>"
-    echo "REFRESH <img src='${IMAGE_DIR}/refresh.png' align='top' /></button>"
-
-    echo "<span class='submit tooltip' style='width:${check_sz};height:${check_sz}'><input class='dashboard-refresh-checkbox' id='${AUOTO_UPDATE_ID}' type='checkbox' checked /><label for='${AUOTO_UPDATE_ID}'></label><span class='tooltip-text'>${title}</span></span>"
-
-    echo "</span>"
-
-    call-js-function "${refresh_js_func}"
 }
 
 get-assertion-in-query()
@@ -905,7 +882,7 @@ show-shortcut-menu()
     local href="/${GUI_DIR_NAME}/${page}.${GUI_EXT_NAME}${args}"
 
     if test -n "${icon}" ; then
-	echo "<span style='padding:5px;'><a href='${href}'><img src='${IMAGE_DIR}/${icon}.png' title='${title}' alt='' /></a></span>"
+	echo "<a href='${href}'><img src='${IMAGE_DIR}/${icon}.png' title='${title}' alt='' /></a>"
     else
 	echo "<span class='shortcut-menu-item'><a href='${href}'>${title}</a></span>"
     fi
@@ -940,7 +917,7 @@ is-messages-in-log()
 
 show-errors()
 {
-    call-js-function "showZone( 'top-errors' )"
+    echo "<div data-show-errors-zone='${TOP_ERRORS_ID}'></div>"
 }
 
 show-post-errors()
@@ -983,7 +960,7 @@ error-occured()
 display-errors-content()
 {
     if test ! -s ${LOG} ; then
-	#echo "&lt;<i>There is no operation report</i>&gt;"
+	echo "&lt;<i>no execution to report</i>&gt;"
 	return 0
     fi
 
@@ -1008,7 +985,6 @@ display-errors-content()
 	    "${INFO_TAG}")
 		echo "<div><img src='${IMAGE_DIR}/ok.png' class='error-icon' align='top' /><i>${message}</i></div>"
 		;;
-
 	    *)
 		echo "<div><img src='${IMAGE_DIR}/warning.png' class='error-icon' align='top' /><font color='DarkOrange'><i>Internal: ${message}</i></font></div>"
 		;;
@@ -1026,21 +1002,16 @@ display-errors-content()
 
 display-title-errors()
 {
-    echo "<div id='top-errors' class='box-errors-outer'>"
+    echo "<div id='${TOP_ERRORS_ID}' class='box-errors-outer item-not-displayed'>"
     echo "<div class='box-errors-inner'>"
-
-    echo "<div><a href=\"javascript:hideZone( 'top-errors' )\"><img src='${IMAGE_DIR}/delete.png' alt='' title='Close' style='float:right; width:10px; height:10px; margin:0; margin-right:10px; margin-top:5px;' /></a></div>"
-
-    echo "<div style='padding:10px; margin:0;'>"
-    echo "<div style='float:left; margin:0; margin-bottom:5px; font-size:120%; text-align:left; font-weight:bold;'>Last operation report</div>"
-    echo "<div style='clear:left; margin:0; padding:0; height:0;'></div>"
-
+    echo "<div><a href='#' data-action='hide-zone' data-zone='${TOP_ERRORS_ID}'><img src='${IMAGE_DIR}/delete.png' alt='' title='Close' class='close-error-icon' /></a></div>"
+    echo "<div class='operation-report'>"
+    echo "<b>Last command(s) execution report:</b><hr />"
     display-errors-content
+    echo "</div>"
 
     echo "</div>"
     echo "</div>"
-    echo "</div>"
-    echo "<div style='clear:left; margin:0; padding:0; height:0;'></div>"
 }
 
 show-title-errors()
@@ -1072,7 +1043,7 @@ show-title-help()
     local path query
 
     path=$(get-full-menu-path ${content})
-    echo "<div class='box-help-outer' id='top-help'>"
+    echo "<div class='box-help-outer item-not-displayed' id='${TOP_HELP_ID}'>"
     echo "<div class='box-help-inner'>"
 
     if test -n "${path}" ; then
@@ -1080,7 +1051,7 @@ show-title-help()
 	test -z "${QUERY_STRING}" || query="?${QUERY_STRING}"
 	path=${path//\// <strong>></strong> }
 
-	echo "<div id='reload-page-iconbar' style='font-size:120%; font-style:normal;'><a href='/${GUI_DIR_NAME}/${content}.${GUI_EXT_NAME}${query}'><img align='middle' src='${IMAGE_DIR}/${content}.png' alt='Reload Page' title='Reload Page' /></a><span style='margin:0; margin-left:10px;'>${path}</span></div><br />"
+	echo "<div id='reload-page-iconbar'><a href='/${GUI_DIR_NAME}/${content}.${GUI_EXT_NAME}${query}'><img width='60' align='middle' src='${IMAGE_DIR}/${content}.png' alt='Reload Page' title='Reload Page' /></a><span class='help-menu-path'>${path}</span></div><br />"
     fi
 
     echo-quick-help ${content}
@@ -1093,21 +1064,19 @@ show-title-help()
 	    echo -n " Related commands to this page are: ["
 	    for command in ${commands}
 	    do
-		echo -n " <a href=/doc/command/${command}.html target=_blank>${command}</a>"
+		echo -n " <a href=${DOC_COMMAND_DIR}/${command}.html target=_blank>${command}</a>"
 	    done
 	    echo " ]"
 	fi
     fi
     echo "</div>"
     echo "</div>"
-    echo "<div style='clear:left; margin:0; padding:0; height:0;'></div>"
 }
 
 show-title-iconbar-left-menu-arrow()
 {
     test ${AUTH_STATE} -eq 0 || return 0    
-    echo "<div class='left-menu-arrow' id='left-menu-arrow' title='Show/Hide Left Menu'></div>"
-    set-left-menu-arrow
+    echo "<div class='triangle' id='left-menu-arrow' title='Show/Hide Left Menu'></div>"
 }
 
 show-title-iconbar-text()
@@ -1115,7 +1084,7 @@ show-title-iconbar-text()
     test -n "${1}" || return 1
     local title=${1}
 
-    echo "<span class='title-text'>${title}</span>"    
+    echo "<span class='title-bar-item'>${title}</span>"    
 }
 
 show-title-iconbar-global()
@@ -1127,10 +1096,15 @@ show-title-iconbar-global()
     
     if test ${AUTH_STATE} -eq 0 ; then
 	local upper_page=$(get-upper-page "${page}.${GUI_EXT_NAME}")
-	echo "<span id='${GUI_HOME_PAGE}-iconbar'><a class='iconbar-item' href='/${GUI_DIR_NAME}/${GUI_HOME_PAGE}.${GUI_EXT_NAME}'><img src='${IMAGE_DIR}/${GUI_HOME_PAGE}-reflect.png' alt='Panel Board' title='Panel Board' /></a></span>"
+	echo "<span id='${GUI_HOME_PAGE}-iconbar'><a class='title-bar-item' href='/${GUI_DIR_NAME}/${GUI_HOME_PAGE}.${GUI_EXT_NAME}'><img src='${IMAGE_DIR}/${GUI_HOME_PAGE}-reflect.png' alt='Panel Board' title='Panel Board' /></a></span>"
 	if test -n "${upper_page}" ; then
-	    test "${upper_page}" == "${GUI_HOME_PAGE}.${GUI_EXT_NAME}" || \
-		echo "<span id='up-iconbar'><a class='iconbar-item' href='/${GUI_DIR_NAME}/${upper_page}'><img src='${IMAGE_DIR}/arrow-level-up-reflect.png' alt='Upper Level' title='Upper Level' /></a></span>"
+	    case ${upper_page} in
+		"${GUI_HOME_PAGE}.${GUI_EXT_NAME}"|login.${GUI_EXT_NAME})
+		    ;;
+		*)
+		    echo "<span id='up-iconbar'><a class='title-bar-item' href='/${GUI_DIR_NAME}/${upper_page}'><img src='${IMAGE_DIR}/arrow-level-up-reflect.png' alt='Upper Level' title='Upper Level' /></a></span>"
+		    ;;
+	    esac
 	fi
     fi
 }
@@ -1142,7 +1116,7 @@ show-title-manager-context()
 
 show-title-working()
 {
-    echo "<div class='working' id='working'></div>"
+    echo "<span class='title-bar-item' id='working'></span>"
 }
 
 show-title-iconbar-submit()
@@ -1167,13 +1141,17 @@ show-title-iconbar-submit()
     if test -z "${get_checkbox_id}" ; then
 	get_checkbox_id='null'
     else
-	get_checkbox_id="'${get_checkbox_id}'"
+	get_checkbox_id=${get_checkbox_id}
     fi
 
-    local display=none page
+    local visibility page
     local submit_page
 
-    test "${submit_state}" == disabled || display=inline
+    if test "${submit_state}" == disabled ; then
+	visibility='item-not-displayed'
+    else
+	visibility='item-displayed'
+    fi
 
     if test ${AUTH_STATE} -eq 0 ; then
 	case ${page} in
@@ -1195,15 +1173,29 @@ show-title-iconbar-submit()
 		show-title-working
 
 		if test "${get_state}" != disabled ; then
-		    echo "<span id='${iconbar_id}'><a id='${reload_id}' class='iconbar-item' href='javascript:void( 0 );'><img src='${IMAGE_DIR}/refresh-reflect.png' alt='Reload Content' title='Reload Content' /></a></span>"
-		    call-js-function "initGetContent( '${reload_id}', '${submit_page}', ${get_checkbox_id} )"
+		    echo "<span id='${iconbar_id}'><a id='${reload_id}' class='title-bar-item' href='#'><img src='${IMAGE_DIR}/refresh-reflect.png' alt='Reload Content' title='Reload Content' /></a></span>"
+		    echo "<div data-init-get-content data-reload-id='${reload_id}' data-submit-page='${submit_page}' data-checkbox-id='${get_checkbox_id}' hidden></div>"
 		fi
 	esac
     fi
 
-    echo "<span id='ok-iconbar' style='display:${display};'><a class='iconbar-item' href='javascript:void( 0 );' onClick='javascript:doClickButton( \"${SUBMIT_ID}\" );'><img src='${IMAGE_DIR}/ok-reflect.png' alt='${submit_label}' title='${submit_label}' /></a></span>"
-    echo "<span id='report-iconbar'><a class='iconbar-item' href=\"javascript:toggleZone( 'top-errors' )\"><img src='${IMAGE_DIR}/report-reflect.png' alt='Operation Report' title='Operation Report' /></a></span>"
-    echo "<span id='help-iconbar'><a class='iconbar-item' href=\"javascript:toggleZone( 'top-help' )\"><img src='${IMAGE_DIR}/help-reflect.png' alt='Quick Help' title='Quick Help' /></a></span>"
+    test ${AUTH_STATE} -eq 0 || return 0
+    case ${page} in
+	login|about|system-report|diagnostic-tools)
+	    ;;
+	*)
+	    echo "<span id='ok-iconbar' class='${visibility};'><a class='title-bar-item' href='#' data-action='submit-page' data-button='${SUBMIT_ID}'><img src='${IMAGE_DIR}/ok-reflect.png' alt='${submit_label}' title='${submit_label}' /></a></span>"
+	    ;;
+    esac
+
+    case ${page} in
+	login|system-report)
+	    ;;
+	*)
+	    echo "<span id='report-iconbar'><a class='title-bar-item' href='#' data-action='toggle-zone' data-zone='${TOP_ERRORS_ID}'><img src='${IMAGE_DIR}/report-reflect.png' alt='Operation Report' title='Operation Report' /></a></span>"
+	    echo "<span id='help-iconbar'><a class='title-bar-item' href='#' data-action='toggle-zone' data-zone='${TOP_HELP_ID}'><img src='${IMAGE_DIR}/help-reflect.png' alt='Quick Help' title='Quick Help' /></a></span>"
+	    ;;
+    esac
 }
 
 show-title()
@@ -1240,8 +1232,8 @@ show-title()
     show-title-iconbar-text "${title}"
     show-title-iconbar-submit ${page} ${submit_state} ${get_state} ${get_checkbox_id}
     show-title-iconbar-custom ${controls}
-    show-title-iconbar-global ${page} ${content}
     show-title-manager-context
+    show-title-iconbar-global ${page} ${content}
     echo "</div>"
 
     show-title-help ${content} "${commands}"
@@ -1282,7 +1274,7 @@ display-user()
 	    ;;
     esac
 
-    echo "[ ${REMOTE_USER}@${hostname}.${domainname} ]"
+    echo "[${REMOTE_USER}@${hostname}.${domainname}]"
 }
 
 display-os-version()
@@ -1316,7 +1308,7 @@ display-os-version-user()
 
 display-right-header-info()
 {
-    echo "<div style='float:right; background-color:transparent;'>"
+    echo "<div class='header-info-text'>"
     display-os-version-user
     echo "</div>"
 }
@@ -1326,7 +1318,7 @@ display-remote-ip()
     local ip=${REMOTE_ADDR}
     test -n "${ip}" || ip="<i>None</i>"
 
-    echo "<span style='float:left; background-color:transparent;'>Your IP: [${REMOTE_ADDR}]</span>"
+    echo "<span>Your IP: [${REMOTE_ADDR}]</span>"
 }
 
 display-check-new-version()
@@ -1406,7 +1398,6 @@ set-auth-token()
     local user=${1}
 
     local date=$(date +"%s" 2> /dev/null)
-#   ((date+=7200060)) # Should be greater than the javascript logout timeout
     local rand=$(random-phrase-base62)
     local hmac=$(hmac "${user}" "${date}" "${rand}")
 
@@ -1423,7 +1414,7 @@ get-auth-token()
     local auth
 
     case "${GUI_AUTH_TOKEN}" in
-	"")
+	'')
 	    local cookie=${HTTP_COOKIE/*${GUI_COOKIE_AUTH_NAME}=/}
 	    test "${cookie}" != "${HTTP_COOKIE}" || return 1
 	    auth=${cookie/;*}
@@ -1443,7 +1434,7 @@ is-authenticated()
     local auth
 
     case "${GUI_AUTH_TOKEN}" in
-	"")
+	'')
 	    auth=$(get-auth-token)
 	    ;;
 	"${GUI_LOGOUT_TOKEN}")
@@ -1454,7 +1445,7 @@ is-authenticated()
     esac
 
     test -n "${auth}" || return 11
-    
+
     local user=${auth/,*/}
     test -n "${user}" || return 13
     gui-user-exist ${user} || return 15
@@ -1694,22 +1685,6 @@ require-confirmation()
     return 1
 }
 
-set-left-menu-visibility()
-{
-    echo "<script type='text/javascript'>"
-    echo "var status = getCookieValue( '${GUI_COOKIE_LEFT_MENU_NAME}${GUI_MODULE_NAME}' );"
-    echo "showHideLeftMenu( 'left-menu', status );"
-    echo "</script>"
-}
-
-set-left-menu-arrow()
-{
-    echo "<script type='text/javascript'>"
-    echo "var status = getCookieValue( '${GUI_COOKIE_LEFT_MENU_NAME}${GUI_MODULE_NAME}' );"
-    echo "setLeftMenuArrow( 'left-menu-arrow', status );"
-    echo "</script>"
-}
-
 show-left-menu()
 {
     local extension=$(gui-get-contextual-menu-extension)
@@ -1719,16 +1694,6 @@ show-left-menu()
     cat ${ETC_HTML_DIR}/left-menu${extension}.html
     echo "</div>"
     echo "</div>"
-
-    set-left-menu-visibility
-}
-
-set-top-menu-visibility()
-{
-    echo "<script type='text/javascript'>"
-    echo "var status = getCookieValue( '${GUI_COOKIE_TOP_MENU_NAME}${GUI_MODULE_NAME}' );"
-    echo "showHideTopMenu( 'top-menu', 'top-menu-arrow', status );"
-    echo "</script>"
 }
 
 show-top-menu()
@@ -1737,63 +1702,32 @@ show-top-menu()
 
     echo "<div id='top-menu' class='ddsmoothmenu'>"
     cat ${ETC_HTML_DIR}/top-menu${extension}.html
-    echo "<br style='clear:left; margin:0; padding:0; height:0;' /></div>"
-
-    set-top-menu-visibility
-}
-
-show-scroll-top()
-{
-    echo "<script type='text/javascript' src='/js/scrolltopcontrol.js'></script>"
+    echo "</div>"
 }
 
 show-form-begin()
 {
-    test -n "${1}" || return 1
-    local length=${1}
-
     local page=$(get-submit-page)
     local cookie=$(get-auth-token)
-    local on_submit
 
-    if test ${AUTH_STATE} -eq 0 ; then
-	on_submit="onSubmit='javascript:return( false );'"
-    else
-	on_submit="onSubmit=''"
-    fi
-
-    echo "<form name='mainform' id='mainform' method='post' ${on_submit} action='${page}'>"
+    echo "<form name='mainform' id='mainform' method='post' action='${page}'>"
     echo "<input type='hidden' name='${GUI_CSRF_ATTRIBUTE}' value='${cookie}' />"
 }
 
 show-form-end()
 {
-    show-scroll-top
     echo "</form>"
 }
 
 show-table-begin()
 {
-    test -n "${1}" || return 1
-    local length=${1}
-    local width=${2}
-
-    test ${length} -gt 0 || return 0
-    test -z "${width}" || width=" width='${width}'"
-
-    echo "<table class='highlight-form'${width}>"
+    echo "<table class='highlight-form'>"
     echo "<thead></thead>"
     echo "<tbody>"
-
 }
 
 show-table-end()
 {
-    test -n "${1}" || return 1
-    local length=${1}
-
-    test ${length} -gt 0 || return 0
-
     echo "</tbody>"
     echo "</table>"
 }
@@ -1802,8 +1736,11 @@ show-do-apply()
 {
     test -n "${1}" || return 1
     local state=${1}
-    local on_submit=${2}
+    local callback=${2}
+    local callback_args=${3}
+    local before=${4}
 
+    local data_with data_before
     local label page=$(get-page)
 
     case ${page} in
@@ -1829,14 +1766,13 @@ show-do-apply()
 	    ;;
     esac
 
-    local button_type='button'
-
-    test ${AUTH_STATE} -eq 0 || button_type='submit'
-    test -z "${on_submit}" || on_submit="onClick=\"${on_submit};\""
-
-    echo -n "<button id='${SUBMIT_ID}' type='${button_type}' class='submit' ${on_submit}${state}>"
-    echo -n "${label} <img src='${IMAGE_DIR}/ok.png' align='top' />"
-    echo    "</button>"
+    if test -n "${callback}" ; then
+	if test -z "${before}" ; then
+	    data_with=" data-action='${callback}' data-action-args='${callback_args}'"
+	else
+	    data_before=" data-action-before-post='${callback}' data-action-args='${callback_args}'"
+	fi
+    fi
 
     local command_name=$(get-command-name)
 
@@ -1846,14 +1782,22 @@ show-do-apply()
 	local ask=false
     fi
 
-    test ${AUTH_STATE} -ne 0 || call-js-function "initPostContent( '${SUBMIT_ID}', 'mainform', ${ask} )"
+    echo -n "<button id='${SUBMIT_ID}' type='submit' class='form-button' data-button='${SUBMIT_ID}' data-confirmation='${ask}'${data_with}${state}>"
+    echo -n "${label} <img src='${IMAGE_DIR}/ok.png' align='top' />"
+    echo "</button>"
+
+    test ${AUTH_STATE} -ne 0 || \
+	echo "<div data-init-post-content data-button-id='${SUBMIT_ID}' data-form-id='mainform' data-confirmation='${ask}'${data_before} hidden></div>"
 }
 
 show-do-reset()
 {
     test -n "${1}" || return 1
     local state=${1}
-    local on_reset=${2}
+    local callback=${2}
+    local callback_args=${3}
+
+    local data
 
     case ${state} in
 	enabled)
@@ -1868,10 +1812,10 @@ show-do-reset()
 	*)
 	    ;;
     esac
-	
-    test -z "${on_reset}" || on_reset="onClick=\"${on_reset};\""
 
-    echo -n "<button id='${RESET_ID}' type='reset' class='submit'${state} ${on_reset}>"
+    test -z "${callback}" || data=" data-action='${callback}' data-action-args='${callback_args}'"
+
+    echo -n "<button id='${RESET_ID}' type='reset' class='form-button'${data}${state}>"
     echo -n "RESET <img src='${IMAGE_DIR}/undo.png' align='top' />"
     echo    "</button>"
 }
@@ -1880,18 +1824,104 @@ show-do()
 {
     local submit_state=${1}
     local reset_state=${2}
-    local on_submit=${3}
-    local on_reset=${4}
     test -n "${submit_state}" || submit_state="enabled"
     test -n "${reset_state}" || reset_state="enabled"
 
-    echo "<div style='float:left; margin:0; margin-top:${BUTTON_MARGIN_TOP}; margin-bottom:${BUTTON_MARGIN_BOTTOM};'>"
+    show-do-apply ${submit_state}
+    show-do-reset ${reset_state}
+}
 
-    show-do-apply ${submit_state} "${on_submit}"
-    show-do-reset ${reset_state} "${on_reset}"
+get-form-js-check-function()
+{
+    test -n "${1}" || return 0
+    local check_in=${1}
+    
+    local check
+    
+    case "${check_in}" in
+	aalphanum)
+	    check="checkAAlphanum"
+	    ;;
+	alphanum)
+	    check="checkAlphanum"
+	    ;;
+	digit)
+	    check="checkDigit"
+	    ;;
+	percent)
+	    check="checkPercent"
+	    ;;
+	weight)
+	    check="checkWeight"
+	    ;;
+	ip)
+	    check="checkIP"
+	    ;;
+	ippx)
+	    check="checkIPPx"
+	    ;;
+	iplist)
+	    check="checkIPList"
+	    ;;
+	port)
+	    check="checkPort"
+	    ;;
+	ports)
+	    check="checkPorts"
+	    ;;
+	mac)
+	    check="checkMAC"
+	    ;;
+	guard)
+	    check="checkGuard"
+	    ;;
+	identifier)
+	    check="checkIdentifier"
+	    ;;
+	'time')
+	    check="checkTime"
+	    ;;
+	printable)
+	    check="checkPrintable"
+	    ;;
+	hostname)
+	    check="checkHostname"
+	    ;;
+	domainname)
+	    check="checkDomainname"
+	    ;;
+	username)
+	    check="checkUsername"
+	    ;;
+	email)
+	    check="checkEmail"
+	    ;;
+	dn)
+	    check="checkDN"
+	    ;;
+	fqdnlist)
+	    check="checkFQDNList"
+	    ;;
+	ipdomainname)
+	    check="checkIPDomainname"
+	    ;;
+	text)
+	    check="checkText"
+	    ;;
+	qos)
+	    check="checkQoS"
+	    ;;
+	url)
+	    check="checkURL"
+	    ;;
+	computer_name)
+	    check="checkComputerName"
+	    ;;
+	*)
+	    ;;
+    esac
 
-    echo "<div style='clear:left; margin:0; padding:0; height:0;'></div>"
-    echo "</div>"
+    echo ${check}
 }
 
 show-form()
@@ -1901,8 +1931,10 @@ show-form()
     local after_function=${3}
     shift 3 ; local after_function_args="${@}"
 
+    unset width
+    local data_item class
     local submit_state reset_state item_state item_title item_title_id
-    local check jsfunction
+    local check callback
     local first_tab=yes
 
     case "${submit_state}" in
@@ -1925,7 +1957,8 @@ show-form()
     fi
 
     echo "<div class='core-form'>"
-    show-form-begin ${length}
+    show-shortcuts-menu
+    show-form-begin
 
     for ((i=0 ; i<length ; i++))
     do
@@ -1933,82 +1966,23 @@ show-form()
 	echo "<input type='hidden' id='${itemID[${i}]}' name='${itemID[${i}]}' ${blankItemContent[${i}]} />"	
     done
 
-    test "${itemForm[0]}" == tab || show-table-begin ${length} ${width}
+    test "${itemForm[0]}" == tab || show-table-begin
 
     for ((i=0 ; i<length ; i++))
     do
-	item_state=${itemState[${i}]}
-	test -z "${item_state}" || item_state=" ${item_state}"
+	if test -n "${itemData[${i}]}" ; then
+	    data_item=" ${itemData[${i}]}"
+	else
+	    unset data_item
+	fi
 
-	case "${checkItem[${i}]}" in
-	    aalphanum)
-		check="checkAAlphanum( \"${itemID[${i}]}\" );"
-		;;
-	    alphanum)
-		check="checkAlphanum( \"${itemID[${i}]}\" );"
-		;;
-	    digit)
-		check="checkDigit( \"${itemID[${i}]}\" );"
-		;;
-	    percent)
-		check="checkPercent( \"${itemID[${i}]}\" );"
-		;;
-	    weight)
-		check="checkWeight( \"${itemID[${i}]}\" );"
-		;;
-	    ip)
-		check="checkIP( \"${itemID[${i}]}\" );"
-		;;
-	    iplist)
-		check="checkIPList( \"${itemID[${i}]}\" );"
-		;;
-	    ikeidentifier)
-		check="checkIKEIdentifier( \"${itemID[${i}]}\" );"
-		;;
-	    port)
-		check="checkPort( \"${itemID[${i}]}\" );"
-		;;
-	    printable)
-		check="checkPrintable( \"${itemID[${i}]}\" );"
-		;;
-	    hostname)
-		check="checkHostname( \"${itemID[${i}]}\" );"
-		;;
-	    domainname)
-		check="checkDomainname( \"${itemID[${i}]}\" );"
-		;;
-	    username)
-		check="checkUsername( \"${itemID[${i}]}\" );"
-		;;
-	    email)
-		check="checkEmail( \"${itemID[${i}]}\" );"
-		;;
-	    dn)
-		check="checkDN( \"${itemID[${i}]}\" );"
-		;;
-	    fqdnlist)
-		check="checkFQDNList( \"${itemID[${i}]}\" );"
-		;;
-	    ipdomainname)
-		check="checkIPDomainname( \"${itemID[${i}]}\" );"
-		;;
-	    text)
-		check="checkText( \"${itemID[${i}]}\" );"
-		;;
-	    qos)
-		check="checkQoS( \"${itemID[${i}]}\" );"
-		;;
-	    url)
-		check="checkURL( \"${itemID[${i}]}\" );"
-		;;
-	    none)
-		unset check
-		;;
-	    *)
-		unset check
-		;;
-	esac
+	if test -n "${itemState[${i}]}" ; then
+	    item_state=" ${itemState[${i}]}"
+	else
+	    unset item_state
+	fi
 
+	check=$(get-form-js-check-function "${checkItem[${i}]}")
 	item_title_id=${itemTitleId[${i}]}
 
 	if test -z "${item_title_id}" ; then
@@ -2021,52 +1995,48 @@ show-form()
 	    'hidden')
 		;;
 	    'textarea')
-		echo "<tr><td width='${itemWidth[0]}%'>${item_title}</td>"
-		echo "<td width='${itemWidth[1]}%'><textarea id='${itemID[${i}]}' name='${itemID[${i}]}' ${blankItemContent[${i}]} onblur='${check}'${item_state}>${itemValue[${i}]}</textarea></td></tr>"
+		echo "<tr><td>${item_title}</td>"
+		echo "<td><textarea id='${itemID[${i}]}' name='${itemID[${i}]}' ${blankItemContent[${i}]} data-action='check-input' data-check-function='${check}'${item_state}>${itemValue[${i}]}</textarea></td></tr>"
 		;;
 	    'select')
-		echo "<tr><td width='${itemWidth[0]}%'>${item_title}</td>"
-		if test -n "${itemFormSelectCB[${i}]}" ; then
-		    jsfunction=" onChange=\"javascript:${itemFormSelectCB[${i}]}\""
-		else
-		    unset jsfunction
-		fi
-		echo "<td width='${itemWidth[1]}%'><select id='${itemID[${i}]}' name='${itemID[${i}]}'${item_state}${jsfunction}>${blankItemContent[${i}]}</select></td></tr>"
+		echo "<tr><td>${item_title}</td>"
+		echo "<td><select id='${itemID[${i}]}' name='${itemID[${i}]}'${item_state}${callback}${data_item}>${blankItemContent[${i}]}</select></td></tr>"
 		;;
 	    'check')
-		echo "<tr><td width='${itemWidth[0]}%'><label for='${itemID[${i}]}'>${item_title}</label></td>"
-		if test -n "${itemFormCheckCB[${i}]}" ; then
-		    jsfunction=" onChange=\"javascript:${itemFormCheckCB[${i}]}\""
-		else
-		    unset jsfunction
-		fi
-		echo "<td width='${itemWidth[1]}%'><input id='${itemID[${i}]}' name='${itemID[${i}]}' ${blankItemContent[${i}]} onblur='${check}'${item_state}${jsfunction} /></td></tr>"
+		echo "<tr><td><label for='${itemID[${i}]}'>${item_title}</label></td>"
+		echo "<td><input id='${itemID[${i}]}' name='${itemID[${i}]}' type='checkbox' ${blankItemContent[${i}]}${item_state}${data_item} /></td></tr>"
 		;;
 
 	    'text')
-		echo "<tr><td width='${itemWidth[0]}%'>${item_title}</td>"
-		echo "<td width='${itemWidth[1]}%'><span id='${itemID[${i}]}'>${blankItemContent[${i}]}</span></td></tr>"
+		if test -n "${itemTdClass[${i}]}" ; then
+		    class=" class='${itemTdClass[${i}]}'"
+		else
+		    unset class
+		fi
+		echo "<tr><td>${item_title}</td>"
+		echo "<td${class}><span id='${itemID[${i}]}'>${blankItemContent[${i}]}</span></td></tr>"
 		;;
 	    'tab')
 		if test -z "${first_tab}" ; then
-		    show-table-end ${length}
+		    show-table-end
 		    echo "</div>"
 		else
 		    unset first_tab
 		fi
 		echo "<div id='${itemID[${i}]}' class='tabcontent'>"
-		show-table-begin ${length} ${width}
+		show-table-begin
 		;;
 	    *)
-		echo "<tr><td width='${itemWidth[0]}%'><label for='${itemID[${i}]}'>${item_title}</label></td>"
-		echo "<td width='${itemWidth[1]}%'><input id='${itemID[${i}]}' name='${itemID[${i}]}' ${blankItemContent[${i}]} onblur='${check}'${item_state} /></td></tr>"
+		echo "<tr><td><label for='${itemID[${i}]}'>${item_title}</label></td>"
+		echo "<td><input id='${itemID[${i}]}' name='${itemID[${i}]}' ${blankItemContent[${i}]} data-action='check-input' data-check-function='${check}'${item_state} /></td></tr>"
 		;;
 	esac
     done
 
-    show-table-end ${length}
+    show-table-end
     test "${itemForm[0]}" != tab || echo "</div>"
-    show-do ${submit_state} ${reset_state}
+    show-do-apply ${submit_state}
+    show-do-reset ${reset_state}
     test -z "${after_function}" || eval ${after_function} ${after_function_args}
     show-form-end
     echo '</div>'
@@ -2074,22 +2044,12 @@ show-form()
 
 show-tab-form()
 {
-    local width=${1}
-    local submit_state=${2}
-    local after_function=${3}
-    shift 3 ; local after_function_args="${@}"
-
-    local i=0
+    local i=0 tabid='formtabs'
     test "${itemForm[${i}]}" == tab || return 1
     local length=${#itemID[@]}
 
-    echo "<script type='text/javascript' src='/js/tabcontent.js'></script>"
-    echo "<link rel='stylesheet' type='text/css' href='/tabcontent.css' />"
-
-    echo "<div style='clear:left; height:11px;'></div>"
-
     echo "<div class='core-form'>"
-    echo "<ul id='formtabs' class='shadetabs'>"
+    echo "<ul id='${tabid}' class='shadetabs'>"
     echo "<li><a href='#' rel='${itemID[${i}]}' class='selected'>${itemTitle[${i}]}</a></li>"
 
     for ((i=1 ; i<length ; i++))
@@ -2101,95 +2061,57 @@ show-tab-form()
     echo "</ul>"
     echo "</div>"
 
-    show-form "${width}" "${submit_state}"
+    show-form "" "${submit_state}"
 
-    echo "<script type='text/javascript'>"
-    echo "var formTabs = new ddtabcontent( 'formtabs' );"
-    echo "formTabs.setpersist( true );"
-    echo "formTabs.setselectedClassTarget( 'link' );"
-    echo "formTabs.init( );"
-    echo "</script>"
-
-    test -z "${after_function}" || eval ${after_function} ${after_function_args}
+    echo "<div data-ddtabcontent='${tabid}' data-persist='true' data-selected-class-target='link' hidden></div>"
 }
 
 echo-noscript()
 {
-    local items item n i=0
-    declare -a items
-
-    items[${i}]="The requested page contains JavaScript codes that could not be executed while this application uses JavaScript." ; ((i++))
-    items[${i}]="If your browser doesn't support JavaScript please feel free to use a browser that supports JavaScript." ; ((i++))
-    items[${i}]="It may also possible that you disabled JavaScript in your browser. In this case, please reactivate it in order to use this application." ; ((i++))
-    items[${i}]="Please note that the system may also be configured using the CLI (Command Line Interface) via the Console port or an SSH client." ; ((i++))
-    n=${i}
-
-    local code="Web GUI error"
-    local title="JavaScript is disabled"
-
-    echo "<noscript>"
-    echo "<table width='100%'>"
-    echo "<tr>"
-    echo "<td width='20%' bgcolor='FireBrick' valign='center'><center><font size='2' color='White'><strong>${code}</strong></font></center></td>"
-    echo "<td width='80%' bgcolor='' valign='center'>"
-    echo "<span style='font-size:150%; font-weight:bold; color:FireBrick;'>"
-    echo "<center>${title}</center>"
-    echo "</span>"
-    echo "</td>"
-    echo "</tr>"
-    for ((i=0 ; i<n ; i++))
-    do
-	item=${items[${i}]}
-
-	echo "<tr>"
-	echo "<td width='20%' bgcolor='Gainsboro'></td>"
-	echo "<td width='80%' bgcolor='Gainsboro' valign='center'><font size='2' color='DarkSlateGray'>${item}</font></td>"
-	echo "</tr>"
-    done
-
-    echo "</table>"
-    echo "</noscript>"
+    cat <<EOT
+<noscript>
+<div class='unavailable-message'>
+The requested page contains JavaScript code that could not be executed, while this application requires JavaScript to be enabled. If your browser does not support JavaScript, please use a browser that supports JavaScript. If JavaScript has been disabled in your browser, please enable it in order to use this application.
+<p>
+Please note that the system can also be configured using the CLI (Command Line Interface) through the Console port or an SSH client.
+</div>
+</noscript>
+EOT
 }
 
 echo-top-page-begin()
 {
-    local peer_role bgcolor menucolor
+    local role
 
-    case ${APL_ROLE} in
-	gateway)
-	    bgcolor=${GATEWAY_HEAD_COLOR};
-	    menucolor=${GATEWAY_TITLE_COLOR}
-	    ;;
-	manager)
-	    bgcolor=${MANAGER_HEAD_COLOR};
-	    menucolor=${MANAGER_TITLE_COLOR}
-	    case ${CURRENT_MANAGER_SYNC_ROLE} in
-		master)
-		    peer_role=" (${CURRENT_MANAGER_SYNC_ROLE})"
-		    ;;
-		slave)
-		    peer_role=" <i>(${CURRENT_MANAGER_SYNC_ROLE})</i>"
-		    ;;
-		*)
-		    ;;
-	    esac
-	    ;;
-	*)
-	    bgcolor=${GATEWAY_HEAD_COLOR};
-	    menucolor=${GATEWAY_TITLE_COLOR}
-	    ;;
-    esac
+    if test ${AUTH_STATE} -eq 0 ; then
+	case ${APL_ROLE} in
+	    manager)
+		local peer_role
+		case ${CURRENT_MANAGER_SYNC_ROLE} in
+		    master)
+			peer_role=" (${CURRENT_MANAGER_SYNC_ROLE})"
+			;;
+		    slave)
+			peer_role=" <i>(${CURRENT_MANAGER_SYNC_ROLE})</i>"
+			;;
+		    *)
+			;;
+		esac
+		;;
+	    gateway)
+		;;
+	    *)
+		;;
+	esac
+	role="${APL_ROLE^}${peer_role}"
+    else
+	role="Appliance"
+    fi
 
     cat <<EOF
-<div class='box-header' style='background-color:${bgcolor};'>
-<div class='box-logo'>
-<a href='/'><img src='${IMAGE_DIR}/${COMMERCIAL_NAME}Logo.png' alt='${COMMERCIAL_NAME}' align='left' height='65' /></a>
-</div>
-<div class='header-left' style='float:left;'>
-<span style='float:left; color:FireBrick;'>Cache</span>
-<span style='float:left; color:#75757c;'>Guard</span><br />
-<span style='float:left; color:${menucolor}; font-style:normal;'>${APL_ROLE^}${peer_role}</span>
-</div>
+<div class='header-left'>
+<a href='/'><img src='${IMAGE_DIR}/${COMMERCIAL_NAME}Logo.png' alt='${COMMERCIAL_NAME}' /></a>
+<span>${COMMERCIAL_NAME} ${role}</span>
 </div>
 EOF
 }
@@ -2203,8 +2125,8 @@ echo-top-page-middle()
 echo-top-page-end()
 {
     cat <<EOF
-<div style='float:right; text-align:end;'><b>${COMMERCIAL_NAME} ${APL_ROLE^}</b><br />
-Network Security & Optimisation
+<div class='header-right'>
+<span>Network Security & Optimisation</span>
 EOF
 
     if test ${AUTH_STATE} -ne 0 ; then
@@ -2212,7 +2134,7 @@ EOF
 	return 0
     fi
 
-    echo "<div id='logout-iconbar' style='margin:0; margin-top:2px;'><a class='iconbar-item' href='#' style='float:right;margin-left:10px;' onClick='requestLogout( );'><img src='${IMAGE_DIR}/exit-reflect.png' alt='Logout' title='Logout' /></a></div>"
+    echo "<div id='logout-iconbar'><a href='#' data-action='request-logout'><img src='${IMAGE_DIR}/exit-reflect.png' alt='Logout' title='Logout' /></a></div>"
     echo "</div>"
 }
 
@@ -2232,18 +2154,18 @@ EOF
 
 echo-top-page()
 {
-    echo "<div style='padding:5px; margin:0;' >"
+    echo "<div>"
     echo "<table width='100%'><tr>"
 
-    echo "<td width='25%'>"
+    echo "<td>"
     echo-top-page-begin
     echo "</td>"
 
-    echo "<td width='50%'>"
+    echo "<td>"
     echo-top-page-middle
     echo "</td>"
 
-    echo "<td width='25%'>"
+    echo "<td>"
     echo-top-page-end
     echo "</td>"
 
@@ -2255,11 +2177,22 @@ echo-top-html()
 {
     test -n "${1}" || return 1
     local id=${1}
-    local style=${2}
+    local class=${2}
 
     echo-noscript
     echo-head-end
-    echo-body-top "${id}" "${style}"
+    echo-body-top "${id}" "${class}"
+}
+
+echo-page-javascript()
+{
+    test -n "${1}" || return 1
+    local page=${1}
+    
+    local file=${JS_DIR}/apl-${page}-${GUI_FE_VERSION}.js
+    test -s ${file} || return 0
+
+    echo "<script src=\"${file}\" defer></script>"
 }
 
 gui-authenticate-phase1()
@@ -2283,7 +2216,7 @@ gui-authenticate-phase1()
 
 	local role=$(gui-get-contextual-role)
 	cat ${ETC_HTML_DIR}/head-top.${APL_ROLE}.html
-	echo "<script type=\"text/javascript\" src=\"${JS_DIR}/ddaccordioninit.${role}.js\"></script>"
+	echo-page-javascript ${page}
     else
 	echo-http-header
 	cat ${ETC_HTML_DIR}/head-login-top.html
@@ -2300,32 +2233,34 @@ gui-authenticated-core-content()
     local page=$(file-basename ${0} .${GUI_EXT_NAME})
     test ${page} != 'login' || page=$(get-login-redirect-page)
 
-    echo "<table width='100%'><tr><td valign='top'>"
+    echo "<table class='menus'>"
+    echo "<thead></thead>"
+    echo "<tbody>"
+    echo "<tr>"
 
+    echo "<td>"
     show-left-menu ${module}
-    echo "</td><td valign='top' width='100%'>"
-    show-top-menu ${module}
+    echo "</td>"
 
+    echo "<td>"
+    show-top-menu ${module}
     echo "<div class='core' id='core' name='core'>"
 
     if test ${INITENV_STATUS} -eq 0 ; then
 
 	local page=$(get-contextual-page "${@}")
 	test ${page} != 'login' || page=$(get-login-redirect-page)
-
 	source ${page}${GUI_CORE_EXT}
-
-	if test -f ${GUI_CGI_DIR}/update-${page}.${GUI_EXT_NAME} ; then
-	    local script="update_${page//-/_}( 0 );"
-	    call-js-function "${script}"
-	fi
     else
 	gen-gui-error 12
 	show-title-errors
     fi
-
     echo "</div>"
-    echo "</td><tr></table>"
+    echo "</td>"
+    echo "</tr>"
+    echo ""
+    echo "</tbody>"
+    echo "</table>"
 }
 
 gui-unauthenticated-core-content()
@@ -2338,29 +2273,17 @@ gui-unauthenticated-core-content()
 gui-authenticate-phase2()
 {
     if test ${AUTH_STATE} -eq 0 ; then
+	echo "<div class='header-info'>"
 
-	case ${APL_ROLE} in
-	    gateway)
-		local bgcolor=${GATEWAY_HEAD_COLOR};
-		;;
-	    manager)
-		local bgcolor=${MANAGER_HEAD_COLOR};
-		;;
-	    *)
-		local bgcolor=${GATEWAY_HEAD_COLOR};
-		;;
-	esac
-
-	echo "<div style='background-color:${bgcolor};'>"
-	echo "<span style='float:left; background-color:transparent;'>"
+	echo "<div class='header-info-left'>"
 	display-left-header-info
-	echo "</span>"
+	echo "</div>"
 
-	echo "<span style='float:right; background-color:transparent;'>"
-	echo "<span class='top-menu-arrow' id='top-menu-arrow' title='Show/Hide Top Menu'></span>"
+	echo "<div class='header-info-right'>"
+	echo "<span class='triangle' id='top-menu-arrow' title='Show/Hide Top Menu'></span>"
 	display-right-header-info
+	echo "</div>"
 
-	echo "</span>"
 	echo "</div>"
 
 	gui-authenticated-core-content "${@}"
@@ -2399,7 +2322,7 @@ gui-authenticate-dashboard-phase2()
 gui-run-authentication()
 {
     check-cgi-security
-    verify-authentication || http-exit 1
+    verify-authentication || http-exit 11
     gui-init-env-variables
     echo-http-header
 }
@@ -2409,7 +2332,7 @@ gui-run-dashboard-page()
     local page=$(file-basename ${0} .${GUI_EXT_NAME})
 
     gui-authenticate-dashboard-phase1
-    echo-top-html ${page} 'min-width:0px; overflow-x:hidden;'
+    echo-top-html ${page} 'dashboard-page'
     gui-authenticate-dashboard-phase2 "${@}"
     gen-body-bottom
     gen-bottom-html
@@ -2426,8 +2349,6 @@ gui-run-page()
     echo-top-page
     gui-authenticate-phase2 "${@}"
 
-    test ${page} == login -a "${1}" == 'logout' || call-js-function 'initAutoLogout( )'
-
     show-footer
     gen-body-bottom
     gen-bottom-html
@@ -2442,18 +2363,15 @@ show-copyright()
 
 show-footer()
 {
-    echo "<div style='clear:left; margin:0; padding:0; height:0;'></div>"
     show-copyright
 }
 
 gui-information-message()
 {
     local message=${1}
-    local font_sz=${2}
-    test -n "${font_sz}" || font_sz=120%
 
     echo "<div class='core-form'>"
-    echo "<div class='box-help-inner' style='font-size:${font_sz}; margin:0; padding:15px; border:solid FireBrick 1px;'>"
+    echo "<div class='box-help-inner information-message'>"
     echo ${message}
     echo "</div>"
     echo "</div>"
@@ -2469,7 +2387,7 @@ show-pre-clipboard-copy()
     local icon_id="${pre_id}-icon"
     local title="Copy${object_type} to Clipboard"
 
-    echo "<div style='float:right;'><img id='${icon_id}' style='width:40px; height:40px; margin:0; margin-left:5px;' src='${IMAGE_DIR}/clipboard-copy.png' alt='${title}' title='${title}' onclick='copyPreToClipboard( \"${pre_id}\", \"${icon_id}\" )' /></div>"
+    echo "<div class='clipboard-copy'><img id='${icon_id}' src='${IMAGE_DIR}/clipboard-copy.png' alt='${title}' title='${title}' data-action='copy-pre-to-clipboard' data-pre-id='${pre_id}' /></div>"
 }
 
 show-file-content-clipboard-copy()
@@ -2482,9 +2400,8 @@ show-file-content-clipboard-copy()
 
     test -f ${file} || return 11
 
-    local size=$(ls -s --block-size=1024 ${file} 2>/dev/null)
-    size=${size/ */}
-    test ${size} -eq 1 || return 13
+    local size=$(get-limited-character-count-in-file ${file})
+    test ${size} -gt 0 -a ${size} -le 1024  || return 13
 
     local content=$(cat ${file})
 
@@ -2492,7 +2409,7 @@ show-file-content-clipboard-copy()
     local icon_id="${text_area_id}-icon"
     local title="Copy${object_type} to Clipboard"
 
-    echo "<div style='float:right;'><img id='${icon_id}' style='width:40px; height:40px; margin:0; margin-left:5px;' src='${IMAGE_DIR}/clipboard-copy.png' alt='${title}' title='${title}' onclick='copyToClipboard( \"${text_area_id}\", \"${icon_id}\", \"${content}\" )' /></div>"
+    echo "<div class='clipboard-copy'><img id='${icon_id}' src='${IMAGE_DIR}/clipboard-copy.png' alt='${title}' title='${title}' data-action='copy-to-clipboard' data-text-area-id='${text_area_id}' data-content='${content}' /></div>"
 }
 
 show-send-file-content-by-sms()
@@ -2503,9 +2420,8 @@ show-send-file-content-by-sms()
 
     test -f ${file} || return 11
 
-    local size=$(ls -s --block-size=1024 ${file} 2>/dev/null)
-    size=${size/ */}
-    test ${size} -eq 1 || return 13
+    local size=$(get-limited-character-count-in-file ${file})
+    test ${size} -gt 0 -a ${size} -le 1024  || return 13
 
     local phone_len=20
     local phone_id='phone'
@@ -2515,7 +2431,7 @@ show-send-file-content-by-sms()
     message="${content}"
     message=$(url-encode "${message}")
 
-    echo "<div style='float:right;'>${phone_title} <input id='${phone_id}' type='text' size='${phone_len}' maxlength='${phone_len}' /> <img style='width:40px; height:40px; vertical-align:middle;' src='${IMAGE_DIR}/whatsapp.png' alt='${title}' title='${title}' onclick='sendPhoneNumber( \"whatsapp\", \"${phone_id}\", \"${message}\" )' /><hr /></div>"
+    echo "<div class='clipboard-copy'>${phone_title} <input id='${phone_id}' type='text' size='${phone_len}' maxlength='${phone_len}' /> <img src='${IMAGE_DIR}/whatsapp.png' alt='${title}' title='${title}' data-action='send-phone-number' data-application='whatsapp' data-phone-id='${phone_id}' data-message='${message}' /></div><hr />"
 }
 
 get-selected-option()
@@ -2525,21 +2441,6 @@ get-selected-option()
     printf '%s' "${selected}"
 }
 
-echo-content-unavailable()
-{
-    test -n "${1}" || return 1
-    test -n "${2}" || return 2
-    local width=${1}
-    local message=${2}
-
-    len=${#width} ; ((len--))
-    test ${width:${len}:1} == '%' || width="${width}px"
-
-    echo "<table class='report' width='${width}'>"
-    echo "<tr><td width='100%'>${message}</td></tr>"
-    echo "</table>"
-}
-
 form-error-message()
 {
     test -n "${1}" || return 1
@@ -2547,7 +2448,12 @@ form-error-message()
     local width=${1}
     local message=${2}
 
-    echo "<div class='core-form' style='margin-bottom:8px;'>"
-    echo-content-unavailable ${width} "${message}"
+    echo "<div class='core-form'>"
+    echo-unavailable-message "${message}"
     echo "</div>"
+}
+
+refresh-buttons()
+{
+    :
 }

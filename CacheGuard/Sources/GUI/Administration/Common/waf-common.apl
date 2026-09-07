@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -59,7 +58,7 @@ show-generic-waf()
 	filter_name=${WAF_GENERIC_FILTER_NAME[${i}]}
 	echo "<tr>"
 	echo "<td width='${left}%'><label for='waf_${filter_id}'>${filter_name}</label></td>"
-	echo "<td width='${right}%' align='right'><input id='waf_${filter_id}' name='waf_${filter_id}' type='checkbox' style='border:0;' $(filter-checked ${filters:${i}:1}) /></td>"
+	echo "<td width='${right}%' align='right'><input id='waf_${filter_id}' name='waf_${filter_id}' type='checkbox' $(filter-checked ${filters:${i}:1}) /></td>"
 	echo "</tr>"
 	unset filter_name
     done

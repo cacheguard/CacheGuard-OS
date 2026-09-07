@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -32,26 +31,34 @@ show-dhcp-fixed-form()
 
     local max=$[${users_nb} * 2]
 
-    itemWidth[1]=45
+    itemWidth[1]=31
+    itemWidth[2]=15
+    itemWidth[3]=22
+    itemWidth[4]=22
 
     itemTitle[0]=""
     itemTitle[1]="Host Name"
-    itemTitle[2]="MAC Address"
-    itemTitle[3]="IP Address"
-    
+    itemTitle[2]="Interface"
+    itemTitle[3]="MAC Address"
+    itemTitle[4]="IP Address"
+
     itemID[0]="Fixed"
     itemID[1]="hostname"
-    itemID[2]="mac"
-    itemID[3]="ip"
-    
+    itemID[2]="interface"
+    itemID[3]="mac"
+    itemID[4]="ip"
+
     blankItemContent[0]=""
     blankItemContent[1]="type='text' size='20' maxlength='64'"
-    blankItemContent[2]="type='text' size='17' maxlength='17'"
-    blankItemContent[3]="type='text' size='15' maxlength='15'"
+    blankItemContent[2]="internal auxiliary"
+    blankItemContent[3]="type='text' size='17' maxlength='17'"
+    blankItemContent[4]="type='text' size='15' maxlength='15'"
+
+    itemForm[2]="select"
 
     checkItem[1]=domainname
-    checkItem[2]=mac
-    checkItem[3]=ip
+    checkItem[3]=mac
+    checkItem[4]=ip
 
     listContent=${DHCP_FIXED_LIST}
     test -n "${listContent}" || state=disabled

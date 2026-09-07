@@ -1,20 +1,23 @@
 #dhtmltooltip{
 font-size:100%;
-position: absolute;
-left: -300px;
-width: 150px;
-border: none;
-padding: 2px;
-background-color: lightyellow;
-visibility: hidden;
-z-index: 100;
-/*Remove below line to remove shadow. Below line should always appear last within this CSS*/
-filter: progid:DXImageTransform.Microsoft.Shadow(color=gray,direction=135);
+position:absolute;
+left:-300px;
+min-width:250px;
+max-width:450px;
+border:none;
+padding:10px;
+background-color:lightyellow;
+white-space:normal;
+overflow-wrap:break-word;
+word-break:normal;
+visibility:hidden;
+z-index:100;
+border-radius:var(--box-border-radius);
 }
 
 #dhtmlpointer{
 position:absolute;
-left: -300px;
-z-index: 101;
-visibility: hidden;
+left:-300px;
+z-index:101;
+visibility:hidden;
 }

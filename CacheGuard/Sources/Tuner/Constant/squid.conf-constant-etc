@@ -14,6 +14,8 @@ ipcache_low 90
 ipcache_high 95
 memory_replacement_policy lru
 cache_replacement_policy lru
+memory_cache_mode always
+collapsed_forwarding off
 
 icon_directory /share/icons
 error_directory /share/errors
@@ -38,14 +40,10 @@ logformat forward-syslog %>a %un "%rm %ru HTTP/%rv" %>Hs %<st %Ss %Sh %ssl::bump
 logformat reverse-syslog %>a %un "%rm %ru HTTP/%rv" %>Hs %<st "%{User-Agent}>h"
 log_mime_hdrs off
 
-url_rewrite_extras "%>a/- %un %>rm"
 
 ftp_sanitycheck on
 
 ignore_unknown_nameservers on
-
-url_rewrite_bypass off
-url_rewrite_host_header on
 
 authenticate_ttl 1 hour
 authenticate_ip_ttl 0 seconds
@@ -59,21 +57,25 @@ reload_into_ims off
 range_offset_limit none
 
 # Microsoft Windows Updates
-refresh_pattern -i microsoft.com/.*\.(cab|exe|ms[i|u|f]|[ap]sf|wm[v|a]|dat|zip) 4320 80% 43200
-refresh_pattern -i windowsupdate.com/.*\.(cab|exe|ms[i|u|f]|[ap]sf|wm[v|a]|dat|zip) 4320 80% 43200
-refresh_pattern -i windows.com/.*\.(cab|exe|ms[i|u|f]|[ap]sf|wm[v|a]|dat|zip) 4320 80% 43200
+refresh_pattern -i microsoft\.com/.*\.(cab|exe|ms(i|u|f)|[ap]sf|wm(v|a)|dat|zip) 4320 80% 43200
+refresh_pattern -i windowsupdate\.com/.*\.(cab|exe|ms(i|u|f)|[ap]sf|wm(v|a)|dat|zip) 4320 80% 43200
+refresh_pattern -i windows\.com/.*\.(cab|exe|ms(i|u|f)|[ap]sf|wm(v|a)|dat|zip) 4320 80% 43200
 
 # Apple iOS Updates
 refresh_pattern -i cdn\-apple\.com.*\.(ipsw|ipd|ipcc) 86400 100% 86400
 refresh_pattern -i swcdn\.apple\.com.*\.(ipsw|ipd|ipcc) 86400 100% 86400
 
 # Audio, Video & Images
-refresh_pattern -i \.(bmp|emf|gif|ico|jpeg|jpg|png|tif|tiff)$ 10080 90% 43200
+refresh_pattern -i \.(avif|bmp|emf|gif|ico|jpeg|jpg|png|tif|tiff|webp)$ 10080 90% 43200
 refresh_pattern -i \.(3gp|aac|adts|au|avi|mid|mov|mp3|m4a|m4b|m4p|m4r|m4v|mp4|mpeg|mpg|qt|sis|swf|wav|wma|webm|wmf|wmv)$ 10080 90% 43200
 refresh_pattern -i \.(ogg|ogv|oga|ogx|ogm|spx|opus)$ 10080 90% 43200
 
+# Fonts
+refresh_pattern -i \.(eot|otf|ttf|woff|woff2)$ 10080 90% 43200
+
 # Packages
-refresh_pattern -i \.(ace|arj|bz|bz2|deb|exe|gz|lha|lzh|ram|rar|rar|rpm|tar|tar|tgz|zip)$ 10080 90% 43200
+refresh_pattern -i \.(ace|arj|bz|bz2|deb|gz|xz|lha|lzh|ram|rar|rpm|tar|tgz|zip|apk|appx|appxbundle|msix|msixbundle|vsix|zst|7z)$ 10080 90% 43200
+refresh_pattern -i \.iso$ 10080 90% 43200
 
 # Office documents
 refresh_pattern -i \.(csv|dbf|dif|doc|docm|docx|dot|hqx|odp|ods|odt|pdf|potx|ppa|ppam|pps|ppsm|ppsx|ppt|pptm|pptx|prn|rtf|slk|thmx|txt|uxx|wps|xla|xlam|xls|xlsb|xlsm|xlsx|xlt|xltm|xltx|xlw)$ 1440 100% 10080
@@ -83,7 +85,7 @@ refresh_pattern -i \.(ad|cab|dll|inc)$ 1440 100% 10080
 refresh_pattern -i \.(exe|bin)$ 1440 100% 10080
 
 # Websites
-refresh_pattern -i \.(class|css|js)$ 1440 100% 10080
+refresh_pattern -i \.(class|css|js)$ 10080 90% 43200
 refresh_pattern -i \.(htm|html|mht|mhtml|shtml|xml|xps)$ 1440 50% 10080
 refresh_pattern -i \.(acgi|asp|aspx|php|php3|pl|shtml) 2 20% 60
 refresh_pattern -i (/cgi-bin/|\?) 0 0% 0
@@ -136,7 +138,7 @@ minimum_icp_query_timeout 5
 dead_peer_timeout 5 seconds
 forward_max_tries 32
 query_icmp on
-peer_connect_timeout 5 seconds
+peer_connect_timeout 3 seconds
 
 miss_access allow all
 test_reachability off
@@ -167,3 +169,10 @@ icap_client_username_header X-Authenticated-User
 tls_outgoing_options cipher=ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-AES256-GCM-SHA384:DHE-RSA-AES128-GCM-SHA256:DHE-DSS-AES128-GCM-SHA256:kEDH+AESGCM:ECDHE-RSA-AES128-SHA256:ECDHE-ECDSA-AES128-SHA256:ECDHE-RSA-AES128-SHA:ECDHE-ECDSA-AES128-SHA:ECDHE-RSA-AES256-SHA384:ECDHE-ECDSA-AES256-SHA384:ECDHE-RSA-AES256-SHA:ECDHE-ECDSA-AES256-SHA:DHE-RSA-AES128-SHA256:DHE-RSA-AES128-SHA:DHE-DSS-AES128-SHA256:DHE-RSA-AES256-SHA256:DHE-DSS-AES256-SHA:DHE-RSA-AES256-SHA:!aNULL:!eNULL:!EXPORT:!DES:!RC4:!3DES:!MD5:!PSK default-ca=off
 sslproxy_session_ttl 300
 sslproxy_cert_sign_hash sha256
+sslproxy_session_cache_size 2 MB
+
+url_rewrite_bypass off
+url_rewrite_host_header on
+url_rewrite_extras "%>a/- %un %>rm %ssl::>sni"
+
+http_upgrade_request_protocols OTHER allow all

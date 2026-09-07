@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -55,8 +54,8 @@ urllist-auto()
 		protocol=${VALUES[${protocol_pos}]:1}
 		ip=${VALUES[${ip_pos}]}
 		filename=${VALUES[${filename_pos}]}
-		
-		echo "urllist auto ${urllist} on ${load} ${operation} ${period} ${protocol} ${ip} '${filename}'" >> ${transaction}
+
+		echo "urllist auto ${urllist} on ${load} ${operation} ${period} ${protocol} ${ip} ${filename}" >> ${transaction}
 		;;
 	    off)
 		echo "urllist auto ${urllist} off" >> ${transaction}

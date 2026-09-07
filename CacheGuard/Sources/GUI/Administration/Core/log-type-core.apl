@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -70,16 +69,16 @@ show-log-type()
     show-title "Traffic Logging" "enabled" "log"
 
     echo "<div class='core-form'>"
-    show-form-begin 2
+    show-form-begin
     show-shortcuts-menu
 
-    echo "<table class='highlight-form' width='400'>"
+    echo "<table class='highlight-list'>"
 
     echo "<thead>"
     echo "<tr>"
-    echo "<td class='table-header' width='60%' align='center'>Traffic Type</td>"
-    echo "<td class='table-header' width='20%' align='center'>Logging</td>"
-    echo "<td class='table-header' width='20%' align='center'>Remote<br />Logging</td>"
+    echo "<th class='table-header' width='60%' align='center'>Traffic Type</th>"
+    echo "<th class='table-header' width='20%' align='center'>Logging</th>"
+    echo "<th class='table-header' width='20%' align='center'>Remote<br />Logging</th>"
     echo "</tr>"
     echo "</thead>"
 

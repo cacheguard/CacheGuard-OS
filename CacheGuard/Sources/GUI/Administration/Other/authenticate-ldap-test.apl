@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -27,16 +26,14 @@ source functions
 test-ldap-auth()
 {
     test -n "${1}" || return 1
-    test -n "${2}" || return 2
-    local width=${1}
-    local login=${2}
-    local password=${3}
+    local login=${1}
+    local password=${2}
 
     local tmp_file=/tmp/authenticate-ldap-test.${$}
 
     execute-command-with-output "authenticate ldap test ${login} ${password}" > ${tmp_file}
 
-    echo "<div class='with-border' style='font-size:90%; font-style:italic; width:${width}px; margin-bottom:5px;'><pre>"
+    echo "<div class='diagnostic-tools-msg'><pre>"
     cat ${tmp_file}
     echo "</pre></div>"
 

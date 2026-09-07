@@ -1,46 +1,45 @@
 Manage the operating system
 .SH SYNOPSIS
-
 [1] \fBsystem\fR [\fBsoft\fR [\fBcheck\fR] | \fBrole\fR | \fBhard\fR | \fBmachine\fR | \fBarchitecture\fR | \fBcpu\fR | \fBmemory\fR | \fBdisk\fR | \fBraid\fR | \fBserial\fR | \fBuuid\fR | \fBend\fR]
-
+.sp
 [2] \fBsystem patch\fR (\fBaload\fR | (\fBftp\fR | \fBsftp\fR | \fBtftp\fR) \fI<file-server>\fR \fI<file-path>\fR)
-
+.sp
 [3] \fBsystem backup\fR [(\fBcreate\fR [\fBreport\fR] | \fBclear\fR | \fBwait\fR)]
-
+.sp
 [4] \fBsystem backup\fR [(\fBsave\fR | \fBload\fR) (\fBftp\fR | \fBsftp\fR | \fBtftp\fR) \fI<file-server>\fR \fI<file-path>\fR]
-
+.sp
 [5] \fBsystem report\fR [\fBcpu\fR | \fBload\fR | \fBmemory\fR | \fBdisk\fR | \fBraid\fR | \fBlink\fR | \fBgateway\fR | \fBconnection\fR | \fBservice\fR | \fBvpnipsec\fR | \fBantivirus\fR | \fBcounter\fR [\fBweb\fR | \fBrweb\fR | \fBfirewall\fR | \fBguard\fR | \fBantivirus\fR | \fBavserver\fR | \fBwaf\fR] [\fBraz\fR]]
 
 .SH DESCRIPTION
 The first [1] usage form displays information about the actual system. In this usage form the optional arguments are as follows:
 
-* \fBsoft\fR: software OS (Operating System) name and version. If the optional \fBcheck\fR keyword is specified, the system checks for available updates.
+\(bu \fBsoft\fR: software OS (Operating System) name and version. If the optional \fBcheck\fR keyword is specified, the system checks for available updates.
 
-* \fBrole\fR: the system role (can be Gateway or Manager).
+\(bu \fBrole\fR: the system role (can be Gateway or Manager).
 
-* \fBhard\fR: this is a string consisting of fields that gives the appliance model configured during its installation. Details are as follows:
+\(bu \fBhard\fR: this is a string consisting of fields that gives the appliance model configured during its installation. Details are as follows:
 
-	\(bu OS|VE|WH: (OS installation, VE: Virtual Edition, HW: Hardware),
+\(bu OS|VE|WH: (OS installation, VE: Virtual Edition, HW: Hardware),
 
-	\(bu US<number>: number of USers in forwarding mode,
+\(bu US<number>: number of users in forwarding mode,
 
-	\(bu GR<number>: GuaRd blacklist records number,
+\(bu GR<number>: GuaRd blacklist records number,
 
-	\(bu RU<number>: number of Userse in Revers mode,
+\(bu RU<number>: number of users in reverse mode,
 
-	\(bu RW<number>: number of Reverse Websites,
+\(bu RW<number>: number of Reverse Websites,
 
-	\(bu CR<number>: Cache size per Reverse website in MB,
+\(bu CR<number>: Cache size per Reverse website in MB,
 
-	\(bu LR<number>: Logs Rotation period,
+\(bu LR<number>: Logs Rotation period,
 
-	\(bu UL<number>: maximum size for UpLoaded files in MB,
+\(bu UL<number>: maximum size for UpLoaded files in MB,
 
-	\(bu PC<number>: Persistent Cache (0:off, 1:on),
+\(bu PC<number>: Persistent Cache (0:off, 1:on),
 
-	\(bu WL<number>: persistent Web access logging (0:off, 1:on),
+\(bu WL<number>: persistent web access logging (0:off, 1:on),
 
-	\(bu RL<number>: persistent rWeb access logging (0:off, 1:on).
+\(bu RL<number>: persistent rWeb access logging (0:off, 1:on).
 
 * \fBmachine\fR: machine manufacturer and product name.
 
@@ -60,25 +59,27 @@ The first [1] usage form displays information about the actual system. In this u
 
 * \fBend\fR: subscription period end of the system.
 
-Please note that your appliance should be connected to the internet and have access to registration services (HTTP/HTTPS) in order to allow its subscription renewal.
+Note that your appliance should be connected to the internet and have access to registration services (HTTP/HTTPS) to allow its subscription renewal.
 
-The second [2] usage form allows you to load an OS patch from a file server or automatically from an official Web server. To automatically download a patch from an official Web server use the keyword \fBaload\fR. If you want to explicitly download from a file, only trusted file servers are allowed. Trusted file servers are defined with the command \fBaccess\fR. The explicit download form requires three mandatory arguments. The first argument is the protocol name (\fBftp\fR, \fBtftp\fR or \fBsftp\fR). The second argument is the name or IP address of the file server. The third argument is the patch file name. The \fBapply\fR command must be used to apply a loaded patch. Note that some patches require a system reboot. In this case the system is automatically rebooted.
+The second [2] usage form allows you to load an OS patch from a file server or automatically from an official web server. To automatically download a patch from an official web server use the keyword \fBaload\fR. If you want to explicitly download from a file, only trusted file servers are allowed. Trusted file servers are defined with the command \fBaccess\fR. The explicit download form requires three mandatory arguments. The first argument is the protocol name (\fBftp\fR, \fBtftp\fR or \fBsftp\fR). The second argument is the name or IP address of the file server. The third argument is the patch file name. The \fBapply\fR command must be used to apply a loaded patch. Note that some patches require a system reboot. In this case the system is automatically rebooted.
+
+After patching (completion of the apply command), modifications in the appliance tuner may increase the system resource requirements, particularly RAM usage, depending on the current configuration. To verify that the allocated system resources are sufficient for the active configuration, it is recommended to invoke the \fBapply check\fR command. If your current configuration cannot be applied due to insufficient resources, error messages will be displayed. In this case, you will have two possibilities: upgrade your machine resources or deactivate resource-consuming services. If the error is related to insufficient disk space, the only solution is to reinstall your machine after adding additional disk space.
 
 The third [3] and fourth [4] usage forms allow you to make a full system backup and restore. A system backup contains all necessary files to restore a crashed system on a new machine. Note that a system backup should only be restored on a freshly installed OS. Compared to a saved configuration (see the command \fBconf\fR), a system backup includes not only the logical configuration but also all data uploaded to the system like the antivirus signatures, URL lists, SSL certificates or custom WAF rules. Note that cached objects and archived logs are not part of the backup.
 
-It is important to note that the OS version and tuning parameters (chosen during the installation) in the backup should be the same as the OS version and tuning parameters chosen for the new machine. In addition the CPU architecture and number of network interface devices on the new  machine should be identical to the machine on which the backup has been made. Otherwise the restore operation can fail. As a restoration operation may fail for various reasons, it is highly recommended to test and validate backups prior to rely on them.
+Note that the OS version and tuning parameters (chosen during the installation) in the backup should be the same as the OS version and tuning parameters chosen for the new machine. In addition the CPU architecture and number of network interface devices on the new  machine should be identical to the machine on which the backup has been made. Otherwise the restore operation can fail. As a restoration operation may fail for various reasons, it is highly recommended to test and validate backups prior to rely on them.
 
 \fBCAUTION\fR: as the S/N of a registered appliance is bound to the MAC address of its first NIC (eth0), the first NIC of the new machine should have the same MAC address as the crashed machine. If changing a MAC address on the new machine is not an option, please contact our support services.
 
 Without any argument, the \fBsystem backup\fR command displays the last system backup date and time. A system backup should be first created prior to save it on a file server. To create a system backup, use the keyword \fBcreate\fR. This will launch the system backup operation. The backup operation runs in background unless the \fBwait\fR keyword is used. Depending on your configuration, a system backup could take between 10 seconds and several minutes. The optional keyword \fBreport\fR allows you to display the last system backup report. To delete a previously created or loaded system backup use the keyword \fBclear\fR.
 
-A system backup can only be save on a trusted file servers. Trusted file servers are defined with the command \fBaccess\fR. The \fBsave\fR usage form requires three mandatory arguments. The first argument is the protocol name. Possible values for this argument are \fBftp\fR, \fBsftp\fR and \fBtftp\fR. The second argument is the name or IP address of the file server. The third argument is the system backup file name. To restore a previously saved system backup use the \fBload\fR usage form. To take effect, the command \fBapply\fR should be used after having loaded a system backup. Please note that loading a system backup automatically clear any previousely loaded or created backup.
+A system backup can only be saved on a trusted file servers. Trusted file servers are defined with the command \fBaccess\fR. The \fBsave\fR usage form requires three mandatory arguments. The first argument is the protocol name. Possible values for this argument are \fBftp\fR, \fBsftp\fR and \fBtftp\fR. The second argument is the name or IP address of the file server. The third argument is the system backup file name. To restore a previously saved system backup use the \fBload\fR usage form. To take effect, the command \fBapply\fR should be used after having loaded a system backup. Note that loading a system backup automatically clear any previously loaded or created backup.
 
 The fifth [5] usage form allows you to display a \fBreport\fR on the system activity and its health. It checks critical software and hardware health components and informs you about potential malfunction. Without any optional argument, this command displays a complete report on all components. If an optional argument is given, only a report  related to that component is displayed.
 
 The keyword \fBcpu\fR displays a report of CPU usage, expressed as a percentage and averaged over a period of 10 seconds.
 
-The keyword \fBload\fR displays a report of the combined CPU and disk I/O utilisation, expressed as a relative percentage and averaged over 1, 5, and 15 minutes. It indicates the system load. A value of zero means there is relatively no load, while a value of 100 means the system is relatively fully loaded. Please note that this does not represent a percentage of CPU capacity usage.
+The keyword \fBload\fR displays a report of the combined CPU and disk I/O utilisation, expressed as a relative percentage and averaged over 1, 5, and 15 minutes. It indicates the system load. A value of zero means there is relatively no load, while a value of 100 means the system is relatively fully loaded. Note that this does not represent a percentage of CPU capacity usage.
 
 The keyword \fBmemory\fR displays a report on the RAM and swap memory size.
 
@@ -88,7 +89,7 @@ If the system has been installed with software RAID support, the keyword \fBraid
 
 The keyword \fBlink\fR displays the status of Ethernet links. Associated IP addresses to each Ethernet interface are also displayed. You can use this command to check floating IP addresses configured with the command \fBvrrp\fR.
 
-The keyword \fBgateway\fR displays the status of connected gateways. Please note that only gateways that have been manually added by the \fBip\fR command are monitored (ie. automatically added gateways in public cloud environment are not monitored).
+The keyword \fBgateway\fR displays the status of connected gateways. Note that only gateways that have been manually added by the \fBip\fR command are monitored (ie. automatically added gateways in public cloud environment are not monitored).
 
 The keyword \fBconnection\fR displays the number of active (established) TCP connections per appliance network interface. In addition the total number of all TCP connections in all states (established, syn-sent, syn-recv, fin-wait-1, fin-wait-2, time-wait, closed, close-wait, last-ack, closing and listening) is displayed.
 
@@ -98,7 +99,20 @@ The keyword \fBvpnipsec\fR displays the status of site to site IPsec VPN tunnels
 
 The keyword \fBantivirus\fR displays the status of the last automatic antivirus signatures update.
 
-Finally the keyword \fBcounter\fR displays the total number of blocked or allowed contents until the last log rotation. Please note that a counter is available only if its related logging is activated (see the command \fBlog\fR). The optional argument \fBraz\fR allows you to reset a counter. Counter calculations are made since the system installation or the last reset operation. The real number of blocked or allowed contents can differ from values given by counters as some logs can be deactivated for a period of time and then be reactivated.
+Finally the keyword \fBcounter\fR displays the total number of blocked or allowed contents until the last log rotation. Note that a counter is available only if its related logging is activated (see the command \fBlog\fR). The optional argument \fBraz\fR allows you to reset a counter. Counter calculations are made since the system installation or the last reset operation. The real number of blocked or allowed contents can differ from values given by counters as some logs can be deactivated for a period of time and then be reactivated.
 
 .SH SEE ALSO
-\fBaccess\fR (1) \fBantivirus\fR (1) \fBapply\fR (1) \fBconf\fR (1) \fBfile\fR (1) \fBip\fR (1) \fBjob\fR (1) \fBlog\fR (1) \fBmode\fR (1) \fBreboot\fR (1) \fBregister\fR (1) \fBrweb\fR (1) \fBtransparent\fR (1) \fBvrrp\fR (1)
+.BR access (1),
+.BR antivirus (1),
+.BR apply (1),
+.BR conf (1),
+.BR file (1),
+.BR ip (1),
+.BR job (1),
+.BR log (1),
+.BR mode (1),
+.BR reboot (1),
+.BR register (1),
+.BR rweb (1),
+.BR transparent (1),
+.BR vrrp (1)

@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -31,7 +30,7 @@ select-dyndns()
     local password_id=${5}
     local provider_website_id=${6}
 
-    call-js-function "dynamicDNSSelectCB( '${state_id}', '${provider_id}', '${hostname_id}', '${username_id}', '${password_id}', '${provider_website_id}' )"
+    echo "<div data-init-dynamic-dns-select data-state-id='${state_id}' data-provider-id='${provider_id}' data-hostname-id='${hostname_id}' data-username-id='${username_id}' data-password-id='${password_id}' data-provider-website-id='${provider_website_id}' hidden></div>"
 }
 
 show-dyndns-options()
@@ -110,9 +109,8 @@ show-dyndns-form()
     blankItemContent[${i}]="type='password' size='32' maxlength='${MAX_LEN}' value='${DYNAMIC_DNS_PASSWORD}'" ; ((i++))
     blankItemContent[${i}]=$(show-dyndns-intervals ${DYNAMIC_DNS_INTERVAL}) ; ((i++))
 
-    local cb="dynamicDNSSelectCB( '${state_id}', '${provider_id}', '${hostname_id}', '${username_id}', '${password_id}', '${provider_website_id}' );"
-    itemFormSelectCB[0]=${cb}
-    itemFormSelectCB[1]=${cb}
+    itemData[0]="data-action='dynamic-dns' data-state-id='${state_id}' data-provider-id='${provider_id}' data-hostname-id='${hostname_id}' data-username-id='${username_id}' data-password-id='${password_id}' data-provider-website-id='${provider_website_id}'"
+    itemData[1]=${itemData[0]}
 
     checkItem[3]=domainname
     checkItem[4]=username
@@ -123,7 +121,6 @@ show-dyndns-form()
     local after_function="select-dyndns ${state_id} ${provider_id} ${hostname_id} ${username_id} ${password_id} ${provider_website_id}"
 
     show-title "Dynamic DNS" "enabled" "dynamicdns rweb tls vpnipsec"
-    show-shortcuts-menu
     show-form "${width}" enabled "${after_function}"
 }
 

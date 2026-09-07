@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -29,11 +28,10 @@ show-tls-ca-cert()
     local tls_ca=${1}
     local content_id=${2}
 
-    echo "<div style='clear:left;'></div><br />"
     echo "<div class='table-title'>The TLS object</div>"
     echo "<div id='${content_id}'></div>"
 
-    call-js-function "printTLSCA( '/${GUI_DIR_NAME}/tls-print.${GUI_EXT_NAME}?ca:${tls_ca}+certificate', '${content_id}' );"
+    echo "<div data-init-print-tls-ca data-page='tls-print' data-page-args='ca:${tls_ca}+certificate' data-content-id='${content_id}' hidden></div>"
 }
 
 show-tls-ca-third-load-form()
@@ -71,7 +69,7 @@ show-tls-ca-third-load-form()
     blankItemContent[1]="${tls_ca}"
     blankItemContent[2]="$(show-file-protocol1 ${VALUES[1]:1})"
     blankItemContent[3]=${file_servers}
-    blankItemContent[4]="type='text' size='48' maxlength='128' value='${VALUES[3]}'"
+    blankItemContent[4]="type='text' size='32' maxlength='128' value='${VALUES[3]}'"
 
     checkItem[4]=printable
 
@@ -86,7 +84,6 @@ show-tls-ca-third-load-form()
     shortcutMenuTitle[1]="Accounts"
 
     show-title "Import Other CA Certificate" "${state}" "admin access password sslmediate tls"
-    show-shortcuts-menu
     show-form "${width}" "${state}" "show-tls-ca-cert ${tls_ca} ${content_id}"
 }
 

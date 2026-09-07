@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       Commands
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -363,19 +362,32 @@ urllist-auto-load()
     local prefix=${7}
     local suffix=${8}
 
+    readonly max_update_period=30
+
     local suffixes=$(urllist-get-suffixes ${suffix})
     local last_days_file=${URLLIST_VAR_DIR}/${ul}.${suffix}.${URLLIST_UPDATE}
 
+    local force_create
+
     if test ! -f ${last_days_file} ; then
+	force_create=yes
+    else
+	local last_days ; read last_days < ${last_days_file}
+	test -n "${last_days}" || last_days=0
+
+	local today_seconds=$(date +"%s")
+	local today_days=$[${today_seconds} / 86400]
+	local elapsed_days=$[${today_days} - ${last_days}]
+	test ${elapsed_days} -lt ${max_update_period} || force_create=yes
+    fi
+
+    if test -n "${force_create}" ; then
 	local seconds=$(date +"%s")
 	local days=$[${seconds} / 86400]
 	urllist-load ${days} ${act} ${ul} ${protocol} ${ip} ${fn} create ${prefix} ${suffixes}
 	return ${?}
     fi
 
-    local last_days ; read last_days < ${last_days_file}
-    local today_seconds=$(date +"%s")
-    local today_days=$[${today_seconds} / 86400]
     local days date
 
     ((last_days++))

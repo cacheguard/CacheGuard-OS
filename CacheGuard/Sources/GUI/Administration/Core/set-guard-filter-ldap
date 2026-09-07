@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -26,6 +25,7 @@ set-guard-filter-ldap()
 {
     local pos=0 entry_pos del_pos
     local name_pos base_dn_pos login_attribute_pos filter_pos
+    local base_dn
 
     local transaction=/tmp/${TRANSACTION_FILE}.wadmin.${REMOTE_USER}.${$}
     rm -f ${transaction}
@@ -47,20 +47,26 @@ set-guard-filter-ldap()
 	filter_pos=$[${pos} - ${shift_pos} + 5]
 	
 	if test ${shift_pos} -eq 0 ; then
-	    echo "guard filter ldap del '${VALUES[${name_pos}]}'" >> ${transaction}
+	    echo "guard filter ldap del ${VALUES[${name_pos}]}" >> ${transaction}
 	    ((pos+=6))
 	else
+	    base_dn=${VALUES[${base_dn_pos}]}
+	    filter=${VALUES[${filter_pos}]}
+
+	    base_dn=${base_dn// /}
+	    filter=${filter// /}
+
 	    if test "${VALUES[${entry_pos}]}" == anew -a \
 		-n "${VALUES[${name_pos}]}" -a \
-		-n "${VALUES[${base_dn_pos}]}" -a \
+		-n "${base_dn}" -a \
 		-n "${VALUES[${login_attribute_pos}]}" -a \
-		-n "${VALUES[${filter_pos}]}" ; then
-		echo "guard filter ldap add '${VALUES[${name_pos}]}' '${VALUES[${base_dn_pos}]}' '${VALUES[${login_attribute_pos}]}' '${VALUES[${filter_pos}]}'" >> ${transaction}
+		-n "${filter}" ; then
+		echo "guard filter ldap add ${VALUES[${name_pos}]} ${base_dn} ${VALUES[${login_attribute_pos}]} ${filter}" >> ${transaction}
 	    fi
 	    ((pos+=5))
 	fi
     done
-    
+
     execute-transaction ${transaction}
 }
 

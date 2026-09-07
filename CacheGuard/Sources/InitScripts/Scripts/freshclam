@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       InitScript
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -38,7 +37,7 @@ init-environment()
     LAST_DATE_FILE=${RUN_DIR}/${AV_UPDATE_DATE}
     CURRENT_DATE=$(date +"%s" 2> /dev/null)
 
-    local min_elapsed_time=3660
+    local min_elapsed_time=86400
     local last_date elapsed_time
     unset UPDATE_ALLOWED
 
@@ -55,6 +54,7 @@ init-environment()
     AV_USER=${AV_USER-root}
     AV_GROUP=${AV_GROUP-root}
     AV_DB_DIR=${AV_DB_DIR-/var/clamav}
+    AV_CERTS_DIR=${AV_CERTS_DIR-${LOCAL_DIR}/etc/certs}
 
     if test ${AV_DEBUG} == yes ; then
 	VERBOSITY_OPTION=' --debug'
@@ -70,7 +70,7 @@ init-environment()
     fi
 
     elapsed_time=$((CURRENT_DATE - last_date))
-    test ${elapsed_time} -le ${min_elapsed_time} || UPDATE_ALLOWED=yes
+    test ${elapsed_time} -lt ${min_elapsed_time} || UPDATE_ALLOWED=yes
 
     install -d -m 755 -o ${AV_USER} -g ${AV_GROUP} /run/clamav
 
@@ -114,6 +114,8 @@ reset-clamav-db()
 	rm -f ${AV_DB_DIR}/${db}.{cvd,cld}
 	ret=$[${ret} + ${?}]
     done
+
+    rm -f ${AV_DB_DIR}/*.sign
 
     [ ${ret} -eq 0 ]
     evaluate_retval
@@ -225,9 +227,9 @@ update-clamav-db()
     fi
 
     if test ${AV_DEBUG} == yes ; then
-	${FPROG}${VERBOSITY_OPTION} --user ${AV_USER} --foreground
+	${FPROG}${VERBOSITY_OPTION} --user ${AV_USER} --cvdcertsdir=${AV_CERTS_DIR} --foreground
     else
-	${FPROG}${VERBOSITY_OPTION} --user ${AV_USER} --foreground > /dev/null 2>&1
+	${FPROG}${VERBOSITY_OPTION} --user ${AV_USER} --cvdcertsdir=${AV_CERTS_DIR} --foreground > /dev/null 2>&1
     fi
     retval=${?}
 

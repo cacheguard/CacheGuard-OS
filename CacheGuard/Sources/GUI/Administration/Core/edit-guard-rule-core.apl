@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -31,18 +30,14 @@ show-edit-guard-rule()
     local in_policy_name=${1}
     local state=${2}
 
-    local select_size=16
-    local arrow_sz=25px
-    local length=2
-
     local i=0 elt range
     local policy_name action urllists_col urllists_lst
     local urllist_name policy_title
 
-    local from_urllists_array
-    local to_urllists_array
-
-    local tip_width
+    local available_urllists_array
+    local selected_urllists_array
+    local select1_id='available-countries'
+    local select2_id='selected-countries'
 
     for elt in ${GUARD_RULE_LIST}
     do
@@ -80,8 +75,7 @@ show-edit-guard-rule()
     fi
 
     if test ${in_policy_name} == default ; then
-	tip_width=300
-	echo "<div class='table-title'>${policy_title} URL lists for the <a href='#' onMouseOver='ddrivetip( \"The default policy is applied to end-users not caught by defined policies.\", ${tip_width} );' onMouseOut='hideddrivetip( );'>${in_policy_name}</a> policy.</div>"
+	echo "<div class='table-title'>${policy_title} URL lists for the <a href='#' data-action='show-tooltip' data-tip='The default policy is applied to end-users not caught by defined policies.'>${in_policy_name}</a> policy.</div>"
     else
 
 	local filters_col filters_lst
@@ -110,20 +104,17 @@ show-edit-guard-rule()
 			    case ${filter_type} in
 				ip)
 				    filter_description=$(get-ip-filter ${filter_name})
-				    tip_width=250
 				    ;;
 				"time")
-				    tip_width=250
 				    filter_description=$(get-time-filter ${filter_name})
 				    ;;
 				ldap)
-				    tip_width=400
 				    filter_description=$(get-ldap-filter ${filter_name})
 				    ;;
 				*)
 				    ;;
 			    esac
-			    filter_name="<a href='#' onMouseOver='ddrivetip( \"${filter_description}\", ${tip_width} );' onMouseOut='hideddrivetip( );'>${filter_name}</a>"
+			    filter_name="<a href='#' data-action='show-tooltip' data-tip='${filter_description}'>${filter_name}</a>"
 			    filters="${filters}, [${filter_type}] ${filter_name}"
 			done
 
@@ -139,62 +130,54 @@ show-edit-guard-rule()
 
 	filters=${filters:2}
 
-	echo "<div style='float:left;'>"
-        echo "<span class='shortcut-menu-item' style='float:left;'><a href='/${GUI_DIR_NAME}/edit-guard-policy.${GUI_EXT_NAME}?${in_policy_name}'>Edit <strong>${in_policy_name}</strong> policy</a></span>"
+        echo "<span class='shortcut-menu-item'><a href='/${GUI_DIR_NAME}/edit-guard-policy.${GUI_EXT_NAME}?${in_policy_name}'>Edit <strong>${in_policy_name}</strong> policy</a></span>"
 
-        echo "<span style='float:left; margin:0; margin-top:2px;'>"
+        echo "<span>"
         if test -z "${filters}" ; then
             echo "= { }"
         else
             echo "= { ${filters} }"
         fi
         echo "</span>"
-        echo "</div>"
-
-        echo "<div style='clear:left;'></div>"
         echo "<div class='table-title'>${policy_title} URL lists for the <strong>${in_policy_name}</strong> policy.</div>"
     fi
 
-    echo "<table class='highlight-list' width='500'>"
+    echo "<table class='bi-select-list'>"
     echo "<thead>"
     echo "<tr valign='middle'>"
-    echo "<td class='table-header' width='47%'>Available URL lists</td>"
-    echo "<td class='table-header' style='background:none; background-color:White; border:none'></td>"
-    echo "<td class='table-header' width='47%'>${policy_title} URL lists</td>"
+    echo "<th class='table-header'>Available URL lists</th>"
+    echo "<th></th>"
+    echo "<th class='table-header'>${policy_title} URL lists</th>"
     echo "</tr>"
     echo "</thead>"
     
     echo "<tbody>"
     echo "<tr valign='middle'>"
-    echo "<td style='background-color:White; padding:0; margin:0; padding-top:5px; padding-bottom:5px; border:1px solid LightSteelBlue;'>"
-    echo "<select name='urllist_from' id='urllist_from' multiple size='${select_size}' style='width:100%; border:0;'>"
+    echo "<td>"
+    echo "<select name='${select1_id}' id='${select1_id}' multiple>"
     for urllist_name in ${URLLIST_LIST}
     do
 	! member "${urllists_lst}" ${urllist_name} || continue
-	from_urllists_array="${from_urllists_array},['${urllist_name}','${urllist_name}']"
+	available_urllists_array="${available_urllists_array},[\"${urllist_name}\",\"${urllist_name}\"]"
 	echo "<option value='${urllist_name}' id='${urllist_name}'>${urllist_name}</option>"
     done
     echo "</select>"
     echo "</td>"
 
-    from_urllists_array="[${from_urllists_array:1}]"
+    available_urllists_array="[${available_urllists_array:1}]"
 
-    echo "<td style='background-color:White;padding:0;margin:0;'>"
-    echo "<center><a href='JavaScript:void( 0 );' id='add_button'><img src='/image/right-arrow.png' alt='Add Selected URL lists' title='Add Selected URL lists' align='top' style='height:${arrow_sz}; width:${arrow_sz};' /></a></center>"
+    echo-add-remove-selected-row ${select1_id} ${select2_id} "URL Lists"
 
-    echo "<center><a href='JavaScript:void( 0 );' id='del_button'><img src='/image/left-arrow.png' alt='Remove Selected URL lists' title='Remove Selected URL lists' align='top' border='0' style='height:${arrow_sz}; width:${arrow_sz};' /></a></center>"
-    echo "</td>"
+    echo "<td>"
 
-    echo "<td style='background-color:White; padding:0; margin:0; padding-top:5px; padding-bottom:5px; border:1px solid LightSteelBlue;'>"
-
-    echo "<select name='urllist' id='urllist' multiple size='${select_size}' style='width:100%; border:0;'>"
+    echo "<select name='${select2_id}' id='${select2_id}' multiple>"
     for urllist_name in ${urllists_lst}
     do
 	test ${urllist_name} != self || continue
-	to_urllists_array="${to_urllists_array},['${urllist_name}','${urllist_name}']"
+	selected_urllists_array="${selected_urllists_array},[\"${urllist_name}\",\"${urllist_name}\"]"
 	echo "<option value='${urllist_name}' id='${urllist_name}'>${urllist_name}</option>"
     done
-    to_urllists_array="[${to_urllists_array:1}]"
+    selected_urllists_array="[${selected_urllists_array:1}]"
 
     echo "</select>"
     echo "</td>"
@@ -203,15 +186,13 @@ show-edit-guard-rule()
     echo "</tbody>"
     echo "</table>"
 
-    show-form-begin ${length}
+    show-form-begin
     echo "<input name='policy_name' type='hidden' value='${in_policy_name}' />"
-    echo "<input name='action' type='hidden' value='${action}' />"
-    
-    show-do ${state} ${state} "addHiddenInputFromSelectionItem( 'mainform', 'urllist' )" "setSelectOptions( 'urllist_from', ${from_urllists_array} ); setSelectOptions( 'urllist', ${to_urllists_array} )"
+    echo "<input name='policy_action' type='hidden' value='${action}' />"
+
+    show-do-apply ${state} 'add-hidden-input-from-selection-item' "[\"${select2_id}\"]" before
+    show-do-reset ${state} 'set-select-guard-rule-options' "[\"${select1_id}\",${available_urllists_array},\"${select2_id}\",${selected_urllists_array}]"
     show-form-end
-    echo "<script type='text/javascript'>"
-    echo "initSelectionList( 'urllist_from', 'urllist', 'add_button', 'del_button' );"
-    echo "</script>"
 }
 
 edit-guard-rule()

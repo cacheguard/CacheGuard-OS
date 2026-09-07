@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       Commands
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -896,7 +895,7 @@ show-all-rweb-generic1()
 	return 0
     fi
 
-    local i=0 n=0 elt range
+    local elt range i=0 n=0
     local name filters
 
     local col1=${PRINT_COL}
@@ -1556,7 +1555,7 @@ manage-rweb-http-errors()
 	    fi
 	    ;;
 	raz)
-	    export WAF_RWEB_REWRITE_HTTP_ERRORS_LIST=
+	    unset WAF_RWEB_REWRITE_HTTP_ERRORS_LIST
 	    ;;
 	del)
 	    test -n "${name}" || return 1

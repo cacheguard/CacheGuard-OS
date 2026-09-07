@@ -7,5 +7,8 @@ SecRule REQUEST_URI "^/favicon\.ico$"
 SecRule REQUEST_METHOD "^GET$" id:304,log,auditlog,severity:5,allow,chain
 SecRule REQUEST_URI "^/gui/login\.apl(\?logout)?$"
 
-SecRule REQUEST_METHOD "^POST$" id:306,severity:5,allow,chain
+SecRule REQUEST_METHOD "^GET$" id:306,log,auditlog,severity:5,allow,chain
+SecRule REQUEST_URI "^/gui/auto-logout\.apl\?(touch|check|raz)$"
+
+SecRule REQUEST_METHOD "^POST$" id:308,severity:5,allow,chain
 SecRule REQUEST_BODY "^csrf_cookie=[[:print:]]{0,128}\&authentication=(basic|2fa)\&user=[[:print:]]{0,192}\&password=[[:print:]]{0,96}$"

@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -49,7 +48,6 @@ show-audit()
     local name=${1}
     local log_file=${2}
 
-    local bg_color="style='background-color:Lavender;'"
     local audit_file=${WAUDITDIR}/${name}${log_file}
     test -f ${audit_file} || return 2
 
@@ -173,38 +171,35 @@ show-audit()
 	esac
     done < ${audit_file}
 
-    local title_pct=15
-    local value_pct=85
-
-    local style="style='word-wrap:break-word;'"
-    
     local method=${request[0]/ */}
     local uri=${request[0]/${method} /}
     local version=${uri/* /}
     uri=${uri/ */}
     uri=$(no-html-format "$(url-decode "${uri}")")
-    
-    echo "<table class='highlight-list' style='table-layout:fixed; width:750px; margin-bottom:10px;'>"
+
+    echo "<div class='table-title'>Selected request details</div>"
+
+    echo "<table class='highlight-report'>"
 
     echo "<thead>"
     echo "<tr>"
-    echo "<td width='${title_pct}%' ${bg_color}><strong>Request</strong></td>"
-    echo "<td width='${value_pct}%' ${bg_color}><span ${style}>${method} ${uri}</span></td>"
+    echo "<th class='highlight'>Request</th>"
+    echo "<th class='highlight'><span>${method} ${uri}</span></th>"
     echo "</tr>"
 
     echo "<tr>"
-    echo "<td ${bg_color}><strong>Date</strong></td>"
-    echo "<td ${bg_color}><span ${style}>${date}</td>"
+    echo "<th class='highlight'>Date</th>"
+    echo "<th class='highlight'><span>${date}</th>"
     echo "</tr>"
 
     echo "<tr>"
-    echo "<td ${bg_color}><strong>Version</strong></td>"
-    echo "<td ${bg_color}><span ${style}>${version}</td>"
+    echo "<th class='highlight'>Version</th>"
+    echo "<th class='highlight'><span>${version}</th>"
     echo "</tr>"
 
     echo "<tr>"
-    echo "<td ${bg_color}><strong>Client IP</strong></td>"
-    echo "<td ${bg_color}><span ${style}>${ip}</td>"
+    echo "<th class='highlight'>Client IP</th>"
+    echo "<th class='highlight'><span>${ip}</th>"
     echo "</tr>"
     echo "</thead>"
 
@@ -221,8 +216,8 @@ show-audit()
 
 	if test ${nb} -ne 0 ; then
 	    echo "<tr>"
-	    echo "<td ${bg_color}></td>"
-	    echo "<td ${bg_color}></td>"
+	    echo "<td class='highlight'></td>"
+	    echo "<td class='highlight'></td>"
 	    echo "</tr>"
 	fi
 
@@ -277,13 +272,13 @@ show-audit()
 	fi
 
 	echo "<tr>"
-	echo "<td><strong>Rule ID</strong></td>"
-	echo "<td><span ${style}>${id}</span></td>"
+	echo "<td>Rule ID</td>"
+	echo "<td><span>${id}</span></td>"
 	echo "</tr>"
 
 	echo "<tr>"
-	echo "<td><strong>Status</strong></td>"
-	echo "<td><span ${style}>"
+	echo "<td>Status</td>"
+	echo "<td><span>"
 	case ${status} in
 	    allowed)
 		echo "<font color='DarkSlateGray'>"
@@ -294,7 +289,7 @@ show-audit()
 	    *)
 		if test "${message:9:8}" == "Warning." ; then
 		    status=allowed
-		    echo "<font color='DarkSlateGray'>"
+		    echo "<font color='SeaGreen'>"
 		else
 		    status='<i>unknown</i>'
 		    echo "<font color='DarkSlateGray'>"
@@ -305,8 +300,8 @@ show-audit()
 	echo "</tr>"
 
 	echo "<tr>"
-	echo "<td><strong>Severity</strong></td>"
-	echo "<td><span ${style}>${severity}</span></td>"
+	echo "<td>Severity</td>"
+	echo "<td><span>${severity}</span></td>"
 	echo "</tr>"
 
 	if test ${id} -lt ${WAF_RULE_ID_INIT} ; then
@@ -315,14 +310,14 @@ show-audit()
 
 	    if test -n "${generic_filter}" ; then
 		echo "<tr>"
-		echo "<td><strong>Generic Filter</strong></td>"
-		echo "<td><span ${style}>${generic_filter}</span></td>"
+		echo "<td>Generic Filter</td>"
+		echo "<td><span>${generic_filter}</span></td>"
 		echo "</tr>"
 	    fi
 	fi
 	echo "<tr>"
-	echo "<td><strong>Message</strong></td>"
-	echo "<td><span ${style}>${msg}</span></td>"
+	echo "<td>Message</td>"
+	echo "<td><span>${msg}</span></td>"
 	echo "</tr>"
 
 	((nb++))
@@ -330,20 +325,20 @@ show-audit()
 
     if test -n "${ipost}" ; then
 	echo "<tr>"
-	echo "<td><strong>Post Args</strong></td>"
-	echo "<td><span ${style}>${ipost[0]}</span></td>"
+	echo "<td>Post Args</td>"
+	echo "<td><span>${ipost[0]}</span></td>"
 	echo "</tr>"
     fi
 
     if test -n "${cpost}" ; then
 	echo "<tr>"
-	echo "<td><strong>Post Args</strong></td>"
-	echo "<td><span ${style}>${cpost[0]}</span></td>"
+	echo "<td>Post Args</td>"
+	echo "<td><span>${cpost[0]}</span></td>"
 	echo "</tr>"
     elif test -n "${cppost}" ; then
 	echo "<tr>"
-	echo "<td><strong>Post Content</strong></td>"
-	echo "<td><span ${style}>"
+	echo "<td>Post Content</td>"
+	echo "<td><span>"
 	for ((i=0;i<cp;i++))
 	do
 	    echo "${cppost[${i}]}<br />"

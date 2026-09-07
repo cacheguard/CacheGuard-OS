@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -30,48 +29,33 @@ show-authenticate-ldap-server-form()
     local width=${DEFAULT_LIST_FORM_WIDTH}
     local state
 
-    itemWidth[1]=10
-    itemWidth[3]=25
-    itemWidth[4]=10
-
     itemTitle[0]=''
     itemTitle[1]="Protocol"
-    itemTitle[2]="Server name"
-    itemTitle[3]="IP Address"
-    itemTitle[4]="Port"
+    itemTitle[2]="Network IP or Name"
+    itemTitle[3]="Port"
     
     itemID[0]="LDAP Server"
     itemID[1]="protocol"
     itemID[2]="name"
-    itemID[3]="ip"
-    itemID[4]="port"
+    itemID[3]="port"
 
     blankItemContent[0]=""
     blankItemContent[1]="ldap ldaps sldap"
     blankItemContent[2]="type='text' size='24' maxlength='${MAX_LEN}'"
-    blankItemContent[3]="type='text' size='15' maxlength='15'"
-    blankItemContent[4]="type='text' size='5' maxlength='5'"
+    blankItemContent[3]="type='text' size='5' maxlength='5'"
 
     checkItem[2]=domainname
-    checkItem[3]=ip
-    checkItem[4]=port
+    checkItem[3]=port
 
     itemForm[1]="select"
 
-    shortcutMenuItem[0]="network-utilities"
+    shortcutMenuItem[0]="diagnostic-tools"
     shortcutMenuTitle[0]="Test Authentication"
 
     listContent=${LDAP_SERVER_LIST}
     test -n "${listContent}" || state=disabled
 
     show-title "LDAP Authentication Servers" "${state}" "authenticate"
-
-    test \
-	-z "${CURRENT_LDAP_SERVER_LIST}" -o \
-	"${CURRENT_AUTHENTICATE_MODE}" == False -o \
-	"${CURRENT_AUTHENTICATE_LDAP}" == False \
-	|| show-shortcuts-menu
-
     show-list-form ${MAX_LDAP_SERVER_NB} "${width}" "${page_ref}"
 }
 

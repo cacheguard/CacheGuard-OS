@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       Commands
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -135,9 +134,9 @@ __complete-help()
 		    COMPREPLY=(guard)
 		    ;;
 		h)
-		    COMPREPLY=('' halt help history hostname)
+		    COMPREPLY=('' ha halt help history hostname)
 		    ;;
-		ha|hal|halt)
+		hal|halt)
 		    COMPREPLY=(halt)
 		    ;;
 		he|hel|help)
@@ -302,7 +301,7 @@ __complete-help()
 		    COMPREPLY=(warning)
 		    ;;
 		'')
-		    COMPREPLY=('' '<RET>' access admin antivirus apply authenticate bond cancel clear clock conf countrylist dns domainname dynamicdns email error exit factoryreset firewall guard halt help hostname information ip job keyboard log mode manager ntp password peer port qos reboot setup service sslmediate system timezone timezonelist transaction urllist vrrp vlan vpnipsec waf warning)
+		    COMPREPLY=('' '<RET>' access admin antivirus apply authenticate bond cancel clear clock conf countrylist dns domainname dynamicdns email error exit factoryreset firewall guard ha halt help hostname information ip job keyboard log mode manager ntp password peer port qos reboot setup service sslmediate system timezone timezonelist transaction urllist vrrp vlan vpnipsec waf warning)
 		    ;;
 		*)
 		    COMPREPLY=()

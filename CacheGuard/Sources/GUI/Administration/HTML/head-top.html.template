@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+<meta charset="UTF-8">
+
+<link rel="shortcut icon" type="image/x-image" href="/favicon.ico" />
+<link rel="stylesheet" type="text/css" href="/ddsmoothmenu-@GUI_FE_VERSION@.css" />
+<link rel="stylesheet" type="text/css" href="/ddaccordion-@GUI_FE_VERSION@.css" />
+<link rel="stylesheet" type="text/css" href="/ddtooltip-@GUI_FE_VERSION@.css" />
+<link rel="stylesheet" type="text/css" href="/scrolltopcontrol-@GUI_FE_VERSION@.css" />
+<link rel="stylesheet" type="text/css" href="/tabcontent-@GUI_FE_VERSION@.css" />
+<link rel="stylesheet" type="text/css" href="/animatedcollapse-@GUI_FE_VERSION@.css" />
+<link rel="stylesheet" type="text/css" href="/apl-@ROLE@-@GUI_FE_VERSION@.css" />
+<link rel="stylesheet" type="text/css" href="/apl-@GUI_FE_VERSION@.css" />
+<link rel="stylesheet" type="text/css" href="/apl-window-@GUI_FE_VERSION@.css" />
+<link rel="stylesheet" type="text/css" href="/apl-chart-@GUI_FE_VERSION@.css" />
+
+<script type="text/javascript" src="/js/apl-constant-@GUI_FE_VERSION@.js"></script>
+<script type="text/javascript" src="/js/apl-var-@GUI_FE_VERSION@.js"></script>
+<script type='text/javascript' src='/js/apl-mosaic-constant-@GUI_FE_VERSION@.js'></script>
+
+<script type="text/javascript" src="/js/jquery.min-@GUI_FE_VERSION@.js"></script>
+<script type="text/javascript" src="/js/animatedcollapse-@GUI_FE_VERSION@.js"></script>
+<script type="text/javascript" src="/js/ddsmoothmenu-@GUI_FE_VERSION@.js"></script>
+<script type="text/javascript" src="/js/ddaccordion-@GUI_FE_VERSION@.js"></script>
+<script type="text/javascript" src="/js/ajaxpage-@GUI_FE_VERSION@.js"></script>
+<script type="text/javascript" src="/js/qrcode.min-@GUI_FE_VERSION@.js"></script>
+<script type="text/javascript" src="/js/tabcontent-@GUI_FE_VERSION@.js"></script>
+<script type="text/javascript" src="/js/d3.min-@GUI_FE_VERSION@.js"></script>
+<script type='text/javascript' src='/js/ddtooltip-@GUI_FE_VERSION@.js' defer></script>
+<script type='text/javascript' src='/js/scrolltopcontrol-@GUI_FE_VERSION@.js' defer></script>
+
+<script type='text/javascript' src='/js/apl-window-@GUI_FE_VERSION@.js'></script>
+<script type='text/javascript' src='/js/apl-mosaic-@GUI_FE_VERSION@.js'></script>
+<script type="text/javascript" src="/js/apl-chart-@GUI_FE_VERSION@.js"></script>
+<script type="text/javascript" src="/js/apl-file-exchange-@GUI_FE_VERSION@.js"></script>
+<script type="text/javascript" src="/js/apl-@GUI_FE_VERSION@.js"></script>
+<script type="text/javascript" src="/js/apl-init-@GUI_FE_VERSION@.js" defer></script>

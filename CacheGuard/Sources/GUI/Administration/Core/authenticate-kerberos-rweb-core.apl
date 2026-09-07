@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -35,8 +34,8 @@ show-kerberos-rweb-form()
     itemWidth[1]=55
 
     itemTitle[1]="Website Name"
-    itemTitle[2]="Canonical Name"
-    
+    itemTitle[2]="Canonical Service Name"
+
     itemID[0]="Kerberos RWeb"
     itemID[1]="site_name"
     itemID[2]="canonical_name"
@@ -45,9 +44,9 @@ show-kerberos-rweb-form()
 
     blankItemContent[0]=""
     blankItemContent[1]=$(show-uniq-rweb-sites)
-    blankItemContent[2]="type='text' size='15' maxlength='14'"
+    blankItemContent[2]="type='text' size='15' maxlength='15'"
 
-    checkItem[2]=hostname
+    checkItem[2]=computer_name
 
     shortcutMenuItem[0]="authenticate-kerberos-create"
     shortcutMenuTitle[0]="Kerberos Initialization"
@@ -57,13 +56,6 @@ show-kerberos-rweb-form()
     show-title "Kerberos Authentication for Reverse Websites" "${state}" "authenticate rweb"
 
     nb=$(rweb-site-nb)
-
-    test \
-	-z "${CURRENT_KERBEROS_SERVER_LIST}" -o \
-	"${CURRENT_AUTHENTICATE_MODE}" == False -o \
-	"${CURRENT_AUTHENTICATE_KERBEROS}" == False \
-	|| show-shortcuts-menu
-
     show-list-form ${nb} "${width}" "${page_ref}"
 }
 

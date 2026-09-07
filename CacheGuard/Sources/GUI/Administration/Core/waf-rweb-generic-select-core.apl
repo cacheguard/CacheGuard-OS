@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -36,8 +35,8 @@ show-filter-rweb-select-form()
     echo "<table class='highlight-list' width='${width}'>"
     echo "<thead>"
     echo "<tr>"
-    echo "<td class='table-header' width='80%'>Site Name</td>"
-    echo "<td class='table-header' width='20%'><center>Generic<br />Filter</center></td>"
+    echo "<th class='table-header' width='80%'>Site Name</th>"
+    echo "<th class='table-header' width='20%'><center>Generic<br />Filter</center></th>"
     echo "</tr>"
     echo "</thead>"
     
@@ -72,10 +71,9 @@ show-filter-rweb-select-form()
 
     if test -z "${RWEB_SITE_LIST}" ; then
 	echo "<br />"
-	echo "<div style='clear:left;'></div>"
 	echo "<div class='table-title'>"
-	echo "<span class='table-title' style='fload:left;'>&lt;no reverse Web site has been defined&gt;</span>"
-	echo "<span class='shortcut-menu-item' style='display:inline;'><a href='rweb-site.${GUI_EXT_NAME}'>Add rWeb</a></span>"
+	echo "<span class='table-title'>&lt;no reverse Web site has been defined&gt;</span>"
+	echo "<span class='shortcut-menu-item'><a href='rweb-site.${GUI_EXT_NAME}'>Add rWeb</a></span>"
 	echo "</div>"
     fi
 

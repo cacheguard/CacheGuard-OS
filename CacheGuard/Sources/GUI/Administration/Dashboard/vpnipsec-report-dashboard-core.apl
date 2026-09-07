@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -24,28 +23,24 @@
 
 show-system-report-vpnipsec-site()
 {
-    local width="400"
-
     if test ! -s ${RUN_DIR}/${VPN_IPSEC_SITE_STATE_FILENAME} ; then
         echo "<div class='core-form'>"
-	echo-content-unavailable ${width} "This is no entry in this report yet."
+	echo-unavailable-message "this is no entry in this report yet."
         echo "</div>"
         return 0
     fi
 
     echo "<div class='core-form'>"
 
-    echo "<table class='highlight-form' style='margin-bottom:5px;' width='${width}'>"
-    display-appliance-time-row right
-    echo "</table>"
+    test ${display_time} != time || display-appliance-time-table
 
-    echo "<table class='highlight-list' width='${width}'>"
+    echo "<table class='highlight-list compact'>"
 
     echo "<thead>"
     echo "<tr>"
-    echo "<td class='table-header indicator-table-header' width='50%' align='center'>Remote Site Name</td>"
-    echo "<td class='table-header indicator-table-header' width='35%' align='center'>Remote IP</td>"
-    echo "<td class='table-header' width='15%' align='center'>State</td>"
+    echo "<th class='table-header' width='50%' align='center'>Remote Site Name</th>"
+    echo "<th class='table-header' width='35%' align='center'>Remote IP</th>"
+    echo "<th class='table-header' width='15%' align='center'>State</th>"
     echo "</tr>"
     echo "</thead>"
 

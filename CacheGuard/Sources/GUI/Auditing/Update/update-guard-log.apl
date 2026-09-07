@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -35,39 +34,41 @@ show-log()
     local log=/var/log/${ACCESS_GUARD_LOG}
 
     if test ! -s "${log}" ; then
-	echo "<div style='font-style:italic;'>&lt;The denied URLs log is empty&gt;</div>"
+	echo-unavailable-message "the denied URLs log is empty."
 	return 0
     fi
 
     local time code req url ip user method rest
     local i=0
-    local style="style='word-wrap:break-word;'"
 
-    echo "<table class='highlight-list' width:100%;'>"
+    echo "<table class='highlight-log'>"
     echo "<thead>"
     echo "<tr>"
-    echo "<td class='table-header'><strong>Date</strong></td>"
-    echo "<td class='table-header'><strong>Client IP</strong></td>"
-    echo "<td class='table-header'><strong>Auth User</strong></td>"
-    echo "<td class='table-header'><strong>Category</strong></td>"
-    echo "<td class='table-header'><strong>URL</strong></td>"
+    echo "<th class='table-header'><strong>Date</strong></th>"
+    echo "<th class='table-header'><strong>Time</strong></th>"
+    echo "<th class='table-header'><strong>Client IP</strong></th>"
+    echo "<th class='table-header'><strong>Auth User</strong></th>"
+    echo "<th class='table-header'><strong>Category</strong></th>"
+    echo "<th class='table-header'><strong>URL</strong></th>"
     echo "</tr>"
     echo "</thead>"
     
     echo "<tbody>"
 
-    tac ${log} | while read time code req url ip user method rest
+    tac ${log} | while read date time code req url ip user method rest
     do
+	test -n "${method}" || continue
 	test ${i} -lt ${number} || break
 	req=${req/Request(/}
 	req=${req/\/-)/}
 	req=${req/*\//}
 	echo "<tr>"
-	echo "<td><span ${style}>${date} ${time}</span></td>"
-	echo "<td><span ${style}>${ip/\/*/}</span></td>"
-	echo "<td><span ${style}>${user}</span></td>"
-        echo "<td><span ${style}>${req}</span></td>"
-        echo "<td><span ${style}>${url}</span></td>"
+	echo "<td><span>${date}</span></td>"
+	echo "<td><span>${time}</span></td>"
+	echo "<td><span>${ip/\/*/}</span></td>"
+	echo "<td><span>${user}</span></td>"
+        echo "<td><span>${req}</span></td>"
+        echo "<td><span>${url}</span></td>"
 	echo "</tr>"
 	((i++))
     done

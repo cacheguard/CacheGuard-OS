@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -22,36 +21,25 @@
 #
 ###########################################################################
 
-show-ha-system-title()
-{
-    echo "<div class='table-title'>Please select your action on this "
-    if test "${CURRENT_HA_MODE}" == False ; then
-        echo "stand alone system:"
-    else
-	echo "HA (High Availability) node:"
-    fi
-    echo "</div>"
-}
-
 show-power-state-radio-buttons()
 {
     test -n "${1}" || return 1
     local id=${1}
 
-    local i=0 n actionT stateT titleT
-    declare -a  actionT stateT titleT
+    local i=0 n operationT stateT titleT
+    declare -a  operationT stateT titleT
 
-    actionT[${i}]="reboot" ; stateT[${i}]="" ; titleT[${i}]="Reboot" ; ((i++))
-    actionT[${i}]="halt" ; stateT[${i}]="" ; titleT[${i}]="Power Off" ; ((i++))
-    actionT[${i}]="ha-active" ; stateT[${i}]="" ; titleT[${i}]="HA Node On" ; ((i++))
-    actionT[${i}]="ha-failover" ; stateT[${i}]="" ; titleT[${i}]="HA Node Off" ; ((i++))
+    operationT[${i}]="reboot" ; stateT[${i}]="" ; titleT[${i}]="Reboot" ; ((i++))
+    operationT[${i}]="halt" ; stateT[${i}]="" ; titleT[${i}]="Power Off" ; ((i++))
+    operationT[${i}]="ha-active" ; stateT[${i}]="" ; titleT[${i}]="HA Node On" ; ((i++))
+    operationT[${i}]="ha-failover" ; stateT[${i}]="" ; titleT[${i}]="HA Node Off" ; ((i++))
     ((n = i))
     
     if test "${CURRENT_HA_MODE}" == False ; then
 	for ((i=2 ; i<n ; i++))
 	do
 	    stateT[${i}]="disabled "
-	    titleT[${i}]="<span style='color:LightSlateGray;'>${titleT[${i}]}</span>"
+	    titleT[${i}]="<span class='unavailable-item'>${titleT[${i}]}</span>"
 	done
     fi
 
@@ -59,8 +47,8 @@ show-power-state-radio-buttons()
     for ((i=0 ; i<n ; i++))
     do
 	echo "<tr>"
-	echo "<td height='20' width='90%'><label for='${actionT[${i}]}'>${titleT[${i}]}</label></td>"
-	echo "<td height='20' align='right'><input style='margin:0; margin-top:5px;' ${stateT[${i}]}type='radio' name='${id}' id='${actionT[${i}]}' value='${actionT[${i}]}' /></td>"
+	echo "<td height='20' width='90%'><label for='${operationT[${i}]}'>${titleT[${i}]}</label></td>"
+	echo "<td height='20' align='right'><input ${stateT[${i}]}type='radio' name='${id}' id='${operationT[${i}]}' value='${operationT[${i}]}' /></td>"
 	echo "</tr>"
     done
     echo "</table>"
@@ -74,9 +62,8 @@ show-power-form()
     show-title "Reboot | Halt | HA State" "${state}" "ha mode reboot halt"
 
     echo "<div class='core-form'>"
-    show-ha-system-title
-    show-form-begin 1
-    show-power-state-radio-buttons action
+    show-form-begin
+    show-power-state-radio-buttons operation
     show-do ${state}
     show-form-end
     echo "</div>"

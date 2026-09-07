@@ -17,190 +17,320 @@
 	//1) Added ability to customize reveal animation speed (# of steps)
 	//2) Menu now works in IE8 beta2 (a valid doctype at the top of the page is required)
 
-var cssdropdown={
-disappeardelay: 250, //set delay in miliseconds before menu disappears onmouseout
-dropdownindicator: '<img src="/image/down.gif" border="0" />', //specify full HTML to add to end of each menu item with a drop down menu
-enablereveal: [true, 5], //enable swipe effect? [true/false, steps (Number of animation steps. Integer between 1-20. Smaller=faster)]
-enableiframeshim: 1, //enable "iframe shim" in IE5.5 to IE7? (1=yes, 0=no)
+//Version 2.6: Auguts 17th, 20226
+//** Modifications made by CacheGuard Technologies SAS (FR): the menu has been updated to comply with Content Security Policy (CSP) requirements. Dynamic JavaScript evaluation and document-based HTML injection have been removed.
 
-//No need to edit beyond here////////////////////////
+var cssdropdown = {
+    disappeardelay: 250,
+    dropdownindicator: "/image/down.gif",
+    enablereveal: [true, 5],
+    enableiframeshim: 1,
+    dropmenuobj: null,
+    asscmenuitem: null,
+    domsupport: !!document.getElementById,
+    standardbody: null,
+    iframeshimadded: false,
+    revealtimers: {},
+    delayhide: null,
+    shimobject: null,
 
-dropmenuobj: null, asscmenuitem: null, domsupport: document.all || document.getElementById, standardbody: null, iframeshimadded: false, revealtimers: {},
+    getposOffset: function( what, offsettype ) {
+        var totaloffset = offsettype === "left" ? what.offsetLeft : what.offsetTop;
+        var parentEl = what.offsetParent;
 
-getposOffset:function(what, offsettype){
-	var totaloffset=(offsettype=="left")? what.offsetLeft : what.offsetTop;
-	var parentEl=what.offsetParent;
-	while (parentEl!=null){
-		totaloffset=(offsettype=="left")? totaloffset+parentEl.offsetLeft : totaloffset+parentEl.offsetTop;
-		parentEl=parentEl.offsetParent;
-	}
-	return totaloffset;
-},
+        while ( parentEl !== null ) {
+            totaloffset += offsettype === "left" ? parentEl.offsetLeft : parentEl.offsetTop;
+            parentEl = parentEl.offsetParent;
+        }
 
-css:function(el, targetclass, action){
-	var needle=new RegExp("(^|\\s+)"+targetclass+"($|\\s+)", "ig")
-	if (action=="check")
-		return needle.test(el.className)
-	else if (action=="remove")
-		el.className=el.className.replace(needle, "")
-	else if (action=="add" && !needle.test(el.className))
-		el.className+=" "+targetclass
-},
+        return totaloffset;
+    },
 
-showmenu:function(dropmenu, e){
-	if (this.enablereveal[0]){
-		if (!dropmenu._trueheight || dropmenu._trueheight<10)
-			dropmenu._trueheight=dropmenu.offsetHeight
-		clearTimeout(this.revealtimers[dropmenu.id])
-		dropmenu.style.height=dropmenu._curheight=0
-		dropmenu.style.overflow="hidden"
-		dropmenu.style.visibility="visible"
-		this.revealtimers[dropmenu.id]=setInterval(function(){cssdropdown.revealmenu(dropmenu)}, 10)
-	}
-	else{
-		dropmenu.style.visibility="visible"
-	}
-	this.css(this.asscmenuitem, "selected", "add")
-},
+    css: function( el, targetclass, action ) {
+        if ( !el )
+            return;
 
-revealmenu:function(dropmenu, dir){
-	var curH=dropmenu._curheight, maxH=dropmenu._trueheight, steps=this.enablereveal[1]
-	if (curH<maxH){
-		var newH=Math.min(curH, maxH)
-		dropmenu.style.height=newH+"px"
-		dropmenu._curheight= newH + Math.round((maxH-newH)/steps) + 1
-	}
-	else{ //if done revealing menu
-		dropmenu.style.height="auto"
-		dropmenu.style.overflow="hidden"
-		clearInterval(this.revealtimers[dropmenu.id])
-	}
-},
+        var needle = new RegExp( "(^|\\s+)" + targetclass + "($|\\s+)", "ig" );
 
-clearbrowseredge:function(obj, whichedge){
-	var edgeoffset=0
-	if (whichedge=="rightedge"){
-		var windowedge=document.all && !window.opera? this.standardbody.scrollLeft+this.standardbody.clientWidth-15 : window.pageXOffset+window.innerWidth-15
-		var dropmenuW=this.dropmenuobj.offsetWidth
-		if (windowedge-this.dropmenuobj.x < dropmenuW)  //move menu to the left?
-			edgeoffset=dropmenuW-obj.offsetWidth
-	}
-	else{
-		var topedge=document.all && !window.opera? this.standardbody.scrollTop : window.pageYOffset
-		var windowedge=document.all && !window.opera? this.standardbody.scrollTop+this.standardbody.clientHeight-15 : window.pageYOffset+window.innerHeight-18
-		var dropmenuH=this.dropmenuobj._trueheight
-		if (windowedge-this.dropmenuobj.y < dropmenuH){ //move up?
-			edgeoffset=dropmenuH+obj.offsetHeight
-			if ((this.dropmenuobj.y-topedge)<dropmenuH) //up no good either?
-				edgeoffset=this.dropmenuobj.y+obj.offsetHeight-topedge
-		}
-	}
-	return edgeoffset
-},
+        if ( action === "check" )
+            return needle.test( el.className );
 
-dropit:function(obj, e, dropmenuID){
-	if (this.dropmenuobj!=null) //hide previous menu
-		this.hidemenu() //hide menu
-	this.clearhidemenu()
-	this.dropmenuobj=document.getElementById(dropmenuID) //reference drop down menu
-	this.asscmenuitem=obj //reference associated menu item
-	this.showmenu(this.dropmenuobj, e)
-	this.dropmenuobj.x=this.getposOffset(obj, "left")
-	this.dropmenuobj.y=this.getposOffset(obj, "top")
-	this.dropmenuobj.style.left=this.dropmenuobj.x-this.clearbrowseredge(obj, "rightedge")+"px"
-	this.dropmenuobj.style.top=this.dropmenuobj.y-this.clearbrowseredge(obj, "bottomedge")+obj.offsetHeight+1+"px"
-	this.positionshim() //call iframe shim function
-},
+        if ( action === "remove" ) {
+            el.className = el.className.replace( needle, " " ).trim( );
+            return;
+        }
 
-positionshim:function(){ //display iframe shim function
-	if (this.iframeshimadded){
-		if (this.dropmenuobj.style.visibility=="visible"){
-			this.shimobject.style.width=this.dropmenuobj.offsetWidth+"px"
-			this.shimobject.style.height=this.dropmenuobj._trueheight+"px"
-			this.shimobject.style.left=parseInt(this.dropmenuobj.style.left)+"px"
-			this.shimobject.style.top=parseInt(this.dropmenuobj.style.top)+"px"
-			this.shimobject.style.display="block"
-		}
-	}
-},
+        if ( action === "add" && !needle.test( el.className ) )
+            el.className = ( el.className + " " + targetclass ).trim( );
+    },
 
-hideshim:function(){
-	if (this.iframeshimadded)
-		this.shimobject.style.display='none'
-},
+    showmenu: function( dropmenu ) {
+        if ( !dropmenu )
+            return;
 
-isContained:function(m, e){
-	var e=window.event || e
-	var c=e.relatedTarget || ((e.type=="mouseover")? e.fromElement : e.toElement)
-	while (c && c!=m)try {c=c.parentNode} catch(e){c=m}
-	if (c==m)
-		return true
-	else
-		return false
-},
+        if ( this.enablereveal[0] ) {
+            if ( !dropmenu._trueheight || dropmenu._trueheight < 10 )
+                dropmenu._trueheight = dropmenu.offsetHeight;
 
-dynamichide:function(m, e){
-	if (!this.isContained(m, e)){
-		this.delayhidemenu()
-	}
-},
+            clearInterval( this.revealtimers[dropmenu.id] );
 
-delayhidemenu:function(){
-	this.delayhide=setTimeout("cssdropdown.hidemenu()", this.disappeardelay) //hide menu
-},
+            dropmenu.style.height = "0px";
+            dropmenu._curheight = 0;
+            dropmenu.style.overflow = "hidden";
+            dropmenu.style.visibility = "visible";
 
-hidemenu:function(){
-	this.css(this.asscmenuitem, "selected", "remove")
-	this.dropmenuobj.style.visibility='hidden'
-	this.dropmenuobj.style.left=this.dropmenuobj.style.top="-1000px"
-	this.hideshim()
-},
+            var self = this;
 
-clearhidemenu:function(){
-	if (this.delayhide!="undefined")
-		clearTimeout(this.delayhide)
-},
+            this.revealtimers[dropmenu.id] = setInterval( function( ) {
+                self.revealmenu( dropmenu );
+            }, 10 );
+        }
+        else {
+            dropmenu.style.visibility = "visible";
+        }
 
-addEvent:function(target, functionref, tasktype){
-	if (target.addEventListener)
-		target.addEventListener(tasktype, functionref, false);
-	else if (target.attachEvent)
-		target.attachEvent('on'+tasktype, function(){return functionref.call(target, window.event)});
-},
+        this.css( this.asscmenuitem, "selected", "add" );
+    },
 
-startchrome:function(){
-	if (!this.domsupport)
-		return
-	this.standardbody=(document.compatMode=="CSS1Compat")? document.documentElement : document.body
-	for (var ids=0; ids<arguments.length; ids++){
-		var menuitems=document.getElementById(arguments[ids]).getElementsByTagName("a")
-		for (var i=0; i<menuitems.length; i++){
-			if (menuitems[i].getAttribute("rel")){
-				var relvalue=menuitems[i].getAttribute("rel")
-				var asscdropdownmenu=document.getElementById(relvalue)
-				this.addEvent(asscdropdownmenu, function(){cssdropdown.clearhidemenu()}, "mouseover")
-				this.addEvent(asscdropdownmenu, function(e){cssdropdown.dynamichide(this, e)}, "mouseout")
-				this.addEvent(asscdropdownmenu, function(){cssdropdown.delayhidemenu()}, "click")
-				try{
-					menuitems[i].innerHTML=menuitems[i].innerHTML+" "+this.dropdownindicator
-				}catch(e){}
-				this.addEvent(menuitems[i], function(e){ //show drop down menu when main menu items are mouse over-ed
-					if (!cssdropdown.isContained(this, e)){
-						var evtobj=window.event || e
-						cssdropdown.dropit(this, evtobj, this.getAttribute("rel"))
-					}
-				}, "mouseover")
-				this.addEvent(menuitems[i], function(e){cssdropdown.dynamichide(this, e)}, "mouseout") //hide drop down menu when main menu items are mouse out
-				this.addEvent(menuitems[i], function(){cssdropdown.delayhidemenu()}, "click") //hide drop down menu when main menu items are clicked on
-			}
-		} //end inner for
-	} //end outer for
-	if (this.enableiframeshim && document.all && !window.XDomainRequest && !this.iframeshimadded){ //enable iframe shim in IE5.5 thru IE7?
-		document.write('<IFRAME id="iframeshim" src="about:blank" frameBorder="0" scrolling="no" style="left:0; top:0; position:absolute; display:none;z-index:90; background: transparent;"></IFRAME>')
-		this.shimobject=document.getElementById("iframeshim") //reference iframe object
-		this.shimobject.style.filter='progid:DXImageTransform.Microsoft.Alpha(style=0,opacity=0)'
-		this.iframeshimadded=true
-	}
-} //end startchrome
+    revealmenu: function( dropmenu ) {
+        var curH = dropmenu._curheight;
+        var maxH = dropmenu._trueheight;
+        var steps = this.enablereveal[1];
 
-}
+        if ( curH < maxH ) {
+            var newH = Math.min( curH, maxH );
+
+            dropmenu.style.height = newH + "px";
+            dropmenu._curheight = newH + Math.round( ( maxH - newH ) / steps ) + 1;
+        }
+        else {
+            dropmenu.style.height = "auto";
+            dropmenu.style.overflow = "hidden";
+            clearInterval( this.revealtimers[dropmenu.id] );
+        }
+    },
+
+    clearbrowseredge: function( obj, whichedge ) {
+        var edgeoffset = 0;
+
+        if ( whichedge === "rightedge" ) {
+            var windowedge = this.standardbody.scrollLeft + this.standardbody.clientWidth - 15;
+            var dropmenuW = this.dropmenuobj.offsetWidth;
+
+            if ( windowedge - this.dropmenuobj.x < dropmenuW )
+                edgeoffset = dropmenuW - obj.offsetWidth;
+        }
+        else {
+            var topedge = window.pageYOffset;
+            var windowedge = window.pageYOffset + window.innerHeight - 18;
+            var dropmenuH = this.dropmenuobj._trueheight;
+
+            if ( windowedge - this.dropmenuobj.y < dropmenuH ) {
+                edgeoffset = dropmenuH + obj.offsetHeight;
+
+                if ( this.dropmenuobj.y - topedge < dropmenuH )
+                    edgeoffset = this.dropmenuobj.y + obj.offsetHeight - topedge;
+            }
+        }
+
+        return edgeoffset;
+    },
+
+    dropit: function( obj, e, dropmenuID ) {
+        if ( this.dropmenuobj !== null )
+            this.hidemenu( );
+
+        this.clearhidemenu( );
+
+        this.dropmenuobj = document.getElementById( dropmenuID );
+        this.asscmenuitem = obj;
+
+        if ( !this.dropmenuobj )
+            return;
+
+        this.dropmenuobj.x = this.getposOffset( obj, "left" );
+        this.dropmenuobj.y = this.getposOffset( obj, "top" );
+
+        this.showmenu( this.dropmenuobj );
+
+        this.dropmenuobj.style.left = this.dropmenuobj.x - this.clearbrowseredge( obj, "rightedge" ) + "px";
+        this.dropmenuobj.style.top = this.dropmenuobj.y - this.clearbrowseredge( obj, "bottomedge" ) + obj.offsetHeight + 1 + "px";
+
+        this.positionshim( );
+    },
+
+    positionshim: function( ) {
+        if ( !this.iframeshimadded || !this.dropmenuobj )
+            return;
+
+        if ( this.dropmenuobj.style.visibility === "visible" ) {
+            this.shimobject.style.width = this.dropmenuobj.offsetWidth + "px";
+            this.shimobject.style.height = this.dropmenuobj._trueheight + "px";
+            this.shimobject.style.left = parseInt( this.dropmenuobj.style.left, 10 ) + "px";
+            this.shimobject.style.top = parseInt( this.dropmenuobj.style.top, 10 ) + "px";
+            this.shimobject.style.display = "block";
+        }
+    },
+
+    hideshim: function( ) {
+        if ( this.iframeshimadded )
+            this.shimobject.style.display = "none";
+    },
+
+    isContained: function( m, e ) {
+        if ( !e )
+            return false;
+
+        var c = e.relatedTarget;
+
+        while ( c && c !== m ) {
+            c = c.parentNode;
+        }
+
+        return c === m;
+    },
+
+    dynamichide: function( m, e ) {
+        if ( !this.isContained( m, e ) )
+            this.delayhidemenu( );
+    },
+
+    delayhidemenu: function( ) {
+        var self = this;
+
+        if ( this.delayhide )
+            clearTimeout( this.delayhide );
+
+        this.delayhide = setTimeout( function( ) {
+            self.hidemenu( );
+        }, this.disappeardelay );
+    },
+
+    hidemenu: function( ) {
+        if ( this.asscmenuitem )
+            this.css( this.asscmenuitem, "selected", "remove" );
+
+        if ( this.dropmenuobj ) {
+            this.dropmenuobj.style.visibility = "hidden";
+            this.dropmenuobj.style.left = "-1000px";
+            this.dropmenuobj.style.top = "-1000px";
+        }
+
+        this.hideshim( );
+        this.dropmenuobj = null;
+        this.asscmenuitem = null;
+    },
+
+    clearhidemenu: function( ) {
+        if ( this.delayhide ) {
+            clearTimeout( this.delayhide );
+            this.delayhide = null;
+        }
+    },
+
+    addEvent: function( target, functionref, tasktype ) {
+        if ( !target )
+            return;
+
+        target.addEventListener( tasktype, functionref, false );
+    },
+
+    addDropdownIndicator: function( menuitem ) {
+        var img = document.createElement( "img" );
+
+        img.src = this.dropdownindicator;
+        img.alt = "";
+        img.setAttribute( "aria-hidden", "true" );
+
+        menuitem.appendChild( document.createTextNode( " " ) );
+        menuitem.appendChild( img );
+    },
+
+    startchrome: function( ) {
+        if ( !this.domsupport )
+            return;
+
+        this.standardbody = document.compatMode === "CSS1Compat" ? document.documentElement : document.body;
+
+        var self = this;
+
+        for ( var ids = 0; ids < arguments.length; ids++ ) {
+            var menu = document.getElementById( arguments[ids] );
+
+            if ( !menu )
+                continue;
+
+            var menuitems = menu.getElementsByTagName( "a" );
+
+            for ( var i = 0; i < menuitems.length; i++ ) {
+                var menuitem = menuitems[i];
+                var relvalue = menuitem.getAttribute( "rel" );
+
+                if ( !relvalue )
+                    continue;
+
+                var asscdropdownmenu = document.getElementById( relvalue );
+
+                if ( !asscdropdownmenu )
+                    continue;
+
+                self.addEvent( asscdropdownmenu, function( ) {
+                    self.clearhidemenu( );
+                }, "mouseover" );
+
+                self.addEvent( asscdropdownmenu, function( e ) {
+                    self.dynamichide( this, e );
+                }, "mouseout" );
+
+                self.addEvent( asscdropdownmenu, function( ) {
+                    self.delayhidemenu( );
+                }, "click" );
+
+                self.addDropdownIndicator( menuitem );
+
+                self.addEvent( menuitem, function( e ) {
+                    if ( !self.isContained( this, e ) ) {
+                        self.dropit( this, e, this.getAttribute( "rel" ) );
+                    }
+                }, "mouseover" );
+
+                self.addEvent( menuitem, function( e ) {
+                    self.dynamichide( this, e );
+                }, "mouseout" );
+
+                self.addEvent( menuitem, function( ) {
+                    self.delayhidemenu( );
+                }, "click" );
+            }
+        }
+
+        if ( this.enableiframeshim )
+            this.createIframeShim( );
+    },
+
+    createIframeShim: function( ) {
+        if ( this.iframeshimadded )
+            return;
+
+        var iframe = document.createElement( "iframe" );
+
+        iframe.id = "iframeshim";
+        iframe.src = "about:blank";
+        iframe.frameBorder = "0";
+        iframe.scrolling = "no";
+        iframe.setAttribute( "aria-hidden", "true" );
+
+        iframe.style.position = "absolute";
+        iframe.style.left = "0";
+        iframe.style.top = "0";
+        iframe.style.display = "none";
+        iframe.style.zIndex = "90";
+        iframe.style.background = "transparent";
+        iframe.style.opacity = "0";
+
+        document.body.appendChild( iframe );
+
+        this.shimobject = iframe;
+        this.iframeshimadded = true;
+    }
+};

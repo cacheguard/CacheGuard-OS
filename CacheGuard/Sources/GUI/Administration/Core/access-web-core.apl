@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -61,8 +60,7 @@ show-access-web-form()
     listContent=${ACCESS_WEB_LIST}
     test -n "${listContent}" || state=disabled
 
-    
-    show-title "Allowed Web Browsing Client IPs" "${state}" "access"
+    show-title "Allowed Web Proxy Direct Clients" "${state}" "access"
     show-list-form ${MAX_ACL_WEB_NB} "${width}" "${page_ref}"
 }
 

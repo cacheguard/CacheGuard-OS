@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       Commands
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -482,9 +481,12 @@ db-waf-rule-raz()
     test -n "${1}" || return 1
     local name=${1}
 
-    rm -f ${WAF_DIR}/${name}.rules
-
-    test ! -f ${WAF_DIR}/${name}.rules.current || NEWENV=1
+    if test -f ${WAF_DIR}/${name}.rules ; then
+	rm -f ${WAF_DIR}/${name}.rules
+	NEWENV=1
+    else
+	test ! -f ${WAF_DIR}/${name}.rules.current || NEWENV=1
+    fi
 }
 
 db-waf-rule-raz-all()

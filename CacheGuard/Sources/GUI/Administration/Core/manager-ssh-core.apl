@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -34,13 +33,11 @@ show-manager-key-type()
 
 show-manager-public-ssh()
 {
-    echo "<div style='clear:left;'></div><br />"
-
     local public_file public_state private_state
 
     if test -f ${TMP_DIR}/${LOADED}.manager.${SSH_KEY}.public ; then
 	public_file=${TMP_DIR}/${LOADED}.manager.${SSH_KEY}.public
-	public_state="<span style='color:FireBrick;'>[loaded]</span>"
+	public_state="<u>[loaded]</u>"
     elif
 	test -f ${ADMIN_DIR}/.ssh/id_rsa.pub ; then
 	public_file=${ADMIN_DIR}/.ssh/id_rsa.pub
@@ -51,7 +48,7 @@ show-manager-public-ssh()
 
     if test -f ${TMP_DIR}/${LOADED}.manager.${SSH_KEY}.private ; then
 	private_file=${TMP_DIR}/${LOADED}.manager.${SSH_KEY}.private
-	private_state="<span style='color:FireBrick;'>[loaded]</span>"
+	private_state="<span>[loaded]</span>"
     elif
 	test -f ${ADMIN_DIR}/.ssh/id_rsa ; then
 	private_file=${ADMIN_DIR}/.ssh/id_rsa
@@ -60,9 +57,8 @@ show-manager-public-ssh()
 	private_state='[empty]'
     fi
 
-    echo "<div class='table-title' style='width:100%;'>Manager's Private SSH Key ${private_state} (<i>hidden for security reasons</i>)</div>"
-    echo '<br />'
-    echo "<div class='table-title' style='width:100%;'>Manager's Public SSH Key ${public_state}</div>"
+    echo "<div class='table-title' width='700'>Manager's Public SSH key ${public_state}</div>"
+
     show-public-ssh-key ${public_file}
 }
 
@@ -126,7 +122,7 @@ show-manager-ssh-key-form()
     itemState[3]=${field_state}
     itemState[4]=${field_state}
 
-    itemFormSelectCB[0]="SSHOperationSelectCB( '${operation_id}', '${key_type_id}', '${protocol_id}', '${server_id}', '${filename_id}' );"
+    itemData[0]="data-action='ssh-operation' data-operation-id='${operation_id}' data-key-type-id='${key_type_id}' data-protocol-id='${protocol_id}' data-server-id='${server_id}' data-filename-id='${filename_id}'"
 
     shortcutMenuItem[0]="access-file"
     shortcutMenuItem[1]="password-file"
@@ -134,8 +130,6 @@ show-manager-ssh-key-form()
     shortcutMenuTitle[1]="Accounts"
 
     show-title "Manager Client SSH Keys" "${state}" "manager"
-    show-shortcuts-menu
-
     show-form "${width}" "${state}" "show-manager-public-ssh"
 }
 

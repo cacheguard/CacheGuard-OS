@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -24,10 +23,9 @@
 
 system-report-load()
 {
-    show-title "CPU and IO Load" "disabled" "system"
-    echo "<div class='core-form' style='margin-top:0;'>"
-    refresh-buttons "update_system_report_load( 1 )"
-    echo "<div style='clear:left;'></div>"
+    show-title "CPU and System Load" "disabled" "system"
+    echo "<div class='core-form'>"
+    refresh-buttons
     echo "<div id='${AUTO_REPORT_ID}'></div>"
     echo "</div>"
 }

@@ -73,8 +73,8 @@ authenticate_mode_kerberos	authenticate
 authenticate_ldap_binddn	authenticate-ldap-request
 authenticate_ldaps_ca		tls-ocsp-etc
 authenticate_kerberos_server	authenticate-kerberos-server
-authenticate_kerberos_encrypt	authenticate-kerberos-ad
-authenticate_kerberos_hapassword	authenticate-kerberos-ad
-authenticate_ad_rdn		authenticate-kerberos-ad
 authenticate_kerberos_web	authenticate-kerberos-ad
 authenticate_kerberos_rweb	authenticate-kerberos-rweb
+authenticate_ad			authenticate-kerberos-ad
+authenticate_ad_account		authenticate-kerberos-ad
+authenticate_ad_rdn		authenticate-kerberos-ad

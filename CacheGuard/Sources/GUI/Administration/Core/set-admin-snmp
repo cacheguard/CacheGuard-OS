@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -25,14 +24,15 @@
 set-admin-snmp()
 {
     local transaction=/tmp/${TRANSACTION_FILE}.wadmin.${REMOTE_USER}.${$}
+    rm -f ${transaction}
 
-    test -z "${VALUES[0]}" || echo "admin snmp user '${VALUES[0]}'" > ${transaction}
+    test -z "${VALUES[0]}" || echo "admin snmp user ${VALUES[0]}" >> ${transaction}
 
     if test -n "${VALUES[1]}" -a -n "${VALUES[2]}" ; then
 	if test "${VALUES[1]}" == "${VALUES[2]}" ; then
 	    echo "admin snmp community '${VALUES[1]}'" >> ${transaction}
 	else
-	    gen-gui-error 4
+	    gen-gui-error 28
 	fi
     fi
 
@@ -40,7 +40,7 @@ set-admin-snmp()
 	if test "${VALUES[3]}" == "${VALUES[4]}" ; then
 	    echo "admin snmp privacy '${VALUES[3]}'" >> ${transaction}
 	else
-	    gen-gui-error 4
+	    gen-gui-error 29
 	fi
     fi
 
@@ -55,9 +55,9 @@ set-admin-snmp()
 	local ${mode}=on
     done
 
-    echo "admin snmp tls '${tls}'"		>> ${transaction}
-    echo "admin snmp udp '${udp}'"		>> ${transaction}
-    echo "admin snmp tcp '${tcp}'"		>> ${transaction}
+    echo "admin snmp tls ${tls}"		>> ${transaction}
+    echo "admin snmp udp ${udp}"		>> ${transaction}
+    echo "admin snmp tcp ${tcp}"		>> ${transaction}
 
     execute-transaction ${transaction}
 }

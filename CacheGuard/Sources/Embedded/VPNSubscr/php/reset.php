@@ -4,7 +4,6 @@
 ###########################################################################
 #
 # MODULE:       VPN Subscription
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -248,11 +247,8 @@ function vpnsubscr_display_form( $reset )
 
     vpnsubscr_print_all_errors( $errors );
 
-    echo "<center>\n";
-    echo "<table class='box-form'>\n";
-
+    echo "<table class='highlight-form'>\n";
     echo "<tr class='separator'><td><strong>VPN Settings</strong></td><td></td></tr>\n";
-
     echo "<tr><td>Service State</td><td>";
 
     switch ($service_state) {
@@ -326,7 +322,7 @@ function vpnsubscr_display_form( $reset )
     case SETUP_STATE_RESET_FAILED:
         echo "<tr><td><label for='$confirm_reset_id'>Confirm Reset</label></td>";
         echo "<td>";
-        echo "<input type='checkbox' $confirm_reset_id_html />";
+        echo "<input type='checkbox' $confirm_reset_id_html data-action='confirm-reset' />";
         echo "</td></tr>\n";
         break;
 
@@ -341,7 +337,7 @@ function vpnsubscr_display_form( $reset )
     case SETUP_STATE_RESET_FAILED:
         if ($method == 'GET' or $errors) {
             echo "<input maxlength='$input_maxlength' size='$input_size' value='$vpn_address' $vpn_address_id_html />\n";
-            echo "<div class='box-comment'>Leave blank to use your public IP address.</div>\n";
+            echo "<div class='comment'>Leave blank to use your public IP address.</div>\n";
         }
         elseif ($method == "POST") {
             echo "<input type='hidden' value='$vpn_address' $vpn_address_id_html />$visible_vpn_address\n";
@@ -366,7 +362,6 @@ function vpnsubscr_display_form( $reset )
 
     echo <<< EOT
 </table>
-</center>
 
 EOT;
     switch ($service_state) {
@@ -387,27 +382,11 @@ $RESET = vpnsubscr_get_reset( );
 ?>
 <!DOCTYPE html>
 <html>
-  <head>
-    <title><?php echo vpnsubscr_get_org_name( ); ?> Reset Service</title>
-
-    <link rel="shortcut icon" type="image/x-image" href="/image/favicon.ico" />
-    <link rel="stylesheet" type="text/css" href="/chromestyle.css" />
-    <link rel="stylesheet" type="text/css" href="/style.css" />
-
-    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
-    <meta name="robots" content="noindex, nofollow, noarchive, noarchive, nosnippet, noodp, noydir" />
-    <meta name="description" content="This page allows you to manage VPN subscribers." />
-
-    <script type="text/javascript" src="/js/chrome.js"></script>
-    <script type="text/javascript" src="/js/vpnsubscr.js"></script>
-    <script type="text/javascript" src="/js/printmenu.js"></script>
-    <script type="text/javascript" src="/js/logout.js"></script>
-  </head>
-
+<?php vpnsubscr_display_html_header( "Reset Service" ); ?>
   <body>
     <?php vpnsubscr_display_header( ); ?>
-    <div class='box-centered-container'>
-      <div class='box-centered-nested'>
+    <div class='centered-container'>
+      <div class='centered-nested'>
 	<div class='page-title'>Setup &gt; <?php vpnsubscr_display_title( ); ?></div>
 	<?php vpnsubscr_display_form( $RESET ); ?>
       </div>

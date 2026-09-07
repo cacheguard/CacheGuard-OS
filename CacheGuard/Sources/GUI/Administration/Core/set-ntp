@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -38,11 +37,11 @@ set-ntp()
 	[[ "${ATTRIBUTES[${del_pos}]}" =~ ^del_[0-9]+$ ]]
 	if test ${?} -ne 0 ; then
 	    if test "${VALUES[${entry_pos}]}" == anew -a -n "${VALUES[${ip_pos}]}" ; then
-		echo "ntp add '${VALUES[${ip_pos}]}'" >> ${transaction}
+		echo "ntp add ${VALUES[${ip_pos}]}" >> ${transaction}
 	    fi
 	    pos=$[${pos} + 2]
 	else
-	    echo "ntp del '${VALUES[${ip_pos}]}'" >> ${transaction}
+	    echo "ntp del ${VALUES[${ip_pos}]}" >> ${transaction}
 	    pos=$[${pos} + 3]
 	fi
     done

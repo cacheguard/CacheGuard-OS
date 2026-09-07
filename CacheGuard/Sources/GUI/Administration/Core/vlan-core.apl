@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -26,63 +25,59 @@ print-check-digit-function()
 {
     test -n "${1}" || return 1
     local id=${1}
-    echo "onblur=\"checkDigit( '${id}' );\""
+    echo "data-action='check-input' data-check-function='checkDigit'"
 }
 
 show-vlan-core()
 {
-    local left=75
-    local right=25
-    local length=6
-
     shortcutMenuItem[0]="ip"
     shortcutMenuTitle[0]="IP addresses"
 
     show-title "802.1q VLAN Tags" "enabled" "vlan ip"
-    show-shortcuts-menu
 
     echo "<div class='core-form'>"
-    show-form-begin ${length}
+    show-shortcuts-menu
+    show-form-begin
     echo "<table class='highlight-form'>"
 
     echo "<tr>"
-    echo "<td class='table-header' width=${left}%>Pseudo Device</td>"
-    echo "<td class='table-header' width=${right}%>TAG</td>"
+    echo "<td class='table-header'>Pseudo Device</td>"
+    echo "<td class='table-header'>TAG</td>"
     echo "</tr>"
 
     echo "<tr>"
-    echo "<td width=${left}%>Forward & Transparent Clients</td>"
-    echo "<td width=${right}%><input id=web name=web type='text' size='7' maxlength='4' value='$(get-vlan-tag web new)' $(print-check-digit-function web)></td>"
+    echo "<td>Forward & Transparent Clients</td>"
+    echo "<td><input id=web name=web type='text' size='7' maxlength='4' value='$(get-vlan-tag web new)' $(print-check-digit-function web)></td>"
     echo "</tr>"
 
     echo "<tr>"
-    echo "<td width=${left}%>Reverse Web Servers</td>"
-    echo "<td width=${right}%><input id=rweb name=rweb type='text' size='7' maxlength='4' value='$(get-vlan-tag rweb new)' $(print-check-digit-function rweb)></td>"
+    echo "<td>Reverse Web Servers</td>"
+    echo "<td><input id=rweb name=rweb type='text' size='7' maxlength='4' value='$(get-vlan-tag rweb new)' $(print-check-digit-function rweb)></td>"
     echo "</tr>"
 
     echo "<tr>"
-    echo "<td width=${left}%>Antivirus Clients</td>"
-    echo "<td width=${right}%><input id=antivirus name=antivirus type='text' size='7' maxlength='4' value='$(get-vlan-tag antivirus new)' $(print-check-digit-function antivirus)></td>"
+    echo "<td>Antivirus Clients</td>"
+    echo "<td><input id=antivirus name=antivirus type='text' size='7' maxlength='4' value='$(get-vlan-tag antivirus new)' $(print-check-digit-function antivirus)></td>"
     echo "</tr>"
 
     echo "<tr>"
-    echo "<td width=${left}%>Peer Appliances</td>"
-    echo "<td width=${right}%><input id=peer name=peer type='text' size='7' maxlength='4' value='$(get-vlan-tag peer new)' $(print-check-digit-function peer)></td>"
+    echo "<td>Peer Appliances</td>"
+    echo "<td><input id=peer name=peer type='text' size='7' maxlength='4' value='$(get-vlan-tag peer new)' $(print-check-digit-function peer)></td>"
     echo "</tr>"
 
     echo "<tr>"
-    echo "<td width=${left}%>File Servers</td>"
-    echo "<td width=${right}%><input id=file name=file type='text' size='7' maxlength='4' value='$(get-vlan-tag file new)' $(print-check-digit-function file)></td>"
+    echo "<td>File Servers</td>"
+    echo "<td><input id=file name=file type='text' size='7' maxlength='4' value='$(get-vlan-tag file new)' $(print-check-digit-function file)></td>"
     echo "</tr>"
 
     echo "<tr>"
-    echo "<td width=${left}%>Administration</td>"
-    echo "<td width=${right}%><input id=admin name=admin type='text' size='7' maxlength='4' value='$(get-vlan-tag admin new)' $(print-check-digit-function admin)></td>"
+    echo "<td>Administration</td>"
+    echo "<td><input id=admin name=admin type='text' size='7' maxlength='4' value='$(get-vlan-tag admin new)' $(print-check-digit-function admin)></td>"
     echo "</tr>"
 
     echo "<tr>"
-    echo "<td width=${left}%>Management (SNMP...)</td>"
-    echo "<td width=${right}%><input id=mon name=mon type='text' size='7' maxlength='4' value='$(get-vlan-tag mon new)' $(print-check-digit-function mon)></td>"
+    echo "<td>Monitoring</td>"
+    echo "<td><input id=mon name=mon type='text' size='7' maxlength='4' value='$(get-vlan-tag mon new)' $(print-check-digit-function mon)></td>"
     echo "</tr>"
 
     echo "</table>"

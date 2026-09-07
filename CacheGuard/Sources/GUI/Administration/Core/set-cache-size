@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -27,13 +26,13 @@ set-cache-size()
     local transaction=/tmp/${TRANSACTION_FILE}.wadmin.${REMOTE_USER}.${$}
     rm -f ${transaction}
 
-    echo "cache object '${VALUES[0]}' '${VALUES[1]}'" >> ${transaction}
+    echo "cache object ${VALUES[0]} ${VALUES[1]}" >> ${transaction}
 
     if test "${VALUES[2]}" == off ; then
 	echo "cache bigobject off" >> ${transaction}
     else
 	if test -n "${VALUES[3]}" -a -n "${VALUES[4]}" ; then
-	    echo "cache bigobject on '${VALUES[3]}' '${VALUES[4]}'" >> ${transaction}
+	    echo "cache bigobject on ${VALUES[3]} ${VALUES[4]}" >> ${transaction}
 	fi
     fi
 

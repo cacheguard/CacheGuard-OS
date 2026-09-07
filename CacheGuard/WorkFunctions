@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       Build
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -225,6 +224,7 @@ gen-root-fs()
     fi
 
     custom-ramdisk ${mnt_dir}
+
     if test ${?} -ne 0 ; then
 	gen-root-fs-error-cb ${cur_dir} ${mnt_dir} ${loopdev}
 	return 35

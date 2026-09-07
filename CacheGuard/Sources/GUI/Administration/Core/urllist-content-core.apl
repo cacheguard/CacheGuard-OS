@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -32,7 +31,7 @@ select-urllist-content-operation()
     local filename_id="${4}"
     local verify_id="${5}"
 
-    call-js-function "URLListContentSelectCB( '${operation_id}', '${protocol_id}', '${server_id}', '${filename_id}', '${verify_id}' )"
+    echo "<div data-init-url-list-content-select data-operation-id='${operation_id}' data-protocol-id='${protocol_id}' data-server-id='${server_id}' data-filename-id='${filename_id}' data-verify-id='${verify_id}' hidden></div>"
 }
 
 show-urllist()
@@ -140,15 +139,15 @@ show-urllist-load-form()
 
     for ((i=pos ; i<=${ATTRIBUTE_NB} ; i++))
     do
-	test "${ATTRIBUTES[${i}]}" != verify || checked_verify=checked
-	test "${ATTRIBUTES[${i}]}" != domains || checked_domains=checked
-	test "${ATTRIBUTES[${i}]}" != urls || checked_urls=checked
-	test "${ATTRIBUTES[${i}]}" != expressions || checked_expressions=checked
+	test "${ATTRIBUTES[${i}]}" != verify || checked_verify=' checked'
+	test "${ATTRIBUTES[${i}]}" != domains || checked_domains=' checked'
+	test "${ATTRIBUTES[${i}]}" != urls || checked_urls=' checked'
+	test "${ATTRIBUTES[${i}]}" != expressions || checked_expressions=' checked'
     done
 
     if test -z "${checked_domains}" -a -z "${checked_urls}" -a -z "${checked_expressions}" ; then
-	checked_domains=checked
-	checked_urls=checked
+	checked_domains=' checked'
+	checked_urls=' checked'
     fi
 
     local file_servers=$(show-file-servers 'cur' ${server})
@@ -159,21 +158,28 @@ show-urllist-load-form()
     blankItemContent[2]="$(print-operation ${operation})"
     blankItemContent[3]="$(show-file-protocol1 ${protocol})"
     blankItemContent[4]=${file_servers}
-    blankItemContent[5]="type='text' size='48' maxlength='128' value='${filename}'"
-    blankItemContent[6]="type='checkbox' ${checked_verify}"
-    blankItemContent[7]="type='checkbox' ${checked_domains}"
-    blankItemContent[8]="type='checkbox' ${checked_urls}"
-    blankItemContent[9]="type='checkbox' ${checked_expressions}"
+    blankItemContent[5]="type='text' size='32' maxlength='128' value='${filename}'"
+    blankItemContent[6]="${checked_verify}"
+    blankItemContent[7]="${checked_domains}"
+    blankItemContent[8]="${checked_urls}"
+    blankItemContent[9]="${checked_expressions}"
 
     checkItem[5]=printable
 
     itemForm[0]="text"
+
     itemForm[1]="select"
     itemForm[2]="select"
     itemForm[3]="select"
     itemForm[4]="select"
 
-    itemFormSelectCB[2]="URLListContentSelectCB( '${operation_id}', '${protocol_id}', '${server_id}', '${filename_id}', '${verify_id}' );"
+    itemForm[6]="check"
+    itemForm[7]="check"
+    itemForm[8]="check"
+    itemForm[9]="check"
+
+    itemData[2]="data-action='url-list-content' data-operation-id='${operation_id}' data-protocol-id='${protocol_id}' data-server-id='${server_id}' data-filename-id='${filename_id}' data-verify-id='${verify_id}'"
+
     local progression=$(echo-urllist-download-percent ${urllist})	
 
     shortcutMenuItem[0]="access-file"
@@ -184,7 +190,6 @@ show-urllist-load-form()
     local after_function="select-urllist-content-operation ${operation_id} ${protocol_id} ${server_id} ${filename_id} ${verify_id}"
 
     show-title "Manage URL Lists Content" "${state}" "access guard password sslmediate urllist"
-    show-shortcuts-menu
     show-form "${width}" "${state}" "${after_function}"
 
     init-refresh-exchnage-file-progress-bar ${urllist_id} ${progress_id} ${progression} "urllist-download-percentage"

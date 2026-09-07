@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -35,11 +34,12 @@ show-log()
     local log=/var/log/${WAF_LOG}
 
     if test ! -s "${log}" ; then
-	echo "<div style='font-style:italic;'>&lt;The WAF log is empty&gt;</div>"
+	echo-unavailable-message "the WAF log is empty."
 	return 0
     fi
 
-    local time machine process ip modsecurity_tag rest
+    local rfc3339_time machine process ip modsecurity_tag rest
+    local date_time date time
     local previous_rest id msg severity hostname
     local attack
 
@@ -47,23 +47,22 @@ show-log()
     local detected_msg_len=${#detected_msg}
     local i=0
 
-    local style="style='word-wrap:break-word;'"
-
-    echo "<table class='highlight-list' width:100%;'>"
+    echo "<table class='highlight-log'>"
     echo "<thead>"
     echo "<tr>"
-    echo "<td class='table-header'><strong>Date</strong></td>"
-    echo "<td class='table-header'><strong>Client IP</strong></td>"
-    echo "<td class='table-header'><strong>Website</strong></td>"
-    echo "<td class='table-header'><strong>ID</strong></td>"
-    echo "<td class='table-header'><strong>Severity</strong></td>"
-    echo "<td class='table-header'><strong>Attack</strong></td>"
+    echo "<th class='table-header'><strong>Date</strong></th>"
+    echo "<th class='table-header'><strong>Time</strong></th>"
+    echo "<th class='table-header'><strong>Client IP</strong></th>"
+    echo "<th class='table-header'><strong>Website</strong></th>"
+    echo "<th class='table-header'><strong>ID</strong></th>"
+    echo "<th class='table-header'><strong>Severity</strong></th>"
+    echo "<th class='table-header'><strong>Attack</strong></th>"
     echo "</tr>"
     echo "</thead>"
     
     echo "<tbody>"
 
-    tac ${log} | while read time machine process ip modsecurity_tag rest
+    tac ${log} | while read rfc3339_time machine process ip modsecurity_tag rest
     do
 	test ${i} -lt ${number} || break
 
@@ -83,14 +82,19 @@ show-log()
 
 	rest=${rest/*\[hostname \"}
 	hostname=${rest/\"\]*}
-	
+
+	date_time=$(gui-get-date-time "${rfc3339_time}")
+	date=${date_time/@*}
+	time=${date_time/*@}
+
 	echo "<tr>"
-	echo "<td><span ${style}>${time}</span></td>"
-	echo "<td><span ${style}>${ip}</span></td>"
-	echo "<td><span ${style}>${hostname}</span></td>"
-        echo "<td><span ${style}>${id}</span></td>"
-        echo "<td><span ${style}>${severity}</span></td>"
-	echo "<td><span ${style}>${msg}</span></td>"
+	echo "<td><span>${date}</span></td>"
+	echo "<td><span>${time}</span></td>"
+	echo "<td><span>${ip}</span></td>"
+	echo "<td><span>${hostname}</span></td>"
+        echo "<td><span>${id}</span></td>"
+        echo "<td><span>${severity}</span></td>"
+	echo "<td><span>${msg}</span></td>"
 	echo "</tr>"
 	((i++))
     done

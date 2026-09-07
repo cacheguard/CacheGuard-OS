@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       Commands
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -239,13 +238,14 @@ get-system-soft-check-message()
     test -n "${1}" || return 1
     local new_os_version=${1}
 
-    local os=$(get-system-soft)
-    local new_os=$(get-system-soft ${new_os_version})
+    local cur_os_version=$(get-os-cur-version)
 
-    if test "${new_os}" == "${os}" ; then
-	echo -n "OS Up-to-Date"
+    if test "${new_os_version}" == "${cur_os_version}" ; then
+	echo "The OS is Up to Date."
+	return 0
     else
-	echo -n "New ${new_os}"
+	echo "Version ${new_os_version} is now available."
+	return 11
     fi
 }
 
@@ -535,37 +535,6 @@ is-basic-rweb-balancer()
     return 0
 }
 
-set-new-proxy2-mode()
-{
-    export PROXY2_MODE=False
-
-    test ${RWEB_MODE} == True || return 0
-
-    if test "${WAF_MODE}" == True ; then
-	PROXY2_MODE=True
-	return 0
-    fi
-
-    local in_context=${1}
-
-    local rweb_site_hosts_list
-    local rweb_site_balancer_list
-
-    case ${in_context} in
-	configurator)
-	    rweb_site_hosts_list=${_RWEB_SITE_HOSTS_LIST}
-	    rweb_site_balancer_list=${_RWEB_SITE_BALANCER_LIST}
-	    ;;
-	*)
-	    rweb_site_hosts_list=${RWEB_SITE_HOSTS_LIST}
-	    rweb_site_balancer_list=${RWEB_SITE_BALANCER_LIST}
-	    ;;
-    esac
-
-    ! single-rweb-host "${rweb_site_hosts_list}" || return 0
-    is-basic-rweb-balancer "${rweb_site_balancer_list}" || PROXY2_MODE=True
-}
-
 set-new-self-ns()
 {
     member "${NAME_SERVER_LIST}" "127.0.0.1"
@@ -604,7 +573,7 @@ get-free-memory-sz()
     local total_memory_sz=${1}
 
     local cache_mode
-    local free_memory_sz=$[${total_memory_sz} - ${MIN_OS_MEMORY_SIZE}]
+    local free_memory_sz=$[${total_memory_sz} - ${MIN_OS_MEMORY_SZ}]
 
     if test ${PERSISTENT_CACHE} == True -o ${CACHE_MODE} == True ; then
 	cache_mode=True
@@ -612,8 +581,38 @@ get-free-memory-sz()
 	cache_mode=False
     fi
 
+    if test ${VPN_IPSEC_MODE} == True ; then
+	local access_mode=${VPN_IPSEC_ACCESS/ *}
+	if test "${access_mode}" == 'on' ; then
+	    free_memory_sz=$[${free_memory_sz} - ${VPN_IPSEC_ACCESS_MEMORY_SZ}]
+	else
+	    local ipsec_site_usage_ratio=5
+	    local sites=$(record-length-list 12 "${VPN_IPSEC_SITE_LIST}")
+	    local ipsec_site_tunnel_memory_sz=$[${sites} * ${IPSEC_SITE_TUNNEL_MEMORY_SZ}]
+	    local ipsec_site_traffic_memory_sz=$[${sites} * ${IPSEC_SITE_TRAFFIC_MEMORY_SZ} / 5]
+	    free_memory_sz=$[${free_memory_sz} - ${ipsec_site_tunnel_memory_sz} - ${ipsec_site_traffic_memory_sz}]
+	fi
+    fi
+
+    if test ${WEB_MODE} == True -o ${TRANSPARENT_MODE} == True ; then
+	if test ${SSLMEDIATE_MODE} == False ; then
+	    free_memory_sz=$[${free_memory_sz} - ${PROXY_TCP_MEMORY_SZ}]
+	else
+	    free_memory_sz=$[${free_memory_sz} - ${PROXY_SSLM_MEMORY_SZ}]
+	fi
+    fi
+
+    if test ${RWEB_MODE} == True ; then
+	if test ${WAF_MODE} == True ; then
+	    free_memory_sz=$[${free_memory_sz} - ${HTTPD_WAF_MEMORY_SZ}]
+	else
+	    free_memory_sz=$[${free_memory_sz} - ${HTTPD_RPROXY_MEMORY_SZ}]
+	fi
+	test ${cache_mode} == False || free_memory_sz=$[${free_memory_sz} - ${CACHE_CLEAN_MEMORY_SZ}]
+    fi
+
+    test ${QOS_MODE} == False || free_memory_sz=$[${free_memory_sz} - ${QOS_MEMORY_SZ}]
     test ${cache_mode} == False || free_memory_sz=$[${free_memory_sz} - ${CACHE_IO_MEMORY_SZ}]
-    test ${SSLMEDIATE_MODE} == False || free_memory_sz=$[${free_memory_sz} - ${SQUID_SSL_MEDIATE_MEMORY_SZ}]
     test ${SELF_NS} == False || free_memory_sz=$[${free_memory_sz} - ${NAMED_MEMORY_SZ}]
     test ${GUARD_MODE} == False || free_memory_sz=$[${free_memory_sz} - ${GUARD_MEMORY_SZ} - ${HTTPD_GUARD_MEMORY_SZ}]
     test ${DHCP_MODE} == False || free_memory_sz=$[${free_memory_sz} - ${DHCPD_MEMORY_SZ}]
@@ -621,32 +620,14 @@ get-free-memory-sz()
     test ${OCSP_MODE} == False || free_memory_sz=$[${free_memory_sz} - ${OCSPD_MEMORY_SZ}]
     test ${ADMIN_SNMP} == False || free_memory_sz=$[${free_memory_sz} - ${SNMPD_MEMORY_SZ}]
 
-    if test ${PROXY2_MODE} == True ; then
-	free_memory_sz=$[${free_memory_sz} - ${HTTPD_PROXY_MEMORY_SZ}]
-	test ${cache_mode} == False || free_memory_sz=$[${free_memory_sz} - ${CACHE_CLEAN_MEMORY_SZ}]
-    fi
-
-    local proxy
-
-    if test ${WEB_MODE} == True -o ${TRANSPARENT_MODE} == True ; then
-	proxy=yes
-    elif test ${RWEB_MODE} == True -a ${PROXY2_MODE} == False ; then
-	proxy=yes
-    fi
-
-    test -z "${proxy}" || free_memory_sz=$[${free_memory_sz} - ${PROXY_MEMORY_SZ}]
-
     if test ${cache_mode} == True ; then
-	local store_average_object_sz=$(get-cache-reference-mean-object-sz) max_objects_in_cache
+
+	local store_average_object_sz=$(get-cache-reference-mean-object-sz)
+	local max_objects_in_cache
 
 	((max_objects_in_cache = PROXY_CACHE_SZ * 1024 / store_average_object_sz))
-	((cache_index_memory_sz = max_objects_in_cache * CACHE_INDEX_OBJECT_MEMORY_SZ / 1024 / 1024))
-
-	if test ${cache_index_memory_sz} -le ${free_memory_sz} ; then
-	    ((free_memory_sz -= cache_index_memory_sz))
-	else
-	    ((free_memory_sz = 0))
-	fi
+	((cache_index_memory_sz = max_objects_in_cache * SQUID_MD_MEMORY_SZ / 1024 / 1024))
+	((free_memory_sz -= cache_index_memory_sz))
     fi
 
     echo ${free_memory_sz}
@@ -1348,7 +1329,7 @@ get-vlan-tag()
 	    ;;
     esac
 
-    local i=0 elt range
+    local elt range i=0
     local vid flows_col flows_spc
 
     for elt in ${list}
@@ -1505,116 +1486,6 @@ get-web-ip()
     echo -n "${ip}"
 }
 
-get-web-netmask()
-{
-    test -n "${1}" || return 1
-    local state=${1}
-
-    local vlan=$(get-vlan-tag web ${state})
-    local netmask=$(get-vlan-netmask ${vlan} ${state})
-    echo -n "${netmask}"
-}
-
-get-rweb-ip()
-{
-    test -n "${1}" || return 1
-    local state=${1}
-
-    local vlan=$(get-vlan-tag rweb ${state})
-    local ip=$(get-vlan-ip ${vlan} ${state})
-    echo -n "${ip}"
-}
-
-get-rweb-netmask()
-{
-    test -n "${1}" || return 1
-    local state=${1}
-
-    local vlan=$(get-vlan-tag rweb ${state})
-    local netmask=$(get-vlan-netmask ${vlan} ${state})
-    echo -n "${netmask}"
-}
-
-get-peer-ip()
-{
-    test -n "${1}" || return 1
-    local state=${1}
-
-    local vlan=$(get-vlan-tag peer ${state})
-    local ip=$(get-vlan-ip ${vlan} ${state})
-    echo -n "${ip}"
-}
-
-get-peer-netmask()
-{
-    test -n "${1}" || return 1
-    local state=${1}
-
-    local vlan=$(get-vlan-tag peer ${state})
-    local netmask=$(get-vlan-netmask ${vlan} ${state})
-    echo -n "${netmask}"
-}
-
-get-admin-ip()
-{
-    test -n "${1}" || return 1
-    local state=${1}
-
-    local vlan=$(get-vlan-tag admin ${state})
-    local ip=$(get-vlan-ip ${vlan} ${state})
-    echo -n "${ip}"
-}
-
-get-admin-netmask()
-{
-    test -n "${1}" || return 1
-    local state=${1}
-
-    local vlan=$(get-vlan-tag admin ${state})
-    local netmask=$(get-vlan-netmask ${vlan} ${state})
-    echo -n "${netmask}"
-}
-
-get-file-ip()
-{
-    test -n "${1}" || return 1
-    local state=${1}
-
-    local vlan=$(get-vlan-tag file ${state})
-    local ip=$(get-vlan-ip ${vlan} ${state})
-    echo -n "${ip}"
-}
-
-get-file-netmask()
-{
-    test -n "${1}" || return 1
-    local state=${1}
-
-    local vlan=$(get-vlan-tag file ${state})
-    local netmask=$(get-vlan-netmask ${vlan} ${state})
-    echo -n "${netmask}"
-}
-
-get-mon-ip()
-{
-    test -n "${1}" || return 1
-    local state=${1}
-
-    local vlan=$(get-vlan-tag mon ${state})
-    local ip=$(get-vlan-ip ${vlan} ${state})
-    echo -n "${ip}"
-}
-
-get-mon-netmask()
-{
-    test -n "${1}" || return 1
-    local state=${1}
-
-    local vlan=$(get-vlan-tag mon ${state})
-    local netmask=$(get-vlan-netmask ${vlan} ${state})
-    echo -n "${netmask}"
-}
-
 get-multi-gateways-route-list()
 {
     test -n "${1}" || return 0
@@ -1723,7 +1594,7 @@ get-site-balancer()
 	    ;;
     esac
 
-    local i=0 elt range
+    local elt range i=0
     local name algorithm sticky mode cookie
 
     for elt in ${list}
@@ -1756,6 +1627,7 @@ get-site-balancer()
 	((i++))
     done
 
+    echo "robin nosticky nil nil"
     return 0
 }
 
@@ -1852,7 +1724,7 @@ get-qos-bw()
 
     bw=\${$(echo ${in_current}QOS_BW_${interface}_${sense})}
     bw="$(eval echo ${bw})"
-    
+
     echo "${bw}"
 }
 
@@ -2242,13 +2114,13 @@ print-ldap-urls()
 {
     local servers="${1}"
 
-    local elt i=0 range
-    local proto name ip port
+    local elt range i=0
+    local proto name port
     local urls
 
     for elt in ${servers}
     do
-	range=$[${i} % 4]
+	range=$[${i} % 3]
 	case ${range} in
 	    0)
 		proto=${elt}
@@ -2257,14 +2129,11 @@ print-ldap-urls()
 		name=${elt}
 		;;
 	    2)
-		ip=${elt}
-		;;
-	    3)
 		port=${elt}
 
 		case ${proto} in
 		    ldap)
-			urls="${urls} ldap://${ip}:${port}"
+			urls="${urls} ldap://${name}:${port}"
 			;;
 		    ldaps)
 			urls="${urls} ldaps://${name}:${port}"
@@ -2282,9 +2151,7 @@ print-ldap-urls()
 	((i++))
     done
 
-    urls="${urls:1}"
-
-    echo "${urls}"
+    echo "${urls:1}"
 }
 
 test-sldap()
@@ -2292,19 +2159,17 @@ test-sldap()
     test -n "${1}" || return 1
     local servers=${1}
 
-    local i=0 elt range
+    local elt range i=0
     local proto name ip port
     local urls
 
     for elt in ${servers}
     do
-	range=$[${i} % 4]
+	range=$[${i} % 3]
 	case ${range} in
 	    0)
 		proto=${elt}
 		test ${proto} != sldap || return 0
-		;;
-	    1|2|3)
 		;;
 	    *)
 		;;
@@ -2534,10 +2399,10 @@ get-max-vpn-nb()
 	    max=$((MAX_VPN_NB / 32))
 	    ;;
 	1)
-	    max=$((MAX_VPN_NB / 8))
+	    max=$((MAX_VPN_NB / 16))
 	    ;;
 	2)
-	    max=$((MAX_VPN_NB / 2))
+	    max=$((MAX_VPN_NB / 8))
 	    ;;
 	3)
 	    max=${MAX_VPN_NB}

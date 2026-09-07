@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -22,33 +21,33 @@
 #
 ###########################################################################
 
-print-conf-state()
+print-conf-version()
 {
-    local state selected
+    local in_version=${1}
 
-    for state in current new
+    local version selected
+
+    for version in current new
     do
-	if test ${state} == "${1}" ; then
-	    selected=selected
+	if test ${version} == "${in_version}" ; then
+	    selected=' selected'
 	else
 	    unset selected
 	fi
-	echo -n "<option value='${state}' ${selected}>${state}</option>"
+	echo -n "<option value='${version}'${selected}>${version}</option>"
     done
 }
 
-show-conf-save-form()
+show-conf-load-save-form()
 {
-    local width
-
-    local state
+    local state width
 
     itemWidth[0]=40
     itemWidth[1]=60
 
     itemTitle[0]="Operation"
     itemTitle[1]="Protocol"
-    itemTitle[2]="Version"
+    itemTitle[2]="Configuration Version"
     itemTitle[3]="File Server"
     itemTitle[4]="File Path"
 
@@ -58,14 +57,17 @@ show-conf-save-form()
     itemID[3]="server"
     itemID[4]="filename"
 
-    local version server filename upload
-    local protocols
+    local operation protocol
+    local version server filename
+    local protocols="sftp ftp tftp"
 
     if test "${REQUEST_METHOD}" == POST ; then
-	case "${ATTRIBUTES[0]}" in
-	    operation)
-		local operation="${VALUES[0]}"
-		local protocol="${VALUES[1]:1}"
+	operation="${VALUES[0]}"
+
+	case ${operation} in
+	    load|save)
+
+		protocol="${VALUES[1]:1}"
 
 		for ((i=2 ; i<ATTRIBUTE_NB ; i++))
 		do
@@ -83,46 +85,17 @@ show-conf-save-form()
 			    ;;
 		    esac
 		done
-		;;
-
-	    upload)
-		check-csrf-cookie || logout-page
-		local uploaded_filename="${UPLOADED_FILES[0]}"
-
-		if test -n "${uploaded_filename}" -a -f "${ADMIN_TMP_DIR}/${uploaded_filename}" ; then
-		    execute-command "conf inject ${uploaded_filename}"
-                    rm -f "${ADMIN_TMP_DIR}/${uploaded_filename}"
-		else
-		    gen-gui-error 16
-		fi
-		show-post-errors
-		;;
-	    
+		;;	    
 	    *)
 		;;
 	esac
-    else
-	local operation="load"
-	local protocol="sftp"
     fi
 
     case "${operation}" in
-	load)
-	    protocols="sftp ftp tftp"
+	load|'')
 	    itemState[2]="disabled"
 	    ;;
 	save)
-	    protocols="web sftp ftp tftp"
-	    ;;
-	*)
-	    ;;
-    esac
-
-    case "${protocol}" in
-	web)
-	    itemState[3]="disabled"
-	    ;;
-	ftp|sftp|tftp)
 	    ;;
 	*)
 	    ;;
@@ -133,7 +106,7 @@ show-conf-save-form()
 
     blankItemContent[0]=$(show-file-operation ${operation})
     blankItemContent[1]=$(show-file-protocol1 "${protocol}" "${protocols}")
-    blankItemContent[2]=$(print-conf-state ${version})
+    blankItemContent[2]=$(print-conf-version ${operation} ${version})
     blankItemContent[3]=${file_servers}
     blankItemContent[4]="type='text' size='48' maxlength='128' value='${filename}'"
 
@@ -144,51 +117,121 @@ show-conf-save-form()
     itemForm[2]="select"
     itemForm[3]="select"
 
-    local cb="configurationLoadSaveSelectCB( 'operation', 'protocol', 'version', 'server', 'filename' );"
-    itemFormSelectCB[0]=${cb}
-    itemFormSelectCB[1]=${cb}
+    itemData[0]="data-action='configuration-load-save' data-operation='operation' data-version='version' data-server='server' data-filename='filename'"
+    itemData[1]=${itemData[0]}
 
     shortcutMenuItem[0]="access-file"
     shortcutMenuItem[1]="password-file"
+    shortcutMenuItem[2]="file-operation"
+
     shortcutMenuTitle[0]="File Servers"
     shortcutMenuTitle[1]="Accounts"
+    shortcutMenuTitle[2]="File Operations"
 
     show-title "Load Save Configuration" "${state}" "access conf file password"
-    show-shortcuts-menu
+    show-form "${width}" ${state}
+}
 
-    local token=$(get-auth-token)
+show-conf-upload-form()
+{
+    local form_id='upload-form'
+    local button_id='upload-button'
 
     echo "<div class='core-form'>"
-    echo "<form action='/${GUI_DIR_NAME}/conf-load-save.${GUI_EXT_NAME}' method='post' enctype='multipart/form-data'>"
-    echo "<input type='hidden' name='${GUI_CSRF_ATTRIBUTE}' value='${token}' />"
+    echo "<div class='table-title'>Upload Configuration form your Workstation</div>"
+    
+    echo "<form name='${form_id}' id='${form_id}' action='/${GUI_DIR_NAME}/submit-conf-load-save.${GUI_EXT_NAME}' method='post' enctype='multipart/form-data'>"
+    echo "<input type='hidden' name='${GUI_CSRF_ATTRIBUTE}' value='${TOKEN}' />"
+    echo "<input type='hidden' name='operation' value='upload' />"
+    echo "<input type='hidden' name='protocol' value='_web' />"
+
     echo "<table class='highlight-form'>"
+
     echo "<tr>"
-    echo "<td width='40%'>Local File</td>"
-    echo "<td width='60%'>"
-    echo "<input type='file' name='upload' style='margin:0;' />"
+    echo "<td>Source File Path</td>"
+    echo "<td>"
+    echo "<input type='file' name='filename' />"
+    echo "</td>"
+    echo "<td align='right'>"
+    echo "<button id='${button_id}' type='submit' class='form-button compact' data-post-form-id='${form_id}' data-button='submit' data-action='__nil__'>"
+    echo "<div data-init-post-content data-button-id='${button_id}' data-form-id='${form_id}' data-confirmation='false' hidden></div>"
+    echo "UPLOAD <img src='${IMAGE_DIR}/up.png' align='middle' />"
+    echo "</button>"
     echo "</td>"
     echo "</tr>"
+
     echo "</table>"
-    echo "<button id='${UPLOAD_ID}' type='submit' class='submit' style='margin:0; margin-top:5px;'>"
-    echo "UPLOAD <img src='${IMAGE_DIR}/upload.png' align='top' />&nbsp;"
-    echo "</button>"
-    echo "<div style='clear:left;'></div><br />"
     echo "</form>"
     echo "</div>"
+}
 
-    show-form "${width}" ${state}
+show-conf-download-form()
+{
+    local form_id='download-form'
+    local button_id='download-button'
+    local version filename
 
-    local src_filename="${DEFAULT_SHOSTNAME}.conf.${$}"
-    local dst_filename=${VALUES[3]}
-    test -z "${dst_filename}" || dst_filename=" ${dst_filename}"
+    if test "${REQUEST_METHOD}" == POST ; then
+	local operation="${VALUES[0]}"
 
-    if test -f ${ADMIN_TMP_DIR}/${src_filename} ; then
-	local href_id="do-download"
-        echo "<a href='/${GUI_DIR_NAME}/conf-download.${GUI_EXT_NAME}?${src_filename}${dst_filename}' id='${href_id}'></a>"
-        call-js-function "document.getElementById( '${href_id}' ).click( )"
+	case ${operation} in
+	    download)
+		version=${VALUES[2]}
+		filename=${VALUES[3]}
+		;;
+	    *)
+		;;
+	esac
     fi
+
+    echo "<div class='core-form'>"
+    echo "<div class='table-title'>Download Configuration to your Workstation</div>"
+
+    echo "<form name='${form_id}' id='${form_id}' action='/${GUI_DIR_NAME}/submit-conf-load-save.${GUI_EXT_NAME}' method='post' data-download='true'>"
+    echo "<input type='hidden' name='${GUI_CSRF_ATTRIBUTE}' value='${TOKEN}' />"
+
+    echo "<input type='hidden' name='operation' value='download' />"
+    echo "<input type='hidden' name='protocol' value='_web' />"
+
+    echo "<table class='highlight-form'>"
+
+    echo "<tr>"
+    echo "<td>Configuration Version</td>"
+    echo "<td>"
+    echo "<select name='verison'>"
+    print-conf-version ${version}
+    echo "</select>"
+    echo "</td>"
+    echo "<td></td>"
+    echo "</tr>"
+
+    echo "<tr>"
+    echo "<td>Target File Name</td>"
+    echo "<td>"
+    echo "<input type='text' name='filename' size='24' maxlength='32' value='${filename}' />"
+    echo "</td>"
+    echo "<td align='right'>"
+    echo "<button id='${button_id}' type='submit' class='form-button compact'>"
+    echo "DOWNLOAD <img src='${IMAGE_DIR}/down.png' align='middle' />"
+    echo "</button>"
+    echo "</td>"
+    echo "</tr>"
+
+    echo "</table>"
+    echo "</form>"
+    echo "</div>"
+}
+
+show-forms()
+{
+    show-conf-load-save-form
+
+    local TOKEN=$(get-auth-token)
+
+    show-conf-upload-form
+    show-conf-download-form
 }
 
 # Main()
 
-show-conf-save-form
+show-forms

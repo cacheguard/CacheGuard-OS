@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -27,11 +26,9 @@ source /home/${ADMIN_NAME}/${ENV_RDIR}/${ENV_CURRENT_NAME}
 
 show-network-activity-dashboard()
 {
-    local width=350
-
-    show-network-activity-external ${width}
-    show-network-activity-internal ${width}
-    show-network-activity-auxiliary ${width}
+    show-network-activity-external 'compact'
+    show-network-activity-internal 'compact'
+    show-network-activity-auxiliary 'compact'
 }
 
 # Main()

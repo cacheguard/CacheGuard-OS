@@ -4,7 +4,6 @@
 ###########################################################################
 #
 # MODULE:       VPN Subscription
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -191,12 +190,12 @@ function vpnsubscr_check_login()
 
 function vpnsubscr_print_error( $code, $message )
 {
-    echo "<div style='margin-top:10px;'>ERROR " . $code . ": " . $message . "</div>\n";
+    echo "<div>ERROR " . $code . ": " . $message . "</div>\n";
 }
 
 function vpnsubscr_print_all_errors( $errors )
 {
-    echo "<div class='box-error'>\n";
+    echo "<div class='error'>\n";
     foreach ($errors as $message) {
         vpnsubscr_print_error( $message[0], $message[1] );
     }
@@ -395,8 +394,7 @@ function vpnsubscr_subscriber_get_password_icons( $username, $name, $phone, $tls
     $clipboard_icon = 'clipboard.png';
     $clipboard_icon_id = $username . '-clipboard-copy';
     $clipboard_title = "Copy Password to Clipboard";
-    $clipboard_js = "copyToClipboard( \"$text_area_id\", \"$clipboard_icon_id\", \"$tls_password\" );";
-    $clipboard_icon = "<img id='$clipboard_icon_id' onclick='$clipboard_js' src='/image/$clipboard_icon' title='$clipboard_title' alt='$clipboard_title' />";
+    $clipboard_icon = "<img id='$clipboard_icon_id' src='/image/$clipboard_icon' title='$clipboard_title' alt='$clipboard_title' data-action='copy-to-clipboard' data-text-area-id='$text_area_id' data-content='$tls_password'/>";
 
     $whatsapp_icon = 'whatsapp.png';
     $whatsapp_title = "Send Password to $phone via WhatsApp&trade;";
@@ -621,7 +619,7 @@ function vpnsubscr_check_service( )
 
 function vpnsubscr_display_setup_help( $operation, $service_state )
 {
-    $message = "Fill out the form below to setup your service as a VPN provider. Please note that your Service Identity and Private Domain names can only be set during the first setup or by resetting your service.";
+    $message = "Fill out the form below to set up your service as a VPN provider. Please note that your Service Identity and Private Domain names can only be set during the initial setup or by resetting your service.";
 
     switch ($service_state) {
 
@@ -630,7 +628,7 @@ function vpnsubscr_display_setup_help( $operation, $service_state )
 
         switch ($operation) {
         case 'reset':
-            $message = "The service has never been setup before. Please make a first setup to initialise the service at [<a href='setup.php'>SETUP</a>].";
+            $message = "The service has never been set up before. Please perform the initial setup to initialise the service at [<a href='setup.php'>SETUP</a>].";
             break;
 
         default:
@@ -641,13 +639,13 @@ function vpnsubscr_display_setup_help( $operation, $service_state )
     case SETUP_STATE_INITIALISED:
     case SETUP_STATE_MODIFIED:
 
-        $message = "A setup configuration request is in progress. Please wait for its termination before any further requests.";
+        $message = "A setup configuration request is currently in progress. Please wait for it to complete before submitting any further requests.";
         break;
 
     case SETUP_STATE_FAILED:
         switch ($operation) {
         case 'reset':
-            $message = "The service reset is unavailable because the first setup operation has failed. Please make a first setup to initialise the service at [<a href='setup.php'>SETUP</a>].";
+            $message = "The service reset is unavailable because the initial setup has failed. Please perform the initial setup to initialise the service at [<a href='setup.php'>SETUP</a>].";
             break;
 
         default:
@@ -664,7 +662,7 @@ function vpnsubscr_display_setup_help( $operation, $service_state )
 
         switch ($operation) {
         case 'reset':
-            $message = "<span style='color:firebrick;font-weight:bold;'>Caution</span>: by resetting the service, subscribers will receive new connection instructions by email. If you still want to reset the service, fill out the form below and validate your choice.</span>";
+            $message = "<span>Caution</span>: Resetting the service will cause all subscribers to receive new connection instructions by email. If you still want to reset the service, fill out the form below and confirm your choice.</span>";
             break;
 
         default:
@@ -673,23 +671,37 @@ function vpnsubscr_display_setup_help( $operation, $service_state )
         break;
     }
 
-    echo "<div class='box-help'>$message</div>";
+    echo "<div class='help'>$message</div>";
 }
 
-function vpnsubscr_display_footer()
+function vpnsubscr_display_html_header( $title = "" )
 {
     $org_name = vpnsubscr_get_org_name( );
-    $years = YEARS;
-    $company = COMPANY;
+    if ($title != "") {
+        $title = "$org_name - $title";
+    }
+    else {
+        $title = $org_name;
+    }
+
+    $version = GUI_FE_VERSION;
 
     echo <<< EOT
-<p><center><strong>$org_name</strong> is based upon a dedicated <a href="https://www.cacheguard.com/" target="_blank">CacheGuard</a> Gateway.</center><br />
-<div style="clear:left;"></div>
-<footer>
-<div class='box-copyright'>
-Copyright (C) $years $company - All rights reserved
-</div>
-</footer>
+  <head>
+    <title>$title</title>
+    
+    <link rel="shortcut icon" type="image/x-image" href="/image/favicon.ico" />
+    <link rel="stylesheet" type="text/css" href="/chromestyle-{$version}.css" />
+    <link rel="stylesheet" type="text/css" href="/style-{$version}.css" />
+
+    <meta charset="UTF-8" />
+
+    <script type="text/javascript" src="/js/chrome-{$version}.js"></script>
+    <script type="text/javascript" src="/js/qrcode.min-{$version}.js"></script>
+    <script type="text/javascript" src="/js/vpnsubscr-{$version}.js"></script>
+    <script type="text/javascript" src="/js/vpnsubscr-init-{$version}.js" defer></script>
+  </head>
+
 
 EOT;
 }
@@ -700,17 +712,38 @@ function vpnsubscr_display_header( $logout = true )
 
     if ($logout) {
         $title = 'Logout';
-        $logout_html = "<div class='box-logout'><a href='/logout.php'><img src='/image/logout.png' title='$title' alt='$title' /></a></div>\n";
-        $logout_html .= "<div style='clear:left;'></div>";
-        $logout_html .= "<script type='text/javascript'>printmenu( );</script>";
+        $logout_html = "\n      <div class='top-logout'><a href='/logout.php'><img src='/image/logout.png' title='$title' alt='$title' /></a></div>";
+        include __DIR__ . '/menu.html';
+        $display_menu = "\n      <div data-display-menu hidden></div>";
     }
     else {
-        $logout_html="<div style='clear:left;'></div><br />";
+        $logout_html = '';
+        $display_menu = '';
     }
 
     echo <<< EOT
-<div class='box-header'><a href="/"><strong>$org_name</strong></a></div>
-$logout_html
+
+    <div class='top-header'>
+      <div class='top-title'><a href="/"><img src='/image/bevypn-logo.png' />$org_name</a></div>{$display_menu}{$logout_html}
+    </div>
+
+EOT;
+}
+
+function vpnsubscr_display_footer()
+{
+    $org_name = vpnsubscr_get_org_name( );
+    $years = YEARS;
+    $company = COMPANY;
+
+    echo <<< EOT
+
+    <p><center><strong>$org_name</strong> is based upon a dedicated <a href="https://www.cacheguard.com/" target="_blank">CacheGuard</a> Gateway.</center>
+    <footer>
+      <div class='copyright'>
+        Copyright (C) $years $company - All rights reserved
+      </div>
+    </footer>
 
 EOT;
 }
@@ -726,7 +759,7 @@ function vpnsubscr_print_recaptcha( )
 <tr>
 <td>CAPTCHA</td>
 <td>
-    <div class='g-recaptcha' style='margin:0; margin-top:5px;' data-sitekey='$key'></div>
+    <div class='g-recaptcha' data-sitekey='$key'></div>
 </td>
 </tr>
 

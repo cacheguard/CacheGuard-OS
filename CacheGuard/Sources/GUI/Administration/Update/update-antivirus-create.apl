@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -26,6 +25,11 @@ source functions
 
 gui-display-av-create()
 {
+    if test ! -s ${AV_CREATE_LOG} ; then
+	echo-unavailable-message "the AV SDB creation report is not yet available."
+	return 0
+    fi
+
     execute-command-nolog "antivirus create report"
     show-log ${AV_CREATE_LOG}
 }

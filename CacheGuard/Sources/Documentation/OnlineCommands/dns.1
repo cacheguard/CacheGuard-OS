@@ -1,8 +1,7 @@
 Display, add or delete DNS (Domain Name Service) servers
 .SH SYNOPSIS
-
 [1] \fBdns\fR [\fBraz\fR | (\fBadd\fR | \fBdel\fR) \fI<ip>\fR]
-
+.sp
 [2] \fBdns\fR [\fBresolve\fR [(\fBon\fR | \fBoff\fR)]]
 
 .SH DESCRIPTION
@@ -13,5 +12,4 @@ To add an DNS server use the keyword \fBadd\fR. To remove one, use the keyword \
 The second [2] usage form allows you to arm the resolution of all names used in the configuration to IP addresses. When the resolution is armed all firewall and QoS rules are recompiled during the apply operation. To arm the resolution use the keyword \fBon\fR. To deactivate the resolution use the keyword \fBoff\fR.
 
 .SH SEE ALSO
-.B apply
-(1)
+.BR apply (1)

@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       Commands
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -364,42 +363,29 @@ remove-ip-port()
 remove-site-balancer()
 {
     test -n "${1}" || return 1
-    local in_name=${1}
+    local name=${1}
 
-    local rweb_site_balancer_list
-    local i=0 elt range
-    local name algorithm sticky mode cookie
+    RWEB_SITE_BALANCER_LIST=$(remove-record-from-list 5 1 "${name}" "${RWEB_SITE_BALANCER_LIST}")
+}
 
-    for elt in ${RWEB_SITE_BALANCER_LIST}
-    do
-	range=$[${i} % 5]
-	case ${range} in
-	    0)
-		name=${elt}
-		;;
-	    1)
-		algorithm=${elt}
-		;;
-	    2)
-		sticky=${elt}
-		;;
-	    3)
-		mode=${elt}
-		;;
-	    4)
-		cookie=${elt}
-		test ${name} == ${in_name} || rweb_site_balancer_list="${rweb_site_balancer_list} ${name} ${algorithm} ${sticky} ${mode} ${cookie}"
-		;;
-	    
-	    *)
-		return 1
-		;;
-	esac
-	((i++))
-    done
-    rweb_site_balancer_list="${rweb_site_balancer_list:1}"
+add-site-balancer()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    test -n "${3}" || return 3
+    test -n "${4}" || return 4
+    test -n "${5}" || return 5
+    local name=${1}
+    local algorithm=${2}
+    local sticky=${3}
+    local mode=${4}
+    local cookie=${5}
 
-    RWEB_SITE_BALANCER_LIST=${rweb_site_balancer_list}
+    if test ${algorithm} == robin -a ${sticky} == nosticky ; then
+	RWEB_SITE_BALANCER_LIST=$(remove-record-from-list 5 1 "${name}" "${RWEB_SITE_BALANCER_LIST}")
+    else
+	RWEB_SITE_BALANCER_LIST=$(insert-record-in-slist 5 1 "${name} ${algorithm} ${sticky} ${mode} ${cookie}" "${RWEB_SITE_BALANCER_LIST}")
+    fi
 }
 
 get-rweb-external-ip()
@@ -428,13 +414,13 @@ manage-site()
 
     case ${action} in
 	add|del)
-	    test "${action}" != "add" || check-rweb-nb || return 90
-
 	    test -n "${2}" || return 1
 	    local name=${2}
 	    name=${name^^}
 	    name=${name~~}
 	    check-sitename ${name} || return 78
+
+	    test "${action}" != "add" || check-rweb-nb ${name} || return 90
 
 	    if test -z "${3}" ; then
 		local protocol=http
@@ -469,7 +455,7 @@ manage-site()
 		    *)
 			;;
 		esac
-		
+
 		if test -z "${4}" ; then
 		    local ip=$(get-rweb-external-ip)
 		    local qos=100
@@ -490,8 +476,7 @@ manage-site()
 
 	    case ${action} in
 		add)
-		    set-site-balancer ${name} 1 robin nosticky nil nil
-		    export RWEB_SITE_LIST=$(insert-record-in-slist 5 3 "${name} ${protocol} ${ip} ${tls} ${qos}" "${RWEB_SITE_LIST}")
+		    RWEB_SITE_LIST=$(insert-record-in-slist 5 3 "${name} ${protocol} ${ip} ${tls} ${qos}" "${RWEB_SITE_LIST}")
 		    ;;
 		del)
 		    local rweb_site_list
@@ -499,15 +484,15 @@ manage-site()
 
 		    if test ${?} -eq 11 ; then
 
-			export RWEB_SITE_LIST=${rweb_site_list}
-			export RWEB_SITE_HTTPX_LIST=$(remove "${RWEB_SITE_HTTPX_LIST}" ${name})
+			RWEB_SITE_LIST=${rweb_site_list}
+			RWEB_SITE_HTTPX_LIST=$(remove "${RWEB_SITE_HTTPX_LIST}" ${name})
 
 			if ! site-name-exist ${name} ; then
-			    export RWEB_SITE_HOSTS_LIST=$(host-remove "${RWEB_SITE_HOSTS_LIST}" ${name})
-			    export KERBEROS_RWEB_LIST=$(remove-record-from-list 2 1 "${name}" "${KERBEROS_RWEB_LIST}")
-			    export WAF_RWEB_AUDIT_LIST=$(remove "${WAF_RWEB_AUDIT_LIST}" ${name})
-			    export RWEB_SITE_DENYURL_LIST=$(rweb-denyurl-remove ${name})
-			    export RWEB_SITE_STANDBY_LIST=$(standby-remove ${name})
+			    RWEB_SITE_HOSTS_LIST=$(host-remove "${RWEB_SITE_HOSTS_LIST}" ${name})
+			    KERBEROS_RWEB_LIST=$(remove-record-from-list 2 1 "${name}" "${KERBEROS_RWEB_LIST}")
+			    WAF_RWEB_AUDIT_LIST=$(remove "${WAF_RWEB_AUDIT_LIST}" ${name})
+			    RWEB_SITE_DENYURL_LIST=$(rweb-denyurl-remove ${name})
+			    RWEB_SITE_STANDBY_LIST=$(standby-remove ${name})
 
 			    remove-waf-generic ${name}
 			    remove-waf-bypass-rule ${name}
@@ -516,7 +501,7 @@ manage-site()
 			fi
 
 			if ! site-name-ip-exist ${name} ${ip} ; then
-			    export RWEB_SITE_VIA_LIST=$(remove-record-from-list 3 2 "${name} ${ip}" "${RWEB_SITE_VIA_LIST}")
+			    RWEB_SITE_VIA_LIST=$(remove-record-from-list 3 2 "${name} ${ip}" "${RWEB_SITE_VIA_LIST}")
 			fi
 		    fi
 		    ;;
@@ -918,68 +903,6 @@ show-site-balancer()
     echo-end-show
 }
 
-set-site-balancer()
-{
-    test -n "${1}" || return 1
-    test -n "${2}" || return 2
-    test -n "${3}" || return 3
-    test -n "${4}" || return 4
-    test -n "${5}" || return 5
-    test -n "${6}" || return 6
-    local in_name=${1}
-    local in_condition=${2}
-    local in_algorithm=${3}
-    local in_sticky=${4}
-    local in_mode=${5}
-    local in_cookie=${6}
-
-    local rweb_site_balancer_list
-    local i=0 elt range found=0
-    local name algorithm sticky mode cookie
-
-    for elt in ${RWEB_SITE_BALANCER_LIST}
-    do
-	range=$[${i} % 5]
-	case ${range} in
-	    0)
-		name=${elt}
-		;;
-	    1)
-		algorithm=${elt}
-		;;
-	    2)
-		sticky=${elt}
-		;;
-	    3)
-		mode=${elt}
-		;;
-	    4)
-		cookie=${elt}
-		if test ${name} != ${in_name} ; then
-		    rweb_site_balancer_list="${rweb_site_balancer_list} ${name} ${algorithm} ${sticky} ${mode} ${cookie}"
-		else
-		    found=1
-		    if test ${in_condition} -eq 0 ; then
-			rweb_site_balancer_list="${rweb_site_balancer_list} ${in_name} ${in_algorithm} ${in_sticky} ${in_mode} ${in_cookie}"
-		    else
-			rweb_site_balancer_list="${rweb_site_balancer_list} ${name} ${algorithm} ${sticky} ${mode} ${cookie}"
-		    fi
-		fi
-		;;
-
-	    *)
-		return 1
-		;;
-	esac
-	((i++))
-    done
-    rweb_site_balancer_list="${rweb_site_balancer_list:1}"
-
-    test ${found} -eq 1 || rweb_site_balancer_list="${rweb_site_balancer_list} ${in_name} ${in_algorithm} ${in_sticky} ${in_mode} ${in_cookie}"
-
-    RWEB_SITE_BALANCER_LIST=${rweb_site_balancer_list}
-}
-
 manage-balancer()
 {
     if test -z "${1}" ; then
@@ -1045,7 +968,7 @@ manage-balancer()
 	esac
     fi
 
-    set-site-balancer ${name} 0 ${algorithm} ${sticky} ${mode} ${cookie}
+    add-site-balancer ${name} ${algorithm} ${sticky} ${mode} ${cookie}
     SAVENV=1
 }
 
@@ -1573,6 +1496,16 @@ manage-standby()
 run()
 {
     contextual-command-is-allowed || return 207
+
+    export RWEB_SITE_LIST
+    export RWEB_SITE_BALANCER_LIST
+    export RWEB_SITE_HTTPX_LIST
+    export RWEB_SITE_HOSTS_LIST
+    export KERBEROS_RWEB_LIST
+    export WAF_RWEB_AUDIT_LIST
+    export RWEB_SITE_DENYURL_LIST
+    export RWEB_SITE_STANDBY_LIST
+    export RWEB_SITE_VIA_LIST
 
     if test -n "${ARGS[1]}" ; then
 	local op=${ARGS[1]}

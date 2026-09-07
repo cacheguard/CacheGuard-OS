@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -34,7 +33,7 @@ set-admin-snmp-certificate()
 	    echo "admin snmp certificate raz" >> ${transaction}
 	    ;;
 	load)
-	    echo "admin snmp certificate load '${VALUES[1]:1}' '${VALUES[2]}' '${VALUES[3]}'" >> ${transaction}
+	    echo "admin snmp certificate load ${VALUES[1]:1} ${VALUES[2]} ${VALUES[3]}" >> ${transaction}
 	    ;;
 	*)
 	    ;;

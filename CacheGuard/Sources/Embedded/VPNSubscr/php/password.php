@@ -4,7 +4,6 @@
 ###########################################################################
 #
 # MODULE:       VPN Subscription
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -199,7 +198,7 @@ function vpnsubscr_display_form( $record )
         array_push( $errors, array( 301, "this HTTP method is not supported." ));
     }
 
-    $help_message = "Use this form to modify your login password.";
+    $help_message = "To change your login password, enter your current password and your new password. Please re-enter your new password to confirm it.";
 
     if ($method == 'POST' && !$errors) {
         switch ($write_state) {
@@ -215,7 +214,7 @@ function vpnsubscr_display_form( $record )
     }
 
     echo <<< EOT
-<div class="box-help">
+<div class="help">
 $help_message
 </div>
 
@@ -229,8 +228,7 @@ EOT;
 
     echo <<< EOT
 <form name="submit-vpnsubscr-form" id="submit-vpn-form" action="/password.php" method="POST">
-<center>
-<table class='box-form'>
+<table class='highlight-form'>
 
 EOT;
 
@@ -270,7 +268,6 @@ EOT;
 
     echo <<< EOT
 </table>
-</center>
 </form>
 
 EOT;
@@ -283,27 +280,11 @@ $PFORM = vpnsubscr_get_pform( );
 ?>
 <!DOCTYPE html>
 <html>
-  <head>
-    <title>Login to <?php echo vpnsubscr_get_org_name( ); ?> Login Password Modification</title>
-
-    <link rel="shortcut icon" type="image/x-image" href="/image/favicon.ico" />
-    <link rel="stylesheet" type="text/css" href="/chromestyle.css" />
-    <link rel="stylesheet" type="text/css" href="/style.css" />
-
-    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
-    <meta name="robots" content="noindex, nofollow, noarchive, noarchive, nosnippet, noodp, noydir" />
-    <meta name="description" content="This page allows you to modify your password to login to the VPN management application." />
-
-    <script type="text/javascript" src="/js/chrome.js"></script>
-    <script type="text/javascript" src="/js/vpnsubscr.js"></script>
-    <script type="text/javascript" src="/js/printmenu.js"></script>
-    <script type="text/javascript" src="/js/logout.js"></script>
-  </head>
-
+<?php vpnsubscr_display_html_header( "Login Password" ); ?>
   <body>
     <?php vpnsubscr_display_header( ); ?>
-    <div class='box-centered-container'>
-      <div class='box-centered-nested'>
+    <div class='centered-container'>
+      <div class='centered-nested'>
 	<div class='page-title'>Account &gt; Login Password</div>
 	<?php vpnsubscr_display_form( $PFORM ); ?>
       </div>

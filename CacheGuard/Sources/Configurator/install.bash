@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       Build
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -121,6 +120,25 @@ gen-userenv()
     rm -f ${tmp_userenv}
 }
 
+gen-shared-functions()
+{
+    cp ../Shared/common-functions ${GENERATED_DIR}/apl_common
+    cp ../Shared/device-functions ${GENERATED_DIR}/apl_device
+
+    ln -sf ../${GENERATED_DIR}/apl_common lib/apl_common
+    ln -sf ../${GENERATED_DIR}/apl_device lib/apl_device
+
+    cat << EOF >> ${GENERATED_DIR}/apl_common
+
+LIB_APL_COMMON=Yes
+EOF
+
+    cat << EOF >> ${GENERATED_DIR}/apl_device
+
+LIB_APL_DEVICE=Yes
+EOF
+}
+
 gen-apl_functions()
 {
     local lib name len
@@ -189,7 +207,7 @@ install-files()
     do
 	len=${#lib} ; ((len--))
 	test "${lib:${len}}" != "~" || continue
-	sudo install -m 444 -o root -g root ${lib} ${APL}${LOCAL_DIR}/lib
+	sudo install -m 644 -o root -g root ${lib} ${APL}${LOCAL_DIR}/lib
     done
 
     for bin in sbin/apl_*
@@ -199,7 +217,7 @@ install-files()
 	sudo install -m 755 -o root -g root ${bin} ${APL}${LOCAL_DIR}/sbin
     done
 
-    sudo install -m 444 -o root -g root ${GENERATED_DIR}/apl_functions ${APL}${LOCAL_DIR}/lib
+    sudo install -m 644 -o root -g root ${GENERATED_DIR}/apl_functions ${APL}${LOCAL_DIR}/lib
 
     sudo install -m 644 -o root -g root ${VPN_IPSEC_ACCESS_DB_SCHEMA} ${APL}${DB_SCHEMA_DIR}
     sudo install -m 644 -o root -g root ${CONFIGURATION_DB_SCHEMA} ${APL}${DB_SCHEMA_DIR}
@@ -211,8 +229,8 @@ mkdir -p ${FULL_GENERATED_DIR}
 ln -sf ${FULL_GENERATED_DIR}
 
 gen-userenv
-
 gen-current-userenv > ${GENERATED_DIR}/current-userenv
+gen-shared-functions
 gen-apl_functions > ${GENERATED_DIR}/apl_functions
 
 reset-htpasswd

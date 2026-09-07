@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -79,48 +78,44 @@ show-waf-limit-form()
 {
     local rbl_url="https://www.projecthoneypot.org"
 
-    local width=520
+    local width=500
 
-    itemWidth[0]=45
-    itemWidth[1]=55
+    itemWidth[0]=50
+    itemWidth[1]=50
 
     itemTitle[0]="Filtering Level"
     itemTitle[1]="Request Score Threshold"
     itemTitle[2]="Response Score Threshold"
     itemTitle[3]="Project Honey Pot RBL API Key"
-    itemTitle[4]="Rewrite HTTP Error Pages"
-    itemTitle[5]="Allow insecure HTTP methods"
+    itemTitle[4]=''
+    itemTitle[5]="Rewrite HTTP Error Pages"
+    itemTitle[6]="Allow insecure HTTP methods"
 
     itemID[0]="level"
     itemID[1]="score_request"
     itemID[2]="score_response"
     itemID[3]="rbl_key"
-    itemID[4]="errors"
-    itemID[5]="imethods"
+    itemID[4]='get_key'
+    itemID[5]="errors"
+    itemID[6]="imethods"
 
     checkItem[3]=alphanum
 
     itemForm[0]="select"
     itemForm[1]="select"
     itemForm[2]="select"
+    itemForm[4]="text"
 
     blankItemContent[0]=$(show-waf-select-options ${WAF_LEVEL} 4)
     blankItemContent[1]=$(show-waf-select-options ${WAF_REQUEST_SCORE} ${MAX_WAF_SCORE})
     blankItemContent[2]=$(show-waf-select-options ${WAF_RESPONSE_SCORE} ${MAX_WAF_SCORE})
-    blankItemContent[3]="type='password' size='32' maxlength='64' value='${WAF_REPUTATION_RBL_KEY}'"
-    blankItemContent[4]="type='checkbox' $(waf-errors-checked ${WAF_REWRITE_HTTP_ERRORS})"
-    blankItemContent[5]="type='checkbox' $(waf-imethods-checked ${WAF_IMETHODS})"
+    blankItemContent[3]="type='password' size='24' maxlength='32' value='${WAF_REPUTATION_RBL_KEY}'"
+    blankItemContent[4]="<div class='information-notice'>Get a real time blacklists API key at <a href='${rbl_url}/' target='_blank'>${rbl_url}</a></div>"
+    blankItemContent[5]="type='checkbox' $(waf-errors-checked ${WAF_REWRITE_HTTP_ERRORS})"
+    blankItemContent[6]="type='checkbox' $(waf-imethods-checked ${WAF_IMETHODS})"
 
     show-title "Scoring & Other WAF Settings" "waf"
     show-form "${width}"
-
-    echo "<div class='core-form'>"
-    echo "<p><br />"
-    echo "<div style='clear:left;'></div>"
-    echo "<div class='table-title'>"
-    echo "Get a Real Time Blacklists API Key at <a href='${rbl_url}/' target='_blank'>${rbl_url}</a>"
-    echo "</div>"
-    echo "</div>"
 }
 
 # Main()

@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -58,19 +57,20 @@ show-waf-rweb-errors-form()
     listContent=${WAF_RWEB_REWRITE_HTTP_ERRORS_LIST}
     local rweb_nb=$(gui-get-contextual-rweb-nb)
 
+    shortcutMenuItem[0]="rweb-site"
+    shortcutMenuTitle[0]="Add rWeb"
+
     test -n "${RWEB_SITE_LIST}" || state=disabled    
+
     show-title "WAF HTTP Errors" "${state}" "waf"
-    show-list-form ${rweb_nb} "${width}" "${page_ref}" "" "" ${state}
 
     if test -z "${RWEB_SITE_LIST}" ; then
 	echo "<div class='core-form'>"
-	echo "<p><br />"
-	echo "<div style='clear:left;'></div>"
-	echo "<div class='table-title'>"
-	echo "<span class='table-title' style='fload:left;'>&lt;no reverse Web site has been defined&gt;</span>"
-	echo "<span class='shortcut-menu-item' style='display:inline;'><a href='rweb-site.${GUI_EXT_NAME}'>Add rWeb</a></span>"
+	show-shortcuts-menu
+	echo-unavailable-message "no reverse website has been defined."
 	echo "</div>"
-	echo "</div>"
+    else
+	show-list-form ${rweb_nb} "${width}" "${page_ref}" "" "" ${state}
     fi
 }
 

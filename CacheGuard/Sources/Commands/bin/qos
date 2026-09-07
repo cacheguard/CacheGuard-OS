@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       Commands
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -38,6 +37,18 @@ check-gress()
     esac
 }
 
+check-qos-interface()
+{
+    case "${1}" in
+	external|web|rweb|antivirus|admin|mon|file|peer|auxiliary)
+	    return 0
+	    ;;
+	*)
+	    return 1
+	    ;;
+    esac
+}
+
 check-qos-protocol()
 {
     test -n "${1}" || return 1
@@ -53,15 +64,6 @@ check-qos-protocol()
 	    return 1
 	    ;;
     esac
-}
-
-check-qos-port()
-{
-    test -n "${1}" || return 1
-    local port=${1}
-
-    test ${port} != any || return 0
-    check-port-nb ${port} || return 1
 }
 
 check-dscp()
@@ -105,46 +107,13 @@ check-qos-flow-type()
     local at=${1}
 
     case ${at} in
-	all|admin|etc|gateway)
+	all|admin|etc|routed)
 	    return 0
 	    ;;
 	*)
 	    check-qos-shape-type ${at}
 	    ;;
     esac
-}
-
-get-qos()
-{
-    test -n "${1}" || return 1
-    test -n "${2}" || return 1
-
-    local list=${1}
-    local in_at=${2}
-
-    local elt i=0 range
-    local at qos
-    for elt in ${list}
-    do
-	range=$[${i} % 2]
-	case ${range} in
-	    0)
-		at=${elt}
-		;;
-	    1)
-		qos=${elt}
-		if test "${at}" == "${in_at}" ; then
-		    show-qos-value ${qos}
-		    return 0
-		fi
-		;;
-	    *)
-		return 1
-		;;
-	esac
-	((i++))
-    done
-    return 1
 }
 
 show-qos-value()
@@ -895,8 +864,8 @@ conf-shape-router()
 		    test -n "${3}" || return 1
 		    local dev=${3}
 		    test ${dev} != vpnipsec || return 43
-		    check-interface ${dev} || return 43
-		    
+		    check-qos-interface ${dev} || return 43
+
 		    test -n "${4}" || return 1
 		    local protocol=${4}
 		    check-qos-protocol ${protocol} || return 59
@@ -908,7 +877,7 @@ conf-shape-router()
 
 		    test -n "${6}" || return 1
 		    local src_port=${6}
-		    check-qos-port ${src_port} || return 60
+		    check-rule-port ${src_port} || return 60
 
 		    test -n "${7}" || return 1
 		    local ingress_qos=${7}
@@ -921,7 +890,7 @@ conf-shape-router()
 
 		    test -n "${9}" || return 1
 		    local dst_port=${9}
-		    check-qos-port ${dst_port} || return 60
+		    check-rule-port ${dst_port} || return 60
 
 		    test -n "${10}" || return 1
 		    local egress_qos=${10}
@@ -1173,7 +1142,7 @@ show-qos-report()
 	qos_traffic_filename=${QOS_DIFF_TRAFFIC_FILENAME}
     fi
 
-    update-report qos-report 20 5000000 || return 104
+    update-report qos-report 10 5000000 || return 104
     test -f ${RUN_DIR}/${qos_traffic_filename} || return 104
 
     test "${TERM}" != "${WADMIN_TERM}" || return 0
@@ -1191,16 +1160,7 @@ show-qos-report()
 	if test -z "${in_flow}" ; then
 	    printf "%-36s%-11s%16d%16d\n" ${flow} ${interface} ${ikbits} ${okbits}
 	else
-	    case ${in_flow} in
-		rweb)
-		    test ${flow:0:4} == rweb || continue
-		    ;;
-		all|antivirus|gateway|antivirus|etc|peer|tweb|admin|default|file|router|vpnipsec|web)
-		    test ${flow:0:${len}} == ${in_flow} || continue
-		    ;;
-		*)
-		    ;;
-	    esac
+	    test ${flow:0:${len}} == ${in_flow} || continue
 	    printf "%-36s%-11s%16d%16d\n" ${flow} ${interface} ${ikbits} ${okbits}
 	fi
     done < ${RUN_DIR}/${qos_traffic_filename}

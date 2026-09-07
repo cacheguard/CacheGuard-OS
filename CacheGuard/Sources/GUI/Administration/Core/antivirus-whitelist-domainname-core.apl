@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -48,8 +47,6 @@ show-antivirus-whitelist-domainname-form()
     test -n "${listContent}" || state=disabled
 
     show-title "Antivirus Domain Name White List" "${state}" "sslmediate urllist"
-
-    echo "<div class='table-title' style='margin:5px;'>Bypass the antivirus for the following domain names.</div>"
     show-list-form ${MAX_AV_WHITELIST_DOMAINNAME_NB} "${width}" "${page_ref}"
 }
 

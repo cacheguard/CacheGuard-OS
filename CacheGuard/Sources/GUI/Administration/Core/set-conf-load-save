@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -22,99 +21,143 @@
 #
 ###########################################################################
 
-set-conf-save()
+file-size()
 {
-    local i
+    test -n "${1}" || return 1
+    local file=${1}
 
+    if test ! -f ${file} ; then
+	echo 0
+	return 11
+    fi
+
+    local f1 f2 f3 f4 size fn
+
+    ls -l ${file} 2> /dev/null | \
+	while read f1 f2 f3 f4 size fn
+    do
+	test -n "${size}" || continue
+	echo ${size}
+	break
+    done
+
+    return 0
+}
+
+download-conf()
+{
+    test -n "${1}" || return 1
+    local filename=${1}
+
+    local file=${ADMIN_TMP_DIR}/${filename}
+    test -f ${file} || return 11
+
+    local size=$(file-size ${file})
+
+    echo "Content-Disposition: attachment; filename=\"${filename}\""
+    echo "Content-Length: ${size}"
+    echo "Cache-control: private"
+
+    echo-http-header "application/octet-stream"
+
+    cat ${file}
+}
+
+set-conf-io-operation()
+{
     local operation="${VALUES[0]}"
     local protocol="${VALUES[1]:1}"
 
     local version server filename
 
-    for ((i=2 ; i<ATTRIBUTE_NB ; i++))
-    do
-	case ${ATTRIBUTES[${i}]} in
-	    version)
-		version="${VALUES[${i}]}"
-		;;
-	    server)
-		server="${VALUES[${i}]}"
-		;;
-	    filename)
-		filename="${VALUES[${i}]}"
-		;;
-	    *)
-		;;
-	esac
-    done
-
-    case "${operation}" in
+    case ${operation} in
 	load|save)
-	    ;;
-	*)
-	    return 1
-	    ;;
-    esac
-    
-    case "${protocol}" in
-	ftp|sftp|tftp)
+	    local i
+	    for ((i=2 ; i<ATTRIBUTE_NB ; i++))
+	    do
+		case ${ATTRIBUTES[${i}]} in
+		    version)
+			version="${VALUES[${i}]}"
+			;;
+		    server)
+			server="${VALUES[${i}]}"
+			;;
+		    filename)
+			filename="${VALUES[${i}]}"
+			;;
+		    *)
+			;;
+		esac
+	    done
+
 	    if test -z "${filename}" ; then
 		gen-gui-error 6
 		return 0
 	    fi
-	    ;;
-	web)
-	    local filename="${DEFAULT_SHOSTNAME}.conf.${$}"
-	    ;;
-	*)
-	    return 3
-	    ;;
-    esac
 
-    case "${operation}" in
-	save)
-	    case "${version}" in
-		new)
-		    version=" ${version}"
-		    ;;
-		current)
-		    unset version
-		    ;;
-		*)
-		    unset version
-		    ;;
-	    esac
+	    case "${operation}" in
+		save)
+		    case "${version}" in
+			new)
+			    version=" ${version}"
+			    ;;
+			current)
+			    unset version
+			    ;;
+			*)
+			    unset version
+			    ;;
+		    esac
 	    
-	    case "${protocol}" in
-		ftp|sftp|tftp)
 		    log-command "conf" "save ${protocol} ${server} ${filename}${version}"
 		    execute-command "conf save ${protocol} ${server} ${filename}${version}"
 		    ;;
-		web)
-		    execute-command "conf create ${filename}${version}"
-		    ;;
-		*)
-		    return 255
-		    ;;
-	    esac
-	    ;;
-	load)
-	    case "${protocol}" in
-		ftp|sftp|tftp)
+		load)
 		    log-command "conf" "load ${protocol} ${server} ${filename}"
 		    execute-command "conf load ${protocol} ${server} ${filename}"
 		    ;;
-		web)
-		    ;;
 		*)
 		    return 255
 		    ;;
 	    esac
 	    ;;
+	upload)
+	    local uploaded_filename=${UPLOADED_FILES[0]}
+	    if test -n "${uploaded_filename}" -a -f ${ADMIN_TMP_DIR}/${uploaded_filename} ; then
+		execute-command "conf inject ${uploaded_filename}"
+		rm -f ${ADMIN_TMP_DIR}/${uploaded_filename}
+	    else
+		gen-gui-error 16
+	    fi
+	    ;;
+	download)
+	    test "${protocol}" == 'web' || exit 0
+	    version=${VALUES[2]}
+	    filename=${VALUES[3]}
+	    test -n "${filename}" || filename=${DEFAULT_SHOSTNAME}.conf
+
+	    case ${version} in
+		'cur')
+		    unset version
+		    ;;
+		'new')
+		    version=" ${version}"
+		    ;;
+		*)
+		    unset version
+		    ;;
+	    esac
+
+	    execute-command "conf create ${filename}${version}"
+	    download-conf ${filename}
+	    execute-command "conf clear ${filename}"
+	    reset-gui-error-log
+	    exit 0 # important
+	    ;;
 	*)
-	    return 255
+	    return 13
 	    ;;
     esac
 }
 
-set-conf-save
+set-conf-io-operation

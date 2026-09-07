@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       Configurator
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -55,8 +54,7 @@ remove-rweb-tls-server-components()
 	rm -f \
 	   ${dir}/${tls}.key \
 	   ${dir}/${tls}.certificate \
-	   ${dir}/${tls}.chain \
-	   ${dir}/${tls}.certificate+chain
+	   ${dir}/${tls}.chain
     done
 }
 
@@ -436,41 +434,23 @@ set-tls-rweb()
 			else
 			    diff --brief ${SSL_SERVER_DIR}/${tls_id}.key ${WEB_SSL_DIR}/${tls_id}.key > /dev/null 2>&1 || do_key='yes'
 			fi
-			if test -n "${do_key}" ; then
+			test -z "${do_key}" || \
 			    install -m 644 -o root -g root ${SSL_SERVER_DIR}/${tls_id}.key ${WEB_SSL_DIR}/${tls_id}.key
-			    install -m 644 -o root -g root ${SSL_SERVER_DIR}/${tls_id}.key ${PROXY_SSL_SERVER_DIR}/${tls_id}.key
-			fi
 
 			unset do_cert
-			if test ${PROXY2_MODE} == True -o -z "${ca_id}" ; then
-			    if test ${mode} == force ; then
-				do_cert='yes'
-			    else
-				diff --brief ${SSL_SERVER_DIR}/${tls_id}.certificate ${WEB_SSL_DIR}/${tls_id}.certificate > /dev/null 2>&1 || do_cert='yes'
-			    fi
-			    if test -n "${do_cert}" ; then
-				install -m 644 -o root -g root ${SSL_SERVER_DIR}/${tls_id}.certificate ${WEB_SSL_DIR}/${tls_id}.certificate
-				install -m 644 -o root -g root ${SSL_SERVER_DIR}/${tls_id}.certificate ${PROXY_SSL_SERVER_DIR}/${tls_id}.certificate
-			    fi
+			if test ${mode} == force ; then
+			    do_cert='yes'
+			else
+			    diff --brief ${SSL_SERVER_DIR}/${tls_id}.certificate ${WEB_SSL_DIR}/${tls_id}.certificate > /dev/null 2>&1 || do_cert='yes'
 			fi
+			test -z "${do_cert}" || \
+			    install -m 644 -o root -g root ${SSL_SERVER_DIR}/${tls_id}.certificate ${WEB_SSL_DIR}/${tls_id}.certificate
 		    fi
 
 		    if test -n "${ca_id}" -a -f ${SSL_LOCAL_CA_DIR}/${ca_id}.certificate ; then
-			if test ${PROXY2_MODE} == True ; then
-			    install -m 644 -o root -g root ${SSL_LOCAL_CA_DIR}/${ca_id}.certificate ${WEB_SSL_DIR}/${tls_id}.chain
-			    install -m 644 -o root -g root ${SSL_LOCAL_CA_DIR}/${ca_id}.certificate ${PROXY_SSL_SERVER_DIR}/${tls_id}.chain
-			    rm -f ${WEB_SSL_DIR}/${tls_id}.certificate+chain
-			    rm -f ${PROXY_SSL_SERVER_DIR}/${tls_id}.certificate+chain
-			else
-			    cat ${SSL_SERVER_DIR}/${tls_id}.certificate ${SSL_LOCAL_CA_DIR}/${ca_id}.certificate > /tmp/${tls_id}.certificate+chain
-			    install -m 644 -o root -g root /tmp/${tls_id}.certificate+chain ${WEB_SSL_DIR}/${tls_id}.certificate+chain
-			    install -m 644 -o root -g root /tmp/${tls_id}.certificate+chain ${PROXY_SSL_SERVER_DIR}/${tls_id}.certificate+chain
-			    rm -f ${WEB_SSL_DIR}/${tls_id}.certificate
-			    rm -f ${PROXY_SSL_SERVER_DIR}/${tls_id}.certificate
-			fi
+			install -m 644 -o root -g root ${SSL_LOCAL_CA_DIR}/${ca_id}.certificate ${WEB_SSL_DIR}/${tls_id}.chain
 		    else
-			rm -f ${WEB_SSL_DIR}/${tlsid}.{chain,certificate+chain}
-			rm -f ${PROXY_SSL_SERVER_DIR}/${tls_id}.{chain,certificate+chain}
+			rm -f ${WEB_SSL_DIR}/${tlsid}.chain
 		    fi
 		fi
 		;;
@@ -734,7 +714,7 @@ set-ca-browsing()
 
     local ret
 
-    log "Activating the '${ca}' CA for Web browsing"
+    log "Activating the '${ca}' CA for web browsing"
     install -m 644 -o root -g root ${SSL_LOCAL_CA_DIR}/${ca}.certificate ${PROXY_SSL_LOCAL_CA_DIR}/${ca}.certificate
     local hash_value=$(openssl x509 -noout -hash -in ${PROXY_SSL_LOCAL_CA_DIR}/${ca}.certificate 2> /dev/null)
     ln -sf ${ca}.certificate ${PROXY_SSL_LOCAL_CA_DIR}/${hash_value}.0 2> /dev/null &&
@@ -791,8 +771,10 @@ set-ca()
 			if test ${mode} == force ; then
 			    set-ca-browsing ${ca} || ((ret++))
 			else
-			    if test ! -f ${PROXY_SSL_LOCAL_CA_DIR}/${ca}.certificate || \
-				    diff --brief ${PROXY_SSL_LOCAL_CA_DIR}/${ca}.certificate ${SSL_LOCAL_CA_DIR}/${ca}.certificate > /dev/null 2>&1 ; then
+			    if test -f ${PROXY_SSL_LOCAL_CA_DIR}/${ca}.certificate ; then
+				diff --brief ${PROXY_SSL_LOCAL_CA_DIR}/${ca}.certificate ${SSL_LOCAL_CA_DIR}/${ca}.certificate > /dev/null 2>&1 || \
+				    set-ca-browsing ${ca} || ((ret++))
+			    else
 				set-ca-browsing ${ca} || ((ret++))
 			    fi
 			fi

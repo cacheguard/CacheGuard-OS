@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       Commands
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -590,6 +589,7 @@ insert-record-in-slist()
     local key_len=${2}
     local in_record=${3}
     local in_list=${4}
+    local numerical=${5}
 
     test ${key_len} -le ${record_len} || return 11
     test ${record_len} -gt 0 || return 0
@@ -604,7 +604,7 @@ insert-record-in-slist()
 	return 0
     fi
 
-    local in_key
+    local in_key added=0
     local elt key record i=0
     local out_list rest
 
@@ -615,7 +615,7 @@ insert-record-in-slist()
 	((i++))
     done
     in_key=${in_key:1}
-    
+
     while test -n "${in_list}"
     do
 	unset record
@@ -637,22 +637,42 @@ insert-record-in-slist()
 	record=${record:1}
 	key=${key:1}
 
-	if [[ "${in_key}" > "${key}" ]] ; then
-	    out_list="${out_list} ${record}"
-	elif [[ "${in_key}" == "${key}" ]] ; then
-	    out_list="${out_list} ${in_record} ${in_list}"
-	    break
+	if test -z "${numerical}" ; then
+	    [[ "${in_key}" > "${key}" ]]
 	else
-	    out_list="${out_list} ${in_record} ${record} ${in_list}"
-	    break
+	    test ${in_key} -gt ${key}
+	fi
+
+	if test ${?} -eq 0 ; then
+	    out_list="${out_list} ${record}"
+	else
+	    if test -z "${numerical}" ; then
+		[[ "${in_key}" == "${key}" ]]
+	    else
+		test ${in_key} -eq ${key}
+	    fi
+	    if test ${?} -eq 0 ; then
+		out_list="${out_list} ${in_record} ${in_list}"
+		added=1
+		break
+	    else
+		out_list="${out_list} ${in_record} ${record} ${in_list}"
+		break
+	    fi
 	fi
     done
 
-    if [[ "${in_key}" > "${key}" ]] ; then
-	out_list="${out_list} ${in_record}"
+    if test -z "${numerical}" ; then
+	[[ "${in_key}" > "${key}" ]]
+    else
+	test ${in_key} -gt ${key}
     fi
 
+    test ${?} -ne 0 || out_list="${out_list} ${in_record}"
+
     echo ${out_list:1}
+
+    return ${added}
 }
 
 get-diff-list()
@@ -751,4 +771,38 @@ keep-ge-in-slist()
     out_list=${out_list:1}
 
     echo $(revert-list "${out_list}")
+}
+
+sort-list()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    test -n "${3}" || return 0
+    local record_len=${1}
+    local sort_key=${2}
+    local list=${3}
+
+    local elt range i=1
+    local record tmp_file=/tmp/list2sort.${$}
+
+    rm -f ${tmp_file}
+
+    for elt in ${list}
+    do
+	record="${record} ${elt}"
+	range=$[${i} % ${record_len}]
+	if test ${range} -eq 0 ; then
+	    echo ${record:1}
+	    unset record
+	fi
+	((i++))
+    done > ${tmp_file}
+
+    sort_key=(${sort_key})
+
+    sort ${sort_key[@]} ${tmp_file} > ${tmp_file}.sorted
+    cat ${tmp_file}.sorted
+    rm -f \
+       ${tmp_file} \
+       ${tmp_file}.sorted
 }

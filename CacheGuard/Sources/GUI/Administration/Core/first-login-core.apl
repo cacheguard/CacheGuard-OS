@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -136,7 +135,6 @@ show-password-login-form()
        local mfa_init_url="otpauth://totp/${organisation}:${USER}@${SHOSTNAME}.${DOMAIN_NAME}?secret=${secret}&issuer=${COMMERCIAL_NAME}"
        local ecodes=${secrets#* }
        local qrcode_id='qrcode'
-       local qrcode_size=95
        local ecode html_ecodes
 
        for ecode in ${ecodes}
@@ -175,20 +173,7 @@ show-password-login-form()
 	gui-information-message "${message}"
     fi
 
-    if test -n "${init_2fa}" ; then
-	cat <<EOF
-<script type='text/javascript'>
-var qrcode = new QRCode( document.getElementById( '${qrcode_id}' ), {
-text: '${mfa_init_url}',
-width: ${qrcode_size},
-height: ${qrcode_size},
-colorDark: 'FireBrick',
-colorLight: 'White',
-correctLevel: QRCode.CorrectLevel.M
-} );
-</script>
-EOF
-    fi
+    test -z "${init_2fa}" || echo "<div data-init-qrcode data-target-id='${qrcode_id}' data-text='${mfa_init_url}' hidden></div>"
 }
 
 # Main()

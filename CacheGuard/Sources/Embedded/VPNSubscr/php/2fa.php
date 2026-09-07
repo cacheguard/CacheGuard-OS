@@ -4,7 +4,6 @@
 ###########################################################################
 #
 # MODULE:       VPN Subscription
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -372,7 +371,7 @@ function vpnsubscr_write_db( $data )
 
 function vpnsubscr_display_help( $method, $mfa_state, $write_state, $errors )
 {
-    $mfa_message = "In order to activate the 2FA, please scan the following QR code with your Authenticator App and then submit a first Verification Code (provided by your App).<p>Think about saving emergency codes displayed below in a safe place. You can use them instead of a Verification Code in case where your Authenticator App would not be available.";
+    $mfa_message = "To enable 2FA, scan the following QR code with your authenticator app and then enter the first verification code provided by the app.<p>Be sure to save the emergency codes displayed below in a safe place. You can use them instead of a verification code if your authenticator app is unavailable.";
 
     switch ($method) {
     case 'GET':
@@ -380,7 +379,7 @@ function vpnsubscr_display_help( $method, $mfa_state, $write_state, $errors )
             $help_message = $mfa_message;
         }
         else {
-            $help_message = "Use this form to setup the 2FA (Two Factor Authentication).";
+            $help_message = "To enable 2FA (Two-Factor Authentication), select <strong>Enable 2FA</strong>. To disable it, select <strong>Disable 2FA</strong>.";
         }
         break;
 
@@ -403,7 +402,7 @@ function vpnsubscr_display_help( $method, $mfa_state, $write_state, $errors )
         break;
     }
 
-    echo "<div class='box-help'>$help_message</div>";
+    echo "<div class='help'>$help_message</div>";
 
     return true;
 }
@@ -448,81 +447,65 @@ function vpnsubscr_display_form( $record )
 
     $enabled_check = $mfa_state == 0 ? '' : ' checked';
     $disabled_check = $mfa_state != 0 ? '' : ' checked';
-    $timecontainer_id = 'timecontainer';
-    $timezone = new DateTimeZone( date_default_timezone_get( ));
-    $date = new DateTime( 'now', $timezone );
-    $date_seconds = $date->format( 'U' );
-    $offset_mn = $date->getOffset( ) / 60;
 
+    echo <<< EOT
+<form name="submit-vpnsubscr-form" id="submit-vpn-form" action="/2fa.php" method="POST">
+<table class='highlight-form'>
+
+<tr>
+<td><label for='mfa_on'>Enable 2FA (Two Factor Authentication)</label></td>
+<td align='center'><input type='radio' id='mfa_on' name='mfa_state' value='on'$enabled_check /></td>
+</tr>
+
+<tr>
+<td><label for='mfa_off'>Disable 2FA (Two Factor Authentication)</label></td>
+<td align='center'><input type='radio' id='mfa_off' name='mfa_state' value='off'$disabled_check /></td>
+</tr>
+EOT;
     if ($mfa_state == 1) {
+        $timecontainer_id = 'timecontainer';
+        $timezone = new DateTimeZone( date_default_timezone_get( ));
+        $date = new DateTime( 'now', $timezone );
+        $date_seconds = $date->format( 'U' );
+        $offset_mn = $date->getOffset( ) / 60;
+
         $app_name = COMMERCIAL_NAME;
         $org_name = vpnsubscr_get_org_name( );
         $username = $_SESSION['username'];
         $domainname = $data[PRIVATE_DOMAIN_NAME];
         $secret = $data[MFA_SECRET];
-
         $mfa_init_url = "otpauth://totp/$org_name:$username@$domainname?secret=$secret&issuer=$app_name";
-        echo <<< EOT
-<center>
-<span id='qrcode'></span>
-</center>
-<script type='text/javascript'>
-var qrcode = new QRCode( document.getElementById( 'qrcode' ), {
-text: "$mfa_init_url",
-width: 95, 
-height: 95, 
-colorDark: 'FireBrick',
-colorLight: 'White',
-correctLevel: QRCode.CorrectLevel.M
-} );
-</script>
-EOT;
-    }
-    echo <<< EOT
-<div class='box-field'>
-Local Time: <span id='$timecontainer_id'></span>
-</div>
 
-<script type='text/javascript'>
-new showLocalTime( '$timecontainer_id', $date_seconds, $offset_mn, 'short');
-</script>
-
-<form name="submit-vpnsubscr-form" id="submit-vpn-form" action="/2fa.php" method="POST">
-<center>
-<table class='box-form'>
-
-<tr>
-<td width='95%'><label for='mfa_on'>Enable 2FA (Two Factor Authentication)</label></td>
-<td width='5%' align='center'><input style='margin:0; margin-top:5px;' type='radio' id='mfa_on' name='mfa_state' value='on'$enabled_check /></td>
-</tr>
-
-<tr>
-<td><label for='mfa_off'>Disable 2FA (Two Factor Authentication)</label></td>
-<td align='center'><input style='margin:0; margin-top:5px;' type='radio' id='mfa_off' name='mfa_state' value='off'$disabled_check /></td>
-</tr>
-EOT;
-    if ($mfa_state == 1) {
         $mfa_emergencies_html = implode( '<br />', $mfa_emergencies );
         echo <<< EOT
 
 <tr>
+<td>QR Code</td>
+<td class='qrcode'><span id='qrcode'></span><div data-display-qrcode data-init-url='$mfa_init_url' hidden></div></td>
+</tr>
+
+<tr>
+<td>Appliance Date & Time (ISO-style)</td>
+<td><span class='clock' id='$timecontainer_id'></span><div data-display-time data-container-id='$timecontainer_id' data-date-seconds='$date_seconds' data-offset-mn='$offset_mn' hidden></div></td>
+</tr>
+
+<tr>
 <td>Verification Code</td>
-<td><center><input name='token' maxlength='8' size='8' value='' autocomplete='off' /></center></td>
+<td><input name='token' maxlength='8' size='8' value='' autocomplete='off' /></td>
 </tr>
 
 <tr>
 <td>Emergency Codes</td>
-<td><center>$mfa_emergencies_html</center></td>
+<td>$mfa_emergencies_html</td>
+</tr>
 EOT;
     }
     echo <<< EOT
-</tr>
 
 <tr>
 <td></td><td align='right'><input class='valid-button' type='submit' value='Validate' /></td>
 </tr>
 </table>
-</center>
 </form>
 EOT;
 }
@@ -534,29 +517,11 @@ $TWOFAFORM = vpnsubscr_get_2fa_form( );
 ?>
 <!DOCTYPE html>
 <html>
-  <head>
-    <title>Login to <?php echo vpnsubscr_get_org_name( ); ?> 2FA Setup</title>
-
-    <link rel="shortcut icon" type="image/x-image" href="/image/favicon.ico" />
-    <link rel="stylesheet" type="text/css" href="/chromestyle.css" />
-    <link rel="stylesheet" type="text/css" href="/style.css" />
-
-    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
-    <meta name="robots" content="noindex, nofollow, noarchive, noarchive, nosnippet, noodp, noydir" />
-    <meta name="description" content="This page allows you to setup the 2FA to login to the VPN management application." />
-
-    <script type="text/javascript" src="/js/localTime.js"></script>
-    <script type="text/javascript" src="/js/qrcode.min.js"></script>
-    <script type="text/javascript" src="/js/chrome.js"></script>
-    <script type="text/javascript" src="/js/vpnsubscr.js"></script>
-    <script type="text/javascript" src="/js/printmenu.js"></script>
-    <script type="text/javascript" src="/js/logout.js"></script>
-  </head>
-
+<?php vpnsubscr_display_html_header( "2FA Setup" ); ?>
   <body>
     <?php vpnsubscr_display_header( ); ?>
-    <div class='box-centered-container'>
-      <div class='box-centered-nested'>
+    <div class='centered-container'>
+      <div class='centered-nested'>
 	<div class='page-title'>Account &gt; 2FA Setup</div>
 	<?php vpnsubscr_display_form( $TWOFAFORM ); ?>
       </div>

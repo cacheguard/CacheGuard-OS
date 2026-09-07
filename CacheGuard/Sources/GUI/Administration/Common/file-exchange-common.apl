@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -24,18 +23,18 @@
 
 show-file-exchange-table()
 {
-    local table_width=500
-
     local file progress base i=0
-    local urllist prefix len
-    local bar
+    local urllist bar
+    local bar_width='60%'
+    local prefix=${LOADED}.${URLLIST}.
+    local len=${#prefix}
 
-    echo "<table class='highlight-list' width='${table_width}'>"
+    echo "<table class='highlight-list'>"
     echo "<thead>"
     echo "<tr>"
-    echo "<td class='table-header indicator-table-header' align='center'>Content</td>"
-    echo "<td class='table-header indicator-table-header' align='center'>Action</td>"
-    echo "<td class='table-header' width='${PERCENT_BAR_WIDTH}' align='center'>Progression</td>"
+    echo "<th class='table-header' align='center'>Content</th>"
+    echo "<th class='table-header' align='center'>Action</th>"
+    echo "<th class='table-header' align='center'>Progression</th>"
     echo "</tr>"
     echo "</thead>"
 
@@ -49,28 +48,27 @@ show-file-exchange-table()
 	progress=$(echo-exchanged-file-percent "${base}")
 	test "${progress}" != '100' || continue
 	base=$(file-basename ${base} .${PROGRESS})
-	bar=$(draw-percent-bar ${PERCENT_BAR_WIDTH} ${progress})
+	bar=$(draw-progress-bar ${progress})
 
 	echo -n "<tr>"
 
 	case "${base}" in
 	    ${SAVED}.backup)
-		echo "<td align='left'>System Backup</td><td align='center'>Saving</td><td  align='left'>${bar}</td>"
+		echo "<td align='left'>System Backup</td><td align='center'>Saving</td><td  align='left' width='${bar_width}'>${bar}</td>"
 		;;
 	    ${LOADED}.backup)
-		echo "<td align='left'>System Backup</td><td align='center'>Loading</td><td  align='left'>${bar}</td>"
+		echo "<td align='left'>System Backup</td><td align='center'>Loading</td><td  align='left' width='${bar_width}'>${bar}</td>"
 		;;
 	    ${LOADED}.os.tar.compressed)
-		echo "<td align='left'>OS Patch</td><td align='center'>Loading</td><td  align='left'>${bar}</td>"
+		echo "<td align='left'>OS Patch</td><td align='center'>Loading</td><td  align='left' width='${bar_width}'>${bar}</td>"
+		;;
+	    *)
+		if test ${base:0:${len}} == ${prefix} ; then
+		    urllist=${base:${len}}
+		    echo "<td align='left'>${urllist} content</td><td align='center'>Loading</td><td align='left' width='${bar_width}'>${bar}</td>"
+		fi
 		;;
 	esac
-
-	prefix=${LOADED}.${URLLIST}. ; len=${#prefix}
-
-	if test ${base:0:${len}} == ${prefix} ; then
-	    urllist=${base:${len}}
-	    echo "<td align='left'>${urllist} content</td><td align='center'>Loading</td><td align='left'>${bar}</td>"
-	fi
 
 	((i++))
 	echo -n "</tr>"
@@ -79,10 +77,10 @@ show-file-exchange-table()
     echo "</tbody>"
     echo "</table>"
 
-    echo "<table class='highlight-list' width='${table_width}' style='margin:0; margin-top:5px;'>"
+    echo "<table class='highlight-list'>"
     echo "<thead></thead>"
     echo "<tbody>"
-    echo "<tr><td align='left' width='100%'>Number of files being exchanged:<span style='float:right;'>${i}</span></td></tr>"
+    echo "<tr><td align='left'>Number of files being exchanged: ${i}</td></tr>"
     echo "</tbody>"
     echo "</table>"
 }

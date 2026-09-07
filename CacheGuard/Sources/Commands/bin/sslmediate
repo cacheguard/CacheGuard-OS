@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       Commands
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -91,20 +90,19 @@ show-sslmediate-selfsigned()
 show-sslmediate()
 {
     echo-begin-show
-    case "${1}" in
-	premature|expired|selfsigned)
-	    show-sslmediate-${1}
-	    ;;
-	"")
-	    show-sslmediate-expired
-	    show-sslmediate-premature
-	    show-sslmediate-selfsigned
- 	    ;;
-	*)
-	    return 255
-	    ;;
-    esac
-    echo-end-show
+
+    if test -n "${1}" ; then
+	show-sslmediate-${1}
+	echo-end-show
+    else
+	show-sslmediate-expired
+	show-sslmediate-premature
+	show-sslmediate-selfsigned
+	show-sslmediate-transparent
+	show-sslmediate-policy
+	show-sslmediate-exception-domainname
+	show-sslmediate-exception-urllist
+    fi
 }
 
 show-sslmediate-policy()

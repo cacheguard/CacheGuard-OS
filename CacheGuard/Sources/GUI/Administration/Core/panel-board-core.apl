@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -31,17 +30,17 @@ show-panel-board()
     process-main-action ${action}
     show-title "Web Administration GUI" disabled
 
-    echo "<script type='text/javascript' src='${JS_DIR}/board-menu${extension}.js'></script>"
+    echo "<script type='text/javascript' src='${JS_DIR}/board-menu${extension}-${GUI_FE_VERSION}.js'></script>"
 
+    echo "<div class='panel-board-container'>"
     echo "<div class='arrowlistmenu'>"
     cat ${ETC_HTML_DIR}/board-menu${extension}.html
     echo "</div>"
 
-    echo "<table><tr><td>"
     echo "<div class='icon-board'>"
     cat ${ETC_HTML_DIR}/board-icon${extension}.html
     echo "</div>"
-    echo "</td></tr></table>"
+    echo "</div>"
 }
 
 # Main()

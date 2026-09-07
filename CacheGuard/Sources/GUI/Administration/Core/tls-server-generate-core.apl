@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -40,7 +39,7 @@ show-tls-generate-form()
     local names numbits days country province locality organisation unit sign ocsp
 
     itemTitle[0]="Hidden"
-    itemTitle[1]="TLS ID"
+    itemTitle[1]="TLS Identifier"
     itemTitle[2]="Common Name(s)"
     itemTitle[3]="RSA Key Size (bits)"
     itemTitle[4]="Validity Days"
@@ -82,21 +81,27 @@ show-tls-generate-form()
     fi
 
     if test "${REQUEST_METHOD}" == POST ; then
-	names="${VALUES[1]}"
-	numbits="${VALUES[2]}"
-	days="${VALUES[3]}"
-	country="${VALUES[4]}"
-	province="${VALUES[5]}"
-	locality="${VALUES[6]}"
-	organisation="${VALUES[7]}"
-	unit="${VALUES[8]}"
+	names=${VALUES[1]}
+	numbits=${VALUES[2]}
+	days=${VALUES[3]}
+	country=${VALUES[4]}
+
+	province=${VALUES[5]}
+	locality=${VALUES[6]}
+	organisation=${VALUES[7]}
+	unit=${VALUES[8]}
+
+	province=${province//\'/\&#39;}
+	locality=${locality//\'/\&#39;}
+	organisation=${organisation//\'/\&#39;}
+	unit=${unit//\'/\&#39;}
     else
 	numbits=2048
     fi
 
     blankItemContent[0]="value='${tls}'"
-    blankItemContent[1]="${tls}"
-    blankItemContent[2]="cols='48' rows='3'"
+    blankItemContent[1]="<a href='/${GUI_DIR_NAME}/tls-server-manage.${GUI_EXT_NAME}?key:${tls}'><img  src='${IMAGE_DIR}/tls-server-manage.png' title='Manage the Certificate' /> ${tls}</a>"
+    blankItemContent[2]="cols='48' rows='3' maxlength='250'"
     blankItemContent[3]="type='text' size='5' maxlength='4' value='${numbits}'"
     blankItemContent[4]="type='text' size='8' maxlength='8' value='${days}'"
     blankItemContent[5]=$(show-tls-country ${country})
@@ -130,15 +135,10 @@ show-tls-generate-form()
     shortcutMenuTitle[0]="OCSP Settings"
 
     show-title "Generate Server TLS" "enabled" "tls"
-    show-shortcuts-menu
     show-form "${width}" enabled
 
-    if test "${REQUEST_METHOD}" != POST ; then
-	echo '<script type="text/javascript">'
-	echo "doNothingOnEnterInInput( 'names' );"
-	echo "AJAX_updateTLSConf( '/${GUI_DIR_NAME}/tls-print.${GUI_EXT_NAME}?server:${tls},${DOMAIN_NAME}+conf', 'names', 'numbits', 'days', 'country', 'province', 'locality', 'organisation', 'unit' );"
-	echo '</script>'
-    fi
+    test "${REQUEST_METHOD}" == POST || \
+	echo "<div data-init-ajax-update-tls-conf data-page='tls-print' data-page-args='server:${tls},${DOMAIN_NAME}+conf' data-names-id='names' data-numbits-id='numbits' data-days-id='days' data-country-id='country' data-province-id='province' data-locality-id='locality' data-organisation-id='organisation' data-unit-id='unit' hidden></div>"
 }
 
 # Main()

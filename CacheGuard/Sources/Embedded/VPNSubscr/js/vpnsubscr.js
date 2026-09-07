@@ -2,7 +2,6 @@
 ###########################################################################
 #
 # MODULE:       VPN Subscription
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -42,8 +41,10 @@ function autoLogout( )
 
 function armAutoLogout( )
 {
-    if (LOGOUT_TIMER) clearTimeout( LOGOUT_TIMER );
-    LOGOUT_TIMER = setTimeout( "autoLogout( )", LOGOUT_TIMEOUT );
+    if ( LOGOUT_TIMER )
+        clearTimeout( LOGOUT_TIMER );
+
+    LOGOUT_TIMER = setTimeout( autoLogout, LOGOUT_TIMEOUT );
 }
 
 function initAutoLogout( )
@@ -102,3 +103,61 @@ function copyToClipboard( text_area_id, icon_id, text )
     document.execCommand( 'copy' );
     text_area.style.visibility = 'hidden';
 }
+
+function startClock( clock_id, utcSeconds, offsetMinutes ) {
+    const clock = document.getElementById( clock_id );
+
+    if (!clock) {
+        return false;
+    }
+
+    let current = new Date( (utcSeconds + offsetMinutes * 60) * 1000 );
+
+    function pad( n ) {
+        return n.toString( ).padStart( 2, '0' );
+    }
+
+     function update( ) {
+        clock.textContent =
+            current.getUTCFullYear( ) + '/' +
+            pad( current.getUTCMonth( ) + 1) + '/' +
+            pad( current.getUTCDate( )) + '-' +
+            pad( current.getUTCHours( )) + ':' +
+            pad( current.getUTCMinutes( )) + ':' +
+            pad( current.getUTCSeconds( ));
+
+        current.setUTCSeconds(current.getUTCSeconds() + 1);
+    }
+
+    update();
+    setInterval( update, 1000 );
+
+    return true;
+}
+
+function activateContent( root = document )
+{
+    root.querySelectorAll( '[data-display-menu]' ).forEach( function( element ) {
+	cssdropdown.startchrome( "chromemenu" );
+    } );
+
+    root.querySelectorAll( '[data-display-qrcode]' ).forEach( function( element ) {
+	var qrcode = new QRCode( document.getElementById( 'qrcode' ), {
+	    text: element.dataset.initUrl,
+	    width: 95,
+	    height: 95,
+	    colorDark: 'firebrick',
+	    colorLight: 'white',
+	    correctLevel: QRCode.CorrectLevel.M
+	} );
+    } );
+
+    root.querySelectorAll( '[data-display-time]' ).forEach( function( element ) {
+	startClock( element.dataset.containerId,
+		    parseInt( element.dataset.dateSeconds, 10 ),
+		    parseInt( element.dataset.offsetMn, 10 ));
+    } );
+}
+
+initAutoLogout( );
+activateContent( );

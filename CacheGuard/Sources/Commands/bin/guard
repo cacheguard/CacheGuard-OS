@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       Commands
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -611,9 +610,9 @@ manage-filter()
 			    local ldap_login=${ARGS[5]}
 			    local ldap_filter=${ARGS[6]}
 
-			    ldap_group=$(remove-quotes "${ldap_group}")
-			    ldap_login=$(remove-quotes "${ldap_login}")
-			    ldap_filter=$(remove-quotes "${ldap_filter}")
+			    test ${TERM} == ${WADMIN_TERM} || ldap_group=$(remove-quotes "${ldap_group}")
+			    test ${TERM} == ${WADMIN_TERM} || ldap_login=$(remove-quotes "${ldap_login}")
+			    test ${TERM} == ${WADMIN_TERM} || ldap_filter=$(remove-quotes "${ldap_filter}")
 
 			    check-ldap-dn-no-space "${ldap_group}" || return 7
 			    check-ldap-attr "${ldap_login}" || return 3

@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -43,16 +42,14 @@ show-cancel-form()
     show-title "Cancel New Configuration" "${state}" "cancel"
 
     echo "<div class='core-form'>"
+    echo "<div class='table-title'>${message}</div>"
 
-    echo "<div style='margin:0; margin-bottom:10px; font-size:110%;'>${message}</div>"
-
-    echo "<table class='highlight-list' width='100%'>"
-
+    echo "<table class='highlight-report'>"
     echo "<thead>"
     echo "<tr>"
-    echo "<td class='table-header indicator-table-header' align='left' width='300' >Command</td>"
-    echo "<td class='table-header' align='center' width='40'>State</td>"
-    echo "<td class='table-header'  align='left'>Value(s)</td>"
+    echo "<th class='table-header' align='left'>Command</th>"
+    echo "<th class='table-header' align='center'>State</th>"
+    echo "<th class='table-header'  align='left'>Value(s)</th>"
     echo "</tr>"
     echo "</thead>"
     echo "<tbody>"
@@ -66,9 +63,7 @@ show-cancel-form()
 
     echo "</tbody>"
     echo '</table>'
-
-    show-scroll-top
-    test -n "${state}" || echo "<div style='margin:0; margin-top:5px; margin-bottom:5px; font-size:110%;'>Press the SUBMIT button to CANCEL modifications.</div>"
+    test -n "${state}" || echo "<div class='table-title'>Press the CONFIRM button to CANCEL modifications.</div>"
     echo "</div>"
 
     show-form "${width}" ${state}

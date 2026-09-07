@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -24,7 +23,7 @@
 
 print-countries()
 {
-    local code name style
+    local code name
 
     while read code name
     do
@@ -87,7 +86,7 @@ show-av-form()
     itemWidth[0]=40
     itemWidth[1]=60
 
-    itemTitle[0]="Update Country<img align='middle' src='${IMAGE_DIR}/country-flag-${AV_COUNTRY_CODE}.png' style='margin-bottom:5px; margin-left:5px; width:20px; height:14px;' />"
+    itemTitle[0]="Update Country <img align='middle' src='${IMAGE_DIR}/country-flag-${AV_COUNTRY_CODE}.png' />"
     itemTitle[1]="Extended Antivirus update Method"
     itemTitle[2]="Extended Antivirus update Protocol"
     itemTitle[3]="Extended Antivirus update Location"
@@ -116,7 +115,7 @@ show-av-form()
 	itemID[4]="maxobject_file"
 	itemID[5]="pua"
 
-	blankItemContent[4]="type='text' size='6' maxlength='6' value='${AV_MAX_OBJECT_SZ}' onMouseOver=showMinMaxToolTip(${AV_MAX_FILE_MIN},${AV_MAX_FILE_MAX}); onMouseOut=hideMinMaxToolTip();"
+	blankItemContent[4]="type='text' size='6' maxlength='6' value='${AV_MAX_OBJECT_SZ}' data-action='show-min-max-tooltip' data-min='${AV_MAX_FILE_MIN}' data-max='${AV_MAX_FILE_MAX}'"
 	blankItemContent[5]="type='checkbox'$(checked ${AV_PUA})"
 
 	checkItem[4]=digit
@@ -125,9 +124,7 @@ show-av-form()
     shortcutMenuItem[0]="access-file"
     shortcutMenuTitle[0]="File Servers"
 
-    call-js-function "hideMinMaxToolTip( )"
     show-title "Antivirus Settings" "enabled" "antivirus"
-    show-shortcuts-menu
     show-form "${width}"
 }
 

@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -24,7 +23,7 @@
 
 show-factoryreset-form()
 {
-    local disabled width=0
+    local disabled width
     local conf=/tmp/conf.show.${$} line
 
     test "${REMOTE_USER}" == "${ADMIN_NAME}" || disabled=disabled
@@ -32,11 +31,10 @@ show-factoryreset-form()
     execute-command-with-output "conf" > ${conf}
 
     show-form "${width}" ${disabled}
-    echo "<div style='clear:left;'></div>"
 
     echo "<div class='core-form'>"
     echo "<div class='table-title'>The configuration settings</div>"
-    echo "<table class='highlight-list' width='100%'>"
+    echo "<table class='highlight-report'>"
 
     while read line
     do

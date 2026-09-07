@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       Commands
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -491,7 +490,7 @@ manage-ssh-key()
 	    SAVENV=1
 	    ;;
 
-	add|del|load|show)
+	add|del|load|show|'set')
 	    local key_id=${2}
 	    test -n "${key_id}" || return 1
 
@@ -524,38 +523,53 @@ manage-ssh-key()
 		return 0
 	    fi
 
-	    test ${op} == load || return 255
-
-	    local protocol=${3}
-	    local ip=${4}
-	    local fn=${5}
-
-	    test -n "${protocol}" || return 1
-	    test -n "${ip}" || return 1
-	    test -n "${fn}" || return 1
-
-	    check-file-protocol ${protocol} || return 63
-	    check-ip-name ${ip} || return 113
-	    check-file-ip ${ip} || return 27
-	    check-filename ${fn} || return 19
-	    user-has-admin-rights || return 31
-
 	    local tmp_file=${TMP_DIR}/work.${LOADED}.${SSH_KEY}.${key_id}
 
-	    load-files ${protocol} ${ip} "${fn} ${tmp_file}" "" ascii
-	    local ret=${?}
+	    case ${op} in
+		'set')
+		    local ssh_key=${3}
+		    test -n "${ssh_key}" || return 1
+		    shift 2
+		    echo "${*}" > ${tmp_file}
+		    ;;
+		load)
+		    local protocol=${3}
+		    local ip=${4}
+		    local fn=${5}
 
-	    if test ${ret} -eq 0 ; then
-		ssh-keygen -l -f ${tmp_file} > /dev/null 2>&1
-		if test ${?} -ne 0 ; then
-		    rm -f ${tmp_file}
-		    return 225
-		fi
-		load-ssh-public-key-commit ${tmp_file}
-	    else
+		    test -n "${protocol}" || return 1
+		    test -n "${ip}" || return 1
+		    test -n "${fn}" || return 1
+
+		    check-file-protocol ${protocol} || return 63
+		    check-ip-name ${ip} || return 113
+		    check-file-ip ${ip} || return 27
+		    check-filename ${fn} || return 19
+		    user-has-admin-rights || return 31
+
+		    load-files ${protocol} ${ip} "${fn} ${tmp_file}" "" ascii
+		    local ret=${?}
+
+		    if test ${ret} -ne 0 ; then
+		    	rm -f ${tmp_file}
+			return ${ret}
+		    fi
+		    ;;
+		*)
+		    return 255
+		    ;;
+	    esac
+
+	    ssh-keygen -l -f ${tmp_file} > /dev/null 2>&1
+	    if test ${?} -ne 0 ; then
 		rm -f ${tmp_file}
-		return ${ret}
+		return 225
+	    else
+		local ssh_key
+		read ssh_key < ${tmp_file}
+		test "${ssh_key:0:10}" != '-----BEGIN' || return 225
 	    fi
+	    load-ssh-public-key-commit ${tmp_file}
 	    ;;
 	*)
 	    return 1
@@ -1330,7 +1344,7 @@ valid-user()
 
     case ${user} in
 	${SUPERADMIN_NAME}|${ADMIN_NAME}|${WADMIN_NAME}|${MANAGER_NAME}|root|bin|nobody|daemon|sshd|ntp|named|cache|filter|proxy|snmp|av)
-	    return 1
+	    return 11
 	    ;;
 	*)
 	    return 0
@@ -1397,7 +1411,7 @@ manage-user()
 
 	    if ! member "${CURRENT_ADMIN_USER_LIST}" ${user} ; then
 
-		local password=${3}
+		local password=${ARGS[3]}
 
 		if test -z "${password}" ; then
 

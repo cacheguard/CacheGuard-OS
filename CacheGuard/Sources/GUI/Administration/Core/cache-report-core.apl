@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -27,8 +26,10 @@ source cache-report-common.${GUI_EXT_NAME}
 cache-report()
 {
     show-title "Web Cache Report" "disabled" "cache"
+    echo "<div class='core-form'>"
     execute-command-nolog "cache report rused"
-    show-cache-report time
+    show-cache-report 'time'
+    echo "</div>"
 }
 
 # Main()

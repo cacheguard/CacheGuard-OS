@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       Commands
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -101,11 +100,12 @@ set-vlan()
     local in_vid=${2}
 
     local elt range i=0
-    local vlan_exist=0 deleted_vlan=-1
+    local vlan_exist deleted_vlan
     local ats_col ats_txt vid at
-    local new_vlans=""
-    local new_ip_vlans
-    
+    local new_vlans
+
+    in_vid=$((10#${in_vid}))
+
     for elt in ${VLAN_FLOW_LIST}
     do
 	range=$[${i} % 2]
@@ -117,8 +117,8 @@ set-vlan()
 		ats_col=${elt}
 		ats_txt=$(colon2space ${ats_col})
 		if test "${vid}" == "${in_vid}" ; then
-		    vlan_exist=1
-		    ats_col=""
+		    vlan_exist=yes
+		    unset ats_col
 
 		    for at in ${ats_txt}
 		    do
@@ -152,19 +152,16 @@ set-vlan()
 	((i++))
     done
 
-    if test ${vlan_exist} -eq 0 ; then
+    if test -z "${vlan_exist}" ; then
 	new_vlans="${new_vlans} ${in_vid} ${in_at}"
-	new_ip_vlans="${IP_VLAN_LIST} ${in_vid} 0.0.0.0 0.0.0.0"
-    else
-	new_ip_vlans="${IP_VLAN_LIST}"
+	export IP_VLAN_LIST=$(insert-record-in-slist 3 1 "${in_vid} 0.0.0.0 0.0.0.0" "${IP_VLAN_LIST}" numerical)
     fi
 
-    if test ${deleted_vlan} -ne -1 ; then
-	new_ip_vlans=$(remove-ip_vlan_list_vlan "${new_ip_vlans}" ${deleted_vlan})
-    fi
-    
-    export VLAN_FLOW_LIST="${new_vlans}"
-    export IP_VLAN_LIST="${new_ip_vlans}"
+    test -z "${deleted_vlan}" || export IP_VLAN_LIST=$(remove-record-from-list 3 1 ${deleted_vlan} "${IP_VLAN_LIST}")
+
+    export VLAN_FLOW_LIST=${new_vlans}
+
+    SAVENV=1
 }
 
 run()
@@ -178,10 +175,7 @@ run()
     if test -z "${ARGS[2]}" ; then show-vlan ${as} ; return 0 ; fi
     local vl=${ARGS[2]}
     check-vlan ${vl} || return 41
-    
     set-vlan ${as} ${vl}
-    
-    SAVENV=1
 }
 
 main "${@}"

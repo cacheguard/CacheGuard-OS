@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -28,13 +27,13 @@ source /home/${ADMIN_NAME}/${ENV_RDIR}/${ENV_CURRENT_NAME}
 
 show-all-network-activities()
 {
-    local width=700 hide
+    local hide
 
     gui-contextual-is-allowed || hide=yes
 
-    test -n "${hide}" || show-network-activity-external  ${width}
-    show-network-activity-internal  ${width}
-    test -n "${hide}" || show-network-activity-auxiliary ${width}
+    test -n "${hide}" || show-network-activity-external
+    show-network-activity-internal
+    test -n "${hide}" || show-network-activity-auxiliary
 }
 
 # Main()

@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -57,16 +56,10 @@ show-email-form()
     checkItem[3]=domainname
     checkItem[4]=port
 
-    shortcutMenuItem[0]="network-utilities"
+    shortcutMenuItem[0]="diagnostic-tools"
     shortcutMenuTitle[0]="Test Email Sending"
 
     show-title "Email Configuration" "enabled" "email vpnipsec"
-
-    test -z "${CURRENT_ADMINISTRATOR_EMAIL}" -o \
-	 -z "${CURRENT_EMAIL_ACCOUNT_SERVER_FQDN}" -o \
-	 -z "${CURRENT_EMAIL_ACCOUNT_SERVER_PORT}" -o \
-	 -z "${CURRENT_EMAIL_ACCOUNT_USERNAME}" || show-shortcuts-menu
-
     show-form "${width}"
 }
 

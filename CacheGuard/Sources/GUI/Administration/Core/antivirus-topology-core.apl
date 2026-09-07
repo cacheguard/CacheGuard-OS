@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -42,12 +41,16 @@ show-av-topology-form()
     itemID[4]="vpnipsec"
     
     blankItemContent[0]="value='on'"
-    blankItemContent[1]="type=checkbox$(checked ${AV_INTERNAL})"
-    blankItemContent[2]="type=checkbox$(checked ${AV_EXTERNAL})"
-    blankItemContent[3]="type=checkbox$(checked ${AV_AUXILIARY})"
-    blankItemContent[4]="type=checkbox$(checked ${AV_VPN_IPSEC})"
+    blankItemContent[1]="$(checked ${AV_INTERNAL})"
+    blankItemContent[2]="$(checked ${AV_EXTERNAL})"
+    blankItemContent[3]="$(checked ${AV_AUXILIARY})"
+    blankItemContent[4]="$(checked ${AV_VPN_IPSEC})"
 
     itemForm[0]="hidden"
+    itemForm[1]="check"
+    itemForm[2]="check"
+    itemForm[3]="check"
+    itemForm[4]="check"
 
     show-title "Antivirus Topology" "enabled" "admin"
     show-form "${width}"

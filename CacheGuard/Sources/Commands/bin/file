@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       Commands
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -121,7 +120,6 @@ clear-file()
     exclusions=$(remove "${exclusions}" 'waf.rweb.custom')
     exclusions=$(remove "${exclusions}" 'tls.client')
 
-    local admin_ssh_key="${LOADED}.${SSH_KEY}."
     local admin_snmp_certificate="${LOADED}.${SNMP_SSL}.certificate"
     local antivirus_whitelist_signature="${LOADED}.${AV_WHITELIST_SIG}"
     local tls_ca_system="${LOADED}.${SYSTEM_CA}."
@@ -130,7 +128,6 @@ clear-file()
     local tls_client="${LOADED}.${TLS_CLIENT}."
     local manager_ssh="${LOADED}.manager.${SSH_KEY}."
 
-    local len_admin_ssh_key=${#admin_ssh_key}
     local len_admin_snmp_certificate=${#admin_snmp_certificate}
     local len_antivirus_whitelist_signature=${#antivirus_whitelist_signature}
     local len_tls_ca_system=${#tls_ca_system}
@@ -143,12 +140,10 @@ clear-file()
 
     cd ${TMP_DIR}
 
-    for file in ${LOADED}.${SSH_KEY}.*.* ${LOADED}.${SNMP_SSL}.certificate ${LOADED}.${AV_WHITELIST_SIG} ${LOADED}.${SYSTEM_CA}.* ${LOADED}.${THIRD_CA}.* ${LOADED}.${TLS_SERVER}.*.* ${LOADED}.${TLS_CLIENT}.*.*
+    for file in ${LOADED}.${SNMP_SSL}.certificate ${LOADED}.${AV_WHITELIST_SIG} ${LOADED}.${SYSTEM_CA}.* ${LOADED}.${THIRD_CA}.* ${LOADED}.${TLS_SERVER}.*.* ${LOADED}.${TLS_CLIENT}.*.* ${LOADED}.manager.${SSH_KEY}.*
     do
 	if test -n "${exclusions}" ; then
-	    if test ${file:0:${len_admin_ssh_key}} == ${admin_ssh_key} ; then
-		! member "${exclusions}" admin.ssh.key || continue
-	    elif test ${file:0:${len_admin_snmp_certificate}} == ${admin_snmp_certificate} ; then
+	    if test ${file:0:${len_admin_snmp_certificate}} == ${admin_snmp_certificate} ; then
 		! member "${exclusions}" admin.snmp.certificate || continue
 	    elif test ${file:0:${len_antivirus_whitelist_signature}} == ${antivirus_whitelist_signature} ; then
 		! member "${exclusions}" antivirus.whitelist.signature || continue

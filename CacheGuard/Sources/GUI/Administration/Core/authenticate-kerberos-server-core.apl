@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -50,13 +49,6 @@ show-kerberos-server-form()
     listContent=${KERBEROS_SERVER_LIST}
     test -n "${listContent}" || state=disabled    
     show-title "Kerberos Authentication Servers" "${state}" "authenticate"
-
-    test \
-	-z "${CURRENT_KERBEROS_SERVER_LIST}" -o \
-	"${CURRENT_AUTHENTICATE_MODE}" == False -o \
-	"${CURRENT_AUTHENTICATE_KERBEROS}" == False \
-	|| show-shortcuts-menu
-
     show-list-form ${MAX_KERBEROS_SERVER_NB} "${width}" "${page_ref}"
 }
 

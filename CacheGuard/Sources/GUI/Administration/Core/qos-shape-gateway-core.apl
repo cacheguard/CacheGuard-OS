@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -43,10 +42,6 @@ get-qos-sums()
 
 show-overall-qos()
 {
-    local width=${1}
-    test -n "${width}" || width=100
-
-    local margin=5
     local qos_color_pct qos_color
     local dev gress qoss qos qos_pct bw
     local qos_web qos_tweb qos_rweb qos_antivirus qos_file qos_peer qos_vpnipsec qos_default
@@ -77,15 +72,13 @@ show-overall-qos()
 	done
     done
 
-    echo "<div style='clear:left;'></div><br />"
-
-    echo "<div class='table-title' style='margin-left:${margin}px;'>Overall QoS</div>"
-    echo "<table class='highlight-list' style='margin-left:${margin}px;' width='${width}'>"
+    echo "<div class='table-title'>Overall QoS</div>"
+    echo "<table class='highlight-list'>"
     echo "<thead>"
     echo "<tr>"
-    echo "<td class='table-header' width='40%'>Traffic</td>"
-    echo "<td class='table-header' width='30%' align='right'>Overall %</td>"
-    echo "<td class='table-header' width='30%' align='right'>Overall kbps</td>"
+    echo "<th class='table-header'>Traffic</th>"
+    echo "<th class='table-header'>Overall %</th>"
+    echo "<th class='table-header'>Overall kbps</th>"
     echo "</tr>"
     echo "</thead>"
     echo "<tbody>"
@@ -104,8 +97,8 @@ show-overall-qos()
 	    if test ${qos_pct} -gt 100 ; then qos_color_pct='FireBrick' ; else qos_color_pct='Black' ; fi
 	    if test ${qos} -gt ${bw} ; then qos_color='FireBrick' ; else qos_color='Black' ; fi
 
-            echo "<td align='right'><span style='color:${qos_color_pct}'>${qos_pct}%</span></td>"
-	    echo "<td align='right'><span style='color:${qos_color}'>${qos} kbps</span></td>"
+            echo "<td align='right'><font color='${qos_color_pct}'>${qos_pct}%</font></td>"
+	    echo "<td align='right'><font color='${qos_color}'>${qos} kbps</font></td>"
             echo "</tr>"
 	    ((i++))
 	done
@@ -137,7 +130,6 @@ show-qos-shape-gateway-form()
 {
     show-title "Shape Gateway Traffic" "enabled" "qos"
 
-    local width=638
     itemWidth[0]=85
     itemWidth[1]=15
 
@@ -340,7 +332,10 @@ show-qos-shape-gateway-form()
 	done
     done
 
-    show-tab-form ${width} enabled show-overall-qos ${width}
+    show-tab-form
+    echo "<div class='core-form'>"
+    show-overall-qos
+    echo "</div>"
 }
 
 # Main()

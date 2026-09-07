@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -129,10 +128,13 @@ show-tls-ocsp-etc()
 
 	shortcutMenuItem[0]="port"
 	shortcutMenuTitle[0]="Listening Ports"
+	shortcutMenuItem[1]="tls-ca-third"
+	shortcutMenuTitle[1]="CA Certificates"
+	shortcutMenuItem[2]="tls-server"
+	shortcutMenuTitle[2]="Server Certificates"
     fi
 
     show-title "Other TLS Settings" "enabled" "admin authenticate port tls"
-    show-shortcuts-menu
     show-form "${width}"
 }
 

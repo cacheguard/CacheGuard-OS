@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -26,12 +25,12 @@ show-system-report-memory()
 {
     test -f /proc/meminfo || return 0
 
-    local display_totals=${1}
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    local details=${1}
     local display_time=${2}
-    local table_width=${3}
+    local compact=${3}
 
-    test -n "${table_width}" || table_width='405'
-    
     local ram_id='ram'
     local swap_id='swap'
 
@@ -44,8 +43,7 @@ show-system-report-memory()
     local free_color='SeaGreen'
     local used_color='FireBrick'
 
-    local pie_height=190
-    local pie_width=190
+    local pie_height pie_width
 
     local total=$(cat /proc/meminfo | grep MemTotal:)
     local free=$(cat /proc/meminfo | grep MemFree:)
@@ -82,18 +80,19 @@ show-system-report-memory()
     local pused=$[${used} * 100 / ${total}]
     local psused=$[${sused} * 100 / ${stotal}]
 
-    echo "<div class='core-form'>"
+    test -z "${compact}" || compact=' compact'
 
-    if test -n "${display_totals}" ; then
-	echo "<table class='highlight-form' width='${table_width}'>"
+    if test ${details} == total ; then
 
-	test -z "${display_time}" || display-appliance-time-row
+	pie_height=220
 
+	echo "<table class='highlight-form${compact}'>"
+	test ${display_time} != time || display-appliance-time-row left
 	echo "<tr>"
-	echo "<td width='80%'>"
+	echo "<td width='50%'>"
 	echo "Total RAM size"
 	echo "</td>"
-	echo "<td width='20%'>"
+	echo "<td width='50%'>"
 	echo "${total_formatted} MB"
 	echo "</td>"
 	echo "</tr>"
@@ -108,63 +107,51 @@ show-system-report-memory()
 	echo "</tr>"
 
 	echo "</table>"
+	echo "<br />"
+    else
+	pie_height=170
     fi
 
-    echo "<div id='${ram_id}' style='float:left; height:${pie_height}px; width:${pie_width}px; margin:0; padding:0;'></div>"
-    echo "<div id='${swap_id}' style='float:left; height:${pie_height}px; width:${pie_width}px; margin:0; padding:0;'></div>"
-    echo "<div style='clear:left;'></div>"
+    pie_width=${pie_height}
 
-    echo "<script type='text/javascript'>"
+    echo "<table class='chart${compact}'>"
+    echo "<tr>"
+    echo "<td>"
+    echo "<div id='${ram_id}'></div>"
+    echo "</td>"
+    echo "<td>"
+    echo "<div id='${swap_id}'></div>"
+    echo "</td>"
+    echo "</tr>"
+    echo "</table>"
 
-    echo "var pie_ram = c3.generate( {"
-    echo "bindto: '#${ram_id}',"
-    echo "data: {"
-    echo "columns: ["
-    echo "['${free_ram_name}', ${free}],"
-    echo "['${used_ram_name}', ${used}]"
-    echo "],"
-    echo "type: 'pie',"
-    echo "colors: {"
-    echo "'${free_ram_name}': '${free_color}',"
-    echo "'${used_ram_name}': '${used_color}'"
-    echo "}"
+    cat << EOT
+<script type='application/json' data-init-memory-pie-chart>
+{
+EOT
+    echo "\"ram\":{"
+    echo "\"id\":\"${ram_id}\","
+    echo "\"freeName\":\"${free_ram_name}\","
+    echo "\"free\":${free},"
+    echo "\"usedName\":\"${used_ram_name}\","
+    echo "\"used\":${used},"
+    echo "\"freeColor\":\"${free_color}\","
+    echo "\"usedColor\":\"${used_color}\""
     echo "},"
-
-    echo "pie: {"
-    echo "label: {"
-    echo "format: function (value, ratio, id) {"
-    echo "return d3.format('^')(value);"
-    echo "}"
-    echo "}"
-    echo "}"
-
-    echo "} );"
-
-    echo "var pie_swap = c3.generate( {"
-    echo "bindto: '#${swap_id}',"
-    echo "data: {"
-    echo "columns: ["
-    echo "['${free_swap_name}', ${sfree}],"
-    echo "['${used_swap_name}', ${sused}]"
-    echo "],"
-    echo "type: 'pie',"
-    echo "colors: {"
-    echo "'${free_swap_name}': '${free_color}',"
-    echo "'${used_swap_name}': '${used_color}'"
-    echo "}"
+    echo "\"swap\":{"
+    echo "\"id\":\"${swap_id}\","
+    echo "\"freeName\":\"${free_swap_name}\","
+    echo "\"free\":${sfree},"
+    echo "\"usedName\":\"${used_swap_name}\","
+    echo "\"used\":${sused},"
+    echo "\"freeColor\":\"${free_color}\","
+    echo "\"usedColor\":\"${used_color}\""
     echo "},"
+    echo "\"height\":${pie_height},"
+    echo "\"width\":${pie_width}"
 
-    echo "pie: {"
-    echo "label: {"
-    echo "format: function (value, ratio, id) {"
-    echo "return d3.format('^')(value);"
-    echo "}"
-    echo "}"
-    echo "}"
-
-    echo "} );"
-
-    echo "</script>"
-
-    echo "</div>"
+    cat << EOT
+}
+</script>
+EOT
 }

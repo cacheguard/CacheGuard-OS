@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -24,13 +23,9 @@
 
 show-log-rotate-log()
 {
-    echo "<div class='core-form'>"
-    refresh-buttons "update_log_rotate( 1 )"
-    echo "<div style='clear:left;'></div><br />"
-    echo "<span class='table-title'>Last log rotation report&nbsp;</span>"
-    echo "<div style='clear:left;'></div>"
+    refresh-buttons
+    echo "<div class='table-title'>Last log rotation report</div>"
     echo "<div id='${AUTO_REPORT_ID}' class='log-report'></div>"
-    echo "</div>"
 }
 
 show-log-rotate-form()
@@ -44,7 +39,6 @@ show-log-rotate-form()
     shortcutMenuTitle[0]="Save Logs"
 
     show-title "Logs Rotation" "${state}" "log"
-    show-shortcuts-menu
     show-form "${width}" "${state}" show-log-rotate-log
 }
 

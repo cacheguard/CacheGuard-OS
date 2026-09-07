@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       Configurator
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -241,7 +240,7 @@ install-patch()
 
     remove-unused-files
 
-    post-install
+    post-install || return 15
 }
 
 patch-userenv-file()
@@ -518,7 +517,7 @@ apl-manage-patch()
 	done < /root/apply-patch/services
     else
 	log "Stopping all services (may take some time)"
-	apl_services stop < /dev/console
+	apl_service stop < /dev/console
 	ret=${?}
 	log-result ${ret}
     fi
@@ -549,7 +548,7 @@ apl-manage-patch()
 	bash -c "
 source /usr/local/lib/apl_functions
 init-account-environment ${1}
-apl-configure-core"
+PATCH_RETUNE=${PATCH_RETUNE} apl-configure-core"
 	update-os-version "${PATCH_OS_NEW_VERSION}"
 	set-waudit-env-file ${ADMIN_WAUDIT} "${PATCH_OS_NEW_VERSION}"
     fi
@@ -569,7 +568,7 @@ apl-configure-core"
 	done
     else
 	log "Starting all services (may take some time)"
-	apl_services start < /dev/console
+	apl_service start < /dev/console
 	ret=${?}
 	log-result ${ret}
     fi

@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       Commands
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -237,52 +236,6 @@ main()
 		fi
 	    fi
 	fi	
-    fi
-
-    if test ${op} == 'load' ; then
-	if ! member "${exclusions}" admin.ssh.key ; then
-	    for id in ${SSH_KEY_LIST}
-	    do
-		check-file-presence ${proto} ${ip} ${dir}admin.ssh.key.${id} || continue
-		file-log "admin ssh key ${op} ${id} ${proto} ${ip} ${dir}admin.ssh.key.${id}"
-		admin ssh key ${op} ${id} ${proto} ${ip} ${dir}admin.ssh.key.${id} 2> ${TMP_ERROR_FILE} ; ret=${?}
-		file-log-ret ${ret}
-	    done
-
-	    i=0
-	    for elt in ${ACCESS_MANAGER_LIST}
-	    do
-		range=$[${i} % 3]
-		case ${range} in
-		    0)
-			id=$(get-manager-key-id ${elt})
-			;;
-		    1)
-			;;
-		    2)
-			check-file-presence ${proto} ${ip} ${dir}admin.ssh.key.${id} || continue
-			file-log "admin ssh key ${op} ${id} ${proto} ${ip} ${dir}admin.ssh.key.${id}"
-			admin ssh key ${op} ${id} ${proto} ${ip} ${dir}admin.ssh.key.${id} 2> ${TMP_ERROR_FILE} ; ret=${?}
-			file-log-ret ${ret}
-			;;
-		    *)
-			return 255
-			;;
-		esac
-		((i++))
-	    done
-	fi
-
-	if test ${APL_ROLE} == 'manager' ; then
-
-	    id=$(get-manager-key-id peer)
-
-	    if check-file-presence ${proto} ${ip} ${dir}admin.ssh.key.${id} ; then
-		file-log "admin ssh key ${op} ${id} ${proto} ${ip} ${dir}admin.ssh.key.${id}"
-		admin ssh key ${op} ${id} ${proto} ${ip} ${dir}admin.ssh.key.${id} 2> ${TMP_ERROR_FILE} ; ret=${?}
-		file-log-ret ${ret}
-	    fi
-	fi
     fi
 
     if contextual-command-is-allowed ; then

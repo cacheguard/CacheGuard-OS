@@ -12,9 +12,9 @@
 
 ## What Is CacheGuard?
 
-CacheGuard-OS is not an application you install on top of an existing OS — it IS the OS. A fully custom, network appliance oriented Linux distribution built from scratch since 2002, representing over 5,000 man days of research and development, now completely open source.
+CacheGuard-OS is not an application you install on top of an existing OS — it IS the OS. A fully custom, network appliance oriented Linux distribution built from scratch since 2002, representing over 5,000 man days of research and development. While CacheGuard-OS has always been open source, with its complete source code available on every installed appliance, the project is now also publicly hosted on GitHub.
 
-One ISO. Any x86/x64 machine or VM. Production-ready security gateway in under an hour.
+One ISO. Any PC (x86/x64 machine) or VM. Deploy a production-ready security gateway in under an hour, even without specialised network or security expertise.
 
 ---
 
@@ -60,11 +60,12 @@ Full installation guide: [CacheGuard User's Guide](https://www.cacheguard.net/do
 ## Who Is It For?
 
 - **Startups** setting up their network security for the first time
-- **Small and growing businesses** that need enterprise protection without enterprise cost
+- **SMEs** that require enterprise-grade protection without enterprise-level costs.
 - **Schools and institutions** looking for content filtering and safe browsing
 - **MSPs and IT consultants** who want a repeatable, easy-to-deploy solution for clients
 - **Multi-site organizations** that need centralized management of multiple appliances
 - **Homelabbers** who want a real UTM appliance without complexity
+- **Non-technical business owners** who want network protection without hiring an IT consultant
 
 ---
 
@@ -111,8 +112,9 @@ Support plans help sustain the project and fund continued development.
 
 ### Learn More
 
-- [What is a UTM and why your startup needs one](https://www.cacheguard.com/utm-for-startups/)
+- [Network gateway for small business: easy setup guide](https://www.cacheguard.com/network-gateway-for-small-business/)
 - [Startup network security: how to protect your business in under an hour](https://www.cacheguard.com/startup-network-security/)
+- [What is a UTM and why your startup needs one](https://www.cacheguard.com/utm-for-startups/)
 - [What is a WAF?](https://www.cacheguard.com/what-is-a-waf/)
 - [Open source firewall for small business: the complete guide](https://www.cacheguard.com/open-source-firewall-for-small-business/)
 

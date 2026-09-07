@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -31,9 +30,9 @@ set-ip()
 
     if gui-contextual-is-allowed ; then
 	
-	echo "ip external '${VALUES[0]}' '${VALUES[1]}'"   > ${transaction}
-	echo "ip internal '${VALUES[2]}' '${VALUES[3]}'"  >> ${transaction}
-	echo "ip auxiliary '${VALUES[4]}' '${VALUES[5]}'" >> ${transaction}
+	echo "ip external ${VALUES[0]} ${VALUES[1]}"   > ${transaction}
+	echo "ip internal ${VALUES[2]} ${VALUES[3]}"  >> ${transaction}
+	echo "ip auxiliary ${VALUES[4]} ${VALUES[5]}" >> ${transaction}
 
 	for((i=6 ; i<${ATTRIBUTE_NB} ; i++))
 	do
@@ -47,7 +46,7 @@ set-ip()
 		    ;;
 		2)
 		    netmask=${VALUES[${i}]}
-		    echo "ip 'internal.${vlan}' '${ip}' '${netmask}'" >> ${transaction}
+		    echo "ip internal.${vlan} ${ip} ${netmask}" >> ${transaction}
 		    ;;
 		*)
 		    return 1
@@ -55,7 +54,7 @@ set-ip()
 	    esac
 	done
     else
-	echo "ip internal '${VALUES[0]}' '${VALUES[1]}'" > ${transaction}
+	echo "ip internal ${VALUES[0]} ${VALUES[1]}" > ${transaction}
     fi
 
     execute-transaction ${transaction}

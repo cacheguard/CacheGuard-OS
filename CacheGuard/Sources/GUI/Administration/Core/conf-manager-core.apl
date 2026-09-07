@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -60,11 +59,11 @@ show-specific-conf()
     local title=${3}
     local value=${4}
 
-    local icon_title='Modify Value' icon_sz=30
+    local icon_title='Modify Value'
 
     itemTitle[${index}]="${title}"
     itemID[${index}]=${page}
-    blankItemContent[${index}]="<a href='/${GUI_DIR_NAME}/${page}.${GUI_EXT_NAME}'><img style='width:${icon_sz}px; height:${icon_sz}px; margin:0; margin-right:10px;' src='${IMAGE_DIR}/${page}.png' alt='' title='${icon_title}' align='middle' /></a>${value}"
+    blankItemContent[${index}]="<a href='/${GUI_DIR_NAME}/${page}.${GUI_EXT_NAME}'><img src='${IMAGE_DIR}/${page}.png' alt='' title='${icon_title}' align='middle' /></a>${value}"
     itemForm[${index}]="text"
 }
 
@@ -283,7 +282,7 @@ show-conf-template-form()
     ((_INDEX++))
 
     itemID[${_INDEX}]="break1"
-    itemTitle[${_INDEX}]="<span style='color:FireBrick; font-style:italic; text-decoration:underline;'>Main Specific Settings</span>"
+    itemTitle[${_INDEX}]="<u><strong>Main Specific Settings</strong></u>"
     blankItemContent[${_INDEX}]="<hr />"
     itemForm[${_INDEX}]="text"
     ((_INDEX++))
@@ -299,7 +298,7 @@ show-conf-template-form()
     show-specific-ip-vias
 
     itemID[${_INDEX}]="break2"
-    itemTitle[${_INDEX}]="<span style='color:FireBrick; font-style:italic; text-decoration:underline;'>Other Specific Settings</span>"
+    itemTitle[${_INDEX}]="<u><strong>Other Specific Settings</strong></u>"
     blankItemContent[${_INDEX}]="<hr />"
     itemForm[${_INDEX}]="text"
     ((_INDEX++))
@@ -334,8 +333,7 @@ show-conf-template-form()
     shortcutMenuTitle[${i}]="Configuration Overview"
     ((i++))
 
-    show-title "Configure by Template" ${state} "conf manager"
-    show-shortcuts-menu
+    show-title "Configure by Inheritance" ${state} "conf manager"
     show-form "${width}" ${state}
 }
 

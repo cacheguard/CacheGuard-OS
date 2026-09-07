@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       Configurator
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -1042,12 +1041,9 @@ update-latest-os-version()
 
 set-alive-check()
 {
-    return 0
-
     local call=${1}
 
-    local msg ret
-    local trial='no'
+    local msg ret trial='no'
     local date=$(date +"%s" 2> /dev/null)
 
     verify-usage-not-trial ${date} || trial='yes'

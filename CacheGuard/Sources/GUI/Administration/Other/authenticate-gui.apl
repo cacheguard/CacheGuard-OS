@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -24,11 +23,10 @@
 
 show-authenticate-gui()
 {
-    echo "<div class='center-middle-wrapper'>"
-    echo "<div class='center-middle-content'>"
+    echo "<div class='center-middle-wrapper unavailable-element'>"
+    echo "<div class='center-middle-content unavailable-element'>"
     echo "<center>"
-    echo "<a href='/'><img src='${IMAGE_DIR}/exit.png' alt='Login' title='Login' /></a>"
-    echo "<a href='#' onclick=\"location.reload( );\"><img src='${IMAGE_DIR}/refresh.png' alt='Reload' title='Reload' /></a>"
+    echo "<img src='${IMAGE_DIR}/error.png' alt='Authenticate Failed' title='Authenticate Failed' />"
     echo "</center>"
     echo "</div>"
     echo "</div>"

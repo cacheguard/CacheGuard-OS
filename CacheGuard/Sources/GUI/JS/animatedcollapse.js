@@ -10,6 +10,9 @@
 			//1) You can now insert rel="expand[divid] | collapse[divid] | toggle[divid]" inside arbitrary links to act as DIV togglers
 			//2) For image toggler links, you can insert the attributes "data-openimage" and "data-closedimage" to update its image based on the DIV state
 
+//** August 3rd, 09'- Version 2.5, which adds the following:
+//** Modifications made by CacheGuard Technologies SAS (FR): optional class argument addedd to the addDiv() fucntion. Inline CSS removal to respect the CSP header.
+
 var animatedcollapse={
 divholders: {}, //structure: {div.id, div.attrs, div.$divref, div.$togglerimage}
 divgroups: {}, //structure: {groupname.count, groupname.lastactivedivid}
@@ -40,8 +43,8 @@ toggle:function(divid){ //public method
 	this.showhide(divid, "toggle")
 },
 
-addDiv:function(divid, attrstring){ //public function
-	this.divholders[divid]=({id: divid, $divref: null, attrs: attrstring})
+    addDiv:function(divid, attrstring, divclass){ //public function
+	this.divholders[divid]=({id: divid, $divref: null, attrs: attrstring, divclass: divclass || null})
 	this.divholders[divid].getAttr=function(name){ //assign getAttr() function to each divholder object
 		var attr=new RegExp(name+"=([^,]+)", "i") //get name/value config pair (ie: width=400px,)
 		return (attr.test(this.attrs) && parseInt(RegExp.$1)!=0)? RegExp.$1 : null //return value portion (string), or 0 (false) if none found
@@ -53,8 +56,8 @@ addDiv:function(divid, attrstring){ //public function
 showhide:function(divid, action){
 	var $divref=this.divholders[divid].$divref //reference collapsible DIV
 	if (this.divholders[divid] && $divref.length==1){ //if DIV exists
-		var targetgroup=this.divgroups[$divref.attr('groupname')] //find out which group DIV belongs to (if any)
-		if ($divref.attr('groupname') && targetgroup.count>1 && (action=="show" || action=="toggle" && $divref.css('display')=='none')){ //If current DIV belongs to a group
+	        var targetgroup=this.divgroups[this.divholders[divid].group]
+		if (this.divholders[divid].group && targetgroup.count>1 && (action=="show" || action=="toggle" && $divref.hasClass('ac-hidden'))){ //If current DIV belongs to a group
 			if (targetgroup.lastactivedivid && targetgroup.lastactivedivid!=divid) //if last active DIV is set
 				this.slideengine(targetgroup.lastactivedivid, 'hide') //hide last active DIV within group first
 				this.slideengine(divid, 'show')
@@ -69,35 +72,34 @@ showhide:function(divid, action){
 slideengine:function(divid, action){
 	var $divref=this.divholders[divid].$divref
 	var $togglerimage=this.divholders[divid].$togglerimage
-	if (this.divholders[divid] && $divref.length==1){ //if this DIV exists
-		var animateSetting={height: action}
-		if ($divref.attr('fade'))
-			animateSetting.opacity=action
-		$divref.animate(animateSetting, $divref.attr('speed')? parseInt($divref.attr('speed')) : 500, function(){
-			if ($togglerimage){
-				$togglerimage.attr('src', ($divref.css('display')=="none")? $togglerimage.data('srcs').closed : $togglerimage.data('srcs').open)
-			}
-			if (animatedcollapse.ontoggle){
-				try{
-					animatedcollapse.ontoggle(jQuery, $divref.get(0), $divref.css('display'))
-				}
-				catch(e){
-					alert("An error exists inside your \"ontoggle\" function:\n\n"+e+"\n\nAborting execution of function.")
-				}
-			}
-		})
-		return false
-	}
-},
+    if (this.divholders[divid] && $divref.length==1){ //if this DIV exists
+	    if (action=="toggle")
+		action=$divref.hasClass('ac-hidden') ? "show" : "hide";
 
-generatemap:function(){
-	var map={}
-	for (var i=0; i<arguments.length; i++){
-		if (arguments[i][1]!=null){ //do not generate name/value pair if value is null
-			map[arguments[i][0]]=arguments[i][1]
+	    if (action == "show") {
+		$divref.removeClass('ac-hidden').addClass('ac-displayed');
+	    }
+	    else {
+		$divref.removeClass('ac-displayed').addClass('ac-hidden');
+	    }
+
+	    if ($togglerimage) {
+		$togglerimage.prop('src', $divref.hasClass('ac-hidden')? $togglerimage.data('srcs').closed : $togglerimage.data('srcs').open);
+	    }
+
+	    if (animatedcollapse.ontoggle) {
+		try{
+		    animatedcollapse.ontoggle(
+			jQuery,
+			$divref.get(0),
+			$divref.hasClass('ac-hidden')? 'none': 'block' );
 		}
+		catch(e){
+		    alert("An error exists inside your \"ontoggle\" function:\n\n"+e+"\n\nAborting execution of function.");
+		}
+	    }
+	return false
 	}
-	return map
 },
 
 init:function(){
@@ -111,40 +113,63 @@ init:function(){
 			persistopenids=(persistopenids=='nada')? [] : persistopenids.split(',') //if no divs are persisted, set to empty array, else, array of div ids
 		groupswithpersist=(groupswithpersist==null || groupswithpersist=='nada')? [] : groupswithpersist.split(',') //Get list of groups with divs that are persisted
 		jQuery.each(ac.divholders, function(){ //loop through each collapsible DIV object
-			this.$divref=$('#'+this.id)
-			if ((this.getAttr('persist') || jQuery.inArray(this.getAttr('group'), groupswithpersist)!=-1) && persistopenids!=null){ //if this div carries a user "persist" setting, or belong to a group with at least one div that does
-				var cssdisplay=(jQuery.inArray(this.id, persistopenids)!=-1)? 'block' : 'none'
+		        this.$divref=$('#'+this.id);
+
+		        this.group=this.getAttr('group');
+		        this.fade=this.getAttr('fade');
+		        this.persist=this.getAttr('persist');
+		        this.hide=this.getAttr('hide');
+
+		        this.$divref.addClass('ac-collapse');
+
+		        if (this.divclass)
+			    this.$divref.addClass(this.divclass);
+		        if (this.fade)
+			    this.$divref.addClass('ac-fade');
+
+		        if (this.divclass)
+			    this.$divref.addClass(this.divclass);
+		        if ((this.persist || jQuery.inArray(this.group, groupswithpersist)!=-1) && persistopenids!=null){ //if this div carries a user "persist" setting, or belong to a group with at least one div that does
+				var initialstate=(jQuery.inArray(this.id, persistopenids)!=-1)? 'displayed' : 'hidden'
 			}
 			else{
-				var cssdisplay=this.getAttr('hide')? 'none' : null
+				var initialstate=this.hide? 'hidden' : 'displayed'
 			}
 			if (urlparamopenids[0]=="all" || jQuery.inArray(this.id, urlparamopenids)!=-1){ //if url parameter string contains the single array element "all", or this div's ID
-				cssdisplay='block' //set div to "block", overriding any other setting
+				initialstate='displayed' //set div to displayed, overriding any other setting
 			}
 			else if (urlparamopenids[0]=="none"){
-				cssdisplay='none' //set div to "none", overriding any other setting
+				initialstate='hidden' //set div to hidden, overriding any other setting
 			}
-			this.$divref.css(ac.generatemap(['height', this.getAttr('height')], ['display', cssdisplay]))
-			this.$divref.attr(ac.generatemap(['groupname', this.getAttr('group')], ['fade', this.getAttr('fade')], ['speed', this.getAttr('speed')]))
-			if (this.getAttr('group')){ //if this DIV has the "group" attr defined
-				var targetgroup=ac.divgroups[this.getAttr('group')] || (ac.divgroups[this.getAttr('group')]={}) //Get settings for this group, or if it no settings exist yet, create blank object to store them in
+		        this.$divref.addClass('ac-collapse');
+
+		        if (this.fade)
+			    this.$divref.addClass('ac-fade');
+
+		        if (initialstate=='hidden')
+			    this.$divref.addClass('ac-hidden');
+		        else
+			    this.$divref.addClass('ac-displayed');
+
+			if (this.group){ //if this DIV has the "group" attr defined
+				var targetgroup=ac.divgroups[this.group] || (ac.divgroups[this.group]={}) //Get settings for this group, or if it no settings exist yet, create blank object to store them in
 				targetgroup.count=(targetgroup.count||0)+1 //count # of DIVs within this group
 				if (jQuery.inArray(this.id, urlparamopenids)!=-1){ //if url parameter string contains this div's ID
 					targetgroup.lastactivedivid=this.id //remember this DIV as the last "active" DIV (this DIV will be expanded). Overrides other settings
 					targetgroup.overridepersist=1 //Indicate to override persisted div that would have been expanded
 				}
-				if (!targetgroup.lastactivedivid && this.$divref.css('display')!='none' || cssdisplay=="block" && typeof targetgroup.overridepersist=="undefined") //if this DIV was open by default or should be open due to persistence								
+			        if (!targetgroup.lastactivedivid && !this.$divref.hasClass('ac-hidden') || initialstate=="displayed" && typeof targetgroup.overridepersist=="undefined")
 					targetgroup.lastactivedivid=this.id //remember this DIV as the last "active" DIV (this DIV will be expanded)
-				this.$divref.css({display:'none'}) //hide any DIV that's part of said group for now
+			        this.$divref.removeClass('ac-displayed').addClass('ac-hidden');
 			}
 		}) //end divholders.each
 		jQuery.each(ac.divgroups, function(){ //loop through each group
-			if (this.lastactivedivid && urlparamopenids[0]!="none") //show last "active" DIV within each group (one that should be expanded), unless url param="none"
-				ac.divholders[this.lastactivedivid].$divref.show()
+		    if (this.lastactivedivid && urlparamopenids[0]!="none") //show last "active" DIV within each group (one that should be expanded), unless url param="none"
+			ac.divholders[this.lastactivedivid].$divref.removeClass('ac-hidden').addClass('ac-displayed');
 		})
 		if (animatedcollapse.ontoggle){
 			jQuery.each(ac.divholders, function(){ //loop through each collapsible DIV object and fire ontoggle event
-				animatedcollapse.ontoggle(jQuery, this.$divref.get(0), this.$divref.css('display'))
+			    animatedcollapse.ontoggle(jQuery, this.$divref.get(0), this.$divref.hasClass('ac-hidden') ? 'none' : 'block')
 			})
 		}
  		//Parse page for links containing rel attribute
@@ -155,7 +180,12 @@ init:function(){
 				animatedcollapse.preloadimage(this.getAttribute('data-openimage'), this.getAttribute('data-closedimage')) //preload control images (if defined)
 				$togglerimage=$(this).find('img').eq(0).data('srcs', {open:this.getAttribute('data-openimage'), closed:this.getAttribute('data-closedimage')}) //remember open and closed images' paths
 				ac.divholders[this._divids].$togglerimage=$(this).find('img').eq(0) //save reference to toggler image (to be updated inside slideengine()
-				ac.divholders[this._divids].$togglerimage.attr('src', (ac.divholders[this._divids].$divref.css('display')=="none")? $togglerimage.data('srcs').closed : $togglerimage.data('srcs').open)
+			        ac.divholders[this._divids].$togglerimage.prop(
+				    'src',
+				    ac.divholders[this._divids].$divref.hasClass('ac-hidden')
+					? $togglerimage.data('srcs').closed
+					: $togglerimage.data('srcs').open
+				)
 			}
 			$(this).click(function(){ //assign click behavior to each control link
 				var relattr=this.getAttribute('rel')
@@ -167,7 +197,7 @@ init:function(){
 			}) //end control.click
 		})// end control.each
 
-		$(window).bind('unload', function(){
+		$(window).on('unload', function(){
 			ac.uninit()
 		})
 	}) //end doc.ready()
@@ -176,10 +206,10 @@ init:function(){
 uninit:function(){
 	var opendivids='', groupswithpersist=''
 	jQuery.each(this.divholders, function(){
-		if (this.$divref.css('display')!='none'){
+	        if (!this.$divref.hasClass('ac-hidden')){
 			opendivids+=this.id+',' //store ids of DIVs that are expanded when page unloads: 'div1,div2,etc'
 		}
-		if (this.getAttr('group') && this.getAttr('persist'))
+	        if (this.group && this.persist)
 			groupswithpersist+=this.getAttr('group')+',' //store groups with which at least one DIV has persistance enabled: 'group1,group2,etc'
 	})
 	opendivids=(opendivids=='')? 'nada' : opendivids.replace(/,$/, '')

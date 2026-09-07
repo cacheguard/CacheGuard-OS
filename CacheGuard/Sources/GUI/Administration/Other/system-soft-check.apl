@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -35,9 +34,16 @@ print-system-soft-check()
 	return 0
     fi
 
-    local message=$(get-system-soft-check-message "${new_os_version}")
+    local message ret
+    message=$(get-system-soft-check-message "${new_os_version}")
+    ret=${?}
 
-    echo "<a href='${PATCH_URL}' target='_blank'>${message}</a>"
+    if test ${ret} -eq 0 ; then
+	echo "${message}"
+    else
+	local title="Visit ${PATCH_URL}"
+        echo "<a href='${PATCH_URL}' target='_blank'>${message} <img src='${IMAGE_DIR}/upgrade.gif' alt='${title}' title='${title}' /></a>"
+    fi
 }
 
 gui-run-authentication

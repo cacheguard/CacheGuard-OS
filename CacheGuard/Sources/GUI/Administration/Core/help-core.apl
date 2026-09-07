@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -24,12 +23,12 @@
 
 show-help-form()
 {
-    local width=500
+    local width
 
     itemWidth[0]=50
     itemWidth[1]=50
 
-    itemTitle[0]="Get Collaborative Help"
+    itemTitle[0]="Get Free Collaborative Help"
     itemTitle[1]="Request an Anomaly Handling"
     itemTitle[2]="Request an Anomaly Handling"
     itemTitle[3]="Subscribe to a Support Contract"
@@ -60,7 +59,6 @@ show-help-form()
     shortcutMenuTitle[0]=${register_title}
 
     show-title "Get Support & Help"
-    show-shortcuts-menu
     show-form ${width} disable
 }
 

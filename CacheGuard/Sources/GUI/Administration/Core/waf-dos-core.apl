@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -40,16 +39,14 @@ show-waf-limit-form()
     local dos_counter=${WAF_DOS_LIMIT/ *}
     local dos_slice=${WAF_DOS_LIMIT#* } ; dos_slice=${dos_slice/ *}
     local dos_timeout=${WAF_DOS_LIMIT/* }
-
-    blankItemContent[0]="type='text' size='8' maxlength='7' value='${dos_counter}' onMouseOver=showMinMaxToolTip(1,1000000); onMouseOut=hideMinMaxToolTip();"
-    blankItemContent[1]="type='text' size='8' maxlength='5' value='${dos_slice}' onMouseOver=showMinMaxToolTip(1,86400); onMouseOut=hideMinMaxToolTip();"
-    blankItemContent[2]="type='text' size='8' maxlength='6' value='${dos_timeout}' onMouseOver=showMinMaxToolTip(1,604800); onMouseOut=hideMinMaxToolTip();"
+    blankItemContent[0]="type='text' size='8' maxlength='7' value='${dos_counter}' data-action='show-min-max-tooltip' data-min='1' data-max='1000000'"
+    blankItemContent[1]="type='text' size='8' maxlength='5' value='${dos_slice}' data-action='show-min-max-tooltip' data-min='1' data-max='86400'"
+    blankItemContent[2]="type='text' size='8' maxlength='6' value='${dos_timeout}' data-action='show-min-max-tooltip' data-min='1' data-max='604800'"
 
     checkItem[0]=digit
     checkItem[1]=digit
     checkItem[2]=digit
 
-    call-js-function "hideMinMaxToolTip( )"
     show-title "WAF Denial of Service" "enabled" "waf"
     show-form "${width}"
 }

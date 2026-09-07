@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -90,7 +89,6 @@ show-vpnipsec-access()
     shortcutMenuTitle[1]="Manage TLS"
 
     show-title "Remote Access IPsec VPN Settings" enabled "dynamicdns tls vpnipsec"
-    show-shortcuts-menu
     show-form "${width}"
 }
 

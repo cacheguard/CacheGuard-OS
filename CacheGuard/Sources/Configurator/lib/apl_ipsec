@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       Configurator
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -43,7 +42,7 @@ set-ipsec-parameters-site()
 
     local vpn_ipsec_site_ip_list vpn_ipsec_site_dn_list
 
-    local elt range i=0
+    local elt range i=0 nb=0
     local vpn_id remote_address remote_isakmp_port remote_natt_port
     local to_remote_addresses ips fqdns
     local host_ip address
@@ -65,6 +64,7 @@ set-ipsec-parameters-site()
 		remote_isakmp_port=${elt}
 		;;
 	    11)
+		((nb++))
 		remote_natt_port=${elt}
 		to_remote_addresses=$(get-vpn-ipsec-tos ${vpn_id} ${state})
 		unset ips fqdns
@@ -96,8 +96,9 @@ set-ipsec-parameters-site()
 	((i++))
     done
 
-    VPN_IPSEC_SITE_IP_LIST=${vpn_ipsec_site_ip_list:1}
-    VPN_IPSEC_SITE_DN_LIST=${vpn_ipsec_site_dn_list:1}
+    export VPN_IPSEC_SITE_NB=${nb}
+    export VPN_IPSEC_SITE_IP_LIST=${vpn_ipsec_site_ip_list:1}
+    export VPN_IPSEC_SITE_DN_LIST=${vpn_ipsec_site_dn_list:1}
 }
 
 set-ipsec-parameters()
@@ -107,8 +108,6 @@ set-ipsec-parameters()
 
     local access_mode
     unset IKE_IS_ACTIVE CURRENT_IKE_IS_ACTIVE
-
-    VPNIPSEC_ACCESS_DB_RESET=False
 
     access_mode=${VPN_IPSEC_ACCESS/ *}
     if test "${access_mode}" == 'on' ; then
@@ -125,19 +124,19 @@ set-ipsec-parameters()
     fi
 
     if test ${VPN_IPSEC_MODE} == True -a ${VPN_IPSEC_ACCESS_MODE} == False ; then
-	VPN_IPSEC_SITE_IS_ACTIVE=True
+	export VPN_IPSEC_SITE_IS_ACTIVE=True
     else
-	VPN_IPSEC_SITE_IS_ACTIVE=False
+	export VPN_IPSEC_SITE_IS_ACTIVE=False
     fi
 
     if test ${CURRENT_VPN_IPSEC_MODE} == True -a ${CURRENT_VPN_IPSEC_ACCESS_MODE} == False ; then
-	CURRENT_VPN_IPSEC_SITE_IS_ACTIVE=True
+	export CURRENT_VPN_IPSEC_SITE_IS_ACTIVE=True
     else
-	CURRENT_VPN_IPSEC_SITE_IS_ACTIVE=False
+	export CURRENT_VPN_IPSEC_SITE_IS_ACTIVE=False
     fi
 
     if test ${VPN_IPSEC_MODE} == False -o ${ROUTER_MODE} == False ; then
-	IKE_IS_ACTIVE=False
+	export IKE_IS_ACTIVE=False
     else
 	if test ${IP_EXTERNAL_IP} != "0.0.0.0" -a ${IP_WEB_IP} != "0.0.0.0" ; then
 	    if test ${VPN_IPSEC_ACCESS_MODE} == True ; then
@@ -155,7 +154,7 @@ set-ipsec-parameters()
     fi
 
     if test ${CURRENT_VPN_IPSEC_MODE} == False -o ${CURRENT_ROUTER_MODE} == False ; then
-	CURRENT_IKE_IS_ACTIVE=False
+	export CURRENT_IKE_IS_ACTIVE=False
     else
 	if test ${CURRENT_IP_EXTERNAL_IP} != "0.0.0.0" -a ${CURRENT_IP_WEB_IP} != "0.0.0.0" ; then
 	    if test ${CURRENT_VPN_IPSEC_ACCESS_MODE} == True ; then
@@ -172,10 +171,11 @@ set-ipsec-parameters()
 	fi
     fi
 
+    export VPNIPSEC_ACCESS_DB_RESET=False
     if test "${VPN_IPSEC_MODE}" != "${CURRENT_VPN_IPSEC_MODE}" -o \
 	    "${VPN_IPSEC_ACCESS_MODE}" != "${CURRENT_VPN_IPSEC_ACCESS_MODE}" ; then
 	test "${VPN_IPSEC_MODE}" == False -o ${VPN_IPSEC_ACCESS_MODE} == False || \
-	    VPNIPSEC_ACCESS_DB_RESET=True
+	    export VPNIPSEC_ACCESS_DB_RESET=True
     fi
 
     set-ipsec-parameters-site ${state}
@@ -766,6 +766,7 @@ EOF
 	    dn)
 		local cert_file=$(get-tls-server-component-file ${left_tls_id} certificate)
 		left_id=$(get-tls-subject ${cert_file})
+		left_id=${left_id//\"/\\\"}
 		test -z "${left_id}" || echo "     leftid = \"${left_id}\"" >> ${IPSEC_CONNECTION_DIR_NAME}/access.conf.work
 		;;
 	    *)

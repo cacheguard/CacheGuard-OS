@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -37,7 +36,7 @@ show-access-manager-form()
     itemTitle[1]="Role"
     itemTitle[2]="Network Interface"
     itemTitle[3]="IP Address"
-    itemTitle[4]="Public SSH Key"
+    itemTitle[4]="SSH Public Key"
 
     itemID[0]=""
     itemID[1]="role"
@@ -49,13 +48,14 @@ show-access-manager-form()
     blankItemContent[1]="master backup"
     blankItemContent[2]="internal external auxiliary"
     blankItemContent[3]="type='text' size='15' maxlength='15'"
-    blankItemContent[4]="cols='40' rows='20'"
+    blankItemContent[4]="cols='40' rows='22' maxlength='1000'"
 
     itemForm[1]="select"
     itemForm[2]="select"
     itemForm[4]="textarea"
 
     checkItem[3]=ip
+    checkItem[4]=text
 
     local access
     local interface role ip

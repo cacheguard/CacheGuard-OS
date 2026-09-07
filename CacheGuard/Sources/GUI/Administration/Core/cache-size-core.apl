@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -96,12 +95,12 @@ show-cache-maxobject-form()
 	big_max=${CACHE_BIG_MAX_OBJECT_SZ}
     fi
 
-    blankItemContent[0]="type='text' size='6' maxlength='6' value='${min}' onMouseOver='showMinMaxToolTip( ${CACHE_MIN_OBJECT_SZ_MIN}, ${CACHE_MAX_OBJECT_SZ_MAX} );' onMouseOut='hideMinMaxToolTip( );'"
-    blankItemContent[1]="type='text' size='6' maxlength='6' value='${max}' onMouseOver='showMinMaxToolTip( ${CACHE_MAX_OBJECT_SZ_MIN}, ${CACHE_MAX_OBJECT_SZ_MAX} );' onMouseOut='hideMinMaxToolTip( );'"
+    blankItemContent[0]="type='text' size='6' maxlength='6' value='${min}' data-action='show-min-max-tooltip' data-min='${CACHE_MIN_OBJECT_SZ_MIN}' data-max='${CACHE_MAX_OBJECT_SZ_MAX}'"
+    blankItemContent[1]="type='text' size='6' maxlength='6' value='${max}' data-action='show-min-max-tooltip' data-min='${CACHE_MAX_OBJECT_SZ_MIN}' data-max='${CACHE_MAX_OBJECT_SZ_MAX}'"
     blankItemContent[2]=$(print-state ${state})
     blankItemContent[3]="${PROXY_CACHE_UNIT_SZ}"
     blankItemContent[4]="type='text' size='10' maxlength='10' value='${big_min}'"
-    blankItemContent[5]="type='text' size='10' maxlength='10' value='${big_max}' onMouseOver='showMinMaxToolTip( ${CACHE_MAX_OBJECT_SZ_MIN}, ${PROXY_CACHE_UNIT_SZ} );' onMouseOut='hideMinMaxToolTip( );'"
+    blankItemContent[5]="type='text' size='10' maxlength='10' value='${big_max}' data-action='show-min-max-tooltip' data-min='${CACHE_MAX_OBJECT_SZ_MIN}' data-max='${PROXY_CACHE_UNIT_SZ}'"
 
     checkItem[0]=digit
     checkItem[1]=digit
@@ -116,9 +115,8 @@ show-cache-maxobject-form()
 	itemState[5]="disabled"
     fi
 
-    itemFormSelectCB[2]="cacheSizeCB( 'state', 'bigobject_min', 'bigobject_max' );"
+    itemData[2]="data-action='cache-size' data-state='state' data-bigobject-min='bigobject_min' data-bigobject-max='bigobject_max'"
 
-    call-js-function "hideMinMaxToolTip( )"
     show-title "Cache Size Limits" "enabled" "cache"
     show-form "${width}"
 }

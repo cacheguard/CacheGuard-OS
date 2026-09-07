@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       InitScript
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -59,18 +58,22 @@ case "${1}" in
 	# Stop daemons.
 	log_info_msg "Stopping ${SERV}... "
 	pids=$(pidof ${PROG})
-	if test -n "${pids}" ; then
-	    pid=$(echo ${pids/* })
-	    if test -n "${pid}" ; then
-		kill ${pid}
+	pid=${pids/* }
+	if [ -n "${pid}" ] ; then
+	    kill -TERM ${pid}
+	    RETVAL=${?}
+	    usleep 500000
+	    pids=$(pidof ${PROG})
+	    pid=${pids/* }
+	    if [ -n "${pid}" ] ; then
+		kill -KILL ${pid}
 		RETVAL=${?}
-		usleep 500000
-	    else
-		RETVAL=10
+		rm -f /run/keepalived.pid
 	    fi
 	else
 	    RETVAL=11
 	fi
+
 	[ ${RETVAL} -eq 0 ]
 	evaluate_retval
 	rm -f /var/lock/${PROG}

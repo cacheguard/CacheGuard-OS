@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -44,11 +43,11 @@ set-ip-name()
 	[[ "${ATTRIBUTES[${del_pos}]}" =~ ^del_[0-9]+$ ]]
 	if test ${?} -ne 0 ; then
 	    if test "${VALUES[${entry_pos}]}" == anew ; then
-		test -z "${name}" -o -z "${ip}" || echo "ip name add '${name}' '${ip}'" >> ${transaction}
+		test -z "${name}" -o -z "${ip}" || echo "ip name add ${name} ${ip}" >> ${transaction}
 	    fi
 	    pos=$[${pos} + 3]
 	else
-	    test -z "${name}" || echo "ip name del '${name}'" >> ${transaction}
+	    test -z "${name}" || echo "ip name del ${name}" >> ${transaction}
 	    pos=$[${pos} + 4]
 	fi
     done

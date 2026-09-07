@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       Configurator
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -44,11 +43,10 @@ set-dns-parameters()
 gen-named-acl-conf()
 {
     local access_web_list=${1}
-    local transparent_web_list=${2}
 
     local acl=web
     
-    if test -z "${access_web_list}" -a -z "${transparent_web_list}" ; then
+    if test -z "${access_web_list}" ; then
 	echo "acl ${acl} { 0.0.0.0/0; };"
 	return 0
     fi
@@ -81,31 +79,6 @@ gen-named-acl-conf()
 	((i++))
     done
 
-    i=0
-    for elt in ${transparent_web_list}
-    do
-	range=$[${i} % 4]
-	case ${range} in
-	    0)
-	        ;;
-	    1)
-		ip=${elt}
-		;;
-	    2)
-		px=${elt}
-		;;
-	    3)
-		ip_px_list="${ip_px_list} ${ip}/${px}"
-		;;
-	    *)
-		return 1
-		;;
-	esac
-	((i++))
-    done
-
-    ip_px_list=$(uniq-elt ${ip_px_list})
-
     for ip_px in ${ip_px_list}
     do
 	echo -n "${ip_px}; "
@@ -120,7 +93,7 @@ gen-named-conf()
 	echo -n "acl listen_ip { "
 	test "${IP_WEB_IP}" == "0.0.0.0" || echo -n "${IP_WEB_IP}/32; "
 	echo "};"
-	gen-named-acl-conf "${ACCESS_IF_IP_PX_WEB_LIST}" "${TRANSPARENT_IF_IP_PX_LIST}"
+	gen-named-acl-conf "${ACCESS_WEB_IF_IP_PX_LIST}"
     else
         echo "acl listen_ip { };"
         echo "acl web { };"
@@ -216,7 +189,7 @@ gen-names-resolved-lists()
 {
     test -n "${NAME_SERVER_LIST}" -o "${SELF_NS}" == True || return 11
 
-    local elt range i
+    local elt range i=0
     local name_port if_name interface name ip port ips
     local protocol_name_port
     local protocol
@@ -227,6 +200,7 @@ gen-names-resolved-lists()
     local access_mon_if_nr_list
     local snmp_trap_server_nr_list
     local syslog_server_nr_list
+    local ldap_server_nr_list
     local kerberos_server_nr_list
     local email_server_nr_list
 
@@ -235,11 +209,46 @@ gen-names-resolved-lists()
     gen-ipsec-site-fqdn-resolved-lists new
     ipsec_ret=${?}
 
+    if test ${AUTHENTICATE_MODE} == True -a ${AUTHENTICATE_LDAP} == True ; then
+	for elt in ${LDAP_SERVER_DN_LIST}
+	do
+	    range=$[${i} % 3]
+	    case ${range} in
+		0)
+		    protocol=${elt}
+		    ;;
+		1)
+		    name=${elt}
+		    ;;
+		2)
+		    port=${elt}
+
+		    ips=$(dig ${name} ${dig_options} 2> /dev/null)
+		    if test ${?} -ne 0 ; then
+			unset ips
+			error_list="${error_list} ${name}"
+		    else
+			test -n "${ips}" || error_list="${error_list} ${name}"
+		    fi
+		    for ip in ${ips}
+		    do
+			check-expr-ip "${ip}" || continue
+			ldap_server_nr_list="${ldap_server_nr_list} ${protocol} ${ip} ${port}"
+		    done
+		    ;;
+		*)
+		    ;;
+	    esac
+	    ((i++))
+	done
+    fi
+
     if test ${AUTHENTICATE_MODE} == True -a ${AUTHENTICATE_KERBEROS} == True ; then
 	for name in ${KERBEROS_SERVER_DN_LIST}
 	do
 	    ips=$(dig ${name} ${dig_options} 2> /dev/null)
 	    if test ${?} -ne 0 ; then
+		unset ips
 		error_list="${error_list} ${name}"
 	    else
 		test -n "${ips}" || error_list="${error_list} ${name}"
@@ -260,6 +269,7 @@ gen-names-resolved-lists()
 
 	ips=$(dig ${name} ${dig_options} 2> /dev/null)
 	if test ${?} -ne 0 ; then
+	    unset ips
 	    error_list="${error_list} ${name}"
 	else
 	    test -n "${ips}" || error_list="${error_list} ${name}"
@@ -279,6 +289,7 @@ gen-names-resolved-lists()
 
 	ips=$(dig ${name} ${dig_options} 2> /dev/null)
 	if test ${?} -ne 0 ; then
+	    unset ips
 	    error_list="${error_list} ${name}"
 	else
 	    test -n "${ips}" || error_list="${error_list} ${name}"
@@ -298,6 +309,7 @@ gen-names-resolved-lists()
 
 	ips=$(dig ${name} ${dig_options} 2> /dev/null)
 	if test ${?} -ne 0 ; then
+	    unset ips
 	    error_list="${error_list} ${name}"
 	else
 	    test -n "${ips}" || error_list="${error_list} ${name}"
@@ -326,6 +338,7 @@ gen-names-resolved-lists()
 
 		ips=$(dig ${name} ${dig_options} 2> /dev/null)
 		if test ${?} -ne 0 ; then
+		    unset ips
 		    error_list="${error_list} ${name}"
 		else
 		    test -n "${ips}" || error_list="${error_list} ${name}"
@@ -347,6 +360,7 @@ gen-names-resolved-lists()
     if test -n "${EMAIL_ACCOUNT_SERVER_FQDN}" ; then
 	ips=$(dig ${EMAIL_ACCOUNT_SERVER_FQDN} ${dig_options} 2> /dev/null)
 	if test ${?} -ne 0 ; then
+	    unset ips
 	    error_list="${error_list} ${EMAIL_ACCOUNT_SERVER_FQDN}"
 	else
 	    test -n "${ips}" || error_list="${error_list} ${EMAIL_ACCOUNT_SERVER_FQDN}"
@@ -365,6 +379,7 @@ gen-names-resolved-lists()
     ACCESS_MON_IF_NR_LIST=${access_mon_if_nr_list:1}
     SNMP_TRAP_SERVER_NR_LIST=${snmp_trap_server_nr_list:1}
     SYSLOG_SERVER_NR_LIST=${syslog_server_nr_list:1}
+    LDAP_SERVER_NR_LIST=${ldap_server_nr_list:1}
     KERBEROS_SERVER_NR_LIST=${kerberos_server_nr_list:1}
     EMAIL_SERVER_NR_LIST=${email_server_nr_list:1}
 
@@ -394,7 +409,7 @@ is-dn-present()
 {
     is-dn-present-in-access || \
 	is-dn-present-in-snmp-conf || \
-	is-dn-present-in-ipsec-site-conf \
+	is-dn-present-in-ipsec-site-conf || \
 	    test -n "${EMAIL_ACCOUNT_SERVER_FQDN}"
 }
 

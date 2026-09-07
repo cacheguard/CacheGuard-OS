@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       Commands
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -101,7 +100,14 @@ show-transparent1()
 		3)
 		    qos=${elt}
 		    test ${n} -eq 0 || echo-blank-command
-		    echo-value "${interface} ${ip} ${netmask} ${qos}%"
+		    case ${interface} in
+			vpnipsec)
+			    echo-value "${interface} ${ip} ${netmask}"
+			    ;;
+			*)
+			    echo-value "${interface} ${ip} ${netmask} ${qos}%"
+			    ;;
+		    esac
 		    ((n++))
 		    ;;
 		*)
@@ -177,18 +183,22 @@ run()
 
 	    check-net-ip-address ${ip} ${mk} || return 70
 
-	    if test -z "${px}" ; then
-		local qos=${ARGS[5]}
+	    if test ${interface} == vpnipsec ; then
+		qos=100
 	    else
-		local qos=${ARGS[4]}
-	    fi
+		if test -z "${px}" ; then
+		    local qos=${ARGS[5]}
+		else
+		    local qos=${ARGS[4]}
+		fi
 
-	    if test -z "${qos}" ; then
-		local qos=100
-	    else
-		qos=$(remove-leading-zeros ${qos})
-		qos=$(get-percent-value ${qos})
-		check-percentage ${qos} || return 11
+		if test -z "${qos}" ; then
+		    local qos=100
+		else
+		    qos=$(remove-leading-zeros ${qos})
+		    qos=$(get-percent-value ${qos})
+		    check-percentage ${qos} || return 11
+		fi
 	    fi
 
 	    export TRANSPARENT_WEB_LIST=$(transparent-remove "${interface} ${ip} ${mk}")

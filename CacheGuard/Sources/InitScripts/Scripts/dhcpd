@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       InitScript
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -41,10 +40,10 @@ SERV="DHCP"
 
 case "${1}" in
     start)
-	[ -n "${DHCPD_IF}" ] || exit 11
+	[ -n "${DHCPD_IFS}" ] || exit 11
 	# Start daemons.
 	log_info_msg "Starting ${SERV}..."
-	start_daemon ${FPROG} -cf /etc/dhcpd.conf -lf ${DB_DIR}/${PROG}.leases ${DHCPD_IF} 2> /dev/null
+	start_daemon ${FPROG} -q -4 -cf /etc/dhcpd.conf -lf ${DB_DIR}/${PROG}.leases ${DHCPD_IFS} 2> /dev/null
 	RETVAL=${?}
 	[ ${RETVAL} -eq 0 ] && touch /var/lock/dhcpd
 	evaluate_retval

@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -82,6 +81,18 @@ display-user()
     echo "[ ${REMOTE_USER}@${hostname}.${domainname} ]"
 }
 
+gui-get-date-time()
+{
+    test -n "${1}" || return 1
+    local rfc3339_time=${1}
+
+    local date=${rfc3339_time/T*}
+    local time=${rfc3339_time#*T}
+    time=${time/.*}
+
+    echo "${date}@${time}"
+}
+
 show-web-log()
 {
     test -n "${1}" || return 1
@@ -96,52 +107,53 @@ show-web-log()
 
     local i=0
     local log=/var/log/${web_log}
-    local style="style='word-wrap:break-word;'"
 
     if test ! -s "${log}" ; then
-	echo "<div style='font-style:italic;'>&lt;The log is empty&gt;</div>"
+	echo-unavailable-message "the access log is empty."
 	return 0
     fi
 
-    local date machine process ip user method req ver status bytes cache peer ssl agent
+    local rfc3339_time machine process ip user method req ver status bytes cache peer ssl agent
+    local date_time date time
     local len r_agent
 
-    echo "<table class='highlight-list' width:100%;'>"
+    echo "<table class='highlight-log'>"
     echo "<thead>"
     echo "<tr>"
-    echo "<td class='table-header'><strong>Date</strong></td>"
-    echo "<td class='table-header'><strong>Client IP</strong></td>"
-    echo "<td class='table-header'><strong>Auth User</strong></td>"
-    echo "<td class='table-header'><strong>User Agent</strong></td>"
+    echo "<th class='table-header'><strong>Date</strong></th>"
+    echo "<th class='table-header'><strong>Time</strong></th>"
+    echo "<th class='table-header'><strong>Client IP</strong></th>"
+    echo "<th class='table-header'><strong>Auth User</strong></th>"
+    echo "<th class='table-header'><strong>User Agent</strong></th>"
     
     case ${mode} in
 	reverse)
 	    ;;
 	forward)
-	    echo "<td class='table-header'><strong>Cache</strong></td>"
-	    echo "<td class='table-header'><strong>Peer</strong></td>"
-	    
+	    # echo "<th class='table-header'><strong>Cache</strong></th>"
+	    # echo "<th class='table-header'><strong>Peer</strong></th>"
 	    ;;
 	*)
 	    ;;
     esac
 
-    echo "<td class='table-header'><strong>Bytes</strong></td>"
-    echo "<td class='table-header'><strong>Status</strong></td>"
-    echo "<td class='table-header'><strong>Request</strong></td>"
+    echo "<th class='table-header'><strong>Bytes</strong></th>"
+    echo "<th class='table-header'><strong>Status</strong></th>"
+    echo "<th class='table-header'><strong>Method</strong></th>"
+    echo "<th class='table-header'><strong>Request</strong></th>"
     echo "</tr>"
     echo "</thead>"
 
     echo "<tbody>"
 
-    tac ${log} | while read date machine process ip user method req ver status bytes cache peer ssl agent
+    tac ${log} | while read rfc3339_time machine process ip user method req ver status bytes cache peer ssl agent
     do
 	test -n "${bytes}" || continue
 	test ${i} -lt ${number} || break
 
         if test "${method:1}" == CONNECT -a ${bytes} == 0 ; then
             case "${ssl}" in
-		peek|stare)
+		peek|stare|splice|terminate)
                     continue
                     ;;
 		*)
@@ -149,13 +161,18 @@ show-web-log()
             esac
         fi
 
+	date_time=$(gui-get-date-time "${rfc3339_time}")
+	date=${date_time/@*}
+	time=${date_time/*@}
+
 	len=${#ver} ; ((len--)) ; ver=${ver:0:${len}}
         req=$(url-decode ${req})
 
 	echo "<tr>"
-	echo "<td><span ${style}>${date}</span></td>"
-	echo "<td><span ${style}>${ip}</span></td>"
-	echo "<td><span ${style}>${user}</span></td>"
+	echo "<td><span>${date}</span></td>"
+	echo "<td><span>${time}</span></td>"
+	echo "<td><span>${ip}</span></td>"
+	echo "<td><span>${user}</span></td>"
 
 	case ${mode} in
 	    reverse)
@@ -180,20 +197,21 @@ show-web-log()
 		;;
 	esac
 
-	echo "<td><span ${style}>${agent}</span></td>"
+	echo "<td><span>${agent}</span></td>"
 
 	if test ${mode} == 'forward' ; then
 	    cache=${cache/TCP_}
 	    cache=${cache//_/ }
 	    peer=${peer//_/ }
 
-	    echo "<td><span ${style}>${cache}</span></td>"
-	    echo "<td><span ${style}>${peer}</span></td>"
+	    # echo "<td><span>${cache}</span></td>"
+	    # echo "<td><span>${peer}</span></td>"
 	fi
 
-	echo "<td><span ${style}>${bytes}</span></td>"
-	echo "<td><span ${style}>${status}</span></td>"
-	echo "<td><span ${style}>${method:1} ${req} ${ver}</span></td>"
+	echo "<td><span>${bytes}</span></td>"
+	echo "<td><span>${status}</span></td>"
+	echo "<td><span>${method:1}</span></td>"
+	echo "<td><span>${req} ${ver}</span></td>"
 	echo "</tr>"
 	((i++))
     done
@@ -202,27 +220,36 @@ show-web-log()
     echo "</table>"
 }
 
-show-audit-log-nb()
+show-audit-log-nb-tr()
 {
     test -n "${1}" || return 1
     title=${1}
 
-    echo "<div class='core-form'>"
-    echo "<table class='highlight-form' width='100%'>"
     echo "<tr>"
-    echo "<td width=25%>${title}</td>"
-    echo "<td width=75%>"
-    echo "<select id=last>"
+    echo "<td>${title}</td>"
+    echo "<td>"
+    echo "<select id='last'>"
     echo -n "<option value='10' selected>10</option>"
     echo -n "<option value='25'>25</option>"
     echo -n "<option value='50'>50</option>"
-    echo -n "<option value='75'>75</option>"
     echo -n "<option value='100'>100</option>"
     echo -n "<option value='200'>200</option>"
     echo -n "<option value='300'>300</option>"
     echo "</select>"
     echo "</td>"
     echo "</tr>"
+}
+
+show-audit-log-nb()
+{
+    test -n "${1}" || return 1
+    title=${1}
+
+    echo "<div class='core-form'>"
+    echo "<table class='highlight-form'>"
+
+    show-audit-log-nb-tr "${title}"
+
     echo "</table>"
     echo "</div>"
 }
@@ -256,4 +283,28 @@ gui-user-exist()
     local htpasswd_file=/etc/.htpasswd
 
     gui-user-exist-file ${htpasswd_file} ${user}
+}
+
+refresh-buttons()
+{
+    local variant=${1}
+
+    local page=$(get-page "${@}")
+    local action
+
+    if test -z "${variant}" ; then
+	action='update-log'
+	echo "<div data-init-update-log='update-${page}' data-force='1' hidden></div>"
+    else
+	action="update-${variant}-log"
+	echo "<div data-init-update-${variant}-log='update-${page}' data-force='1' hidden></div>"
+    fi
+
+    local page=$(get-page "${@}")
+    local title='Toggle Auto Refresh'
+
+    echo "<button id='refresh' type='submit' class='form-button' data-action='${action}' data-update-page='update-${page}'>"
+    echo "REFRESH <img src='${IMAGE_DIR}/refresh.png' align='top' /></button>"
+
+    echo "<span class='contextual-help'><input class='form-refresh-checkbox' id='${AUOTO_UPDATE_ID}' type='checkbox' checked /><label for='${AUOTO_UPDATE_ID}'></label><span class='contextual-help-text'>${title}</span></span>"
 }

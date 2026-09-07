@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -112,7 +111,7 @@ show-rweb-via()
     test -n "${listContent}" || state=disabled
 
     show-title "Website Via Gateways" "${state}" "ip rweb"
-    show-list-form ${MAX_IP_ROUTES_NB} "${width}" "${page_ref}" "<br />${long_title}"
+    show-list-form ${MAX_IP_ROUTES_NB} "${width}" "${page_ref}" "${long_title}"
 }
 
 show-rweb-via "${@}"

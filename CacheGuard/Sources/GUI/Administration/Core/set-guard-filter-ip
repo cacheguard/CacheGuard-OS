@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -40,14 +39,14 @@ set-guard-filter-ip()
 	del_pos=$[${pos} + 5]
 	
 	if [[ "${ATTRIBUTES[${del_pos}]}" =~ ^del_[0-9]+$ ]] ; then
-	    echo "guard filter ip del '${VALUES[${name_pos}]}'" >> ${transaction}
+	    echo "guard filter ip del ${VALUES[${name_pos}]}" >> ${transaction}
 	    pos=$[${pos} + 6]
 	else
 	    if test "${VALUES[${entry_pos}]}" == anew -a \
 		    -n "${VALUES[${name_pos}]}" -a \
 		    -n "${VALUES[${type_pos}]}" -a \
 		    -n "${VALUES[${ip1_pos}]}" ; then
-		echo "guard filter ip add '${VALUES[${name_pos}]}' '${VALUES[${type_pos}]}' '${VALUES[${ip1_pos}]}' '${VALUES[${ip2_pos}]}'" >> ${transaction}
+		echo "guard filter ip add ${VALUES[${name_pos}]} ${VALUES[${type_pos}]} ${VALUES[${ip1_pos}]} ${VALUES[${ip2_pos}]}" >> ${transaction}
 	    fi
 	    pos=$[${pos} + 5]
 	fi

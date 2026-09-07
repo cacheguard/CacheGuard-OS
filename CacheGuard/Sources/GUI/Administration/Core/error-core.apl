@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -30,13 +29,12 @@ show-error-form()
 
     local code_types="GUI_Error Command_Error Command_Warning Command_Information"
     local tabs_id='error_descriptions'
-    local width=800
 
     show-title "Error Descriptions" "enabled" "error information warning"
 
-    echo "<div class='core-form' style='margin-top:15px;'>"
+    echo "<div class='core-form'>"
 
-    echo "<ul id='${tabs_id}' class='shadetabs' style='font-size:14px;'>"
+    echo "<ul id='${tabs_id}' class='shadetabs'>"
     for code_type in ${code_types}
     do
 	echo "<li><a href='#' rel='${code_type}' class='selected'>${code_type//_/ }s</a></li>"
@@ -45,12 +43,12 @@ show-error-form()
     
     for code_type in ${code_types}
     do
-	echo "<div id='${code_type}' class='tabcontent' style='margin:0; padding:0; padding-top:10px;'>"
-	echo "<table class='highlight-list' width='${width}'>"
+	echo "<div id='${code_type}' class='tabcontent'>"
+	echo "<table class='highlight-list noselect wrap'>"
 	echo "<thead>"
 	echo "<tr>"
-	echo "<td class='table-header' style='height:50px;' width='10%' align='center'>Code</td>"
-	echo "<td class='table-header' width='90%' align='center'>Description</td>"
+	echo "<th class='table-header' align='center'>Code</th>"
+	echo "<th class='table-header' align='center'>Description</th>"
 	echo "</tr>"
 	echo "</thead>"
 	echo "<tbody>"
@@ -101,19 +99,7 @@ show-error-form()
 	echo "</div>"
     done
 
-    # Tab Display
-
-    echo "<script type='text/javascript'>"
-    echo "var formTabs = new ddtabcontent( '${tabs_id}' );"
-    echo "formTabs.setpersist( true );"
-    echo "formTabs.setselectedClassTarget( 'link' );"
-    echo "formTabs.init( );"
-    echo "</script>"
-
-    show-scroll-top
-
-    echo "</div>"
-    echo "<br />"
+    echo "<div data-ddtabcontent='${tabs_id}' data-persist='true' data-selected-class-target='link' hidden></div>"
 }
 
 # Main()

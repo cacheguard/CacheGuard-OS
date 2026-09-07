@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -40,16 +39,16 @@ set-waf-rweb-bypass-rule()
 	[[ "${ATTRIBUTES[${del_pos}]}" =~ ^del_[0-9]+$ ]]
 	if test ${?} -ne 0 ; then
 	    if test "${VALUES[${entry_pos}]}" == anew -a -n "${VALUES[${name_pos}]}" ; then
-		echo "waf rweb bypass rule '${VALUES[${name_pos}]}' raz" >> ${transaction}
+		echo "waf rweb bypass rule ${VALUES[${name_pos}]} raz" >> ${transaction}
 		rule_ids=${VALUES[${rule_ids_pos}]}
 		if test -n "${rule_ids}" ; then
 		    rule_ids=${rule_ids//[$'\t\r\n']}
-		    echo "waf rweb bypass rule '${VALUES[${name_pos}]}' add '${rule_ids}'" >> ${transaction}
+		    echo "waf rweb bypass rule ${VALUES[${name_pos}]} add '${rule_ids}'" >> ${transaction}
 		fi
 	    fi
 	    pos=$[${pos} + 3]
 	else
-	    echo "waf rweb bypass rule '${VALUES[${name_pos}]}' raz" >> ${transaction}
+	    echo "waf rweb bypass rule ${VALUES[${name_pos}]} raz" >> ${transaction}
 	    pos=$[${pos} + 4]
 	fi
     done

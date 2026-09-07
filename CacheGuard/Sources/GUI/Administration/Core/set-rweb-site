@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -45,10 +44,10 @@ set-rweb-site()
 		-n "${VALUES[${protocol_pos}]}" ; then
 		case ${VALUES[${protocol_pos}]} in
 		    http)
-			echo "rweb site add '${VALUES[${name_pos}]}' '${VALUES[${protocol_pos}]}' '${VALUES[${ip_pos}]}'" >> ${transaction}
+			echo "rweb site add ${VALUES[${name_pos}]} ${VALUES[${protocol_pos}]} ${VALUES[${ip_pos}]}" >> ${transaction}
 			;;
 		    https)
-			echo "rweb site add '${VALUES[${name_pos}]}' '${VALUES[${protocol_pos}]}' 'default' '${VALUES[${ip_pos}]}'" >> ${transaction}
+			echo "rweb site add ${VALUES[${name_pos}]} ${VALUES[${protocol_pos}]} default ${VALUES[${ip_pos}]}" >> ${transaction}
 			;;
 		    *)
 			;;
@@ -56,7 +55,7 @@ set-rweb-site()
 	    fi
 	    ((pos += 4))
 	else
-	    echo "rweb site del '${VALUES[${name_pos}]}' '${VALUES[${protocol_pos}]}' '${VALUES[${ip_pos}]}'" >> ${transaction}
+	    echo "rweb site del ${VALUES[${name_pos}]} ${VALUES[${protocol_pos}]} ${VALUES[${ip_pos}]}" >> ${transaction}
 	    ((pos += 5))
 	fi
     done

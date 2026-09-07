@@ -2,8 +2,7 @@
 
 ###########################################################################
 #
-# MODULE:       Build
-# AUTHOR(S):    CacheGuard Development Team
+# MODULE:       Production
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -209,6 +208,7 @@ f:${CONF_DIR:1}/*-constant
 d:${ETC_DIR:1}
 d:${LDAP_DIR:1}/schema
 d:${LOCAL_DIR:1}/bin
+f:${LOCAL_DIR:1}/etc/certs/clamav.crt
 f:${LOCAL_DIR:1}/etc/c-icap.magic
 f:${LOCAL_DIR:1}/etc/ipsec.conf
 f:${LOCAL_DIR:1}/etc/strongswan.conf

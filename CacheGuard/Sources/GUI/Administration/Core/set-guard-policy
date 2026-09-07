@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -37,12 +36,12 @@ set-guard-policy()
 	del_pos=$[${pos} + 2]
 	
 	if [[ "${ATTRIBUTES[${del_pos}]}" =~ ^del_[0-9]+$ ]] ; then
-	    echo "guard policy del '${VALUES[${name_pos}]}'" >> ${transaction}
+	    echo "guard policy del ${VALUES[${name_pos}]}" >> ${transaction}
 	    pos=$[${pos} + 3]
 	else
 	    if test "${VALUES[${entry_pos}]}" == anew -a \
 		-n "${VALUES[${name_pos}]}" ; then
-		echo "guard policy add '${VALUES[${name_pos}]}'" >> ${transaction}
+		echo "guard policy add ${VALUES[${name_pos}]}" >> ${transaction}
 	    fi
 	    pos=$[${pos} + 2]
 	fi

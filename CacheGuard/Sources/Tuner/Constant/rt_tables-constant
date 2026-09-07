@@ -1,0 +1,8 @@
+#
+# reserved values
+#
+255     local
+254     main
+253     default
+0       unspec
+#

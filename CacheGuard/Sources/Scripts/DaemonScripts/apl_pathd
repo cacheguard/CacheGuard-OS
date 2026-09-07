@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       Scripts
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -27,12 +26,14 @@ start-loop()
     local interval=${1}
     test -n "${interval}" || interval=3000000
 
-    apl_path_check ${$}
+    local pid=${$}
+
+    apl_path_check ${pid}
 
     while true
     do
 	usleep ${interval}
-	nice --adjustment=-20 apl_path_check ${$} gateway active
+	nice --adjustment=-20 apl_path_check ${pid} gateway active
     done
 }
 

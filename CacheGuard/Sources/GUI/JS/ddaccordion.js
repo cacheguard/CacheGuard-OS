@@ -11,8 +11,11 @@
 //Version 2.2: Aug 28th, 2018':
 //** 1) Added option "scrolltocontent" to scroll to the expanded content in question after it expands, which is useful if the content is in a different area of the page relative to the header.
 
+//Version 2.3: July 10th, 20226
+//** Modifications made by CacheGuard Technologies SAS (FR): inline CSS removal to respect the CSP header. The styles .submenu and a.hiddenajaxlink have beed added to the ddaccordion.css file.
+
 var ddaccordion={
-	ajaxloadingmsg: '<img src="/image/loading.gif" /><br />Loading Content...', //customize HTML to output while Ajax content is being fetched (if applicable)
+        ajaxloadingmsg: '<span class="ajaxloading"><img src="/image/loading.gif" /><br />Loading Content...</span>',
 
 	headergroup: {}, //object to store corresponding header group based on headerclass value
 	contentgroup: {}, //object to store corresponding content group based on headerclass value
@@ -160,10 +163,6 @@ var ddaccordion={
 	},
 
 	init:function(config){
-	document.write('<style type="text/css">\n')
-	document.write('.'+config.contentclass+'{display: none}\n') //generate CSS to hide contents
-	document.write('a.hiddenajaxlink{display: none}\n') //CSS class to hide ajax link
-	document.write('<\/style>')
 	jQuery(document).ready(function($){
 		ddaccordion.urlparamselect(config.headerclass)
 		var persistedheaders=ddaccordion.getCookie(config.headerclass)
@@ -221,7 +220,7 @@ var ddaccordion={
 		})
 		//if (config["scrolltoheader"] && lastexpanded.$header)
 			//ddaccordion.scrollToHeader(lastexpanded.$header)
-		$headers.bind("evt_accordion", function(e, isdirectclick, scrolltoheader){ //assign CUSTOM event handler that expands/ contacts a header
+		$headers.on("evt_accordion", function(e, isdirectclick, scrolltoheader){ //assign CUSTOM event handler that expands/ contacts a header
 				var $subcontent=$subcontents.eq(parseInt($(this).attr('headerindex'))) //get subcontent that should be expanded/collapsed
 				if ($subcontent.css('display')=="none"){
 					ddaccordion.expandit($(this), $subcontent, config, true, isdirectclick, false, scrolltoheader) //2nd last param sets 'isuseractivated' parameter
@@ -234,7 +233,7 @@ var ddaccordion={
 					ddaccordion.collapseit($(this), $subcontent, config, true) //Last Boolean value sets 'isuseractivated' parameter
 				}
  		})
-		$headers.bind(config.revealtype, function(){
+		$headers.on(config.revealtype, function(){
 			if (config.revealtype=="mouseenter"){
 				clearTimeout(config.revealdelay)
 				var headerindex=parseInt($(this).attr("headerindex"))
@@ -245,12 +244,12 @@ var ddaccordion={
 				return false //cancel default click behavior
 			}
 		})
-		$headers.bind("mouseleave", function(){
+		$headers.on("mouseleave", function(){
 			clearTimeout(config.revealdelay)
 		})
 		config.oninit($headers.get(), expandedindices)
-		$(window).bind('unload', function(){ //clean up and persist on page unload
-			$headers.unbind()
+		$(window).on('unload', function(){ //clean up and persist on page unload
+			$headers.off()
 			var expandedindices=[]
 			$subcontents.filter(':visible').each(function(index){ //get indices of expanded headers
 				expandedindices.push($(this).attr('contentindex'))

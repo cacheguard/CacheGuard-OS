@@ -55,6 +55,7 @@ usr/bin/su
 usr/bin/sudo
 usr/bin/tac
 usr/bin/tail
+usr/bin/tar
 usr/bin/tbl
 usr/bin/tee
 usr/bin/touch
@@ -62,6 +63,7 @@ usr/bin/tr
 usr/bin/traceroute
 usr/bin/troff
 usr/bin/tty
+usr/bin/uniq
 usr/bin/usleep
 usr/local/bin/avscan
 usr/local/bin/dig

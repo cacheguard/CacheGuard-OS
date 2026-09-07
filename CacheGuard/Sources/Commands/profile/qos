@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       Commands
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -117,8 +116,8 @@ __complete-qos()
 			r)
 			    COMPREPLY=('' rweb router)
 			    ;;
-			ro|rou|rout|route|router)
-			    COMPREPLY=(router)
+			ro|rou|rout|route|routed)
+			    COMPREPLY=(routed)
 			    ;;
 			rw|rwe|rweb)
 			    COMPREPLY=(rweb)
@@ -127,7 +126,7 @@ __complete-qos()
 			    COMPREPLY=(vpnipsec)
 			    ;;
 			'')
-			    COMPREPLY=('' '<RET>' admin all antivirus default diff etc file gateway peer router rweb tweb vpnipsec web)
+			    COMPREPLY=('' '<RET>' admin all antivirus default diff etc file peer routed rweb tweb vpnipsec web)
 			    ;;
 			*)
 			    COMPREPLY=()
@@ -624,17 +623,38 @@ __complete-qos()
 				${COMP_WORDS[3]:0:7} == "insert:" ; then
 
 				case ${COMP_WORDS[5]} in
-				    i|'in'|int|inte|inter|intern|interna|internal)
-					COMPREPLY=(internal)
-					;;
 				    e|ex|ext|exte|exter|extern|externa|external)
 					COMPREPLY=(external)
 					;;
-				    a|au|aux|auxi|auxil|auxili|auxilia|auxiliar|auxiliary)
+				    a)
+					COMPREPLY=('' antivirus auxiliary)
+					;;
+				    an|ant|anti|antiv|antivi|antivir|antiviru|antivirus)
+					COMPREPLY=(antivirus)
+					;;
+				    au|aux|auxi|auxil|auxili|auxilia|auxiliar|auxiliary)
 					COMPREPLY=(auxiliary)
 					;;
+				    w|we|web)
+					COMPREPLY=(web)
+					;;
+				    r|rw|rwe|rweb)
+					COMPREPLY=(rweb)
+					;;
+				    f|'fi'|fil|file)
+					COMPREPLY=(file)
+					;;
+				    p|pe|pee|peer)
+					COMPREPLY=(peer)
+					;;
+				    a|ad|ad|adm|admi|admin)
+					COMPREPLY=(admin)
+					;;
+				    m|mo|mon)
+					COMPREPLY=(mon)
+					;;
 				    '')
-					COMPREPLY=('' internal external auxiliary)
+					COMPREPLY=('' '<RET>' external auxiliary web rweb antivirus file peer mon admin)
 					;;
 				    *)
 					COMPREPLY=()
@@ -664,7 +684,7 @@ __complete-qos()
 				${COMP_WORDS[3]:0:7} == "insert:" ; then
 
 				case ${COMP_WORDS[5]} in
-				    internal|external|auxiliary)
+				    external|auxiliary|web|rweb|antivirus|file|peer|mon|admin)
 					case ${COMP_WORDS[6]} in
 					    t|tc|tcp)
 						COMPREPLY=(tcp)
@@ -711,7 +731,7 @@ __complete-qos()
 				    ${COMP_WORDS[3]:0:7} == "insert:" ; then
 
 				case ${COMP_WORDS[5]} in
-				    internal|external|auxiliary)
+				    external|auxiliary|web|rweb|antivirus|file|peer|mon|admin)
 					case ${COMP_WORDS[6]} in
 					    tcp|udp|any)
 						case ${COMP_WORDS[7]} in
@@ -759,7 +779,7 @@ __complete-qos()
 				${COMP_WORDS[3]:0:7} == "insert:" ; then
 
 				case ${COMP_WORDS[5]} in
-				    internal|external|auxiliary)
+				    external|auxiliary|web|rweb|antivirus|file|peer|mon|admin)
 					case ${COMP_WORDS[6]} in
 					    tcp|udp|any)
 						case ${COMP_WORDS[8]} in
@@ -767,7 +787,7 @@ __complete-qos()
 							COMPREPLY=(any)
 							;;
 						    '')
-							COMPREPLY=('' '<src-port>' any)
+							COMPREPLY=('' '<src-port1>[:src-port2]' any)
 							;;
 						    *)
 							COMPREPLY=()
@@ -807,7 +827,7 @@ __complete-qos()
 				${COMP_WORDS[3]:0:7} == "insert:" ; then
 
 				case ${COMP_WORDS[5]} in
-				    internal|external|auxiliary)
+				    external|auxiliary|web|rweb|antivirus|file|peer|mon|admin)
 					case ${COMP_WORDS[6]} in
 					    tcp|udp|any)
 						COMPREPLY=('' '<ingress-qos>')
@@ -845,7 +865,7 @@ __complete-qos()
 				    ${COMP_WORDS[3]:0:7} == "insert:" ; then
 
 				case ${COMP_WORDS[5]} in
-				    internal|external|auxiliary)
+				    external|auxiliary|web|rweb|antivirus|file|peer|mon|admin)
 					case ${COMP_WORDS[6]} in
 					    tcp|udp|any)
 						case ${COMP_WORDS[10]} in
@@ -893,7 +913,7 @@ __complete-qos()
 				${COMP_WORDS[3]:0:7} == "insert:" ; then
 
 				case ${COMP_WORDS[5]} in
-				    internal|external|auxiliary)
+				    external|auxiliary|web|rweb|antivirus|file|peer|mon|admin)
 					case ${COMP_WORDS[6]} in
 					    tcp|udp|any)
 						case ${COMP_WORDS[11]} in
@@ -901,7 +921,7 @@ __complete-qos()
 							COMPREPLY=(any)
 							;;
 						    '')
-							COMPREPLY=('' '<dst-port>' any)
+							COMPREPLY=('' '<dst-port1>[:dst-port2]' any)
 							;;
 						    *)
 							COMPREPLY=()
@@ -941,7 +961,7 @@ __complete-qos()
 				    ${COMP_WORDS[3]:0:7} == "insert:" ; then
 
 				case ${COMP_WORDS[5]} in
-				    internal|external|auxiliary)
+				    external|auxiliary|web|rweb|antivirus|file|peer|mon|admin)
 					case ${COMP_WORDS[6]} in
 					    tcp|udp|any)
 						COMPREPLY=('' '<egress-qos>')
@@ -979,7 +999,7 @@ __complete-qos()
 				    ${COMP_WORDS[3]:0:7} == "insert:" ; then
 
 				case ${COMP_WORDS[5]} in
-				    internal|external|auxiliary)
+				    external|auxiliary|web|rweb|antivirus|file|peer|mon|admin)
 					case ${COMP_WORDS[6]} in
 					    tcp|udp|any)
 						COMPREPLY=('' '<RET>' '<DSCP>')

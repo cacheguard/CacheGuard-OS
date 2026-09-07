@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -52,7 +51,7 @@ show-guard-rule-form()
     local get_args=${1}
     local page_ref=$(get-arg-value "${get_args}" page)
 
-    local width=${DEFAULT_LIST_FORM_WIDTH}
+    local width=${DEFAULT_LIST_FORM_WIDTH_1}
     local state
 
     itemWidth[0]=ordered
@@ -60,11 +59,11 @@ show-guard-rule-form()
 
     itemTitle[0]=""
     itemTitle[1]="Policy Name"
-    itemTitle[2]="Action"
+    itemTitle[2]="Operation"
     
     itemID[0]="Guard Rule"
     itemID[1]="policy_name"
-    itemID[2]="action"
+    itemID[2]="operation"
 
     blankItemContent[0]=""
     blankItemContent[1]=$(get-policy-options)

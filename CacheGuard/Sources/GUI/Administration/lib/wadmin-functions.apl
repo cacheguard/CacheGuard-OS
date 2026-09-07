@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -38,22 +37,13 @@ source ${APPLIANCE_DIR}/lib/lib-usage
 
 source ${HARD_DIR}/cloud.conf
 
-export GUI_READONLY_STYLE="background:White url( ${IMAGE_DIR}/gray-hatched.png ) center center repeat; cursor:not-allowed;"
-export PERCENT_BAR_WIDTH=180
-export MAIN_TABLE_ID='main-table'
+DASHBOARD_WINDOW_WIDTH=410
 export CANCEL_ICON_TITLE='Show & Cancel Changes'
 export CONF_MODIFIED=no
-export DEFAULT_LIST_FORM_WIDTH=602
-export DEFAULT_LIST_FORM_WIDTH_1=497
-export DEFAULT_LIST_FORM_WIDTH_2=366
-export DEFAULT_LIST_FORM_WIDTH_3=337
-export DEFAULT_LIST_FORM_WIDTH_4=235
-export LIST_FORM_WIDTH_A=1000
-export LIST_FORM_WIDTH_B=900
-export LIST_FORM_WIDTH_C=800
-export LIST_FORM_WIDTH_D=700
+export DEFAULT_LIST_RECORD_NB=20
+export DEFAULT_MULTI_LIST_RECORD_NB=5
 
-declare -a itemWidth itemTitle itemID blankItemContent itemForm checkItem
+declare -a itemTitle itemID blankItemContent itemForm checkItem
 
 get-upper-page()
 {
@@ -73,10 +63,10 @@ show-title-check-usage()
 
     test -n "${message}" || return 0
 
-    echo "<center><div style='margin:0; padding:5px; font-size:110%; font-style:normal; text-align:start; border:1px solid FireBrick;'>"
+    echo "<div class='box-usage'>"
     local href="/${GUI_DIR_NAME}/${register_page}.${GUI_EXT_NAME}"
-    echo "<a style='color:FireBrick;' href='${href}'>${message}</a>"
-    echo "</div></center>"
+    echo "<a href='${href}'>${message}</a>"
+    echo "</div>"
 }
 
 get-arg-value()
@@ -260,7 +250,7 @@ show-title-iconbar-controls()
 		title=${elt}
 		title=${title//_/ }
 		echo "<span id='${control}'>"
-		echo "<a class='iconbar-item' href='javascript:void( 0 );'><img id='${page}-control-image' src='${IMAGE_DIR}/${page}-reflect.png' alt='${title}' title='${title}' /></a>"
+		echo "<a class='title-bar-item' href='#'><img id='${page}-control-image' src='${IMAGE_DIR}/${page}-reflect.png' alt='${title}' title='${title}' /></a>"
 		echo "</span>"
 		;;
 	    *)
@@ -280,14 +270,26 @@ echo-menu-shortcut()
     local page=${2}
     local title=${3}
     local icon=${4}
+
+    local href class
+
     test -n "${icon}" || icon=${page}-reflect.png
 
-    local href
+    case ${display} in
+	no)
+	    class='item-not-displayed'
+	    ;;
+	yes)
+	    class='item-displayed';
+	    ;;
+	*)
+	    ;;
+    esac
 
     test -z "${page}" || href=" href='/${GUI_DIR_NAME}/${page}.${GUI_EXT_NAME}'"
-	
-    echo "<span id='${page}-shortcut' style='display:${display};'>"
-    echo "<span><a id='${page}-href' class='iconbar-item'${href}><span><img id='${page}-image' src='${IMAGE_DIR}/${icon}' alt='${title}' title='${title}' /></span></a></span>"
+
+    echo "<span id='${page}-shortcut' class='${class}'>"
+    echo "<span><a id='${page}-href' class='title-bar-item'${href}><span><img id='${page}-image' src='${IMAGE_DIR}/${icon}' alt='${title}' title='${title}' /></span></a></span>"
     echo "</span>"
 }
 
@@ -326,7 +328,7 @@ show-title-donate()
 	    ;;
     esac
 
-    echo "<span id='donate-iconbar'><a class='iconbar-item' href='${DONATE_URL}' target='_blank'><img src='${IMAGE_DIR}/dollar-reflect.png' alt='Make a Donation' title='Make a Donation' /></a></span>"
+    echo "<span id='donate-iconbar'><a class='title-bar-item' href='${DONATE_URL}' target='_blank'><img src='${IMAGE_DIR}/dollar-reflect.png' alt='Make a Donation' title='Make a Donation' /></a></span>"
 }
 
 get-apply-icon-title()
@@ -349,27 +351,27 @@ show-title-iconbar-custom()
 
 	show-title-donate
 
-	gui-is-in-contextual-role || ! is-subscription-required || echo-menu-shortcut inline register 'Register & Subscribe'
+	gui-is-in-contextual-role || ! is-subscription-required || echo-menu-shortcut yes register 'Register & Subscribe'
 	local display apply_title=$(get-apply-icon-title)
 
-	if quick-conf-modified ; then CONF_MODIFIED=yes ; display=inline ; else display=none ; fi
+	if quick-conf-modified ; then CONF_MODIFIED=yes ; display=yes ; else display=no ; fi
 
 	echo-menu-shortcut ${display} apply "${apply_title}"
 	echo-menu-shortcut ${display} cancel "${CANCEL_ICON_TITLE}"
 
-	if test -f ${TMP_DIR}/${KERBEROS_CREATE_FILENAME} ; then display=inline ; else display=none ; fi
+	if test -f ${TMP_DIR}/${KERBEROS_CREATE_FILENAME} ; then display=yes ; else display=no ; fi
 	echo-menu-shortcut ${display} 'authenticate-kerberos-create' 'Initialize Kerberos'
 
 	local ha_state=$(get-ha-state)
-	if test ${ha_state} == failover ; then display=inline ; else display=none ; fi
+	if test ${ha_state} == failover ; then display=yes ; else display=no ; fi
 	echo-menu-shortcut ${display} 'power' 'Failed Appliance! Activate?'
 
 
-	if check-exchanging ; then display=inline ; else display=none ; fi
+	if check-exchanging ; then display=yes ; else display=no ; fi
 	echo-menu-shortcut ${display} file-exchange 'Files being Exchanged' loading.gif
 
 	check-lock ; index=${?}
-	if test ${index} -ne 0 ; then display=inline ; else display=none ; fi
+	if test ${index} -ne 0 ; then display=yes ; else display=no ; fi
 	if test -n "${JobsPage[${index}]}" ; then
 	    title="${JobsTitle[${index}]}"
 	    page=${JobsPage[${index}]}
@@ -380,24 +382,22 @@ show-title-iconbar-custom()
 	echo-menu-shortcut ${display} job "${title}" job.gif
 
 	index=0
-	echo "<script type='text/javascript'>"
-	gui-is-in-contextual-role || ! is-subscription-required || is-registered-appliance || echo "initBlinkIcon( ${index}, 'register-image', 'register-reflect.png' );" ; ((index++))
-	echo "initBlinkIcon( ${index}, 'apply-image', 'apply-reflect.png' );" ; ((index++))
-	echo "initBlinkIcon( ${index}, 'cancel-image', 'cancel-reflect.png' );" ; ((index++))
-	echo "initBlinkIcon( ${index}, 'authenticate-kerberos-create-image', 'authenticate-kerberos-create-reflect.png' );" ; ((index++))
-	echo "initBlinkIcon( ${index}, 'power-image', 'power-reflect.png' );" ; ((index++))
-	echo "initRefreshShortcuts( );"
-	echo "</script>"
+	gui-is-in-contextual-role || ! is-subscription-required || is-registered-appliance || { echo "<div data-init-blink-icon data-index='${index}' data-image-id='register-image' hidden></div>"; ((index++)); }
+	echo "<div data-init-blink-icon data-index='${index}' data-image-id='apply-image' hidden></div>"; ((index++))
+	echo "<div data-init-blink-icon data-index='${index}' data-image-id='cancel-image' hidden></div>"; ((index++))
+	echo "<div data-init-blink-icon data-index='${index}' data-image-id='authenticate-kerberos-create-image' hidden></div>"; ((index++))
+	echo "<div data-init-blink-icon data-index='${index}' data-image-id='power-image' hidden></div>"; ((index++))
+	echo "<div data-init-refresh-shortcuts hidden></div>"
 
 	show-title-iconbar-controls ${controls}
     else
-	gui-is-in-contextual-role || echo "<span id='register-shortcut' style='display:none;'></span>"
-	echo "<span id='apply-shortcut' style='display:none;'></span>"
-	echo "<span id='cancel-shortcut' style='display:none;'></span>"
-	echo "<span id='authenticate-kerberos-create-shortcut' style='display:none;'></span>"
-	echo "<span id='ha-failover-shortcut' style='display:none;'></span>"
-	echo "<span id='job-lock-shortcut' style='display:none;'></span>"
-	echo "<span id='exchange-shortcut' style='display:none;'></span>"
+	gui-is-in-contextual-role || echo "<span id='register-shortcut' class='item-not-displayed'></span>"
+	echo "<span id='apply-shortcut' class='item-not-displayed'></span>"
+	echo "<span id='cancel-shortcut' class='item-not-displayed'></span>"
+	echo "<span id='authenticate-kerberos-create-shortcut' class='item-not-displayed'></span>"
+	echo "<span id='ha-failover-shortcut' class='item-not-displayed'></span>"
+	echo "<span id='job-lock-shortcut' class='item-not-displayed'></span>"
+	echo "<span id='exchange-shortcut' class='item-not-displayed'></span>"
     fi
 }
 
@@ -415,28 +415,38 @@ show-title-manager-context()
     local selected context_id='manager-context'
     local up_manager_context='manager:manager'
 
-    echo "<div style='float:right; margin:0; padding:0;'>"
-    echo-menu-shortcut inline manager-gateway "Managed Gateways"
-    echo "<select id='${context_id}' class='manager-context' onChange='managerSelectContextCB( \"${context_id}\" );'>"
+    echo-menu-shortcut yes manager-gateway "Managed Gateways"
+    echo "<span class='title-bar-item'><select id='${context_id}' title='Context' data-action='manager-select-context'>"
 
     test "${GUI_CONTEXT}" != ${up_manager_context} || selected=' selected'
-    echo "<option value='${up_manager_context}'${selected}>MANAGER</option>"
 
-    for template in ${templates}
-    do
-	selected=$(get-selected-option template:${template} "${GUI_CONTEXT}")
-	echo "<option value='template:${template}'${selected}>TEMPLATE > ${template}</option>"
-    done
+    echo "<option value='${up_manager_context}'${selected}>Manager</option>"
 
-    while read uuid domain id ip
-    do
-	test -n "${ip}" || continue
-	selected=$(get-selected-option gateway:${id} "${GUI_CONTEXT}")
-	echo "<option value='gateway:${id}'${selected}>GATEWAY  > ${id}</option>"
-    done < ${HOME}/${MANAGER_GATEWAY_INDEX}
+    if test -s ${HOME}/${MANAGER_GATEWAY_INDEX} ; then
+	echo "<optgroup label='Gateways'>"
+	while read uuid domain id ip
+	do
+	    test -n "${ip}" || continue
+	    selected=$(get-selected-option gateway:${id} "${GUI_CONTEXT}")
+	    echo "<option value='gateway:${id}'${selected}>[G]${id}</option>"
+	done < ${HOME}/${MANAGER_GATEWAY_INDEX}
+	echo "</optgroup>"
+    fi
+
+    if test -n "${templates}" ; then
+	echo "<optgroup label='Templates'>"
+	for template in ${templates}
+	do
+	    selected=$(get-selected-option template:${template} "${GUI_CONTEXT}")
+	    echo "<option value='template:${template}'${selected}>[T]${template}</option>"
+	done
+	echo "</optgroup>"
+    fi
+
+    echo "<option value='${up_manager_context}'>Manager</option>"
 
     echo "</select>"
-    echo "</div>"
+    echo "</span>"
 }
 
 gui-set-context()
@@ -497,8 +507,8 @@ show-table-add-controls()
 
     local i width=100
 
-    echo "<button id='${ADD_ID}' ${state} type='submit' class='${ROW_ACTION_CLASS}' onClick='addTableRecords( \"${MAIN_TABLE_ID}\", \"${ftype}\", ${max} );' style='width:130px; height:100%;'>"
-    echo "<span class='button-label'><span id='${ADD_LABEL_ID}'>ADD</span> <img id='${ADD_IMAGE_ID}' src='${IMAGE_DIR}/add.png' align='top' /></span>"
+    echo "<button id='${ADD_ID}' ${state} type='button' class='${ROW_ACTION_CLASS} row-operation' data-action='add-table-records' data-table='${MAIN_TABLE_ID}' data-list-type='${ftype}' data-max-records='${max}'>"
+    echo "<img id='${ADD_IMAGE_ID}' src='${IMAGE_DIR}/add.png' />"
     echo "</button>"
 
     echo "<select id='${ITEM_2ADD_ID}' class='${ROW_ACTION_CLASS}'>"
@@ -509,29 +519,51 @@ show-table-add-controls()
     done
     echo "</select>"
 
-    echo "<button id='${DELETE_ID}' type='submit' class='${ROW_ACTION_CLASS}' onClick='deleteTableSelectedRecords( \"${ftype}\", \"${MAIN_TABLE_ID}\" );' style='width:${width}px; height:100%;' disabled>"
-    echo "<span class='button-label'>DELETE <img src='${IMAGE_DIR}/delete.png' align='top' /></span>"
+    echo "<button id='${DELETE_ID}' type='submit' class='${ROW_ACTION_CLASS} row-operation' data-action='delete-table-records' data-table='${MAIN_TABLE_ID}' data-list-type='${ftype}' disabled>"
+    echo "<img src='${IMAGE_DIR}/delete.png' />"
     echo "</button>"
 }
 
 show-navigation-controls()
 {
     test -n "${1}" || return 1
-    local records_ppage=${1}
+    test -n "${2}" || return 2
+    test -n "${3}" || return 3
+    local records=${1}
+    local records_ppage=${2}
+    local page_2show=${3}
 
+    local i page_nb pages=$[${records} / ${records_ppage}]
+    test $[${records} % ${records_ppage}] -eq 0 || ((pages++))
     local value selected
 
-    echo "<button id='${PREVIOUS_PAGE_ID}' type='button' class='${ROW_ACTION_CLASS}' style='height:100%;' onClick=''>"
-    echo "<span class='button-label'><img src='${IMAGE_DIR}/left.png' align='top' /></span>"
+    echo "<button id='${PREVIOUS_PAGE_ID}' type='button' class='${ROW_ACTION_CLASS} row-operation'  data-action='previous-page'>"
+    echo "<img src='${IMAGE_DIR}/left.png' align='top' />"
     echo "</button>"
 
-    echo "<select id='${SELECTED_PAGE_ID}' class='${ROW_ACTION_CLASS}'></select>"
+    echo "<select id='${SELECTED_PAGE_ID}' class='${ROW_ACTION_CLASS}' data-action='page-selection'>"
 
-    echo "<button id='${NEXT_PAGE_ID}' type='button' class='${ROW_ACTION_CLASS}' style='height:100%;' onClick=''>"
-    echo "<span class='button-label'><img src='${IMAGE_DIR}/right.png' align='top' /></span>"
+    if test ${pages} -eq 0 ; then
+	echo "<option value='${i}'>Page $((i+1))</option>"
+    else
+	for ((i=0; i<pages; i++))
+	do
+	    page_nb=$[${i} / ${records_ppage}]
+
+	    if test ${i} -eq ${page_2show} ; then
+		echo "<option value='${i}' selected>Page $((i+1))</option>"
+	    else
+		echo "<option value='${i}'>Page $((i+1))</option>"
+	    fi
+	done
+    fi
+    echo "</select>"
+
+    echo "<button id='${NEXT_PAGE_ID}' type='button' class='${ROW_ACTION_CLASS} row-operation' data-action='next-page'>"
+    echo "<img src='${IMAGE_DIR}/right.png' align='top' />"
     echo "</button>"
 
-    echo "<select id='${RECORDS_PPAGE_ID}' class='${ROW_ACTION_CLASS}'>"
+    echo "<select id='${RECORDS_PPAGE_ID}' class='${ROW_ACTION_CLASS}' data-action='records-per-page'>"
     for value in 10 20 30 40 50
     do
 	selected=$(get-selected-option ${value} ${records_ppage})
@@ -545,18 +577,19 @@ show-table-form-controls()
     test -n "${1}" || return 1
     test -n "${2}" || return 2
     test -n "${3}" || return 3
-    local max=${1}
-    local records_ppage=${2}
-    local ftype=${3}
-    local add_state=${4}
+    test -n "${4}" || return 4
+    test -n "${5}" || return 5
+    local records=${1}
+    local max=${2}
+    local records_ppage=${3}
+    local page_2show=${4}
+    local ftype=${5}
+    local add_state=${6}
 
-    echo "<div style='float:left; margin:0; height:30px;'>"
-
+    echo "<div class='navigation-controls' data-table-navigation data-pages='${records_ppage}'>"
     show-table-add-controls ${max} ${ftype} ${add_state}
-    show-navigation-controls ${records_ppage}
-
+    show-navigation-controls ${records} ${records_ppage} ${page_2show}
     echo "</div>"
-    echo "<div style='clear:left;'></div>"
 }
 
 colon2space()
@@ -655,9 +688,6 @@ show-log-line()
 
     local line1 message status
 
-    local left=94
-    local right=6
-
     line1="${rest/\[*/}"
     if test "${rest}" == "${line1}" ; then
 	message=${rest}
@@ -672,16 +702,16 @@ show-log-line()
     local dynamic_value=$(get-dynamic-log-value ${tag})
 
     echo "<tr>"
-    echo "<td width='${left}%'>${date} ${message}${dynamic_value}</td>"
+    echo "<td>${date} ${message}${dynamic_value}</td>"
     case ${status} in
 	OK)
-	    echo "<td width='${right}%' align='center'><img src='${IMAGE_DIR}/ok.png' /></td>"
+	    echo "<td align='center'><img src='${IMAGE_DIR}/ok.png' /></td>"
 	    ;;
 	KO)
-	    echo "<td width='${right}%' align='center'><img src='${IMAGE_DIR}/ko.png' title='KO' /></td>"
+	    echo "<td align='center'><img src='${IMAGE_DIR}/ko.png' title='KO' /></td>"
 	    ;;
 	*)
-	    echo "<td width='${right}%' align='center'><img src='${IMAGE_DIR}/rotating_arrow.gif' /></td>"
+	    echo "<td align='center'><img src='${IMAGE_DIR}/rotating_arrow.gif' /></td>"
     esac
     echo "</tr>"
 }
@@ -709,15 +739,12 @@ show-log()
 {
     test -n "${1}" || return 1
     local log=${1}
-    local table_width=${2}
-    
-    test -n "${table_width}" || table_width="100%"
     if test ! -s ${log} ; then
-	echo-content-unavailable ${table_width} "This report is not yet available."
+	echo-unavailable-message "this report is not yet available."
 	return 0
     fi
 
-    echo "<table class='report' width='${table_width}'>"
+    echo "<table class='report'>"
     show-log1 "${@}"
     echo "</table>"
 }
@@ -747,7 +774,7 @@ show-file-protocol1()
 
     local protocol
 
-    test -n "${protocols}" || protocols="sftp tftp ftp"
+    test -n "${protocols}" || protocols="sftp ftp tftp"
 
     for protocol in ${protocols}
     do
@@ -852,100 +879,20 @@ clean-gui-exit()
     return 0
 }
 
-get-form-js-check-function()
-{
-    test -n "${1}" || return 0
-    local check_in=${1}
-    
-    local check_out
-    
-    case "${check_in}" in
-	aalphanum)
-	    check_out="checkAAlphanum"
-	    ;;
-	alphanum)
-	    check_out="checkAlphanum"
-	    ;;
-	digit)
-	    check_out="checkDigit"
-	    ;;
-	percent)
-	    check_out="checkPercent"
-	    ;;
-	weight)
-	    check_out="checkWeight"
-	    ;;
-	ip)
-	    check_out="checkIP"
-	    ;;
-	ikeidentifier)
-	    check="checkIKEIdentifier( \"${itemID[${i}]}\" );"
-	    ;;
-	domainname)
-	    check_out="checkDomainname"
-	    ;;
-	ippx)
-	    check_out="checkIPPx"
-	    ;;
-	mac)
-	    check_out="checkMAC"
-	    ;;
-	ports)
-	    check_out="checkPorts"
-	    ;;
-	port)
-	    check_out="checkPort"
-	    ;;
-	guard)
-	    check_out="checkGuard"
-	    ;;
-	identifier)
-	    check_out="checkIdentifier"
-	    ;;
-	"time")
-	    check_out="checkTime"
-	    ;;
-	ipdomainname)
-	    check_out="checkIPDomainname"
-	    ;;
-	printable)
-	    check_out="checkPrintable"
-	    ;;
-	text)
-	    check_out="checkText"
-	    ;;
-	qos)
-	    check_out="checkQoS"
-	    ;;
-	url)
-	    check_out="checkURL"
-	    ;;
-	*)
-	    ;;
-    esac
-
-    echo ${check_out}
-    return 0
-}
-
-print-select-titles()
+print-select-items()
 {
     test -n "${1}" || return 1
-    test -n "${2}" || return 2
     local edit_columns=${1}
-    local width=${2}
     local i
 
     for ((i=0 ; i<edit_columns ; i++))
     do
-	echo "<td class='controls' align='center'>${editColumnTitle[${i}]}</td>"
+	echo "<th class='table-header' align='center'>${editColumnTitle[${i}]}</th>"
     done
 
-    echo "<td class='controls' width='${width}' align='center' valign='middle'>"
-    echo "<center>"
-    echo "<button type='button' class='${ROW_ACTION_CLASS}' style='float:none; background-image:url( \"${IMAGE_DIR}/select.png\" );' onClick='toggleSelectionsTableRecords( );'></button>"
-    echo "</center>"
-    echo "</td>"
+    echo "<th class='table-header' align='center' valign='middle'>"
+    echo "<center><button type='button' class='${ROW_ACTION_CLASS} select-items' data-action='toggle-selections-table-records'></button></center>"
+    echo "</th>"
 }
 
 print-edit-delete-blank-columns()
@@ -1019,34 +966,7 @@ get-list-form-item()
     declare -p ${in_array_name}
 }
 
-get-list-form-html-with()
-{
-    test -n "${1}" || return 1
-    local index=${1}
-    local br=${2}
-
-    local width_html
-
-    test -n "${br}" || width_html=" width='${itemWidth[${index}]}%'"
-    echo ${width_html}
-}
-
-get-total-table-width()
-{
-    test -n "${1}" || return 1
-    local columns=${1}
-
-    local width=${itemWidth[0]} i=1
-
-    for ((i=1 ; i < columns ; i++))
-    do
-	((width+=${itemWidth[${i}]}))
-    done
-
-    echo ${width}
-}
-
-js-init-table-form()
+data-init-table-form()
 {
     test -n "${1}" || return 1
     test -n "${2}" || return 2
@@ -1054,6 +974,7 @@ js-init-table-form()
     local record_nb=${1}
     local records_ppage=${2}
     local page_2show=${3}
+
     test ${record_nb} -ge 0 || return 11
     test ${records_ppage} -ge 1 || return 13
 
@@ -1061,29 +982,21 @@ js-init-table-form()
     test $[${record_nb} % ${records_ppage}] -eq 0 || ((pages++))
     test ${pages} -gt 0 || pages=1
 
-    echo "<script type='text/javascript'>"
-    echo "var NewRecords = 0;"
-    echo "var DeletedRecords = 0;"
-    echo "var TableRecordCursor = ${record_nb};"
-    echo "var InitialTableRecordCursor = TableRecordCursor;"
-    echo "var OldTable = \$( '#${MAIN_TABLE_ID}' ).clone( true );"
-    echo "initPageSelection( ${pages}, ${page_2show} );"
-    echo "deactivateOKIconBar( );"
-    echo "</script>"
+    echo "<div data-init-table-form data-record-nb='${record_nb}' hidden></div>"
 }
 
 show-shortcuts-menu()
 {
-    local nb=${#shortcutMenuItem[@]} i=0
+    local nb=${#shortcutMenuItem[@]}
+    test ${nb} -ne 0 || return 0
 
+    local i
     echo "<div class='shortcut-bar'>"
     for ((i=0 ; i<nb ; i++))
     do
 	show-shortcut-menu "${shortcutMenuItem[${i}]}" "${shortcutMenuTitle[${i}]}" "${shortcutMenuArgs[${i}]}" "${shortcutMenuIcon[${i}]}"
     done
     echo "</div>"
-
-    echo "<div style='clear:both; margin:0; padding:0; height:0;'></div>"
 }
 
 get-rows-in-record()
@@ -1136,7 +1049,7 @@ get-html-width-percentage()
 
     test -z "${width}" || width=" width='${width}%'"
     echo "${width}"
-}    
+}
 
 show-list-form()
 {
@@ -1149,107 +1062,97 @@ show-list-form()
     local add_state=${6}
 
     local elt range n i=0
-    local j record_id=0 page_nb index=1
+    local j page_nb index=1 record_id=0
     local items item item_value check state
     local edit_delete_columns key_value key_variable
     local comment comment bool_function icon
-    local br width_html separator
+    local br separator
 
-    test -z "${width}" || width=" width='${width}'"
-    local page_2show_ref=$(page-2show-ref 20 "${page_ref}")
+    unset width
+    local page_2show_ref=$(page-2show-ref ${DEFAULT_LIST_RECORD_NB} "${page_ref}")
     local records_ppage=${page_2show_ref/ *}
     local page_2show=${page_2show_ref/* }
-    local record_separator="border-bottom:2px dotted black;"
     local record_rows=$(get-rows-in-record)
     local main_page=$(get-page) page query
     local cells_in_record=${#itemID[@]}
-    local total_width=$(get-total-table-width ${cells_in_record})
+
+    local records=$(record-length-list ${cells_in_record} "${listContent}")
+
     local length_single=${#singleItemID[@]}
     local edit_columns=${#editColumnPage[@]}
     local blank_columns=$[${edit_columns} + 1]
-    local simple_width=24 ordered_width=111
-    local controls_width
 
-    echo "<script type='text/javascript'>"
+    local insert_state values content_values
+
     if test -n "${insert}" ; then
-	echo "RecordInsertState = true;"
+	insert_state='true'
     else
-	echo "RecordInsertState = false;"
+	insert_state='false'
     fi
 
-    echo "var RecordWidth = new Array( );"
-    echo "var RecordID = new Array( );"
-    echo "var RecordInputType = new Array( );"
-    echo "var RecordContent = new Array( );"
-    echo "var RecordContentValues = new Array( );"
-    echo "var RecordSelectCBFunction = new Array( );"
-    echo "var RecordSelectCBArgs = new Array( );"
-    echo "var RecordCheck = new Array( );"
-    echo "var RecordInputState = new Array( );"
-
-    echo "RecordWidth[0] = '${itemWidth[0]}';"
-
-    echo "var RecordBlankColumns = ${blank_columns};"
-
+    cat << EOT
+<script type='application/json' data-list-records-config>
+{
+"insertState": ${insert_state},
+"blankColumns": ${blank_columns},
+"records": [
+EOT
     for ((i=1 ; i < cells_in_record ; i++))
     do
 	test -n "${itemForm[${i}]}" || itemForm[${i}]="input"
-	echo "RecordWidth[${i}] = '${itemWidth[${i}]}';"
-	echo "RecordID[${i}] = '${itemID[${i}]}';"
+
+	echo "${separator}{"
+	echo "\"id\": \"${itemID[${i}]}\","
 
 	if test "${itemForm[${i}]:0:6}" == select ; then
-	    echo "RecordInputType[${i}] = \"${itemForm[${i}]:0:6}\";"
-	    echo "RecordContent[${i}] = new Array( );"
-	    if test -n "${blankItemContentValues[${i}]}" ; then
-		echo "RecordContentValues[${i}] = new Array( );"
-	    else
-		echo "RecordContentValues[${i}] = null;"
-	    fi
-	    
-	    j=0
-	    if test "${itemForm[${i}]}" == select:blank ; then
-		echo "RecordContent[${i}][${j}] = \"\";"
-		((j++))
-	    fi
-	    for elt in ${blankItemContent[${i}]}
-	    do
-		echo "RecordContent[${i}][${j}] = \"${elt}\";"
-		((j++))
-	    done
 
-	    j=0
+	    echo "\"inputType\": \"${itemForm[${i}]:0:6}\","
+
+	    unset values
+	    test "${itemForm[${i}]}" != select:blank -o -z "${blankItemContentValues[${i}]}" || values="\"\""
 	    for elt in ${blankItemContentValues[${i}]}
 	    do
-		echo "RecordContentValues[${i}][${j}] = \"${elt}\";"
-		((j++))
+		values="${values},\"${elt}\""
 	    done
+	    test "${values:0:1}" != ',' || values=${values:1}
+	    echo "\"contentValues\": [${values}],"
 
-	    echo "RecordSelectCBFunction[${i}] = \"${itemFormSelectCBFunction[${i}]}\";"
-	    echo "RecordSelectCBArgs[${i}] = new Array( );"
-	    j=0
-	    for elt in ${itemFormSelectCBArgs[${i}]}
+	    unset values
+	    test "${itemForm[${i}]}" != select:blank || values="\"\""
+	    for elt in ${blankItemContent[${i}]}
 	    do
-		echo "RecordSelectCBArgs[${i}][${j}] = \"${elt}\";"
-		((j++))
+		values="${values},\"${elt}\""
 	    done
+	    test "${values:0:1}" != ',' || values=${values:1}
+	    echo "\"content\": [${values}],"
 
-	    test -z "${itemState[${i}]}" || echo "RecordInputState[${i}] = \"${itemState[${i}]}\";"
+	    echo "\"data\": \"${itemData[${i}]}\","
+
 	else
-	    echo "RecordInputType[${i}] = \"${itemForm[${i}]}\";"
-	    echo "RecordContent[${i}] = \"${blankItemContent[${i}]}\";"
+	    echo "\"inputType\": \"${itemForm[${i}]}\","
+	    echo "\"content\": \"${blankItemContent[${i}]}\","
 	fi
 
-	echo "RecordCheck[${i}] = \"$(get-form-js-check-function ${checkItem[${i}]})\";"
+	test -z "${itemState[${i}]}" || echo "\"inputState\": \"${itemState[${i}]}\","
+	echo "\"check\": \"$(get-form-js-check-function ${checkItem[${i}]})\""
 
 	test "${itemForm[${i}]}" != br || br=yes
+
+	echo '}'
+	separator=','
     done
 
-    echo "</script>"
+    cat << EOT
+]
+}
+</script>
+EOT
 
     echo "<div class='core-form'>"
-    show-table-form-controls ${max_records} ${records_ppage} list ${add_state}
-    test -z "{title}" || echo "<div class='table-title'>${title}</div>"
-    show-form-begin ${cells_in_record}
+    show-shortcuts-menu
+    show-table-form-controls ${records} ${max_records} ${records_ppage} ${page_2show} list ${add_state}
+    test -z "${title}" || echo "<div class='table-title'>${title}</div>"
+    show-form-begin
 
     for ((i=0 ; i < length_single ; i++))
     do
@@ -1260,28 +1163,20 @@ show-list-form()
     echo "<thead>"
     echo "<tr>"
 
-    if test "${itemWidth[0]}" == ordered ; then
-	controls_width=${ordered_width}
-    else
-	controls_width=${simple_width}
-    fi
-
-    echo "<td class='controls' width='${controls_width}'></td>"
+    echo "<th class='table-header'></th>"
     ((n = cells_in_record)) ; ((n--))
 
     for ((i=1 ; i<n ; i++))
     do
 	test "${itemForm[${i}]}" != "br" || break
-	width_html=$(get-html-width-percentage ${itemWidth[${i}]})
-	echo "<td class='table-header'${width_html}>${itemTitle[${i}]}</td>"
+	echo "<th class='table-header'>${itemTitle[${i}]}</th>"
     done
 
     if test "${itemForm[${i}]}" != "br" ; then
-	width_html=$(get-html-width-percentage ${itemWidth[${i}]})
-	echo "<td class='table-header'${width_html}>${itemTitle[${i}]}</td>"
+	echo "<th class='table-header'>${itemTitle[${i}]}</th>"
     fi
 
-    print-select-titles ${edit_columns} ${simple_width}
+    print-select-items ${edit_columns}
 
     echo "</tr>"
     echo "</thead>"
@@ -1327,10 +1222,10 @@ show-list-form()
         case "${itemForm[${index}]}" in
             br)
 		br=yes
-		test $[${index} % ${record_rows} + 1]  -ne ${record_rows} || separator=${record_separator}
+		test $[${index} % ${record_rows} + 1]  -ne ${record_rows} || separator='list-item-separator'
 		edit_delete_columns=$(print-edit-delete-blank-columns ${edit_columns})
 		items="${items}${edit_delete_columns}"
-		items="${items}</tr><tr class='${RECORD_CLASS_PREFIX}${record_id}'><td style='${separator}' bgcolor='${EMPTY_COLOR}'>${blankItemContent[${index}]}</td>"
+		items="${items}</tr><tr class='${RECORD_CLASS_PREFIX}${record_id}'><td class='${separator}' bgcolor='${EMPTY_COLOR}'>${blankItemContent[${index}]}</td>"
 		((index++))
 		;;
 	    textarea|encoded)
@@ -1342,13 +1237,11 @@ show-list-form()
 
 	while test ${index} -lt ${cells_in_record} -a -z "${itemID[${index}]}"
 	do
-	    width_html=$(get-list-form-html-with ${index} ${br})
-	    items="${items}<td style='${separator}' ${width_html} bgcolor='${EMPTY_COLOR}'></td>"
+	    items="${items}<td class='${separator}' bgcolor='${EMPTY_COLOR}'></td>"
 	    ((index++))
 	done
 
 	if test -z "${listContentVisibility[${range}]}" ; then
-	    width_html=$(get-list-form-html-with ${index} ${br})
 	    case "${itemForm[${index}]}" in
 		state)
 		    if test ${elt} == "on" ; then
@@ -1356,13 +1249,13 @@ show-list-form()
 		    else
 			unset state
 		    fi
-		    items="${items}<td style='${separator}' ${width_html}><center><input id='${itemID[${index}]}_${record_id}' name='${itemID[${index}]}_${record_id}' type='checkbox' ${state} onClick='activatePostButtons( );' /></center></td>"
+		    items="${items}<td class='${separator}'><input id='${itemID[${index}]}_${record_id}' name='${itemID[${index}]}_${record_id}' type='checkbox' ${state} data-action='activate-post-buttons' /></td>"
 		    ;;
 		text)
-		    items="${items}<td style='${separator}' ${width_html}><span class='${RECORD_CELL_CLASS}'>${item}</span></td>"
+		    items="${items}<td class='${separator}'><span class='${RECORD_CELL_CLASS}'>${item}</span></td>"
 		    ;;
 		*)
-		    items="${items}<td style='${separator}' ${width_html}><input id='${itemID[${index}]}_${record_id}' name='${itemID[${index}]}_${record_id}' type='hidden' value='${item_value}' /><span class='${RECORD_CELL_CLASS}'>${item}</span></td>"
+		    items="${items}<td class='${separator}'><input id='${itemID[${index}]}_${record_id}' name='${itemID[${index}]}_${record_id}' type='hidden' value='${item_value}' /><span class='${RECORD_CELL_CLASS}'>${item}</span></td>"
 		    ;;
 	    esac
 	fi
@@ -1374,18 +1267,16 @@ show-list-form()
 	fi
 
 	echo "<tr class='${RECORD_CLASS_PREFIX}${record_id}'>"
-	echo "<td style='padding:1px;'><input id='${ENTRY_ID_PREFIX}${record_id}' name='${ENTRY_ID_PREFIX}${record_id}' type='hidden' value='old' />"
-	echo "<center>"
-	echo "<button type='button' class='${ROW_ACTION_CLASS}' style='background-image:url( \"${IMAGE_DIR}/delete.png\" );' onClick='deleteTableRecord( \"list\", \"${RECORD_CLASS_PREFIX}${record_id}\", \"del_${record_id}\");'></button>"
+	echo "<td><input id='${ENTRY_ID_PREFIX}${record_id}' name='${ENTRY_ID_PREFIX}${record_id}' type='hidden' value='old' />"
 
+	echo "<div class='center'>"
+	echo -n "<button type='button' class='${ROW_ACTION_CLASS} delete-item' data-action='delete-table-record' data-list-id='list' data-record-class='${RECORD_CLASS_PREFIX}${record_id}' data-delete-id='del_${record_id}'></button>"
 	if test -n "${insert}" ; then
-	    echo "<button type='button' class='${ROW_ACTION_CLASS} ${INSERT_IMAGE_CLASS}' style='background-image:url( \"${IMAGE_DIR}/insert.png\" );' onClick='insertTableRecords( \"${MAIN_TABLE_ID}\", \"list\", \"${RECORD_CLASS_PREFIX}${record_id}\", ${max_records} );'></button>"
-	    
-	    echo "<button type='button' class='${ROW_ACTION_CLASS}' style='background-image:url( \"${IMAGE_DIR}/up.png\" );' onClick='moveUpTableRecord( \"${MAIN_TABLE_ID}\", \"${RECORD_CLASS_PREFIX}${record_id}\" );'></button>"
-	    
-	    echo "<button type='button' class='${ROW_ACTION_CLASS}' style='background-image:url( \"${IMAGE_DIR}/down.png\" );' onClick='moveDownTableRecord( \"${MAIN_TABLE_ID}\", \"${RECORD_CLASS_PREFIX}${record_id}\" );'></button>"
+	    echo -n "<button type='button' class='${ROW_ACTION_CLASS} ${INSERT_IMAGE_CLASS} insert-item' data-action='insert-table-records' data-table-id='${MAIN_TABLE_ID}' data-list-id='list' data-record-class='${RECORD_CLASS_PREFIX}${record_id}' data-max-records='${max_records}'></button>"	    
+	    echo -n "<button type='button' class='${ROW_ACTION_CLASS} move-item-up' data-action='move-up-table-record' data-table-id='${MAIN_TABLE_ID}' data-record-class='${RECORD_CLASS_PREFIX}${record_id}'></button>"	    
+	    echo -n "<button type='button' class='${ROW_ACTION_CLASS} move-item-down' data-action='move-down-table-record' data-table-id='${MAIN_TABLE_ID}' data-record-class='${RECORD_CLASS_PREFIX}${record_id}'></button>"
 	fi
-	echo "</center>"
+	echo "</div>"
 	echo "</td>"
 	echo "${items}"
 
@@ -1418,11 +1309,14 @@ show-list-form()
 	    test -z "${query}" || query="${query},"
 	    test -n "${key_variable}" || key_variable=key
 
-	    echo "<td style='${separator}' align='center'><a href=/${GUI_DIR_NAME}/${page}.${GUI_EXT_NAME}?${query}${key_variable}:${key_value}><img id='edit_${record_id}' name='edit_${record_id}' src='${IMAGE_DIR}/${icon}.png' alt='' title='${comment}' align='top' /></a></td>"
+	    echo "<td class='${separator}' align='center'><a href=/${GUI_DIR_NAME}/${page}.${GUI_EXT_NAME}?${query}${key_variable}:${key_value}><img id='edit_${record_id}' name='edit_${record_id}' src='${IMAGE_DIR}/${icon}.png' alt='' title='${comment}' align='top' /></a></td>"
 	done
 
-	echo "<td align='center' style='${separator}'><input name='del_${record_id}' id='del_${record_id}' type='checkbox' style='border:0; display:none;' /><input class='${SELECTION_CLASS}' id='sel_${record_id}' type='checkbox' style='border:0;' onClick='updateTableButtons( )' /></td>"
+	echo "<td align='center' class='${separator}'>"
+	echo "<input name='del_${record_id}' id='del_${record_id}' type='checkbox' class='item-not-displayed' />"
+	echo "<input class='${SELECTION_CLASS}' id='sel_${record_id}' type='checkbox' data-action='update-table-buttons' /></td>"
 	echo "</tr>"
+
 	unset items
 	unset br
 	unset separator
@@ -1434,25 +1328,13 @@ show-list-form()
     echo "</tbody>"
     echo "</table>"
 
-    js-init-table-form ${record_id} ${records_ppage} ${page_2show}
+    data-init-table-form ${record_id} ${records_ppage} ${page_2show}
 
-    show-do "disabled" "disabled" "gotoTopWindow( )" "resetTableChanges( '${MAIN_TABLE_ID}' )"
+    show-do-apply disabled 'goto-top-window'
+    show-do-reset disabled 'reset-table-changes' "[\"${MAIN_TABLE_ID}\"]"
+
     show-form-end
     echo "</div>"
-}
-
-show-multi-form-style()
-{
-    test -n "${1}" || return 1
-    local step=${1}
-
-    echo "<style type='text/css'>"
-    echo "table.highlight-multi-form tr:nth-child(${step}n+1) > td {"
-    echo "background:url(${IMAGE_DIR}/titlebg.gif) center center repeat-x;"
-    echo "height:24px;"
-    echo "border:1px solid DarkSlateGray;"
-    echo "}"
-    echo "</style>"
 }
 
 show-multi-form()
@@ -1465,92 +1347,83 @@ show-multi-form()
     local add_state=${5}
 
     local elt i=0 range item items
-    local blank_items blank_item separator check state
-    local j record_id=0 page_nb index=1
+    local blank_items blank_item check state
+    local j page_nb record_id=0 index=1
 
-    test -z "${width}" || width=" width='${width}'"
-    local page_2show_ref=$(page-2show-ref 5 "${page_ref}")
+    unset width
+    local page_2show_ref=$(page-2show-ref ${DEFAULT_MULTI_LIST_RECORD_NB} "${page_ref}")
     local records_ppage=${page_2show_ref/ *}
     local page_2show=${page_2show_ref/* }
     local cells_in_record=${#itemID[@]}
     local step=$[${cells_in_record} - 1]
     local step_1=$[${step} - 1]
 
-    echo "<script type='text/javascript'>"
+    local records=$(record-length-list ${cells_in_record} "${listContent}")
+    local values separator
 
-    echo "var RecordWidth = new Array( );"
-    echo "var RecordID = new Array( );"
-    echo "var RecordTitle = new Array( );"
-    echo "var RecordInputType = new Array( );"
-    echo "var RecordContent = new Array( );"
-    echo "var RecordContentValues = new Array( );"
-    echo "var RecordSelectCBFunction = new Array( );"
-    echo "var RecordSelectCBArgs = new Array( );"
-    echo "var RecordCheck = new Array( );"
-
-    echo "RecordWidth[0] = '${itemWidth[0]}';"
-    echo "RecordWidth[1] = '${itemWidth[1]}';"
-    echo "RecordTitle[0] = '${itemTitle[0]}';"
-
+    cat << EOT
+<script type='application/json' data-multi-form-records-config>
+{
+"title": "${itemTitle[0]}",
+"records": [
+EOT
     for ((i=1 ; i < cells_in_record ; i++))
     do
 	test -n "${itemForm[${i}]}" || itemForm[${i}]=input
-
-	echo "RecordID[${i}] = '${itemID[${i}]}';"
-	echo "RecordTitle[${i}] = '${itemTitle[${i}]}';"
+	echo "${separator}{"
+	echo "\"id\": \"${itemID[${i}]}\","
+	echo "\"title\": \"${itemTitle[${i}]}\","
 
 	if test "${itemForm[${i}]:0:6}" == select ; then
-	    echo "RecordInputType[${i}] = \"${itemForm[${i}]:0:6}\";"
-	    echo "RecordContent[${i}] = new Array( );"
-	    if test -n "${blankItemContentValues[${i}]}" ; then
-		echo "RecordContentValues[${i}] = new Array( );"
-	    else
-		echo "RecordContentValues[${i}] = null;"
-	    fi
-	    
-	    j=0
-	    if test "${itemForm[${i}]}" == select:blank ; then
-		echo "RecordContent[${i}][${j}] = \"\";"
-		((j++))
-	    fi
-	    for elt in ${blankItemContent[${i}]}
-	    do
-		echo "RecordContent[${i}][${j}] = \"${elt}\";"
-		((j++))
-	    done
 
-	    j=0
+	    echo "\"inputType\": \"${itemForm[${i}]:0:6}\","
+
+	    unset values
+	    test "${itemForm[${i}]}" != select:blank -o -z "${blankItemContentValues[${i}]}" || values="\"\""
 	    for elt in ${blankItemContentValues[${i}]}
 	    do
-		echo "RecordContentValues[${i}][${j}] = \"${elt}\";"
-		((j++))
+		values="${values},\"${elt}\""
 	    done
+	    test "${values:0:1}" != ',' || values=${values:1}
+	    echo "\"contentValues\": [${values}],"
 
-	    echo "RecordSelectCBFunction[${i}] = \"${itemFormSelectCBFunction[${i}]}\";"
-	    echo "RecordSelectCBArgs[${i}] = new Array( );"
-	    j=0
-	    for elt in ${itemFormSelectCBArgs[${i}]}
+	    unset values
+	    test "${itemForm[${i}]}" != select:blank || values="\"\""
+	    for elt in ${blankItemContent[${i}]}
 	    do
-		echo "RecordSelectCBArgs[${i}][${j}] = \"${elt}\";"
-		((j++))
+		values="${values},\"${elt}\""
 	    done
+	    test "${values:0:1}" != ',' || values=${values:1}
+	    echo "\"content\": [${values}],"
+
+	    echo "\"data\": \"${itemData[${i}]}\","
+
 	else
-	    echo "RecordInputType[${i}] = \"${itemForm[${i}]}\";"
-	    echo "RecordContent[${i}] = \"${blankItemContent[${i}]}\";"
+	    echo "\"inputType\": \"${itemForm[${i}]}\","
+	    echo "\"content\": \"${blankItemContent[${i}]}\","
 	fi
-	echo "RecordCheck[${i}] = \"$(get-form-js-check-function ${checkItem[${i}]})\";"
+
+	echo "\"check\": \"$(get-form-js-check-function ${checkItem[${i}]})\""
+
+	test "${itemForm[${i}]}" != br || br=yes
+
+	echo '}'
+	separator=','
     done
 
-    echo "</script>"
-
+    cat << EOT
+]
+}
+</script>
+EOT
+    
     echo "<div class='core-form'>"
+    show-shortcuts-menu
+    show-table-form-controls ${records} ${max_records} ${records_ppage} ${page_2show} multi ${add_state}
 
-    show-table-form-controls ${max_records} ${records_ppage} multi ${add_state}
-    show-multi-form-style ${cells_in_record}
+    test -z "${title}" || echo "<div class='table-title'>${title}</div>"
 
-    test -z "{title}" || echo "<div class='table-title'>${title}</div>"
-
-    show-form-begin ${cells_in_record}
+    show-form-begin
 
     echo "<table id='${MAIN_TABLE_ID}' name='${MAIN_TABLE_ID}' class='highlight-multi-form'${width}>"
     echo "<thead></thead>"
@@ -1575,9 +1448,9 @@ show-multi-form()
 
 	item=${item_array[0]}
 	item_value=${item_array[1]}
-	
+
 	if test "${itemForm[${index}]}" == text ; then
-	    items="${items}<tr class='${RECORD_CLASS_PREFIX}${record_id}'><td width='${itemWidth[0]}%'>${itemTitle[${index}]}</td><td width='${itemWidth[1]}%'>${item}</td></tr>"
+	    items="${items}<tr class='${RECORD_CLASS_PREFIX}${record_id}'><td>${itemTitle[${index}]}</td><td>${item}</td></tr>"
 	else
 	    case "${itemForm[${index}]}" in
 		textarea|encoded)
@@ -1588,7 +1461,7 @@ show-multi-form()
 		    ;;
 	    esac
 
-	    items="${items}<tr class='${RECORD_CLASS_PREFIX}${record_id}'><td width='${itemWidth[0]}%'>${itemTitle[${index}]}</td><td width='${itemWidth[1]}%'><input id='${itemID[${index}]}_${record_id}' name='${itemID[${index}]}_${record_id}' type='hidden' value='${item_value}' />${item}</td></tr>"
+	    items="${items}<tr class='${RECORD_CLASS_PREFIX}${record_id}'><td>${itemTitle[${index}]}</td><td><input id='${itemID[${index}]}_${record_id}' name='${itemID[${index}]}_${record_id}' type='hidden' value='${item_value}' />${item}</td></tr>"
 	fi
 
 	if test ${range} -ne ${step_1} ; then
@@ -1597,13 +1470,12 @@ show-multi-form()
 	    continue
 	fi
 
-	echo "<tr class='${RECORD_CLASS_PREFIX}${record_id}'><td width='${itemWidth[0]}%'><i><strong>${itemTitle[0]} ${record_id}</strong></i><input id='${ENTRY_ID_PREFIX}${record_id}' name='${ENTRY_ID_PREFIX}${record_id}' type='hidden' value='old' /></td>"
-	echo "<td width='${itemWidth[1]}%'>"
+	echo "<tr class='${RECORD_CLASS_PREFIX}${record_id} ${RECORD_FIRST_TR_CLASS}'><td><strong>${itemTitle[0]} ${record_id}</strong><input id='${ENTRY_ID_PREFIX}${record_id}' name='${ENTRY_ID_PREFIX}${record_id}' type='hidden' value='old' /></td>"
+	echo "<td>"
 
-	echo "<input name='del_${record_id}' id='del_${record_id}' type='checkbox' style='border:0; display:none;' /><button type='button' class='${ROW_ACTION_CLASS}' style='background-image:url( \"${IMAGE_DIR}/delete.png\" );' align='left' onClick='deleteTableRecord( \"multi\", \"${RECORD_CLASS_PREFIX}${record_id}\", \"del_${record_id}\");'></button>"
-
-	echo "<input class='${SELECTION_CLASS}' style='float:right; margin:5px; padding:0;' id='sel_${record_id}' type='checkbox' align='right' onClick='updateTableButtons( );' />"
-
+	echo "<input name='del_${record_id}' id='del_${record_id}' type='checkbox' class='item-not-displayed' />"
+	echo "<button type='button' class='${ROW_ACTION_CLASS} delete-item' data-action='delete-table-record' data-list-id='multi' data-record-class='${RECORD_CLASS_PREFIX}${record_id}' data-delete-id='del_${record_id}'></button>"
+	echo "<input class='${SELECTION_CLASS}' id='sel_${record_id}' type='checkbox' data-action='update-table-buttons' />"
 	echo "</td></tr>"
 	echo "${items}"
 	unset items
@@ -1615,9 +1487,11 @@ show-multi-form()
     echo "</tbody>"
     echo "</table>"
 
-    js-init-table-form ${record_id} ${records_ppage} ${page_2show}
+    data-init-table-form ${record_id} ${records_ppage} ${page_2show}
 
-    show-do "disabled" "disabled" "gotoTopWindow( )" "resetTableChanges( '${MAIN_TABLE_ID}' )"
+    show-do-apply disabled 'goto-top-window'
+    show-do-reset disabled 'reset-table-changes' "[\"${MAIN_TABLE_ID}\"]"
+
     show-form-end ${cells_in_record}
     echo "</div>"
 }
@@ -1664,7 +1538,7 @@ show-site-select1()
     local in_name=${2}
 
     if test -z "${RWEB_SITE_LIST}" ; then
-	echo -n "<option value='nil'>The rWeb list is empty</option>"
+	echo -n "<option value='nil'>&lt;Empty List&gt;</option>"
 	return 0
     fi
 
@@ -1718,23 +1592,6 @@ show-site-select1()
 	esac
 	((i++))
     done
-}
-
-show-site-select()
-{
-    local protocol=${1}
-    local js_func=${2}
-    local site_name=${3}
-
-    if test -z "${js_func}" ; then
-	echo "<select name='site_name' id='site_name'>"
-    else
-	echo "<select name='site_name' id='site_name' onChange=\"${js_func}\">"
-    fi
-    
-    show-site-select1 "${protocol}" "${site_name}"
-
-    echo "</select>"
 }
 
 get-posted-site-name()
@@ -1797,7 +1654,7 @@ print-denyurl()
     echo "</select>://"
 
     local domainname_uri=$(get-url-domainname-uri ${url})
-    echo "<input name='domainname_uri' id='domainname_uri' style='width:300px;' type='text' size='32' maxlength='$[${MAX_LEN} * 2]' value='${domainname_uri}' />"
+    echo "<input name='domainname_uri' id='domainname_uri' type='text' size='32' maxlength='$[${MAX_LEN} * 2]' value='${domainname_uri}' />"
 }
 
 init-refresh-exchnage-file-progress-bar()
@@ -1811,21 +1668,20 @@ init-refresh-exchnage-file-progress-bar()
     local progression=${3}
     local refresh_page=${4}
 
-    echo "<script type='text/javascript'>"
-    echo "initRefreshExchangeFilePercent( '${filename_id}', '${progress_id}', ${progression}, '/${GUI_DIR_NAME}/${refresh_page}.${GUI_EXT_NAME}' );"
-    echo "</script>"
+    echo "<div data-init-refresh-exchange-file-percent data-filename-id='${filename_id}' data-progress-id='${progress_id}' data-progression='${progression}' data-page='/${GUI_DIR_NAME}/${refresh_page}.${GUI_EXT_NAME}' hidden></div>"
 }
 
 draw-percent-bar()
 {
     test -n "${1}" || return 1
-    test -n "${2}" || return 2
-    local width=${1}
-    local in_percent=${2}
+    local in_percent=${1}
+    local in_attributes=${2}
+    local compact=${3}
 
-    local percent pixels precision=1000
-    local color='FireBrick'
-    local background='SlateGray'
+    test -z "${compact}" || compact=' compact'
+
+    local percent attributes
+    test -z "${in_attributes}" || attributes=" ${in_attributes}"
 
     if test ${in_percent} -le 100 ; then
 	((percent = in_percent))
@@ -1833,20 +1689,26 @@ draw-percent-bar()
 	percent=100
     fi
 
-    ((pixels = width * percent / 100  ))
-
-    local style1="position: relative; line-height:15px; background-color:${background}; border:1px solid black; width:${width}px;"
-    local style2="height:20px; width:${pixels}px; background-color:${color};"
-    local style3="color:White; position:absolute; text-align:center; padding-top:3px; width:${width}px; top:0; left:0"
-
-    local bar1_open="<div style='${style1}'>"
-    local bar11="<div style='${style2}'></div>"
-    local bar12="<div style='${style3}'>${in_percent}%</div>"
-    local bar1_close="</div>"
-
-    local bar="${bar1_open}${bar11}${bar12}${bar1_close}"
+    local percent_txt="<span class='meter-label'>${percent}%</span>"
+    local meter="<meter min='0' max='100'${attributes} value='${percent}'></meter>"
+    local bar="<div class='meter-wrap${compact}'>${meter}${percent_txt}</div>"
 
     echo -n ${bar}
+}
+
+draw-progress-bar()
+{
+    draw-percent-bar ${1}
+}
+
+draw-load-meter-bar()
+{
+    draw-percent-bar ${1} "low='60' high='85' optimum='0'" ${2}
+}
+
+draw-cache-meter-bar()
+{
+    draw-percent-bar ${1} "low='5' high='10' optimum='100'"
 }
 
 get-highlight-license-state()
@@ -1875,7 +1737,7 @@ display-subscription-info()
 {
     local id=$(get-system-id top)
 
-    echo "<span style='float:left; margin:0; margin-left:5px; background-color:transparent;'>"
+    echo "<span>"
     echo "<strong>S/N</strong>: [${id}]"
 
     if test ${OS_FREE_USAGE} == False ; then
@@ -1908,10 +1770,15 @@ display-left-header-info()
     display-subscription-info
 }
 
+get-appliance-time()
+{
+    date +"%H:%M:%S" 2> /dev/null
+}
+
 display-appliance-time-row()
 {
     local align=${1}
-    local refresh_time=$(date +"%H:%M:%S" 2> /dev/null)
+    local refresh_time=$(get-appliance-time)
     local align_html
     test -z "${align}" || align_html=" align=${align}"
 
@@ -1923,6 +1790,23 @@ display-appliance-time-row()
     echo "<div id='time'>${refresh_time}</div>"
     echo "</td>"
     echo "</tr>"
+}
+
+display-appliance-time-table()
+{
+    local compact=${1}
+    test -z "${compact}" || compact=' compact'
+
+    echo "<table class='highlight-form${compact}'>"
+    display-appliance-time-row right
+    echo "</table>"
+}
+
+display-appliance-time()
+{
+    local refresh_time=$(get-appliance-time)
+
+    echo "<div>Appliance Refresh Time: ${refresh_time}</div>"
 }
 
 show-file-operation()
@@ -2071,7 +1955,7 @@ show-public-ssh-key()
     local pre_id='clipboard'
 
     echo "<table class='report'><tr><td>$(show-pre-clipboard-copy ${pre_id})"
-    echo "<pre id='${pre_id}' style='width:700px;'>"
+    echo "<pre id='${pre_id}' class='ssh-key'>"
     cat ${file} 2> /dev/null
     echo '</pre></td></tr></table>'
 }
@@ -2094,4 +1978,48 @@ remove-eol-from-ssh-public-key()
     rm -f ${ADMIN_TMP_DIR}/ssh_key.${$}
 
     echo ${ssh_key}
+}
+
+echo-add-remove-selected-row()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    local select_id1=${1}
+    local select_id2=${2}
+    local item_name=${3}
+
+    local add_id="add-to-${select2_id}"
+    local del_id="del-from-${select2_id}"
+
+    echo "<td>"
+    echo "<center><a href='#' id='${add_id}'><img src='/image/right-arrow.png' alt='Add Selected Filters' title='Add Selected ${item_name}' align='top' /></a></center>"
+
+    echo "<center><a href='#' id='${del_id}'><img src='/image/left-arrow.png' alt='Remove Selected Filters' title='Remove Selected ${item_name}' align='top' /></a></center>"
+    cat <<EOT
+<div
+data-init-bi-select-list
+data-select-id1="${select_id1}"
+data-select-id2="${select_id2}"
+data-add-to-selected-id="${add_id}"
+data-del-from-selected-id="${del_id}"
+hidden>
+</div>
+EOT
+    echo "</td>"
+}
+
+refresh-buttons()
+{
+    local arg_type=${1}
+    local arg_value=${2}
+
+    local page=$(get-page "${@}")
+    local title='Toggle Auto Refresh'
+
+    echo "<button id='refresh' type='submit' class='form-button' data-action='update-report' data-update-page='update-${page}' data-arg-type='${arg_type}' data-arg-value='${arg_value}'>"
+    echo "REFRESH <img src='${IMAGE_DIR}/refresh.png' align='top' /></button>"
+
+    echo "<span class='contextual-help'><input class='form-refresh-checkbox' id='${AUOTO_UPDATE_ID}' type='checkbox' checked /><label for='${AUOTO_UPDATE_ID}'></label><span class='contextual-help-text'>${title}</span></span>"
+
+    echo "<div data-init-update-report='update-${page}' data-force='1' data-arg-type='${arg_type}' data-arg-value='${arg_value}' hidden></div>"
 }

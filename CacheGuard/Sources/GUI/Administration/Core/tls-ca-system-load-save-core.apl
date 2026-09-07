@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -41,11 +40,10 @@ show-ca-component()
     local component_id=${1}
     local content_id=${2}
 
-    echo "<div style='clear:left;'></div><br />"
     echo "<div class='table-title'>The TLS object</div>"
     echo "<div id='${content_id}'></div>"
 
-    call-js-function "printTLS( '/${GUI_DIR_NAME}/tls-print.${GUI_EXT_NAME}?ca:system', '${component_id}', '${content_id}' );"
+    echo "<div data-init-print-tls data-page='/${GUI_DIR_NAME}/tls-print.${GUI_EXT_NAME}?ca:system' data-component-id='${component_id}' data-content-id='${content_id}' hidden></div>"
 }
 
 show-ca-system-manage-form()
@@ -63,17 +61,23 @@ show-ca-system-manage-form()
     test -n "${file_servers}" || state=disabled
 
     if test ${APL_ROLE} == gateway ; then
-	local web_ip=$(get-web-ip cur)
 	itemTitle[${i}]="CA Certificate Link"
 	itemID[${i}]="ca_links"
-	blankItemContent[${i}]="<a href='http://${web_ip}' target='_blank'>${web_ip}</a> (available from the internal interface)"
+	blankItemContent[${i}]="<a href='http://${SERVER_NAME}' target='_blank'>${SERVER_NAME}</a> (available from the internal interface)"
 	itemForm[${i}]="text"
 	((i++))
-	n=${i}
     fi
 
+    itemTitle[${i}]="Generation Link"
+    itemID[${i}]="generation_link"
+    blankItemContent[${i}]="<a href='/${GUI_DIR_NAME}/tls-ca-system-generate.${GUI_EXT_NAME}'><img  src='${IMAGE_DIR}/tls-ca-system-generate.png' title='Regenerate the System CA Certificate' /> ${tls}</a>"
+    itemForm[${i}]="text"
+    ((i++))
+
+    n=${i}
+
     itemTitle[${i}]="CA Component"
-    itemFormSelectCB[${i}]="printTLS( '/${GUI_DIR_NAME}/tls-print.${GUI_EXT_NAME}?ca:system', '${component_id}', '${content_id}' );"
+    itemData[${i}]="data-action='print-tls' data-url='/${GUI_DIR_NAME}/tls-print.${GUI_EXT_NAME}?ca:system' data-component-id='${component_id}' data-content-id='${content_id}'"
     ((i++))
 
     itemTitle[${i}]="Operation" ; ((i++))
@@ -94,7 +98,7 @@ show-ca-system-manage-form()
     blankItemContent[${i}]="$(show-file-protocol1 ${VALUES[2]:1})" ; ((i++))
     blankItemContent[${i}]=${file_servers} ; ((i++))
 
-    blankItemContent[${i}]="type='text' size='48' maxlength='128' value='${VALUES[4]}'" ; ((i++))
+    blankItemContent[${i}]="type='text' size='32' maxlength='128' value='${VALUES[4]}'" ; ((i++))
     checkItem[${i}]=printable
 
     i=${n}
@@ -109,7 +113,6 @@ show-ca-system-manage-form()
     shortcutMenuTitle[1]="Accounts"
 
     show-title "System CA Management" "${state}" "access admin password sslmediate tls"
-    show-shortcuts-menu
     show-form "${width}" "${state}" "show-ca-component ${component_id} ${content_id}"
 }
 

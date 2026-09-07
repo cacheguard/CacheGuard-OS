@@ -6,6 +6,7 @@
 3 3 Generate_Server_TLS			tls-server-generate	[SECURITY]/[SSL Certificates & PKI]/[Server Certificates]
 1 1 Load_Balancing			rweb-balancer		[GENERAL]/[Cloaked Reverse Websites]/[Website Settings]
 3 3 Load_SSH_Keys			admin-ssh-key-load	[GENERAL]/[Administration Settings]/[Administrator SSH Keys]
+3 3 Set_SSH_Keys			admin-ssh-key-set	[GENERAL]/[Administration Settings]/[Administrator SSH Keys]
 1 1 Load_Third_CA			tls-ca-third-load	[SECURITY]/[SSL Certificates & PKI]/[Other CA]
 3 3 Manage_Server_TLS			tls-server-manage	[SECURITY]/[SSL Certificates & PKI]/[Server Certificates]
 1 1 Manage_Client_TLS			tls-client-manage	[SECURITY]/[SSL Certificates & PKI]/[Client Certificates]

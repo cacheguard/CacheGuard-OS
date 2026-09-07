@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -41,12 +40,12 @@ set-dhcp-peer()
 	  if test "${VALUES[${entry_pos}]}" == anew -a \
 	      -n "${VALUES[${role_pos}]}" -a \
 	      -n "${VALUES[${ip_pos}]}" ; then
-	      echo "dhcp peer add '${VALUES[${role_pos}]}' '${VALUES[${ip_pos}]}'" >> ${transaction}
+	      echo "dhcp peer add ${VALUES[${role_pos}]} ${VALUES[${ip_pos}]}" >> ${transaction}
 	  fi
 	  pos=$[${pos} + 3]
       else
 	  if test -n "${VALUES[${role_pos}]}" -a -n "${VALUES[${ip_pos}]}" ; then
-	      echo "dhcp peer del '${VALUES[${role_pos}]}' '${VALUES[${ip_pos}]}'" >> ${transaction}
+	      echo "dhcp peer del ${VALUES[${role_pos}]} ${VALUES[${ip_pos}]}" >> ${transaction}
 	  fi
 	  pos=$[${pos} + 4]
       fi

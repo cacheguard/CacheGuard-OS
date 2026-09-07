@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       Scripts
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -65,7 +64,7 @@ apl-av-create()
     local av_extended_mode extended log_tag
 
     reset-av-create-log
-    av-create-log "Beginig the Antivirus signatures DB creation"
+    av-create-log "Beginig the manual SDB creation"
     av-create-log-ret ${?}
 
     if test ${APL_ROLE} == 'gateway' ; then
@@ -80,13 +79,13 @@ apl-av-create()
 	local clamd_state=${?}
 
 	if test ${clamd_state} -eq 0 ; then
-	    av-create-log "Stopping the Antivirus service"
+	    av-create-log "Stopping the AV service"
 	    /etc/rc.d/init.d/clamd stop > /dev/null 2>&1
 	    av-create-log-ret ${?}
 	fi
 
 	if test ${freshclam_state} -eq 0 ; then
-	    av-create-log "Stopping the Antivirus Updater service"
+	    av-create-log "Stopping the AV Updater service"
 	    /etc/rc.d/init.d/freshclam stop > /dev/null 2>&1
 	    av-create-log-ret ${?}
 	fi
@@ -108,7 +107,7 @@ apl-av-create()
     reset-av-extended-db-sz
 
     if test ${APL_ROLE} == 'gateway' ; then
-	av-create-log "Regular AV signatures DB creation" ${LOG_TAG_AV_REGULAR}
+	av-create-log "Regular SDB creation" ${LOG_TAG_AV_REGULAR}
 	av-create-log-ret ${?}
     fi
 
@@ -128,9 +127,9 @@ apl-av-create()
 	    *)
 		;;
 	esac
-	av-create-log "${operation_title} AV extended signatures" ${LOG_TAG_AV_EXTENDED_CREATE}
+	av-create-log "${operation_title} extended signatures" ${LOG_TAG_AV_EXTENDED_CREATE}
 	av-create-log-ret 0
-	av-create-log "Installing AV extended signatures" ${LOG_TAG_AV_EXTENDED_UPDATE}
+	av-create-log "Installing extended signatures" ${LOG_TAG_AV_EXTENDED_UPDATE}
 	av-create-log-ret 0
     fi
 
@@ -159,19 +158,19 @@ apl-av-create()
 	ret1=0
     fi
 
-    av-create-log "Terminating all signatures DB creations"
+    av-create-log "Terminating all SDB creations"
     ((ret = ret1 + ret2))
     av-create-log-ret ${ret}
 
     if test ${APL_ROLE} == 'gateway' ; then
 	if test ${freshclam_state} -eq 0 ; then
-	    av-create-log "Starting the Antivirus Updater service"
+	    av-create-log "Starting the AV Updater service"
 	    /etc/rc.d/init.d/freshclam start > /dev/null 2>&1
 	    av-create-log-ret ${?}
 	fi
 
 	if test ${clamd_state} -eq 0 ; then
-	    av-create-log "Starting the Antivirus service"
+	    av-create-log "Starting the AV service"
 	    /etc/rc.d/init.d/clamd start > /dev/null 2>&1
 	    av-create-log-ret ${?}
 	fi
@@ -181,7 +180,7 @@ apl-av-create()
 	av-create-log-ret ${?}
     fi
     
-    av-create-log "Ending Antivirus signatures DB creation"
+    av-create-log "Ending the SDB creation"
     av-create-log-ret ${?}
 }
 
@@ -193,7 +192,7 @@ clean-exit()
     wait 2> /dev/null
     manage-appliance-unlock
     av-create-log-abort
-    av-create-log "Aborting the Antivirus Create operation"
+    av-create-log "Aborting the create operation"
     av-create-log-ret ${?}
 
     exit ${code}

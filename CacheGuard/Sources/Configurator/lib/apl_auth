@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       Configurator
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -56,14 +55,17 @@ test-kerberos-create-required()
 {
     test ${AUTHENTICATE_MODE} == True || return 111
     test ${AUTHENTICATE_KERBEROS} == True || return 113
+
     test ${AUTHENTICATE_MODE} == ${CURRENT_AUTHENTICATE_MODE} || return 0
+    test ${AUTHENTICATE_AD_MODE} == ${CURRENT_AUTHENTICATE_AD_MODE} || return 0
     test ${AUTHENTICATE_KERBEROS} == ${CURRENT_AUTHENTICATE_KERBEROS} || return 0
 
-    test ${KERBEROS_ENCRYPT_TYPE} == ${CURRENT_KERBEROS_ENCRYPT_TYPE} || return 0
-    test ${KERBEROS_HA_SHARED_PASSWORD} == ${CURRENT_KERBEROS_HA_SHARED_PASSWORD} || return 0
     test "${KERBEROS_SERVER_LIST}" == "${CURRENT_KERBEROS_SERVER_LIST}" || return 0
 
-    test ${HA_MODE} == ${CURRENT_HA_MODE} || return 0
+    if test ${AUTHENTICATE_AD_MODE} == True ; then
+	test "${AD_WEBGATEWAY_LOGIN}" == "${CURRENT_AD_WEBGATEWAY_LOGIN}" || return 0
+	test "${AD_WEBGATEWAY_PASSWORD}" == "${CURRENT_AD_WEBGATEWAY_PASSWORD}" || return 0
+    fi
 
     if test ${WEB_MODE} == True ; then
 	test ${WEB_MODE} == ${CURRENT_WEB_MODE} || return 0
@@ -160,7 +162,7 @@ gen-httpd-auth-kerberos-general()
 gen-httpd-rweb-auth-ldap-conf()
 {
     local elt i=0
-    local proto name ip port
+    local proto name port
 
     echo "AuthType Basic"
     echo "AuthName \"Please authenticate yourself\""
@@ -171,7 +173,7 @@ gen-httpd-rweb-auth-ldap-conf()
     echo "AuthLDAPGroupAttributeIsDN On"
     echo "AuthLDAPBindAuthoritative Off"
 
-    if test "${LDAP_BIND_MODE}" == True -a -s ${LDAP_DIR}/${LDAP_PASSWD} ; then
+    if test "${LDAP_BIND_MODE}" == True -a -s ${LDAP_DIR}/${LDAP_PASSWD} -a -n "${LDAP_BIND_PASSWORD}" ; then
 	echo "AuthLDAPBindDN \"${LDAP_BIND_DN}\""
 	echo "AuthLDAPBindPassword \"${LDAP_BIND_PASSWORD}\""
     fi
@@ -180,7 +182,7 @@ gen-httpd-rweb-auth-ldap-conf()
 
     for elt in ${LDAP_SERVER_LIST}
     do
-	range=$[${i} % 4]
+	range=$[${i} % 3]
 	case ${range} in
 	    0)
 		proto=${elt}
@@ -189,14 +191,11 @@ gen-httpd-rweb-auth-ldap-conf()
 		name=${elt}
 		;;
 	    2)
-		ip=${elt}
-		;;
-	    3)
 		port=${elt}
 
 		case ${proto} in
 		    ldap)
-			echo "AuthLDAPUrl \"ldap://${ip}:${port}/${uri}\""
+			echo "AuthLDAPUrl \"ldap://${name}:${port}/${uri}\""
 			;;
 		    ldaps)
 			echo "AuthLDAPUrl \"ldaps://${name}:${port}/${uri}\" SSL"
@@ -237,8 +236,8 @@ gen-httpd-rweb-auth-kerberos-conf()
     echo "GssapiConnectionBound Off"
     echo "GssapiSignalPersistentAuth Off"
     echo "GssapiUseSessions Off"
-    test ${HA_MODE} == False || echo "GssapiSessionKey key:${KERBEROS_HA_SHARED_PASSWORD}"
-    echo "GssapiCredStore keytab:${KERBEROS_KEYTAB_FILE_PROXY2}"
+    test -z "${AD_WEBGATEWAY_PASSWORD}" || echo "GssapiSessionKey key:${AD_WEBGATEWAY_PASSWORD}"
+    echo "GssapiCredStore keytab:${KERBEROS_KEYTAB_FILE_RPROXY}"
     echo "GssapiDelegCcacheUnique Off"
     echo "GssapiBasicAuth On"
     echo "GssapiNegotiateOnce Off"
@@ -294,7 +293,7 @@ gen-auth-ldap-squid()
 
 gen-squid-auth-kerberos-service()
 {
-    echo -n "auth_param negotiate program /libexec/negotiate_kerberos_auth -k ${KERBEROS_KEYTAB_FILE_PROXY1} -r -s "
+    echo -n "auth_param negotiate program /libexec/negotiate_kerberos_auth -k ${KERBEROS_KEYTAB_FILE_FPROXY} -r -s "
 }
 
 gen-squid-auth-kerberos-service-named()
@@ -312,7 +311,7 @@ gen-squid-auth-kerberos-service-not-named()
 gen-squid-auth-kerberos()
 {
     echo "auth_param negotiate realm Please authenticate yourself"
-    if test ${PROXY2_MODE} == True ; then
+    if test ${RWEB_MODE} == True ; then
 	gen-squid-auth-kerberos-service-named
     else
 	if test ${RWEB_MODE} == True -a -n "${KERBEROS_RWEB_LIST}" ; then
@@ -555,13 +554,13 @@ gen-kerberos-conf()
 
     case ${location} in
 	global)
-	    keytab_file=${PROXY_DIR}${KERBEROS_KEYTAB_FILE_PROXY1}
+	    keytab_file=${PROXY_DIR}${KERBEROS_KEYTAB_FILE_FPROXY}
 	    ;;
 	proxy)
-	    keytab_file=${KERBEROS_KEYTAB_FILE_PROXY1}
+	    keytab_file=${KERBEROS_KEYTAB_FILE_FPROXY}
 	    ;;
 	web)
-	    keytab_file=${KERBEROS_KEYTAB_FILE_PROXY2}
+	    keytab_file=${KERBEROS_KEYTAB_FILE_RPROXY}
 	    ;;
 	*)
 	    return 11
@@ -575,21 +574,6 @@ gen-kerberos-conf()
     echo "rdns = no"
     echo "ticket_lifetime = 24h"
     echo "default_keytab_name = ${keytab_file}"
-
-    case ${KERBEROS_ENCRYPT_TYPE} in
-	des)
-	    echo "default_tgs_enctypes = rc4-hmac des-cbc-crc des-cbc-md5"
-	    echo "default_tkt_enctypes = rc4-hmac des-cbc-crc des-cbc-md5"
-	    echo "permitted_enctypes = rc4-hmac des-cbc-crc des-cbc-md5"
-	    ;;
-	aes)
-	    echo "default_tgs_enctypes = aes256-cts-hmac-sha1-96 rc4-hmac des-cbc-crc des-cbc-md5"
-	    echo "default_tkt_enctypes = aes256-cts-hmac-sha1-96 rc4-hmac des-cbc-crc des-cbc-md5"
-	    echo "permitted_enctypes = aes256-cts-hmac-sha1-96 rc4-hmac des-cbc-crc des-cbc-md5"
-	    ;;
-	*)
-	    ;;
-    esac
 
     echo
 

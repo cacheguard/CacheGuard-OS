@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       Build
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -99,7 +98,7 @@ main()
 	cd ${cur_dir}/${module}
 	test -f install.bash || continue
 	echo "ooo Installing the module \"${module}\"..."
-	./install.bash ${mode}
+	./install.bash ${mode} || return ${?}
     done
 
     cd ${cur_dir}

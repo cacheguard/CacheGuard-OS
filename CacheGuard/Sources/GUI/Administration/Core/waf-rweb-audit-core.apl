@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -59,44 +58,18 @@ audit-checked()
     test -n "${1}" || return 1
     local name=${1}
 
-    ! member "${WAF_RWEB_AUDIT_LIST}" ${name} || echo -n checked
+    ! member "${WAF_RWEB_AUDIT_LIST}" ${name} || echo -n ' checked'
 }
 
 show-waf-rweb-audit-form()
 {
     local page_ref=${1}
 
-    local width=${DEFAULT_LIST_FORM_WIDTH_2}
     local state
-
-    local left=80
-    local right=20
-    local length=1
 
     local page_2show_ref=$(page-2show-ref 20 "${page_ref}")
     local records_ppage=${page_2show_ref/ *}
     local page_2show=${page_2show_ref/* }
-
-    echo "<div class='core-form'>"
-
-    echo "<span class='shortcut-menu-item' style='display:inline;'><a href='rweb-site.${GUI_EXT_NAME}'>Add rWeb</a></span>"
-    echo "<div style='clear:left;'></div>"
-
-    echo "<div style='float:left; margin:0; height:24px;'>"
-    show-navigation-controls ${records_ppage}
-    echo "</div>"
-    echo "<div style='clear:left; margin:0;'></div>"
-    echo "<br />"
-
-    show-form-begin ${length}
-
-    echo "<table id='${MAIN_TABLE_ID}' name='${MAIN_TABLE_ID}' class='highlight-list' width='${width}'>"
-    echo "<thead>"
-    echo "<tr>"
-    echo "<td class='table-header' width=${left}%>Site Name</td>"
-    echo "<td class='table-header' width=${right}% align='center'>Audit?</td>"
-    echo "</tr>"
-    echo "</thead>"
 
     local name page_nb nb=0
     local nb_sites=$(get-site-name-list)
@@ -105,7 +78,24 @@ show-waf-rweb-audit-form()
 
     test ${site_nb} -gt 0 || unset sites
 
+    echo "<div class='core-form'>"
+    show-shortcuts-menu
+    echo "<div class='navigation-controls'>"
+    show-navigation-controls ${site_nb} ${records_ppage} ${page_2show}
+    echo "</div>"
+    show-form-begin
+
+    echo "<table id='${MAIN_TABLE_ID}' name='${MAIN_TABLE_ID}' class='highlight-list'>"
+    echo "<thead>"
+    echo "<tr>"
+    echo "<th class='table-header'>Range</th>"
+    echo "<th class='table-header'>Site Name</th>"
+    echo "<th class='table-header' align='center' valign='middle'>Audit Mode</th>"
+    echo "</tr>"
+    echo "</thead>"
+
     echo "<tbody>"
+
     for name in ${sites}
     do
 	page_nb=$[${nb} / ${records_ppage}]
@@ -116,16 +106,20 @@ show-waf-rweb-audit-form()
 	    continue
 	fi
 	echo "<tr>"
+	echo "<td>Website ${nb}</td>"
 	echo "<td><input type='hidden' name='site_name' value='${name}'><label for='site_${nb}'>${name}</label></td>"
-	echo "<td ><center><input id='site_${nb}' name='audit' type='checkbox' onClick='activatePostButtons( );' $(audit-checked ${name}) /></center></td>"
+	echo "<td><input id='site_${nb}' name='audit' type='checkbox' data-action='activate-post-buttons'$(audit-checked ${name}) /></td>"
 	echo "</tr>"
 	((nb++))
     done
     echo "</tbody>"
-    echo '</table>'
+    echo "</table>"
 
-    js-init-table-form ${site_nb} ${records_ppage} ${page_2show}
-    show-do "disabled" "disabled" "" "deactivatePostButtons( )"
+    data-init-table-form ${site_nb} ${records_ppage} ${page_2show}
+
+    show-do-apply disabled
+    show-do-reset disabled 'deactivate-post-buttons'
+
     show-form-end
 
     echo "</div>"
@@ -137,6 +131,9 @@ show-waf-rweb-audit()
 {
     local get_args=${1}
     local page_ref=$(get-arg-value "${get_args}" page)
+
+    shortcutMenuItem[0]="rweb-site"
+    shortcutMenuTitle[0]="Add rWeb"
 
     show-title "Audit rWeb Traffic" "${state}" "rweb waf"
     show-waf-rweb-audit-form "${page_ref}"

@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       VPN Subscription
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -94,12 +93,12 @@ gen-connection-instructions()
     local auto_web_proxy_message manual_web_proxy_message
     local ipv6_default_route_message ssl_mediation_description
 
-    auto_web_proxy_message="Once connected to the VPN, the Web proxy will be automatically used. For your information the \"${VPNSUBSCR_SERVICE_NAME}\" proxy address is \"${proxy_address}\"."
+    auto_web_proxy_message="Once connected to the VPN, the web proxy will be automatically used. For your information the \"${VPNSUBSCR_SERVICE_NAME}\" proxy address is \"${proxy_address}\"."
 
-    manual_web_proxy_message="Once connected to the VPN, the Web proxy will be available at the \"${proxy_address}\" address. It is highly recommended to explicitly configure your device (including all your Web browsers and other applications) to always use the <strong>${VPNSUBSCR_SERVICE_NAME}</strong> proxy."
+    manual_web_proxy_message="Once connected to the VPN, the web proxy will be available at the \"${proxy_address}\" address. It is highly recommended to explicitly configure your device (including all your web browsers and other applications) to always use the <strong>${VPNSUBSCR_SERVICE_NAME}</strong> proxy."
 
     test ${CURRENT_SSLMEDIATE_MODE} == False || \
-	ssl_mediation_description="The Web proxy uses a technology called \"SSL mediation\". SSL mediation allows you to optimize and/or secure network traffic even in an encrypted format. This technology requires that you trust the \"${VPNSUBSCR_SERVICE_NAME}\" CA certificate."
+	ssl_mediation_description="The web proxy uses a technology called \"SSL mediation\". SSL mediation allows you to optimize and/or secure network traffic even in an encrypted format. This technology requires that you trust the \"${VPNSUBSCR_SERVICE_NAME}\" CA certificate."
 
     case ${device} in
 	android|apple)
@@ -116,7 +115,7 @@ gen-connection-instructions()
     cat << EOT
 Dear ${name},
 ${x2newline}
-Attached you will find a ${profile_type} file that allows you to connect your ${device^} device to the "${VPNSUBSCR_SERVICE_NAME}" and Web proxy.
+Attached you will find a ${profile_type} file that allows you to connect your ${device^} device to the "${VPNSUBSCR_SERVICE_NAME}" and web proxy.
 ${x2newline}
 Important notice: your ${profile_type} file embeds a password protected private key that you should not share with third parties. You should receive its password separately in a secure way. Your private key identifier is '${client_vpn_id}' and allows you to have one and only one VPN connection at the same time.
 ${x2newline}
@@ -203,7 +202,7 @@ ${bullet}${ipv6_default_route_message}
 EOT
 	    if test ${CURRENT_SSLMEDIATE_MODE} == True ; then
 		cat << EOT
-${ssl_mediation_description} Please note that the "${VPNSUBSCR_SERVICE_NAME}" CA certificate is installed as a trusted CA certificate for Web browsing by the PowerShell setup script.
+${ssl_mediation_description} Note that the "${VPNSUBSCR_SERVICE_NAME}" CA certificate is installed as a trusted CA certificate for web browsing by the PowerShell setup script.
 EOT
 	    fi	     
 	    ;;
@@ -536,7 +535,7 @@ handle-reset-subscribers()
 		${service} -lt ${VPNSUBSCR_SUBSCRIBER_STATE_RESET}; then
 
 	    name=$(get-name "${first}" "${last}")
-            message="Dear ${name}<p>Please note that due to unwanted circumstances beyond our control, the <strong>${previous_service_name}</strong> service will stop working shortly. We will endeavour to replace it by a new service named <strong>${service_name}</strong> as soon as possible. You will receive your credentials to access the new replacement service in a few moment.<p>Best Regards,<br />${ADMINISTRATOR_CONTACT_NAME}"
+            message="Dear ${name}<p>Note that due to unwanted circumstances beyond our control, the <strong>${previous_service_name}</strong> service will stop working shortly. We will endeavour to replace it by a new service named <strong>${service_name}</strong> as soon as possible. You will receive your credentials to access the new replacement service in a few moment.<p>Best Regards,<br />${ADMINISTRATOR_CONTACT_NAME}"
 
 	    su - ${ADMIN_NAME} -c "TERM=${NOPROGRESS_TERM} CLI_SILENT=yes email send ${email} '${name}' '${subject}' '${message}'" 2> ${error_file}
 	    error=$(get-error-text ${error_file})

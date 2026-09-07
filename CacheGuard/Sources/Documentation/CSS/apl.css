@@ -1,0 +1,84 @@
+/*
+###########################################################################
+#
+# MODULE:       Documentation
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+*/
+
+body {
+    margin:0;
+    padding:8px;
+    font-family:Arial, Helvetica, sans-serif;
+    color:#2f4f4f;
+    background:#fff;
+}
+
+html {
+    margin:0;
+    padding:8px;
+}
+
+a {
+    color:firebrick;
+    text-decoration:none;
+}
+
+a:hover {
+    text-decoration:underline;
+}
+
+th,
+td {
+    padding:10px;
+}
+
+img {
+    border:0;
+}
+
+.schema {
+    display:block;
+    margin:6px auto;
+}
+
+.screenshot {
+    display:block;
+    margin:6px auto;
+    width:800px;
+    height:auto;
+}
+
+.copyright {
+    margin-top:20px;
+    padding:4px;
+    text-align:center;
+    font-size:90%;
+    color:#000;
+    background:gainsboro;
+}
+
+.menu {
+    float:left;
+    margin:2px 10px 2px 2px;
+    padding:2px 5px 2px 2px;
+}
+
+.guide {
+    padding-left:10px;
+}

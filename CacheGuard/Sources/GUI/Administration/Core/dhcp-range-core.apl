@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -27,24 +26,30 @@ show-dhcp-range-form()
     local get_args=${1}
     local page_ref=$(get-arg-value "${get_args}" page)
 
-    local width=${DEFAULT_LIST_FORM_WIDTH_3}
-    local state
+    local state width=${DEFAULT_LIST_FORM_WIDTH_1}
 
-    itemWidth[1]=40
+    itemWidth[1]=18
+    itemWidth[2]=35
+    itemWidth[3]=35
 
-    itemTitle[1]="Min IP Address"
-    itemTitle[2]="Max IP Address"
-    
+    itemTitle[1]="Interface"
+    itemTitle[2]="Min IP Address"
+    itemTitle[3]="Max IP Address"
+
     itemID[0]="Range"
-    itemID[1]="ip1"
-    itemID[2]="ip2"
-    
-    blankItemContent[0]=""
-    blankItemContent[1]="type='text' size='15' maxlength='15'"
-    blankItemContent[2]="type='text' size='15' maxlength='15'"
+    itemID[1]="interface"
+    itemID[2]="ip1"
+    itemID[3]="ip2"
 
-    checkItem[1]=ip
+    blankItemContent[0]=""
+    blankItemContent[1]="internal auxiliary"
+    blankItemContent[2]="type='text' size='15' maxlength='15'"
+    blankItemContent[3]="type='text' size='15' maxlength='15'"
+
+    itemForm[1]="select"
+
     checkItem[2]=ip
+    checkItem[3]=ip
 
     listContent=${DHCP_RANGE_LIST}
     test -n "${listContent}" || state=disabled

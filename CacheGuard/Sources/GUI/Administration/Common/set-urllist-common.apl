@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -60,7 +59,7 @@ load-urllist-content()
 	else
 	    local load='vload'
 	fi
-	
+
 	log-command "urllist" "${load} ${operation} ${name} ${protocol} ${ip} ${fn} ${domains} ${urls} ${expressions}"
 	execute-command "urllist ${load} ${operation} ${name} ${protocol} ${ip} ${fn} ${domains} ${urls} ${expressions}"
     fi

@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -46,7 +45,7 @@ set-vpnipsec-site-settings()
 	    local psk=${VALUES[6]}
 	    test -n "${psk}" || psk='nil'
 
-	    echo "vpnipsec site add '${vpn_id}' '${master_ip}' '${auth_type}' '${psk}' '${VALUES[7]}' '${VALUES[8]}' '${VALUES[9]}' '${VALUES[10]}' '${VALUES[11]}' '${VALUES[12]}' '${VALUES[13]}'" > ${transaction}
+	    echo "vpnipsec site add ${vpn_id} ${master_ip} ${auth_type} '${psk}' ${VALUES[7]} ${VALUES[8]} ${VALUES[9]} ${VALUES[10]} ${VALUES[11]} ${VALUES[12]} ${VALUES[13]}" > ${transaction}
 	    ;;
 	tls)
 	    local auth_key1=${VALUES[3]}
@@ -56,7 +55,7 @@ set-vpnipsec-site-settings()
 			gen-gui-error 24
 			return 0
 		    fi
-		    echo "vpnipsec site add '${vpn_id}' '${master_ip}' '${auth_type}' '${auth_key1}' '${VALUES[4]}' '${VALUES[7]}' '${VALUES[8]}' '${VALUES[9]}' '${VALUES[10]}' '${VALUES[11]}' '${VALUES[12]}' '${VALUES[13]}'" > ${transaction}
+		    echo "vpnipsec site add ${vpn_id} ${master_ip} ${auth_type} ${auth_key1} ${VALUES[4]} ${VALUES[7]} ${VALUES[8]} ${VALUES[9]} ${VALUES[10]} ${VALUES[11]} ${VALUES[12]} ${VALUES[13]}" > ${transaction}
 		    ;;
 		dn|fqdn)
 		    local dn_fqdn=${VALUES[5]}
@@ -73,7 +72,7 @@ set-vpnipsec-site-settings()
 			esac
 			return 0
 		    else
-			echo "vpnipsec site add '${vpn_id}' '${master_ip}' '${auth_type}' '${auth_key1}' '${dn_fqdn}' '${VALUES[7]}' '${VALUES[8]}' '${VALUES[9]}' '${VALUES[10]}' '${VALUES[11]}' '${VALUES[12]}' '${VALUES[13]}'" > ${transaction}
+			echo "vpnipsec site add ${vpn_id} ${master_ip} ${auth_type} ${auth_key1} '${dn_fqdn}' ${VALUES[7]} ${VALUES[8]} ${VALUES[9]} ${VALUES[10]} ${VALUES[11]} ${VALUES[12]} ${VALUES[13]}" > ${transaction}
 		    fi
 		    ;;
 		*)

@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -77,8 +76,8 @@ show-password-ftp-form()
     blankItemContent[0]=""
     blankItemContent[1]="ftp sftp"
     blankItemContent[2]="$(print-password-file-servers)"
-    blankItemContent[3]="type='text' size='12' maxlength='32'"
-    blankItemContent[4]="type='password' size='12' maxlength='32'"
+    blankItemContent[3]="type='text' size='16' maxlength='32'"
+    blankItemContent[4]="type='password' size='16' maxlength='${MAX_LEN}'"
 
     blankItemContentValues[1]="_ftp _sftp"
 
@@ -98,7 +97,6 @@ show-password-ftp-form()
     test -n "${listContent}" || state=disabled
 
     show-title "File Server Accounts" "${state}" "password access"
-    show-shortcuts-menu
     show-list-form ${MAX_ACL_FILE_NB} "${width}" "${page_ref}"
 }
 

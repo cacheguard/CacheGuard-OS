@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -29,4 +28,4 @@ source system-report-service-common.${GUI_EXT_NAME}
 
 gui-run-authentication
 execute-command-nolog "system report service"
-show-system-report-service time
+show-system-report-service 'time'

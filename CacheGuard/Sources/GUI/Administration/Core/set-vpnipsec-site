@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -54,18 +53,18 @@ set-vpnipsec-site()
 			if test -z "${VALUES[${psk_dn_fqdn_pos}]}" ; then
 			    gen-gui-error 21
 			else
-			    echo "vpnipsec site add '${VALUES[${vpn_id_pos}]}' '${VALUES[${remote_address_pos}]}' '${VALUES[${authenticate_pos}]}' '${VALUES[${psk_dn_fqdn_pos}]}'" >> ${transaction}
+			    echo "vpnipsec site add ${VALUES[${vpn_id_pos}]} ${VALUES[${remote_address_pos}]} ${VALUES[${authenticate_pos}]} '${VALUES[${psk_dn_fqdn_pos}]}'" >> ${transaction}
 			fi
 			;;
 		    tls)
 			case ${VALUES[${tls_authenticate_pos}]} in
 			    certificate)
 				test -z "${VALUES[${tls_id_pos}]}" || \
-				    echo "vpnipsec site add '${VALUES[${vpn_id_pos}]}' '${VALUES[${remote_address_pos}]}' '${VALUES[${authenticate_pos}]}' '${VALUES[${tls_authenticate_pos}]}' '${VALUES[${tls_id_pos}]}'" >> ${transaction}
+				    echo "vpnipsec site add ${VALUES[${vpn_id_pos}]} ${VALUES[${remote_address_pos}]} ${VALUES[${authenticate_pos}]} ${VALUES[${tls_authenticate_pos}]} ${VALUES[${tls_id_pos}]}" >> ${transaction}
 				;;
 			    dn|fqdn)
 				test -z "${VALUES[${psk_dn_fqdn_pos}]}" || \
-				    echo "vpnipsec site add '${VALUES[${vpn_id_pos}]}' '${VALUES[${remote_address_pos}]}' '${VALUES[${authenticate_pos}]}' '${VALUES[${tls_authenticate_pos}]}' '${VALUES[${psk_dn_fqdn_pos}]}'" >> ${transaction}
+				    echo "vpnipsec site add ${VALUES[${vpn_id_pos}]} ${VALUES[${remote_address_pos}]} ${VALUES[${authenticate_pos}]} ${VALUES[${tls_authenticate_pos}]} '${VALUES[${psk_dn_fqdn_pos}]}'" >> ${transaction}
 				;;
 			    *)
 				;;
@@ -77,7 +76,7 @@ set-vpnipsec-site()
 	    fi
 	    ((pos += 7))
 	else
-	    echo "vpnipsec site del '${VALUES[${vpn_id_pos}]}'" >> ${transaction}
+	    echo "vpnipsec site del ${VALUES[${vpn_id_pos}]}" >> ${transaction}
 	    ((pos += 8))
 	fi
     done

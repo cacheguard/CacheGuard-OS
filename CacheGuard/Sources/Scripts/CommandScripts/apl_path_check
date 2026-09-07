@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       Scripts
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -41,6 +40,36 @@ source ${LOCAL_DIR}/lib/apl_functions
 source ${APPLIANCE_DIR}/lib/lib-list
 source ${ABASE_DIR}/${ENV_RDIR}/${ENV_CURRENT_NAME}
 source ${ABASE_DIR}/${ENV_RDIR}/${ENV_NAME}
+
+set-environment()
+{
+    if test -n "${1}" ; then
+	CALLER_PID=${1}
+	REPORTS=${2}
+	MODE=${3}
+	REPORTS=${REPORTS//:/ }
+    else
+	CALLER_PID=${$}
+    fi
+
+    trap "clean-end-cb" USR1 INT QUIT TERM
+}
+
+clean-exit()
+{
+    trap '' USR1 INT QUIT TERM
+
+    local code=${1}
+
+    rm -f /var/lock/apl_path_check_${LOCK_POSTFIX}
+
+    exit ${code}
+}
+
+clean-end-cb()
+{
+    :
+}
 
 ############################################################
 # The followings are not used (until the ENDING separator) #
@@ -786,44 +815,9 @@ check-gateways()
     done
 }
 
-clean-exit()
-{
-    trap '' USR1 INT QUIT TERM
-
-    local code=${1}
-
-    rm -f \
-       /var/lock/apl_path_check_${LOCK_POSTFIX} \
-       ${RUN_DIR}/${WAITING_PROCESS}.${CALLER_PID}
-
-    exit ${code}
-}
-
-clean-end-cb()
-{
-    :
-}
-
-init-clean-end-trap()
-{
-    trap "clean-end-cb" USR1 INT QUIT TERM
-    touch ${RUN_DIR}/${WAITING_PROCESS}.${CALLER_PID}
-}
-
 main()
 {
-    local reports mode
-
-    if test -n "${1}" ; then
-	CALLER_PID=${1}
-	local reports=${2}
-	local mode=${3}
-    else
-	CALLER_PID=${$}
-    fi
-
-    init-clean-end-trap
-
+    set-environment "${@}"
     set-ports-nb
     set-network-if-parameters
     set-network-ip-native-parameters
@@ -832,17 +826,15 @@ main()
     set-fw-rule-parameters
     set-ipsec-parameters cur
 
-    if test -z "${reports}" ; then
+    if test -z "${REPORTS}" ; then
 	check-gateways
     else
 	local report_major
-	reports=${reports//:/ }
-
-	for report_major in ${reports}
+	for report_major in ${REPORTS}
 	do
 	    case ${report_major} in
 		gateway)
-		    check-gateways ${mode}
+		    check-gateways ${MODE}
 		    ;;
 		*)
 		    ;;

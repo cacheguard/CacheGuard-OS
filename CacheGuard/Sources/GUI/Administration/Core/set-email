@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -44,9 +43,9 @@ set-emails()
 
     test -n "${server}" || server=raz
 
-    echo "email ftp '${ftp_email}'" >> ${transaction}
-    echo "email admin '${admin_email}' '${admin_name}'" >> ${transaction}
-    echo "email account '${server}' '${port}' '${username}' '${password}'" >> ${transaction}
+    echo "email ftp ${ftp_email}" >> ${transaction}
+    echo "email admin ${admin_email} '${admin_name}'" >> ${transaction}
+    echo "email account ${server} ${port} ${username} '${password}'" >> ${transaction}
 
     execute-transaction ${transaction}
 }

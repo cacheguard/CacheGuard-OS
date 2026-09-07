@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -33,38 +32,46 @@ show-log()
     test ${number} -le 1000 || return 3
 
     local log=/var/log/${ANTI_VIRUS_SERVER_LOG}
-    local style="style='word-wrap:break-word;'"
 
     if test ! -s "${log}" ; then
-	echo "<div style='font-style:italic;'>&lt;The blocked malware log is empty&gt;</div>"
+	echo-unavailable-message "<i>the blocked malware log is empty.</i>"
 	return 0
     fi
 
-    local date hostname program stream_ip virus found
+    local rfc3339_time hostname program stream_ip virus found
+    local date_time date time
     local ip i=0
 
-    echo "<table class='highlight-list' width:100%;>"
+    echo "<table class='highlight-log'>"
     echo "<thead>"
     echo "<tr>"
-    echo "<td class='table-header'><strong>Date</strong></td>"
-    echo "<td class='table-header'><strong>Client IP</strong></td>"
-    echo "<td class='table-header'><strong>Virus Name</strong></td>"
+    echo "<th class='table-header'><strong>Date</strong></th>"
+    echo "<th class='table-header'><strong>Time</strong></th>"
+    echo "<th class='table-header'><strong>Client IP</strong></th>"
+    echo "<th class='table-header'><strong>Virus Name</strong></th>"
     echo "</tr>"
     echo "</thead>"
 
     echo "<tbody>"
 
-    tac ${log} | while read date hostname program stream_ip virus found
+    tac ${log} | while read rfc3339_time hostname program stream_ip virus found
     do
 	test ${i} -lt ${number} || break
 	test -n "${found}" || continue
+
 	ip=${stream_ip/instream\(}
 	ip=${ip/@*}
+
+	date_time=$(gui-get-date-time "${rfc3339_time}")
+	date=${date_time/@*}
+	time=${date_time/*@}
+
 	test ${ip} != '127.0.0.1' || ip='<center>-</center>'
 	echo "<tr>"
-	echo "<td><span ${style}>${date}</span></td>"
-	echo "<td><span ${style}>${ip}</span></td>"
-	echo "<td><span ${style}>${virus}</span></td>"
+	echo "<td><span>${date}</span></td>"
+	echo "<td><span>${time}</span></td>"
+	echo "<td><span>${ip}</span></td>"
+	echo "<td><span>${virus}</span></td>"
 	echo "</tr>"
 	((i++))
     done

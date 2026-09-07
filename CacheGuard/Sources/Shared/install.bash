@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       Build
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -62,16 +61,16 @@ JobsTitle[${i}]='${title}'
 
 gen-js-functions()
 {
-    cat ${GENERATED_DIR}/jobs-tab > ${GENERATED_DIR}/apl-js-var.apl
-    cat ${GENERATED_DIR}/jobs-tab.js > ${GENERATED_DIR}/apl-js-var.js
+    cat ${GENERATED_DIR}/jobs-tab > ${GENERATED_DIR}/apl-var.apl
+    cat ${GENERATED_DIR}/jobs-tab.js > ${GENERATED_DIR}/apl-var.js
 
-    echo >> ${GENERATED_DIR}/apl-js-var.apl
-    echo >> ${GENERATED_DIR}/apl-js-var.js
+    echo >> ${GENERATED_DIR}/apl-var.apl
+    echo >> ${GENERATED_DIR}/apl-var.js
 
     while read var val
     do
-	echo "export ${var}=\"${val}\"" >> ${GENERATED_DIR}/apl-js-var.apl
-	echo "var ${var} = \"${val}\";" >> ${GENERATED_DIR}/apl-js-var.js
+	echo "export ${var}=\"${val}\"" >> ${GENERATED_DIR}/apl-var.apl
+	echo "var ${var} = \"${val}\";" >> ${GENERATED_DIR}/apl-var.js
     done < VARIABLES
 }
 

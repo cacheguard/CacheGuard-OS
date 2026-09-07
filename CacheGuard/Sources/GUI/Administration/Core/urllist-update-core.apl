@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -24,13 +23,9 @@
 
 show-urllist-update-log()
 {
-    echo "<div class='core-form'>"
-    refresh-buttons "update_urllist_update( 1 )"
-    echo "<div style='clear:left;'></div>"
-    echo "<br /><span class='table-title'>Last URL lists update report&nbsp;</span>"
-    echo "<div style='clear:left;'></div><br />"
+    refresh-buttons
+    echo "<div class='table-title'>Last URL lists update report</div>"
     echo "<div id='${AUTO_REPORT_ID}' class='log-report'></div>"
-    echo "</div>"
 }
 
 guard-update()
@@ -46,7 +41,6 @@ guard-update()
     shortcutMenuTitle[0]="Auto load configuration"
 
     show-title "Update Guard Lists" "${state}" "urllist"
-    show-shortcuts-menu
     show-form "${width}" "${state}" show-urllist-update-log
 }
 

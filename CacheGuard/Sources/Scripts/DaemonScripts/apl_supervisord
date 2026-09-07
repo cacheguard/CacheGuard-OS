@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       Scripts
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -63,7 +62,7 @@ apl-ldap-test()
 apl-kerberos-create()
 {
     test -n "${1}" || return 1
-    local user=${2}
+    local user=${1}
 
     read-action-args ${user} || return 11
     test -n "${ACTION_ARGS[0]}" || return 13
@@ -108,6 +107,16 @@ apl-2fa-update-timestamp()
     apl_update_2fa_timestamp ${user} ${status}
 }
 
+apl-kerberos-keytab-report()
+{
+    if test ! -f ${PROXY_DIR}${KERBEROS_KEYTAB_FILE_FPROXY} ; then
+	rm -f ${RUN_DIR}/${KERBEROS_KEYTAB_FILENAME}
+	return 11
+    fi
+
+    klist -k -e ${PROXY_DIR}${KERBEROS_KEYTAB_FILE_FPROXY} | tail +4 > ${RUN_DIR}/${KERBEROS_KEYTAB_FILENAME}
+}
+
 start-loop()
 {
     local command rest
@@ -129,7 +138,7 @@ start-loop()
 	test "${pid}" != "${action}" || unset pid
 
 	case "${action}" in
-	    password-console|password-wadmin|password-login|qos-report|authenticate-ldap-test|health-av|health-disk|health-gateway|health-link|health-raid|health-rcache|health-service|health-tls|health-vpnipsec|connection|ip-neighbour|vpnipsec-report|snmp-trap-test|syslog-test)
+	    password-console|password-wadmin|password-login|qos-report|authenticate-ldap-test|health-av|health-disk|health-gateway|health-link|health-raid|health-rcache|health-service|health-tls|health-vpnipsec|connection|ip-neighbour|vpnipsec-report|snmp-trap-test|syslog-test|kerberos-keytab-report)
 	    ;;
 	    2fa-copy-conf|2fa-revert-copy-conf|2fa-update-timestamp)
 		test ${user} != ${ADMIN_NAME} || continue
@@ -199,10 +208,6 @@ start-loop()
 
 	    health-disk)
 		nice --adjustment=-8 apl_health_check ${pid} disk io:health &
-		;;
-
-	    health-gateway)
-		nice --adjustment=-8 apl_path_check ${pid} gateway &
 		;;
 
 	    health-link)
@@ -305,6 +310,9 @@ start-loop()
 
 	    2fa-update-timestamp)
 		apl-2fa-update-timestamp ${user} &
+		;;
+	    kerberos-keytab-report)
+		apl-kerberos-keytab-report &
 		;;
 	    *)
 		;;

@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -24,21 +23,18 @@
 
 show-system-report-counter()
 {
-    local width=${1}
-    test -n "${width}" || width="400"
-
-    local unavailable_width=$[${width}-10]
+    local width=500
+    local height=300
 
     echo "<div class='core-form'>"
 
     if test ${CURRENT_LOG_MODE} == False ; then
 	echo "<div class='core-form'>"
-	echo-content-unavailable ${unavailable_width} "The logging mode is not activated."
+	echo-unavailable-message "the logging mode is not activated."
         echo "</div>"
 	return 0
     fi
 
-    local height=200
     local log logs
     local log_name counter_file
     local message seconds nb date value color
@@ -54,10 +50,10 @@ show-system-report-counter()
 
     if test -z "${logs}" ; then
 	echo "<div class='core-form'>"
-	echo-content-unavailable ${unavailable_width} "The Web and rWeb access logging are not activated."
+	echo-unavailable-message "the Web and rWeb access logging are not activated."
         echo "</div>"
     else
-	echo "<table class='highlight-form' width='${width}'>"
+	echo "<table class='highlight-form'>"
 	for log in ${logs}
 	do
 	    log_name=${log/\.log}
@@ -109,7 +105,7 @@ show-system-report-counter()
 
     if test -z "${logs}" ; then
 	echo "<div class='core-form'>"
-	echo-content-unavailable ${unavailable_width} "No blocked access logging is activated."
+	echo-unavailable-message "no blocked access logging is activated."
         echo "</div>"
     else
 
@@ -167,9 +163,8 @@ show-system-report-counter()
 
 	title="Blocked Traffic Types"
 
-	echo "<br />"
-	echo "<table class='highlight-form' width='${width}'>"
-	echo "<tr><td class='table-header' style='line-height:25px;'><center>${title}</center></td></tr>"
+	echo "<table class='highlight-form'>"
+	echo "<tr><td class='table-header'><center>${title}</center></td></tr>"
 	echo "<tr><td>"
 	for ((i=0 ; i <array_len ; i++))
 	do
@@ -187,45 +182,60 @@ show-system-report-counter()
 	local n=$(record-length-list 1 "${logs}") i=0
 	local counters_id='counters'
 
-	echo "<div id='${counters_id}' style='float:left; width:${width}px; height:${height}px; margin:0; padding:0;'></div>"
-	echo "<div style='clear:left;'></div>"
-	echo "<script type='text/javascript'>"
+	echo "<div id='${counters_id}' class='graph-bar-report'></div>"
 
-	echo "var bar_counter = c3.generate( {"
-	echo "bindto: '#${counters_id}',"
-	echo "data: {"
-	echo "columns: ["
+	cat << EOT
+<script type='application/json' data-init-bar-chart>
+{
+EOT
+	echo "\"bindto\": \"#${counters_id}\","
+	echo "\"data\": {"
+	echo "\"columns\": ["
 
-	for ((i=0 ; i <array_len ; i++))
+	for ((i=0 ; i<array_len ; i++))
 	do
-	    echo -n "['${log_name_a[${i}]}', ${nb_a[${i}]}]"
-	    if test $[${i} + 1] -eq ${n} ; then echo ; else echo "," ; fi
+	    echo -n "[\"${log_name_a[${i}]}\", ${nb_a[${i}]}]"
+	    if test $((i + 1)) -eq ${array_len}
+	    then
+		echo
+	    else
+		echo ","
+	    fi
 	done
-
+	
 	echo "],"
-	echo "type: 'bar',"
-	echo "labels: false,"
-	echo "colors: {"
+	echo "\"type\": \"bar\","
+	echo "\"labels\": false,"
+	echo "\"colors\": {"
 
-	for ((i=0 ; i <array_len ; i++))
+	for ((i=0 ; i<array_len ; i++))
 	do
-	    echo -n "'${log_name_a[${i}]}': '${color_a[${i}]}'"
-	    if test $[${i} + 1] -eq ${n} ; then echo ; else echo "," ; fi
+	    echo -n "\"${log_name_a[${i}]}\": \"${color_a[${i}]}\""
+	    if test $((i + 1)) -eq ${array_len}
+	    then
+		echo
+	    else
+		echo ","
+	    fi
 	done
 
 	echo "}"
 	echo "},"
-
-	echo "bar: {"
-	echo "width: {"
-	echo "ratio: 0.5"
+	echo "\"bar\": {"
+	echo "\"width\": {"
+	echo "\"ratio\": 0.5"
 	echo "}"
+	echo "},"
+	echo "\"size\": {"
+	echo "\"height\": ${height},"
+	echo "\"width\": ${width}"
 	echo "}"
 
-	echo "} );"
-	echo "</script>"
+	cat << EOT
+}
+</script>
+EOT
     fi
-	
     echo "</div>"
 }
 
@@ -235,8 +245,7 @@ system-report-counter()
     shortcutMenuTitle[0]="Reset Counters"
 
     show-title "Traffic Counters" "disabled" "log system"
-    show-shortcuts-menu
-    show-system-report-counter 500
+    show-system-report-counter
 }
 
 # Main()

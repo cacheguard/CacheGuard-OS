@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       InitScript
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -27,6 +26,7 @@ source /lib/lsb/init-functions
 CACHEGUARD_DIR=/etc/sysconfig/cacheguard
 source ${CACHEGUARD_DIR}/constant
 source ${APPLIANCE_DIR}/etc/role
+source ${LOCAL_DIR}/lib/apl_common
 
 PROG="httpd"
 RPROG="sbin/${PROG}"
@@ -38,7 +38,7 @@ CACHE_CLEAN_PROG="htcacheclean"
 [ -f ${WEB_SERVER_DIR}/etc/${PROG}.conf ] || exit 0
 
 RETVAL=0
-SERV="Web Server"
+SERV="rWeb Server"
 
 reset-waf-persistent-data()
 {
@@ -47,6 +47,9 @@ reset-waf-persistent-data()
     rm -f ${WEB_SERVER_DIR}/tmp/*-{global,ip}.{pag,dir}
 }
 
+CPU_ARCHITECTURE=$(uname -m 2> /dev/null)
+test ${CPU_ARCHITECTURE} == x86_64 || ulimit -s 512
+
 case "${1}" in
     start)
 	# Start daemons.
@@ -54,7 +57,7 @@ case "${1}" in
 	    echo $"${PROG}: already running"
 	    exit 1
 	fi
-	
+
 	log_info_msg "Starting ${SERV}..."
 	rm -f ${WEB_RUN_DIR}/${PROG}.pid
 	${FPROG} -f ${WEB_SERVER_DIR}/etc/${PROG}.conf 2> /dev/null
@@ -69,7 +72,8 @@ case "${1}" in
 	log_info_msg "Stopping ${SERV}..."
 	killproc -p ${WEB_RUN_DIR}/${PROG}.pid ${FPROG}
 	RETVAL=${?}
-	usleep 500000
+	wait4-file ${WEB_RUN_DIR}/${PROG}.pid s 10 500000 r
+	killall --quiet -KILL ${FPROG}
 	[ ${RETVAL} -eq 0 ] && rm -f /var/lock/${PROG} ${WEB_RUN_DIR}/${PROG}.pid
 	evaluate_retval
 	reset-waf-persistent-data

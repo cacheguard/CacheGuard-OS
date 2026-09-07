@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       Configurator
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -109,12 +108,6 @@ min()
     if test ${1} -lt ${2} ; then echo ${1} ; else echo ${2} ; fi
 }
 
-getpids()
-{
-    local base=${1##*/}
-    pidof -o ${$} -o ${PPID} -x ${base}
-}
-
 check-elf-file()
 {
     test -n "${1}" || return 1
@@ -215,33 +208,6 @@ gen-msg-html-end()
     echo '</div></div>'
     echo '</body>'
     echo '</html>'
-}
-
-gen-ldap-ip-name()
-{
-    local elt i=0 rang
-    local name ip
-
-    for elt in ${LDAP_SERVER_LIST}
-    do
-	rang=$[${i} % 4]
-	case ${rang} in
-	    0)
-		;;
-	    1)
-		name=${elt}
-		;;
-	    2)
-		ip=${elt}
-		;;
-	    3)
-		echo "${ip} ${name}"
-		;;
-	    *)
-		;;
-	esac
-	((i++))
-    done
 }
 
 get-hardware-id()

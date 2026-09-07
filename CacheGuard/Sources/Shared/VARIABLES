@@ -1,4 +1,7 @@
+TOP_HELP_ID top-help
+TOP_ERRORS_ID top-errors
 RECORD_CLASS_PREFIX record_
+RECORD_FIRST_TR_CLASS highlight
 INSERT_IMAGE_CLASS insert-image
 SELECTION_CLASS selection
 RECORD_CELL_CLASS record-cell
@@ -11,10 +14,10 @@ NEXT_PAGE_ID next-page
 SELECTED_PAGE_ID page-index
 RECORDS_PPAGE_ID records-ppage
 ADD_IMAGE_ID add-image
-ADD_LABEL_ID add-label
 ENTRY_ID_PREFIX entry_
 SEL_ID_PREFIX sel_
 DEL_ID_PREFIX del_
 AUTO_REPORT_ID auto-report
 AUDIT_RWEB_ID audit-rweb-report
+MAIN_TABLE_ID main-table
 MANAGER_MAIN_PAGE conf-show

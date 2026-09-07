@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -64,11 +63,9 @@ show-vpnipsec-access-access()
     blankItemContent[0]=''
     blankItemContent[1]=$(print-access-operations)
     blankItemContent[2]="type='text' size='64' maxlength='${MAX_IKE_ID_LEN}'"
-    #blankItemContent[2]="rows='${rows}' cols='${cols}'"
 
     itemWidth[1]=10
-    checkItem[2]=ikeidentifier
-    
+
     unset listContent
 
     if test -f ${VPN_IPSEC_DIR}/whitelist.raz ; then
@@ -108,7 +105,6 @@ show-vpnipsec-access-access()
     shortcutMenuTitle[0]="Client Certificates"
 
     show-title "Allowed IPsec VPN Client Access" "${state}" "tls vpnipsec"
-    show-shortcuts-menu
     show-list-form ${max_ike_nb} ${width} "${page_ref}"
 }
 

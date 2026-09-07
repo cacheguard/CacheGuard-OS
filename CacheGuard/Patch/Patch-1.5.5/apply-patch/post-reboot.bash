@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       Patch
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2021 by CacheGuard Technologies Ltd
 #
 # This program is free software: you can redistribute it and/or modify

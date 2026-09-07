@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       Build
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -1601,6 +1600,7 @@ build1_squid()
 	./configure \
 	    --prefix=${PROXY_DIR} \
 	    --mandir=${LOCAL_DIR}/man \
+	    --disable-ipv6 \
 	    --disable-static \
 	    --disable-arch-native \
 	    --disable-strict-error-checking \
@@ -1926,7 +1926,7 @@ build1_httpd()
 	    --with-apr-util=${LOCAL_DIR} \
 	    --with-crypto \
 	    --with-ldap \
-	    --with-mpm=prefork \
+	    --with-mpm=event \
 	    --datadir=${WEB_SERVER_DIR}/share \
 	    --includedir=${WEB_SERVER_DIR}/include \
 	    --localstatedir=${WEB_SERVER_DIR}/var \
@@ -2046,6 +2046,7 @@ build1_php()
 	    --prefix=${LOCAL_DIR} \
 	    --with-apxs2=${WEB_SERVER_DIR}/bin/apxs \
 	    --enable-mbstring \
+	    --enable-zts \
 	    PKG_CONFIG_PATH=${PKGCONFIG_DIR} \
 	    SQLITE_CFLAGS=-lsqlite3 \
 	    SQLITE_LIBS=-lsqlite3

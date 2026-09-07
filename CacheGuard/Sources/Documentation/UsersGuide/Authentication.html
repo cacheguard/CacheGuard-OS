@@ -1,0 +1,64 @@
+<a name='main' class='doc-title'></a>
+<h1>Web Authentication</h1>
+
+Web authentication can be used together with the <strong>web</strong> and <strong>rweb</strong> modes to restrict web browsing and/or access to reverse websites to authenticated users only. By enabling web authentication mode, explicit users of the web proxy in forwarding/browsing mode (<strong>web</strong> mode) and/or external users of reverse websites in reverse mode (<strong>rweb</strong> mode) are required to authenticate before being allowed to connect to the CacheGuard appliance. The CacheGuard appliance supports LDAP and Kerberos authentication modes, which you can configure using the <a href="/doc/command/authenticate.html">authenticate</a> command.
+
+<a name='ldap' class='doc-title'></a><h2>LDAP Authentication</h2>
+
+In LDAP authentication mode, the first time a web user tries to access a web page, they are prompted to submit their credentials via a pop-up window opened by the web browser. With this authentication method, called basic authentication, the CacheGuard appliance sends the collected credentials to an LDAP server. If the credentials are validated by the LDAP server, the CacheGuard appliance allows the web user to connect. Otherwise, access is rejected. You can activate web authentication by using the <a href="/doc/command/mode.html">mode authenticate on</a> command.
+<p>
+To configure LDAP authentication, you must specify at least one LDAP server and the LDAP request to be sent to it to authenticate users. In addition, because most LDAP servers require clients to bind before accepting requests, you must configure LDAP binding in your authentication settings. For example, the commands below configure LDAP authentication to send the <i>'ou=people,dc=example,dc=com' 'uid' 'userPassword' 'objectClass=inetOrgPerson'</i> request to the LDAP server with hostname <i>ldap.example.com</i>. Since this LDAP server requires binding, LDAP binding is enabled by specifying the <i>'cn=admin,dc=example,dc=com'</i> bind DN (Distinguished Name).
+
+<ul>
+  <li><i>mode authenticate on</i></li>
+  <li><i>authenticate web on</i></li>
+  <li><i>authenticate mode ldap on</i></li>
+  <li><i>authenticate ldap request 'ou=people,dc=example,dc=com' 'uid' 'userPassword' 'objectClass=inetOrgPerson'</i></li>
+  <li><i>authenticate ldap server add ldap ldap.example.com</i></li>
+  <li><i>authenticate ldap binddn 'cn=admin,dc=example,dc=com' on</i></li>
+  <li><i>apply</i></li>
+</ul>
+
+<u>LDAP Request Note</u>: In the example above, the LDAP request specifies that users to retrieve are registered under the <i>ou=people,dc=example,dc=com</i> LDAP object, and the login name and password (provided by the web user during basic authentication) are compared against the values in the <i>uid</i> and <i>userPassword</i> LDAP attributes, respectively. Finally, users to search for must belong to the <i>inetOrgPerson</i> LDAP object class.
+<p>
+Note that if an empty value ('') is specified as the password LDAP attribute, an LDAP binding is performed during the basic authentication phase instead of comparing the entered password with the value stored in the password LDAP attribute (this is the preferred method used by Microsoft AD&trade;). If your LDAP server is Microsoft AD&trade;, you can use the following commands to configure LDAP authentication:
+  
+<ul>
+  <li><i>mode authenticate on</i></li>
+  <li><i>authenticate mode ldap on</i></li>
+  <li><i>authenticate ldap request 'cn=users,dc=example,dc=com' 'sAMAccountName'</i></li>
+  <li><i>authenticate ldap server add ldap ldap.example.com</i></li>
+  <li><i>authenticate ldap binddn 'cn=webgateway,cn=users,dc=example,dc=com' on</i></li>
+  <li><i>apply</i></li>
+</ul>
+
+Here, <i>cn=webgateway,cn=users,dc=example,dc=com</i> is the user used for LDAP binding. Make sure that the <i>cn=webgateway,cn=users,dc=example,dc=com</i> user exists in your Microsoft AD, is not disabled, and that its associated password never expires.
+
+<a name='kerberos' class='doc-title'></a><h2>Kerberos Authentication</h2>
+
+In Kerberos authentication mode, the credentials used by users to log in to their workstations are retrieved by the CacheGuard appliance during a negotiation phase and then used to authenticate web users. Kerberos-based authentication is a complex process that goes beyond this documentation, so we focus on how to configure the CacheGuard appliance to use Microsoft AD (as a Kerberos server).
+<p>
+<center><img width='600' src="/doc/image/authentication.png" class="schema" /></center>
+
+You can use the following commands to configure Kerberos authentication on a CacheGuard appliance connected to a Microsoft AD server named <i>dc.example.com</i> on the network:
+<ul>
+  <li><i>domainname example.com</i></li>
+  <li><i>mode authenticate on</i></li>
+  <li><i>authenticate mode kerberos on</i></li>
+  <li><i>authenticate kerberos server add dc.example.com</i></li>
+  <li><i>authenticate kerberos web proxy</i></li>
+  <li><i>authenticate ad on</i></li>
+  <li><i>authenticate ad rdn 'cn=computers'</i></li>
+  <li><i>apply</i></li>
+</ul>
+
+In the example above, the <a href="/doc/command/authenticate.html">authenticate mode kerberos on</a> command activates Kerberos authentication mode, the <a href="/doc/command/authenticate.html">authenticate kerberos web proxy</a> command sets the HTTP service name to <i>proxy</i> on the Kerberos server, and the <a href="/doc/command/authenticate.html">authenticate ad on</a> command activates AD Kerberos authentication mode. An AD server acts not only as a Kerberos server but also as an LDAP server. This is why the <a href="/doc/command/authenticate.html">authenticate ad rdn 'cn=computers'</a> command is used to specify the RDN (Relative Distinguished Name) of the object representing the <i>proxy.example.com</i> web proxy in the Microsoft AD directory tree. The web proxy's fully qualified domain name on the network would then be <i>proxy.example.com</i>, while <i>cn=proxy,cn=computers,dc=example,dc=com</i> represents its full DN in Microsoft AD. The proxy service would then be identified as <i>HTTP/proxy.[example.com@EXAMPLE.COM](mailto:example.com@EXAMPLE.COM)</i>.
+<p>
+
+It is <strong>IMPORTANT</strong> to note that the first time Kerberos authentication mode is activated, after the <i>apply</i> operation completes, it must be initialised on the CacheGuard appliance. During the initialisation process, if the LDAP object representing the web proxy in Microsoft AD does not yet exist, a new LDAP object for the web proxy and its associated account is created in Microsoft AD. By default, the account name is the same as the Kerberos service name (in the example above, <i>proxy</i>). The initialisation process also allows the CacheGuard appliance to obtain a Kerberos ticket. To initialise Kerberos authentication, use the following command:
+<ul>
+  <li>authenticate kerberos create administrator</li>
+  <li>authenticate kerberos report</li>
+</ul>
+
+This command requires you to enter the password associated with the <i>administrator</i> account interactively. The entered password is not permanently saved and is only used to obtain the Kerberos ticket. Note that the Microsoft AD account used must have administrator privileges (here, the <i>administrator</i> user). Kerberos initialisation is an asynchronous operation that runs in the background. The <a href="/doc/command/authenticate.html">authenticate kerberos report</a> command allows you to display a report on the Kerberos initialisation process.

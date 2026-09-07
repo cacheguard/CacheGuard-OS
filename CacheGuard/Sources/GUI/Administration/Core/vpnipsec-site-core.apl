@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -47,14 +46,14 @@ show-vpnipsec-site()
     itemID[4]="tls_authenticate"
     itemID[5]="tls_id"
     itemID[6]="psk_dn_fqdn"
-    
+
     blankItemContent[0]=""
     blankItemContent[1]="type='text' size='${MAX_NAME_LEN}' maxlength='${MAX_NAME_LEN}'"
     blankItemContent[2]="type='text' size='24' maxlength='32'"
     blankItemContent[3]="psk tls"
     blankItemContent[4]="certificate fqdn dn"
     blankItemContent[5]=${TLS_SERVER_LIST}
-    blankItemContent[6]="type='text' size='64' maxlength='256'"
+    blankItemContent[6]="type='text' size='64' maxlength='${MAX_DN_LEN}'"
 
     checkItem[1]=identifier
     checkItem[2]=ipdomainname
@@ -73,11 +72,8 @@ show-vpnipsec-site()
     editColumnPage[0]="vpnipsec-site-settings"
     editColumnQuery[0]="level:1"
 
-    itemFormSelectCBFunction[3]="VPNIPsecSiteCB"
-    itemFormSelectCBArgs[3]="authenticate tls_authenticate tls_id psk_dn_fqdn"
-
-    itemFormSelectCBFunction[4]=${itemFormSelectCBFunction[3]}
-    itemFormSelectCBArgs[4]=${itemFormSelectCBArgs[3]}
+    itemData[3]="data-action='vpnipsec-site' data-authenticate-prefix-id='authenticate' data-tls-authenticate-prefix-id='tls_authenticate' data-tls-prefix-id='tls_id' data-psk-dn-fqdn-prefix-id='psk_dn_fqdn'"
+    itemData[4]=${itemData[3]}
 
     local elt i=0 range
     local vpn_id remote_address auth_type auth_key1 auth_key2
@@ -155,7 +151,6 @@ show-vpnipsec-site()
     local max_vpn_nb=$(get-max-vpn-nb)
 
     show-title "Site to Site IPsec VPNs" "${state}" "port tls vpnipsec"
-    show-shortcuts-menu
     show-list-form ${max_vpn_nb} "${width}" "${page_ref}"
 }
 

@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -48,18 +47,18 @@ set-guard-rule()
 	action=${VALUES[${action_pos}]}
 
 	if [[ "${ATTRIBUTES[${del_pos}]}" =~ ^del_[0-9]+$ ]] ; then
-	    del_array[${del_nb}]="'${name}'"
+	    del_array[${del_nb}]="${name}"
 	    ((del_nb++))
 	    pos=$[${pos} + 4]
 	else
 	    if test -n "${name}" -a -n "${action}" ; then
 		if test "${entry_type}" == anew  ; then
 		    new_list="${new_list} ${name}"
-		    add_array[${add_nb}]="'${name}' '${action}'"
+		    add_array[${add_nb}]="${name} ${action}"
 		    ((add_nb++))
 		elif test "${entry_type}" == inew  ; then
 		    new_list="${new_list} ${name}"
-		    insert_array[${insert_nb}]="'${name}' '${action}'"
+		    insert_array[${insert_nb}]="${name} ${action}"
 		    ((insert_nb++))
 		elif test "${entry_type:0:4}" == move ; then
 		    position=${entry_type:4}
@@ -69,7 +68,7 @@ set-guard-rule()
 		    old_name=${name}
 		    for ((i=0 ; i<insert_nb ; i++))
 		    do
-			echo "guard rule 'insert:${name}' ${insert_array[${i}]}" >> ${transaction}
+			echo "guard rule insert:${name} ${insert_array[${i}]}" >> ${transaction}
 		    done
 		    unset insert_array
 		    insert_nb=0
@@ -84,14 +83,14 @@ set-guard-rule()
 
     for ((i=0 ; i<insert_nb ; i++))
     do
-	echo "guard rule 'insert:${name}' ${insert_array[${i}]}" >> ${transaction}
+	echo "guard rule insert:${name} ${insert_array[${i}]}" >> ${transaction}
     done
 
     if test -n "${old_name}" ; then
 	name=${old_name}
 	for ((i=0 ; i<add_nb ; i++))
 	do
-	    echo "guard rule 'add:${name}' ${add_array[${i}]}" >> ${transaction}
+	    echo "guard rule add:${name} ${add_array[${i}]}" >> ${transaction}
 	    name=${add_array[${i}]/ *}
 	done
     else
@@ -110,10 +109,10 @@ set-guard-rule()
 	if test -z "${prev_name}" ; then
 	    position=${location#*:}
 	    position=${position/:*}
-	    echo "guard rule move:${position} '${name}'" >> ${transaction}
+	    echo "guard rule move:${position} ${name}" >> ${transaction}
 	else
 	    
-	    echo "guard rule 'move:+${prev_name}' '${name}'" >> ${transaction}
+	    echo "guard rule move:+${prev_name} ${name}" >> ${transaction}
 	fi
     done
 

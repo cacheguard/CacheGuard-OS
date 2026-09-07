@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -25,9 +24,6 @@
 show-time-form()
 {
     local width
-    local left=35
-    local right=65
-    local length=7
 
     local date_std=$(/bin/date --utc 2> /dev/null)
     local date_seconds=$(/bin/date --set="${date_std}" +"%s" 2> /dev/null)
@@ -50,22 +46,26 @@ show-time-form()
     local minutes=${time:3:2}
     local seconds=${time:6:2}
 
+    local timecontainer_id='timecontainer'
     local time_zone i=0
-
-    echo "<script type='text/javascript' src='/js/localTime.js'></script>"
 
     show-title "Date & Clock" "enabled" "clock, timezone, timezonelist"
 
     echo "<div class='core-form'>"
-    echo "<div style='font-size:11px; margin:0;margin-bottom:5px;'><span>Appliance time: </span><span id='timecontainer'></span></div>"
+    echo "<div class='table-title'>Appliance Date & Time (ISO-style): <span id='timecontainer' class='clock'></span></div>"
 
-    call-js-function "new showLocalTime( 'timecontainer', ${date_seconds}, ${date_offest_mn}, 'short')"
+    cat <<EOT
+<div data-init-start-clock
+data-container-id='${timecontainer_id}'
+data-date-seconds='${date_seconds}'
+data-date-offset-mn='${date_offest_mn}'
+hidden></div>
+EOT
+    show-form-begin
+    show-table-begin
 
-    show-form-begin ${length}
-    show-table-begin ${length} ${width}
-
-    echo "<tr><td width='${left}%'>Time Zone</td>"
-    echo "<td width='${right}%'><select name='timezone'>"
+    echo "<tr><td>Time Zone</td>"
+    echo "<td><select name='timezone'>"
 
     while read time_zone
     do
@@ -81,10 +81,10 @@ show-time-form()
     echo "</td></tr>"
     
     echo "<tr>"
-    echo "<td width='${left}%'>Date</td><td width='${right}%'>"
-    echo "<input name='year' id='year' value='${year}' size='4' maxlength='4' onChange='setCalendarDay( \"year\", \"month\", \"day\" );' />"
+    echo "<td>Date</td><td>"
+    echo "<input name='year' id='year' value='${year}' size='4' maxlength='4' data-action='set-calendar-day' />"
     echo '/'
-    echo "<select name='month' id='month' onChange='setCalendarDay( \"year\", \"month\", \"day\" );'>"
+    echo "<select name='month' id='month' data-action='set-calendar-day'>"
     echo-month-options ${month}
     echo '</select>'
     echo '/'
@@ -94,9 +94,9 @@ show-time-form()
     echo "</td></tr>"
     
     echo "<tr>"
-    echo "<td width='${left}%'>Time</td>"
+    echo "<td>Time</td>"
     
-    echo "<td width='${right}%'>"
+    echo "<td>"
     echo "<select name='hours' id='hours'>"
     echo-hour-options ${hours}
     echo '</select>'
@@ -111,14 +111,15 @@ show-time-form()
     echo "</td></tr>"
     
     echo "<tr>"
-    echo "<td width='${left}%'>NTP</td>"
-    echo "<td width='${right}%'><span class='shortcut-menu-item' style='font-size:100%;'><a href=/${GUI_DIR_NAME}/ntp.${GUI_EXT_NAME}>Netwrok Time Servers</a></span></td>"
+    echo "<td>NTP</td>"
+    echo "<td><span class='shortcut-menu-item'><a href=/${GUI_DIR_NAME}/ntp.${GUI_EXT_NAME}>Netwrok Time Servers</a></span></td>"
     echo "</tr>"
     
-    show-table-end ${length}
+    show-table-end
     show-do enabled disabled
     show-form-end
 
+    
     echo "</div>"
 }
 

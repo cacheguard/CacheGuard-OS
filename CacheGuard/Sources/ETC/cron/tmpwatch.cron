@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       ETC
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -31,20 +30,21 @@ main()
     local hours
 
     if test -z "${1}" ; then
-	hours=72
+	hours=48
     else
 	hours=${1}
     fi
-    tmpwatch --atime \
-	     -all \
-	     --force \
+
+    tmpwatch --atime -all --quiet --force \
+	     --exclude ${TMP_GATEWAY_DIR} \
+	     --exclude ${TMP_TEMPLATE_DIR} \
 	     ${hours}h \
-	     \
 	     /tmp \
 	     /var/tmp \
 	     ${TMP_DIR} \
 	     ${PROXY_DIR}/tmp \
-	     ${WEB_SERVER_DIR}/tmp
+	     ${WEB_SERVER_DIR}/tmp \
+	     ${RUN_DIR}/${SUPERVISOR_CALLER}
 }
 
-main
+main "${@}"

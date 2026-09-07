@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -41,11 +40,11 @@ set-admin-user()
 	if test ${?} -ne 0 ; then
 	    if test "${VALUES[${entry_pos}]}" == anew -a -n "${VALUES[${user_pos}]}" ; then
 		password=${VALUES[${password_pos}]}
-		echo "admin user add '${VALUES[${user_pos}]}' '${password}'" >> ${transaction}
+		echo "admin user add ${VALUES[${user_pos}]} '${password}'" >> ${transaction}
 	    fi
 	    pos=$[${pos} + 3]
 	else
-	    echo "admin user del '${VALUES[${user_pos}]}'" >> ${transaction}
+	    echo "admin user del ${VALUES[${user_pos}]}" >> ${transaction}
 	    pos=$[${pos} + 4]
 	fi
     done

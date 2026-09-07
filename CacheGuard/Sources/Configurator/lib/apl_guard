@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       Configurator
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -46,7 +45,7 @@ set-warning-parameters()
 
 set-guard-parameters()
 {
-    if test ${SSLMEDIATE_MODE} == True ; then
+    if test ${TRANSPARENT_MODE} == True ; then
 	export GUARD_REDIRECT_WEB_SERVER="http://${IP_WEB_IP}"
     else
 	export GUARD_REDIRECT_WEB_SERVER="http://${WEB_SERVER_DENY_NAME}"
@@ -307,14 +306,14 @@ gen-slapd-conf()
     echo "threadqueues $((cpu_nb/5 + 1))"
     echo
 
-    local i=0 elt range
-    local proto name ip port
+    local elt range i=0
+    local proto name port
     local uri uris ldap_uris ldaps_uris sldap_uris
     local tls_conf
 
     for elt in ${LDAP_SERVER_LIST}
     do
-	range=$[${i} % 4]
+	range=$[${i} % 3]
 	case ${range} in
 	    0)
 		proto=${elt}
@@ -323,13 +322,10 @@ gen-slapd-conf()
 		name=${elt}
 		;;
 	    2)
-		ip=${elt}
-		;;
-	    3)
 		port=${elt}
 		case ${proto} in
 		    ldap)
-			uri="ldap://${ip}:${port}"
+			uri="ldap://${name}:${port}"
 			ldap_uris="${ldap_uris} ${uri}"
 			;;
 		    sldap)
@@ -565,13 +561,13 @@ update-sslmediation-exceptions()
 
     case ${env} in
 	new)
-	    local proxy2_mode=${PROXY2_MODE}
+	    local rweb_mode=${RWEB_MODE}
 	    local rweb_site_name_list=${RWEB_SITE_NAME_LIST}
 	    local sslmediate_exception_domainname_list=${SSLMEDIATE_EXCEPTION_DOMAINNAME_LIST}
 	    local sslmediate_exception_urllist_list=${SSLMEDIATE_EXCEPTION_URLLIST_LIST}
 	    ;;
 	cur)
-	    local proxy2_mode=${CURRENT_PROXY2_MODE}
+	    local rweb_mode=${CURRENT_RWEB_MODE}
 	    local rweb_site_name_list=${CURRENT_RWEB_SITE_NAME_LIST}
 	    local sslmediate_exception_domainname_list=${CURRENT_SSLMEDIATE_EXCEPTION_DOMAINNAME_LIST}
 	    local sslmediate_exception_urllist_list=${CURRENT_SSLMEDIATE_EXCEPTION_URLLIST_LIST}
@@ -586,7 +582,7 @@ update-sslmediation-exceptions()
 
     local reset
 
-    if test ${proxy2_mode} == True ; then
+    if test ${rweb_mode} == True ; then
 	test -n "${sslmediate_exception_urllist_list}" -o \
 	     -n "${sslmediate_exception_domainname_list}" || reset=yes
     else
@@ -608,7 +604,7 @@ update-sslmediation-exceptions()
 
     rm -f ${exceptions_file}.{dump1,dump2,db}
 
-    if test ${proxy2_mode} == False ; then
+    if test ${rweb_mode} == False ; then
 
 	gen-db-dump-header > ${exceptions_file}.dump1
 

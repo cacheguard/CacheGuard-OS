@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -45,7 +44,7 @@ get-lb-sticky()
 	local state=False
     fi
 
-    echo "type=checkbox$(checked ${state})"
+    echo "$(checked ${state})"
 }
 
 get-lb-mode()
@@ -86,11 +85,6 @@ show-rweb-balancer-form()
 
     local balancer=$(get-site-balancer ${in_name} new)
 
-    if test -z "${balancer}" ; then
-	show-title ${title} disabled "rweb"
-	return 1
-    fi
-
     local algorithm=${balancer/ *}
     local sticky_mode_cookie=${balancer#* }
     local sticky=${sticky_mode_cookie/ *}
@@ -120,7 +114,7 @@ show-rweb-balancer-form()
     local color='SeaGreen'
 
     blankItemContent[0]="value='${in_name}'"
-    blankItemContent[1]="<div style='color:${color};'>${in_name}</div>"
+    blankItemContent[1]=${in_name}
     blankItemContent[2]=$(get-lb-method ${algorithm})
     blankItemContent[3]=$(get-lb-sticky ${sticky})
     blankItemContent[4]=$(get-lb-mode ${mode})
@@ -143,8 +137,7 @@ show-rweb-balancer-form()
 	itemState[5]="disabled"
     fi
 
-    local cb="stickyLBSelectCB( 'sticky', 'mode', 'cookie' );"
-    itemFormCheckCB[3]=${cb}
+    itemData[3]="data-action='sticky-lb-select' data-mode-id='mode' data-cookie-id='cookie'"
 
     show-title "Load Balancing" enabled "rweb"
     show-form "${width}"

@@ -1,0 +1,187 @@
+/*
+###########################################################################
+#
+# MODULE:       GUI
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+*/
+
+/*******/
+/* Pie */
+/*******/
+
+.d3-pie {
+    display:inline-block;
+    margin:10px;
+}
+
+.d3-pie-legend {
+    width:100%;
+    margin-top:20px;
+    padding:0;
+}
+
+.d3-pie-legend-item {
+    font-size:12px;
+    cursor:pointer;
+}
+
+.d3-pie-legend-color {
+    display:inline-block;
+    width:10px;
+    height:10px;
+    margin-right:3px;
+    vertical-align:middle;
+}
+
+.d3-pie-slice {
+    cursor:pointer;
+    transition:opacity 150ms;
+}
+
+.d3-pie-slice.is-dimmed {
+    opacity:0.45;
+}
+
+.d3-pie-value {
+    fill:white;
+    font-size:12px;
+    font-weight:bold;
+    text-anchor:middle;
+}
+
+.d3-pie-percentage {
+    fill:white;
+    font-size:12px;
+    font-weight:bold;
+    text-anchor:middle;
+}
+
+.d3-pie-value.is-hover-hidden {
+    display:none;
+}
+
+/*******/
+/* Bar */
+/*******/
+
+.d3-bar-legend-item {
+    cursor:pointer;
+}
+
+.d3-bar-tooltip {
+    display:none;
+    pointer-events:none;
+}
+
+.d3-bar-tooltip.is-visible {
+    display:block;
+}
+
+.d3-bar-tooltip-text {
+    font-size:12px;
+    font-weight:bold;
+    fill:#222;
+}
+
+/*********/
+/* Graph */
+/*********/
+
+.d3-graph-x-axis text {
+    white-space:nowrap;
+}
+
+.d3-graph-x-axis .tick text {
+    white-space:nowrap;
+}
+
+.d3-graph-legend {
+    cursor:pointer;
+}
+
+.d3-graph-legend-item {
+    cursor:pointer;
+}
+
+.d3-graph-legend-item.is-hidden {
+    opacity:0.4;
+}
+
+.d3-graph-legend-color {
+    cursor:pointer;
+}
+
+.d3-graph-legend-item text {
+    cursor:pointer;
+    font-weight:normal;
+}
+
+.d3-graph-tooltip {
+    display:none;
+    pointer-events:none;
+}
+
+.d3-graph-tooltip.is-visible {
+    display:block;
+}
+
+.d3-graph-tooltip-text {
+    font-size:12px;
+    font-weight:normal;
+    fill:#222;
+}
+
+.d3-graph-tooltip-row {
+    pointer-events:none;
+}
+
+.d3-graph-tooltip-row rect {
+    stroke:none;
+}
+
+.d3-graph-tooltip-row text {
+    font-size:12px;
+    font-weight:normal;
+    fill:#222;
+}
+
+.d3-graph-hover-area {
+    fill:transparent;
+    cursor:crosshair;
+}
+
+.d3-graph-hover-line {
+    display:none;
+    pointer-events:none;
+    stroke:#555;
+    stroke-width:1;
+    stroke-dasharray:3,3;
+}
+
+.d3-graph-hover-line.is-visible {
+    display:block;
+}
+
+.d3-graph-point {
+    pointer-events:none;
+}
+
+.d3-graph-line.is-hidden {
+    display:none;
+}

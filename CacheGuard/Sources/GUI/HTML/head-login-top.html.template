@@ -1,0 +1,12 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+<meta charset="UTF-8">
+
+<link rel="shortcut icon" type="image/x-image" href="/favicon.ico" />
+<link rel="stylesheet" type="text/css" href="/apl-@GUI_FE_VERSION@.css" />
+
+<script type="text/javascript" src="/js/apl-constant-@GUI_FE_VERSION@.js"></script>
+<script type="text/javascript" src="/js/apl-var-@GUI_FE_VERSION@.js"></script>
+<script type="text/javascript" src="/js/apl-@GUI_FE_VERSION@.js"></script>

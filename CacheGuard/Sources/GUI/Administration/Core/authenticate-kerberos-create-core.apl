@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -24,64 +23,57 @@
 
 show-kerberos-create-log()
 {
-    refresh-buttons "update_authenticate_kerberos_create( 1 )"
-    echo "<div style='clear:left;'></div><br />"
+    refresh-buttons
     echo "<div class='table-title'>Last kerberos initialization report</div>"
     echo "<div id='${AUTO_REPORT_ID}' class='log-report'></div>"
-    echo "</div>"
 }
 
 show-av-update-form()
 {
-    local state
-    local width
+    local state width
+    local login i=0
 
     test "${REMOTE_USER}" == "${ADMIN_NAME}" || state=disabled
 
-    local dc_chain=$(get-domain-controller-chain ${DOMAIN_NAME})
-    local fdn="cn=${CURRENT_KERBEROS_SERVICE_NAME},${CURRENT_AD_WEBGATEWAY_RDN},${dc_chain}"
+    local principal="HTTP/${CURRENT_KERBEROS_SERVICE_NAME}.${CURRENT_DOMAIN_NAME}@${CURRENT_DOMAIN_NAME^^}"
 
     itemWidth[0]=40
     itemWidth[1]=50
 
-    itemTitle[0]="This system full DN"
-    itemTitle[1]="Kerberos Administrator User"
-    itemTitle[2]="Kerberos Administrator Password"
+    test -z "${VALUES[0]}" || login=${VALUES[0]}
 
-    itemID[0]="fdn"
-    itemID[1]="login"
-    itemID[2]="password"
-
-    if test -n "${VALUES[0]}" ; then
-	local login=${VALUES[0]}
-    else
-	local login=Administrator
+    if test ${CURRENT_AUTHENTICATE_AD_MODE} == True ; then
+	local dc_chain=$(get-domain-controller-chain ${DOMAIN_NAME})
+	local fdn="cn=${CURRENT_KERBEROS_SERVICE_NAME},${CURRENT_AD_WEBGATEWAY_RDN},${dc_chain}"
+	itemID[${i}]="fdn"
+	itemTitle[${i}]="Full DN on Active Directory"
+	blankItemContent[${i}]="${fdn}"
+	itemForm[${i}]="text"
+	((i++))
     fi
 
-    blankItemContent[0]="${fdn}"
-    blankItemContent[1]="type='text' size='16' maxlength='64' value='${login}'"
-    blankItemContent[2]="type='password' size='32' maxlength='64'"
+    itemID[${i}]="principal"
+    itemTitle[${i}]="HTTP Proxy Service Principal"
+    blankItemContent[${i}]="${principal}"
+    itemForm[${i}]="text"
+    ((i++))
 
-    itemForm[0]="text"
+    itemID[${i}]="login"
+    itemTitle[${i}]="Kerberos Administrator User"
+    blankItemContent[${i}]="type='text' size='16' maxlength='64' value='${login}'"
+    checkItem[${i}]=printable
+    ((i++))
 
-    checkItem[1]=printable
-    checkItem[2]=printable
+    itemID[${i}]="password"
+    itemTitle[${i}]="Kerberos Administrator Password"
+    blankItemContent[${i}]="type='password' size='32' maxlength='64'"
+    checkItem[${i}]=printable
+    ((i++))
 
-    shortcutMenuItem[0]="mode-feature"
-    shortcutMenuItem[1]="authenticate"
-    shortcutMenuItem[2]="authenticate-kerberos-ad"
-    shortcutMenuItem[3]="authenticate-kerberos-server"
-    shortcutMenuItem[4]="authenticate-kerberos-rweb"
-    shortcutMenuItem[5]="time"
-    shortcutMenuTitle[0]="Activate Authentication"
-    shortcutMenuTitle[1]="Activate Kerberos"
-    shortcutMenuTitle[2]="Configure Kerberos"
-    shortcutMenuTitle[3]="Kerberos Servers"
-    shortcutMenuTitle[4]="RWeb Kerberos"
-    shortcutMenuTitle[5]="Time Settings"
+    shortcutMenuItem[0]="time"
+    shortcutMenuTitle[0]="Time Settings"
 
     show-title "Kerberos Initialization" "${state}" "authenticate clock ntp"
-    show-shortcuts-menu
     show-form "${width}" "${state}" show-kerberos-create-log
 }
 

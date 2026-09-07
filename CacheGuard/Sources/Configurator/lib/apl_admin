@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       Configurator
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -87,31 +86,33 @@ gen-admin-hosts()
 
 gen-sshd-conf()
 {
-    local admin_user_list=${ADMIN_USER_LIST}
-    test -z "${admin_user_list}" || admin_user_list=" ${admin_user_list}"
     local manager
-
-    echo "Port ${SSH_PORT}"
-    echo "ListenAddress 127.0.0.1"
-
-    if test "${IP_ADMIN_IP}" != "0.0.0.0" ; then
-
-	local admin
-
-	test ${ADMIN_INTERNAL} == False || admin='yes'
-	test ${VPN_IPSEC_MODE} == False -o ${ADMIN_VPN_IPSEC} == False || admin='yes'
-
-	test -z "${admin}" || echo "ListenAddress ${IP_ADMIN_IP}"
-    fi
 
     if test ${APL_ROLE} == 'manager' -a ${MANAGER_SYNC_PEER_IP} != 0.0.0.0 -a ${MANAGER_SYNC_ROLE} == slave ; then
 	manager=" ${MANAGER_NAME}"
     fi
 
+    local allow_users="${ADMIN_NAME}${manager} ${SUPERADMIN_NAME}"
+    test "${APL_MODEL}" != 'test' || allow_users="${allow_users} root"
+    test -z "${ADMIN_USER_LIST}" || allow_users="${allow_users} ${ADMIN_USER_LIST}"
+
+    cat sshd_config-tuned
+    cat sshd_config-constant
+
+    echo "AllowUsers ${allow_users}"
+    echo
+    echo "Port ${SSH_PORT}"
+    echo "ListenAddress 127.0.0.1"
+
     test "${IP_EXTERNAL_IP}" == "0.0.0.0" -o ${ADMIN_EXTERNAL} == False || echo "ListenAddress ${IP_EXTERNAL_IP}"
     test -z "${IF_AUXILIARY}" -o "${IP_AUXILIARY_IP}" == "0.0.0.0" -o ${ADMIN_AUXILIARY} == False || echo "ListenAddress ${IP_AUXILIARY_IP}"
-    echo
-    echo "AllowUsers ${ADMIN_NAME}${manager} ${SUPERADMIN_NAME}${admin_user_list}"
+
+    if test "${IP_ADMIN_IP}" != "0.0.0.0" ; then
+	local admin
+	test ${ADMIN_INTERNAL} == False || admin='yes'
+	test ${VPN_IPSEC_MODE} == False -o ${ADMIN_VPN_IPSEC} == False || admin='yes'
+	test -z "${admin}" || echo "ListenAddress ${IP_ADMIN_IP}"
+    fi
 
     local new_2fa=$(get-admin-2fa ${ADMIN_NAME} new)
 
@@ -132,9 +133,6 @@ gen-sshd-conf()
     else
 	echo "UsePAM no"
     fi
-
-    cat sshd_config-tuned
-    cat sshd_config-constant
 }
 
 gen-directory-admin-access-allow()
@@ -772,6 +770,7 @@ gen-waudit-env-file()
     echo "GUI_MODULE_NAME='Auditing'"
     echo "GUI_EXT_NAME='${GUI_EXT_NAME}'"
     echo "GUI_AUTHENTICATION_KEY_FILE='${GUI_AUTHENTICATION_KEY_FILE}'"
+    echo "GUI_CHECK_DATE_FILENAME='${GUI_CHECK_DATE_FILENAME}'"
     echo "GUI_COOKIE_AUTH_NAME='${GUI_COOKIE_AUTH_NAME}'"
     echo "GUI_COOKIE_CONTEXT_NAME='${GUI_COOKIE_CONTEXT_NAME}'"
     echo "GUI_COOKIE_LEFT_MENU_NAME='${GUI_COOKIE_LEFT_MENU_NAME}'"
@@ -997,7 +996,7 @@ gen-health-check-srv()
 	echo "c-icap major ${ICAP_LOCAL_IP} ${ICAP_PORT}"
     fi
 
-    test ${PROXY2_MODE} == False -o ${CACHE_MODE} == False || echo "htcacheclean minor"
+    test ${RWEB_MODE} == False -o ${CACHE_MODE} == False || echo "htcacheclean minor"
 
     if test ${APL_ROLE} == 'gateway' ; then
 	test ${SQUID_IS_ACTIVE} == False || echo "squid critical 127.0.0.1 ${PROXY_PORT}"
@@ -1084,7 +1083,7 @@ gen-snmpd-conf-proc()
 	cat snmpd.conf-c-icap-tuned
     fi
 
-    test ${PROXY2_MODE} == False -o ${CACHE_MODE} == False || echo "proc htcacheclean 1 1"
+    test ${RWEB_MODE} == False -o ${CACHE_MODE} == False || echo "proc htcacheclean 1 1"
 
     test ${GUARD_MODE} == False || cat snmpd.conf-squidGuard-tuned
 

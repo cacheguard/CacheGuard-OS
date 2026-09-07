@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -27,12 +26,9 @@ show-antivirus-update-log()
     local extended=${1}
     extended=${extended//+/ }
 
-    echo "<div class='core-form' style='margin-top:0;'>"
-    refresh-buttons "update_antivirus_update( 1 )"
-    echo "<div style='clear:left;'></div><br />"
-    echo "<span class='table-title'>Last explicit ${extended}antivirus update report&nbsp;</span>"
+    refresh-buttons
+    echo "<div class='table-title'>Last ${extended}antivirus manual update report</div>"
     echo "<div id='${AUTO_REPORT_ID}' class='log-report'></div>"
-    echo "</div>"
 }
 
 show-av-update-form()
@@ -44,8 +40,6 @@ show-av-update-form()
     test ${APL_ROLE} == 'gateway' || extended="extended "
     test "${REMOTE_USER}" == "${ADMIN_NAME}" || state=disabled
 
-    show-title "Update ${extended^}Antivirus Signature DB" "${state}" "antivirus"
-
     if test ${APL_ROLE} == gateway ; then
 	shortcutMenuItem[${i}]="mode-feature"
 	shortcutMenuTitle[${i}]="Activate the antivirus"
@@ -56,7 +50,7 @@ show-av-update-form()
     shortcutMenuTitle[${i}]="Configure the antivirus"
     ((i++))
 
-    show-shortcuts-menu
+    show-title "Update ${extended^}Antivirus Signature DB" "${state}" "antivirus"
     show-form "${width}" "${state}" show-antivirus-update-log ${extended// /+}
 }
 

@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       Configurator
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -76,42 +75,42 @@ set-vrrp-ip()
 
     case "${state}" in
 	new)
-	    export VRRP_EXTERNAL_IP_LIST=""
+	    unset VRRP_EXTERNAL_IP_LIST
 	    export VRRP_EXTERNAL_IP_LIST_NB=0
 
-	    export VRRP_AUXILIARY_IP_LIST=""
+	    unset VRRP_AUXILIARY_IP_LIST
 	    export VRRP_AUXILIARY_IP_LIST_NB=0
 
-	    export VRRP_WEB_IP_LIST=""
+	    unset VRRP_WEB_IP_LIST
 	    export VRRP_WEB_IP_LIST_NB=0
 	    export VRRP_WEB_MASTER_IP="0.0.0.0"
 
-	    export VRRP_RWEB_IP_LIST=""
+	    unset VRRP_RWEB_IP_LIST
 	    export VRRP_RWEB_IP_LIST_NB=0
 	    export VRRP_RWEB_MASTER_IP="0.0.0.0"
 
-	    export VRRP_AV_IP_LIST=""
+	    unset VRRP_AV_IP_LIST
 	    export VRRP_AV_IP_LIST_NB=0
 	    export VRRP_AV_MASTER_IP="0.0.0.0"
 
 	    test ${HA_MODE} == True || return 0
 	    ;;
 	cur)
-	    export CURRENT_VRRP_EXTERNAL_IP_LIST=""
+	    unset CURRENT_VRRP_EXTERNAL_IP_LIST
 	    export CURRENT_VRRP_EXTERNAL_IP_LIST_NB=0
 
-	    export CURRENT_VRRP_AUXILIARY_IP_LIST=""
+	    unset CURRENT_VRRP_AUXILIARY_IP_LIST
 	    export CURRENT_VRRP_AUXILIARY_IP_LIST_NB=0
 
-	    export CURRENT_VRRP_WEB_IP_LIST=""
+	    unset CURRENT_VRRP_WEB_IP_LIST
 	    export CURRENT_VRRP_WEB_IP_LIST_NB=0
 	    export CURRENT_VRRP_WEB_MASTER_IP="0.0.0.0"
 
-	    export CURRENT_VRRP_RWEB_IP_LIST=""
+	    unset CURRENT_VRRP_RWEB_IP_LIST
 	    export CURRENT_VRRP_RWEB_IP_LIST_NB=0
 	    export CURRENT_VRRP_RWEB_MASTER_IP="0.0.0.0"
 
-	    export CURRENT_VRRP_AV_IP_LIST=""
+	    unset CURRENT_VRRP_AV_IP_LIST
 	    export CURRENT_VRRP_AV_IP_LIST_NB=0
 	    export CURRENT_VRRP_AV_MASTER_IP="0.0.0.0"
 
@@ -810,7 +809,7 @@ set-ha-parameters()
     if test ${HA_MODE} == True ; then
 	HEALTH_CHECK_INTERVAL=5000000
     else
-	HEALTH_CHECK_INTERVAL=20000000
+	HEALTH_CHECK_INTERVAL=10000000
     fi
 }
 

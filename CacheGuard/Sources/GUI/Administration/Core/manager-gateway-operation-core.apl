@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -52,13 +51,15 @@ show-manager-gateway-scope()
     local selected domain
 
     selected=$(get-selected-option "${in_scope}" gateway)    
-    echo "<option value='gateway'${selected}>Specific Gateways</option>"
+    echo "<option value='gateway'${selected}>Specific Gateway</option>"
 
+    echo "<optgroup label='Domains'>"
     for domain in ${domains}
     do
 	selected=$(get-selected-option domain:${domain} "${in_scope}")
 	echo "<option value='domain:${domain}'${selected}>Domain ${domain}</option>"
     done
+    echo "</optgroup>"
 
     selected=$(get-selected-option "${in_scope}" all)
     echo "<option value='all'${selected}>All Gateways</option>"
@@ -87,10 +88,8 @@ show-manager-gateway-operation-log()
     test -n "${1}" || return 1
     local operation_selection_id=${1}
 
-    refresh-buttons "update_manager_gateway_operation( 1, \"${operation_selection_id}\" )"
+    refresh-buttons ObjectId ${operation_selection_id}
 
-    echo "<div style='clear:left;'></div><br />"
-    echo "<div style='clear:left;'></div>"
     echo "<div id='${AUTO_REPORT_ID}' class='log-report'></div>"
 }
 
@@ -160,8 +159,8 @@ show-manager-gateway-operation-form()
     itemForm[1]="select"
     itemForm[2]="select"
 
-    itemFormSelectCB[1]="targetGatewaySelectCB( '${scope_selection_id}', '${gateway_selection_id}' );"
-
+    itemData[1]="data-action='target-gateway-select' data-scope-selection-id='${scope_selection_id}' data-gateway-selection-id='${gateway_selection_id}'"
+    
     test "${in_scope}" == gateway || itemState[2]=disabled
 
     test -s ${HOME}/${MANAGER_GATEWAY_INDEX} || state=disabled
@@ -178,7 +177,6 @@ show-manager-gateway-operation-form()
     shortcutMenuTitle[0]="Gateways Repository"
 
     show-title "Operation on Gateways" "${state}" "manager"
-    show-shortcuts-menu
     show-form "${width}" "${state}" show-manager-gateway-operation-log ${operation_selection_id}
 }
 

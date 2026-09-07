@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -39,24 +38,19 @@ show-vpnipsec-access-conf()
     test -n "${1}" || return 1
     test -n "${2}" || return 2
     test -n "${3}" || return 3
-    test -n "${4}" || return 4
-    local width=${1}
-    local system_id=${2}
-    local tls_id=${3}
-    local content_id=${4}
-    local tls_state=${5}
-
-    echo "<div style='clear:left;'></div><br />"
+    local system_id=${1}
+    local tls_id=${2}
+    local content_id=${3}
+    local tls_state=${4}
 
     if test -n "${tls_state}" ; then
-	echo-content-unavailable ${width} "No client certificate is present on this system."
+	echo-unavailable-message "no client certificate is present on this system."
 	return 0
     fi
 
     echo "<div class='table-title'>IPsec VPN Access Configuration</div>"
     echo "<div id='${content_id}'></div>"
-
-    call-js-function "IPsecVPNAccessConfSelectCB( '${system_id}', '${tls_id}', '/${GUI_DIR_NAME}/vpnipsec-access-conf-print.${GUI_EXT_NAME}', '${content_id}' )"
+    echo "<div data-show-ipsec-access-conf data-system-id='${system_id}' data-tls-id='${tls_id}' data-content-id='${content_id}' hidden></div>"
 }
 
 show-vpnipsec-access-conf-form()
@@ -67,10 +61,10 @@ show-vpnipsec-access-conf-form()
 
     local system_id='system'
     local tls_id='tls'
-    local content_id='vpnipsec_access_conf'
-    local protocol_id='protocol' style protocol
+    local content_id='profile'
+    local protocol_id='protocol' class protocol
     local server_id='server'
-    local target_id='target_title' target_title
+    local target_id='target-title' target_title
     local name_id='name'
 
     itemWidth[0]=25
@@ -82,7 +76,8 @@ show-vpnipsec-access-conf-form()
     itemID[${i}]="${system_id}"
     itemForm[${i}]="select"
     blankItemContent[${i}]="$(show-system-list ${VALUES[${i}]})"
-    itemFormSelectCB[${i}]="IPsecVPNAccessConfSelectCB( '${system_id}', '${tls_id}', '/${GUI_DIR_NAME}/vpnipsec-access-conf-print.${GUI_EXT_NAME}', '${content_id}' );"
+    itemData[${i}]="data-action='ipsec-vpn-access-conf' data-system-id='${system_id}' data-tls-id='${tls_id}' data-content-id='${content_id}'"
+
     ((i++))
 
     if test -z "${psk}" ; then
@@ -95,7 +90,7 @@ show-vpnipsec-access-conf-form()
 	itemID[${i}]="${tls_id}"
 	itemForm[${i}]="select"
 	blankItemContent[${i}]=${tls_clients}
-	itemFormSelectCB[${i}]="IPsecVPNAccessConfSelectCB( '${system_id}', '${tls_id}', '/${GUI_DIR_NAME}/vpnipsec-access-conf-print.${GUI_EXT_NAME}', '${content_id}' );"
+	itemData[${i}]="data-action='ipsec-vpn-access-conf' data-system-id='${system_id}' data-tls-id='${tls_id}' data-content-id='${content_id}'"
 	((i++))
     fi
 
@@ -104,7 +99,8 @@ show-vpnipsec-access-conf-form()
     itemForm[${i}]="select"
     protocol=${VALUES[${i}]:1}
     blankItemContent[${i}]=$(show-file-protocol1 "${protocol}" "sftp tftp ftp smtp")
-    itemFormSelectCB[${i}]="accessIPsecVPNProtocolSelectCB( '${protocol_id}', '${server_id}', '${name_id}', '${target_id}' );"
+    itemData[${i}]="data-action='access-ipsec-vpn-protocol' data-protocol-id='${protocol_id}' data-server-id='${server_id}' data-name-id='${name_id}' data-target-id='${target_id}'"
+
     ((i++))
 
     file_servers=$(show-file-servers 'cur' ${VALUES[${i}]})
@@ -117,12 +113,12 @@ show-vpnipsec-access-conf-form()
 
     case ${protocol} in
 	smtp)
-	    unset style
+	    unset class
 	    target_title="Receiver Email"
 	    ;;
 	*)
 	    target_title="File Path"
-	    style=" style='${GUI_READONLY_STYLE}'"
+	    class=" class='read-only'"
 	    ;;
     esac
 
@@ -135,7 +131,7 @@ show-vpnipsec-access-conf-form()
 
     itemTitle[${i}]="Receiver Name"
     itemID[${i}]=${name_id}
-    blankItemContent[${i}]="type='text' size='32' maxlength='${MAX_LEN}' value='${VALUES[${i}]}'${style}"
+    blankItemContent[${i}]="type='text' size='32' maxlength='${MAX_LEN}' value='${VALUES[${i}]}'${class}"
     ((i++))
 
     i=0
@@ -159,8 +155,7 @@ show-vpnipsec-access-conf-form()
     ((i++))
 
     show-title "Show, Save or Email IPsec VPN Access Configuration" "${state}" "access email password vpnipsec"
-    show-shortcuts-menu
-    show-form "${width}" "${state}" "show-vpnipsec-access-conf ${width} ${system_id} ${tls_id} ${content_id} ${tls_state}"
+    show-form "${width}" "${state}" "show-vpnipsec-access-conf ${system_id} ${tls_id} ${content_id} ${tls_state}"
 }
 
 # Main()

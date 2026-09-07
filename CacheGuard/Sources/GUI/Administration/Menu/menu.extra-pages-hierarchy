@@ -1,4 +1,5 @@
 admin-ssh-key		admin-ssh-key-load
+admin-ssh-key		admin-ssh-key-set
 conf-show		conf-template
 panel-board		system-report
 rweb-settings		rweb-balancer

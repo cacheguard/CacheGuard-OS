@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -32,7 +31,7 @@ select-vpnipsec-site-settings()
     local dn_fqdn_id="${4}"
     local psk_id="${5}"
 
-    call-js-function "VPNIPsecSiteSettingsCB( '${authenticate_id}', '${tls_authenticate_id}', '${tls_id_id}', '${dn_fqdn_id}', '${psk_id}' )"
+    echo "<div data-init-vpn-ipsec-site-settings data-authenticate-id='${authenticate_id}' data-tls-authenticate-id='${tls_authenticate_id}' data-tls-id-id='${tls_id_id}' data-dn-fqdn-id='${dn_fqdn_id}' data-psk-id='${psk_id}' hidden></div>"
 }
 
 show-vpnipsec-site-settings()
@@ -42,7 +41,6 @@ show-vpnipsec-site-settings()
     test -n "${in_vpn_id}" || return 1
 
     local remote_address_tip="Master address followed by optional comma separated backup addresses"
-    local remote_address_tip_width=500
 
     local width=600 i=0
 
@@ -67,7 +65,7 @@ show-vpnipsec-site-settings()
     itemTitle[${i}]="Diffie Hellman Key Strength" ; ((i++))
     itemTitle[${i}]="ESP Encryption Algorithm" ; ((i++))
     itemTitle[${i}]="ESP Integrity Algorithm" ; ((i++))
-    itemTitle[${i}]="Remote ISAMP (IKE) Port" ; ((i++))
+    itemTitle[${i}]="Remote ISAKMP (IKE) Port" ; ((i++))
     itemTitle[${i}]="Remote NAT Transversal (NATT) Port" ; ((i++))
     itemTitle[${i}]="Remote NAT Role" ; ((i++))
     itemTitle[${i}]="Private Networks" ; ((i++))
@@ -202,16 +200,15 @@ show-vpnipsec-site-settings()
 	((i++))
     done
 
-    local color='SeaGreen'
     i=0
 
-    blankItemContent[${i}]="type='text' size='${MAX_NAME_LEN}' maxlength='${MAX_NAME_LEN}' value='${in_vpn_id}' readonly style='color:${color}; border:0;'" ; ((i++))
-    blankItemContent[${i}]="type='text' size='64' maxlength='128' value='${remote_addresses}' onMouseOver='ddrivetip( \"${remote_address_tip}\", ${remote_address_tip_width} );' onMouseOut='hideddrivetip( );'" ; ((i++))
+    blankItemContent[${i}]="type='text' size='${MAX_NAME_LEN}' maxlength='${MAX_NAME_LEN}' value='${in_vpn_id}' class='non-editable' readonly" ; ((i++))
+    blankItemContent[${i}]="type='text' size='48' maxlength='128' value='${remote_addresses}' data-action='show-tooltip' data-tip='${remote_address_tip}'" ; ((i++))
     blankItemContent[${i}]=$(show-vpnipsec-site-authenticates ${auth_type}) ; ((i++))
     blankItemContent[${i}]=$(show-vpnipsec-tls-authenticates ${tls_authenticate}) ; ((i++))
     blankItemContent[${i}]=$(show-vpnipsec-tls ${tls_id}) ; ((i++))
-    blankItemContent[${i}]="type='text' size='64' maxlength='256' value='${tls_dn_fqdn}'" ; ((i++))
-    blankItemContent[${i}]="type='password' size='64' maxlength='64' value=''" ; ((i++))
+    blankItemContent[${i}]="type='text' size='48' maxlength='256' value='${tls_dn_fqdn}'" ; ((i++))
+    blankItemContent[${i}]="type='password' size='48' maxlength='64' value=''" ; ((i++))
     blankItemContent[${i}]=$(show-vpnipsec-encryptions ${ike_encryption}) ; ((i++))
     blankItemContent[${i}]=$(show-vpnipsec-integrities ${ike_integrity}) ; ((i++))
     blankItemContent[${i}]=$(show-vpnipsec-dh ${dh}) ; ((i++))
@@ -224,18 +221,16 @@ show-vpnipsec-site-settings()
     blankItemContent[${i}]="<a href='/${GUI_DIR_NAME}/vpnipsec-site-network.${GUI_EXT_NAME}?level:2,key:${in_vpn_id}'>Manage Private Networks</a>" ; ((i++))
     blankItemContent[${i}]="<a href='/${GUI_DIR_NAME}/vpnipsec-site-via.${GUI_EXT_NAME}?level:2,key:${in_vpn_id}'>Manage Via Gateways</a>" ; ((i++))
 
-    itemFormSelectCB[2]="VPNIPsecSiteSettingsCB( '${authenticate_id}', '${id_based_id}', '${tls_id_id}', '${dn_fqdn_id}', '${psk_id}' );"
-    itemFormSelectCB[3]=${itemFormSelectCB[2]}
-    itemFormSelectCB[4]=${itemFormSelectCB[2]}
+    itemData[2]="data-action='vpn-ipsec-site-settings' data-authenticate-id='${authenticate_id}' data-id-based-id='${id_based_id}' data-tls-id-id='${tls_id_id}' data-dn-fqdn-id='${dn_fqdn_id}' data-psk-id='${psk_id}'"
+    itemData[3]=${itemData[2]}
+    itemData[4]=${itemData[2]}
 
     shortcutMenuItem[0]="tls-server"
     shortcutMenuTitle[0]="Manage TLS"
 
     local after_function="select-vpnipsec-site-settings ${authenticate_id} ${id_based_id} ${tls_id_id} ${dn_fqdn_id} ${psk_id}"
 
-    call-js-function "hideddrivetip( )"
     show-title "IPsec VPN Site Settings" "${state}" "vpnipsec tls"
-    show-shortcuts-menu
     show-form "${width}" enabled "${after_function}"
 }
 

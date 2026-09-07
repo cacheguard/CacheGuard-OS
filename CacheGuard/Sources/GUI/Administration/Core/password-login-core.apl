@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -62,7 +61,6 @@ show-password-login-form()
     shortcutMenuTitle[0]="2FA Settings"
 
     show-title "Admin Password" "enabled" "password"
-    show-shortcuts-menu
     show-form "${width}" enabled show-post-errors
 }
 

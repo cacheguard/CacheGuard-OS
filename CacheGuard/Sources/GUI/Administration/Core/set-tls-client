@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -79,12 +78,12 @@ set-tls()
 			    ocsp='noocsp'
 			fi
 
-			echo "tls client add '${VALUES[${tls_pos}]}' '${days}' '${ocsp}' '${numbits}'" >> ${transaction}
+			echo "tls client add ${VALUES[${tls_pos}]} ${days} ${ocsp} ${numbits}" >> ${transaction}
 
 			if test "${VALUES[${status_pos}]}" == cancelRevocation ; then
-			    echo "tls client revoke '${VALUES[${tls_pos}]}' cancel" >> ${transaction}
+			    echo "tls client revoke ${VALUES[${tls_pos}]} cancel" >> ${transaction}
 			elif test "${VALUES[${status_pos}]}" != '' ; then
-			    echo "tls client revoke '${VALUES[${tls_pos}]}' '${VALUES[${status_pos}]}'" >> ${transaction}
+			    echo "tls client revoke ${VALUES[${tls_pos}]} ${VALUES[${status_pos}]}" >> ${transaction}
 			fi
 			;;
 		    old)
@@ -93,19 +92,19 @@ set-tls()
 			;;
 		esac
 		if test -n "${generate}" ; then
-		    echo "tls client generate '${VALUES[${tls_pos}]}'" >> ${transaction}
+		    echo "tls client generate ${VALUES[${tls_pos}]}" >> ${transaction}
 		else
 		    if test -n "${del_private}" ; then
-			echo "tls client del '${VALUES[${tls_pos}]}' private" >> ${transaction}
+			echo "tls client del ${VALUES[${tls_pos}]} private" >> ${transaction}
 		    else
-			echo "tls client del '${VALUES[${tls_pos}]}' private cancel" >> ${transaction}
+			echo "tls client del ${VALUES[${tls_pos}]} private cancel" >> ${transaction}
 		    fi
 		fi
 	    fi
 	    pos=$[${pos} + ${offset} + 8]
 	else
 	    if test -n "${VALUES[${tls_pos}]}" ; then
-		echo "tls client del '${VALUES[${tls_pos}]}'" >> ${transaction}
+		echo "tls client del ${VALUES[${tls_pos}]}" >> ${transaction}
 	    fi
 	    pos=$[${pos} + ${offset} + 9]
 	fi

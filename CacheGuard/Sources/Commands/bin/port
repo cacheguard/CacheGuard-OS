@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       Commands
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -32,7 +31,7 @@ check-port-name()
 	wadmin)
 	    return 0
 	    ;;
-	proxy|thttp|thttps|antivirus|ocsp|isakmp|natt|icppeer|httppeer|htcppeer|dhcp|waudit)
+	proxy|thttp|thttps|antivirus|ocsp|isakmp|natt|httppeer|htcppeer|dhcp|waudit)
 	    contextual-command-is-allowed || return 207
 	    return 0
 	    ;;
@@ -234,12 +233,10 @@ run()
     pr=$(remove-leading-zeros ${pr})
 
     case "${pt}" in
-	proxy|thttp|thttps|antivirus|ocsp|natt|icppeer|httppeer|htcppeer|dhcp|wadmin|waudit)
+	proxy|thttp|thttps|antivirus|ocsp|httppeer|htcppeer|dhcp|wadmin|waudit)
 	    check-high-port-nb ${pr} || return 20
-	    check-snmp-tls-port-nb ${pr} || return 115
 	    ;;
-	isakmp)
-	    check-snmp-tls-port-nb ${pr} || return 115
+	isakmp|natt)
 	    check-service-port-nb ${pr} || return 61
 	    ;;
 	*)
@@ -268,9 +265,6 @@ run()
 	    ;;
 	natt)
 	    export NATT_PORT=${pr}
-	    ;;
-	icppeer)
-	    export PEER_ICP_PORT=${pr}
 	    ;;
 	httppeer)
 	    export PEER_HTTP_PORT=${pr}

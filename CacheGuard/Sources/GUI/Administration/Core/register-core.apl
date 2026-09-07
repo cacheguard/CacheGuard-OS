@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -28,7 +27,7 @@ select-registration-mode()
     local link="${2}"
     local email="${3}"
 
-    call-js-function "registrationModeSelectCB( '${mode}', '${link}', '${email}' )"
+    echo "<div data-init-registration-mode-select data-mode='${mode}' data-link='${link}' data-email='${email}' hidden></div>"
 }
 
 select-registration-action()
@@ -36,7 +35,7 @@ select-registration-action()
     local action="${1}"
     local os_key="${2}"
 
-    call-js-function "registrationActionSelectCB( '${action}', '${os_key}' )"
+    echo "<div data-init-registration-action-select data-action='${action}' data-os-key='${os_key}' hidden></div>"
 }
 
 print-sn-mode()
@@ -73,10 +72,9 @@ print-comment()
     local comment=${1}
 
     local network_page=$(get-upper-page "ip.${GUI_EXT_NAME}")
-    echo "<div style='margin:0; padding:5px;'>"
-    echo "<div class='shortcut-menu-item' style='font-weight:normal;'><a href='${network_page}'>${comment}</a></div>"
+    echo "<div class='core-form'>"
+    echo "<div class='shortcut-menu-item'><a href='${network_page}'>${comment}</a></div>"
     echo "</div>"
-    echo "<div style='clear:left;'></div>"
 }
 
 show-register-form()
@@ -121,16 +119,16 @@ show-register-form()
 
 	test ! -f ${TMP_DIR}/${REGISTER_KEY} || os_key=$(cat ${TMP_DIR}/${REGISTER_KEY})
 
-	local action_id="action"
+	local operation_id="operation"
 	local os_key_id="os_key"
 
-	after_function="select-registration-action ${action_id} ${os_key_id}"
+	after_function="select-registration-action ${operation_id} ${os_key_id}"
 
 	itemTitle[${i}]="Action"
-	itemID[${i}]=${action_id}
+	itemID[${i}]=${operation_id}
 	itemForm[${i}]="select"
 	blankItemContent[${i}]=$(print-registration-action)
-	itemFormSelectCB[${i}]="registrationActionSelectCB( '${action_id}', '${os_key_id}' );"
+ 	itemData[${i}]="data-action='registration-action' data-action-id='${operation_id}' data-os-key-id='${os_key_id}'"
 	((i++))
 
 	if test ${OS_FREE_USAGE} == True ; then
@@ -153,7 +151,7 @@ show-register-form()
 	if test ${OS_FREE_USAGE} == True ; then
 	    itemTitle[${i}]=""
 	    itemID[${i}]='free_usage'
-	    blankItemContent[${i}]="<span style='font-style:italic; color:SeaGreen;'>Since CacheGuard-OS version UF-2.4.1, no license key is required to run the appliance. However, we strongly recommend purchasing a support contract. To do so, please click on the <span style='font-style:normal;'>${subscription_title}</span> link above.</span>"
+	    blankItemContent[${i}]="<div class='information-notice'>Since CacheGuard-OS version UF-2.4.1, no license key is required to run the appliance. However, we strongly recommend purchasing a support contract. To do so, please click on the ${subscription_title}</div> link above."
 	    itemForm[${i}]="text"
 	    ((i++))
 	fi
@@ -180,7 +178,7 @@ show-register-form()
 	itemTitle[${i}]="Mode"
 	itemID[${i}]=${mode}
 	blankItemContent[${i}]=$(print-sn-mode ${mode_value})
-	itemFormSelectCB[${i}]="registrationModeSelectCB( '${mode}', '${link}', '${email}' );"
+	itemData[${i}]="data-action='registration-mode' data-mode='${mode}' data-link='${link}' data-email='${email}'"
 	itemForm[${i}]="select"
 	((i++))
 
@@ -190,9 +188,9 @@ show-register-form()
 	checkItem[${i}]=email
 	((i++))
 
-	itemTitle[${i}]="<strong>Important Notice</strong>"
+	itemTitle[${i}]=''
 	itemID[${i}]='commitment'
-	blankItemContent[${i}]="<span style='font-style:italic;color:SeaGreen;'>We are responsible email senders and never misuse your address. However, some providers may block our messages - Please check your spam folder or use another email.</span>"
+	blankItemContent[${i}]="<div class='information-notice'>We are responsible email senders and never misuse your address. However, some providers may block our messages. Please check your spam folder or use another email.</div>"
 	itemForm[${i}]="text"
 	((i++))
 
@@ -221,9 +219,10 @@ show-register-form()
 
     test ${state} == disabled || accept_value=" checked"
 
-    itemTitle[${accept_index}]="I agree to terms of the <a href='/doc/command/license.html' target='_blank'>${COMMERCIAL_NAME}-OS License</a>"
+    itemTitle[${accept_index}]="I agree to the terms of the<br /><a href='${DOC_COMMAND_DIR}/license.html' target='_blank'>${COMMERCIAL_NAME}-OS License</a>"
     itemID[${accept_index}]="${accept_id}"
-    blankItemContent[${accept_index}]="type='checkbox'${accept_value} onClick='agreeLicense(\"${accept_id}\")'"
+    itemForm[${accept_index}]="check"
+    blankItemContent[${accept_index}]="data-action='agree-license' data-value='${accept_id}'${accept_value}"
 
     show-title "${title}" ${state} "register"
     print-comment "${comment}"

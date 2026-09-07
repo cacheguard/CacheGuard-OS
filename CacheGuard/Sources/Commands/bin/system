@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       Commands
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -747,7 +746,7 @@ show-system-end()
     local date="${end/* }"
 
     if test ${state} == expired -o ${state} == error ; then
-	state=$(get-highlight-text "${state}")
+	state=$(get-terminal-blink-text "${state}")
     fi
 
     echo-mark-cur
@@ -1052,11 +1051,18 @@ system-soft-check()
     new_os_version=$(get-os-latest-version)
     test ${?} -eq 0 || return 104
 
-    local message=$(get-system-soft-check-message "${new_os_version}")
+    local message ret
+
+    echo-begin-show
 
     echo-command-form "system soft check"
+    message=$(get-system-soft-check-message "${new_os_version}")
+    ret=${?}
+
     echo-value "${message}"
-    echo-value "(visit ${PATCH_URL:8})"
+    test ${ret} -eq 0 || echo-value "Visit ${PATCH_URL:7}"
+
+    echo-end-show
 }
 
 commit-pushed-files()
@@ -1236,6 +1242,9 @@ run()
 		    commit-pushed-files
 		    update-modification-state
 		    ;;
+		packconf)
+		    tar --create --gzip --file - ${ENV_RDIR}
+		    ;;
 		*)
 		    return 0
 		    ;;
@@ -1300,7 +1309,7 @@ go()
 	    cleanurllistmpushed)
 		rm -f ${TMP_DIR}/${MPUSHED}.*
 		;;
-	    integrateconf)
+	    integrateconf|packconf)
 		main "${@}"
 		;;
 	    *)

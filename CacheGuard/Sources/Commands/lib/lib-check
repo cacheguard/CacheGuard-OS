@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       Commands
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -299,8 +298,7 @@ check-vlan()
 {
     test -n "${1}" || return 1
 
-    [[ "${1}" =~ (^[1-9][0-9]{0,3}|^0)$ ]] || return 11
-
+    check-digit ${1} || return 11
     test ${1} -ge 0 || return 13
     test ${1} -le 4095 || return 15
 
@@ -427,10 +425,12 @@ check-tls-server-nb()
 
 get-rweb-unique-nb()
 {
-    local elt i=0 range
-    local name
+    local name2add=${1}
 
-    local name_list nb=0
+    local elt range i=0
+    local name found
+
+    local name_list nb
 
     for elt in ${RWEB_SITE_LIST}
     do
@@ -442,10 +442,8 @@ get-rweb-unique-nb()
 	    1|2|3)
 		;;
 	    4)
-		if ! member "${name_list}" ${name} ; then
-		    name_list="${name_list} ${name}"
-		    ((nb++))
-		fi
+		test "${name2add}" != ${name} || found=yes
+		member "${name_list}" ${name} || name_list="${name_list} ${name}"
 		;;
 	    *)
 		echo 0
@@ -454,14 +452,18 @@ get-rweb-unique-nb()
 	esac
 	((i++))
     done
-    
+
+    name_list=${name_list:1}
+    nb=$(length-list "${name_list}")
+    test -z "${found}" || ((nb--))
+
     echo ${nb}
-    return 0
 }
 
 check-rweb-nb()
 {
-    local len=$(get-rweb-unique-nb)
+    local name2add=${1}
+    local len=$(get-rweb-unique-nb ${name2add})
     local rweb_nb=$(get-contextual-rweb-nb)
     test ${len} -lt ${rweb_nb}
 }
@@ -622,9 +624,9 @@ check-url()
 check-clear-password()
 {
     test -n "${1}" || return 0
-    local passwd=${1}
+    local password=${1}
 
-    test "${passwd:0:6}" == "clear:"
+    test "${password:0:6}" == "clear:"
 }
 
 check-allowed-argument()
@@ -658,29 +660,35 @@ check-ftp-login-name()
 {
     test -n "${1}" || return 1
 
-    test ${#1} -le ${MAX_LEN} || return 11
+    test ${#1} -le 32 || return 11
     [[ "${1}" =~ ^([a-zA-Z0-9]|[\-._~:/?#@\!$&\(\)*+,;=%]|\[|\])+$ ]] || return 13
+}
+
+check-ad-account-login-name()
+{
+    check-ftp-login-name "${@}"
+}
+
+check-external-password-length()
+{
+    test ${#1} -le ${MAX_LEN}
 }
 
 check-file-password()
 {
-    test ${#1} -le ${MAX_LEN} || return 11
+    check-external-password-length || return 11
     check-allowed-argument-no-space "${1}" || return 13
 }
 
 check-computer-name()
 {
     test -n "${1}" || return 1
-    local len=${#1}
-    
-    test ${len} -lt 15 || return 11
-    [[ "${1}" =~ ^[a-zA-Z0-9]([a-zA-Z0-9\-])*$ ]] || return 13
+    local name=${1}
 
-    local without_digit=$(printf "%s" "${1//[[:digit:]]/}")
-    test ${#without_digit} -gt 0 || return 15
+    [[ "${name}" =~ ^[A-Za-z0-9][A-Za-z0-9-]{0,14}$ ]] || return 11
+    [[ "${name}" =~ ^[0-9]+$ ]] && return 13
 
-    ((len--))
-    test ${1:${len}} != '-' || return 17
+    return 0
 }
 
 check-hostname()
@@ -873,11 +881,6 @@ check-password()
     [[ ${#password} -ge 16 && ${#password} -le 32 && "${password}" == *[A-Z]* && "${password}" == *[a-z]* && "${password}" == *[0-9]* && "${password}" == *[\!@#%.\$\&*-]* ]]
 }
 
-check-external-password-length()
-{
-    test ${#1} -le ${MAX_LEN}
-}
-
 check-psk()
 {
     password=${1}
@@ -995,4 +998,34 @@ check-reference()
     check-uuid "${uuid}" || return 15
 
     return 0
+}
+
+check-rule-port-range()
+{
+    test -n "${1}" || return 1
+    local ports=${1}
+
+    [[ "${ports}" =~ (^[1-9][0-9]{0,4}|^0)[:]([1-9][0-9]{0,4}|0)$ ]] || return 2
+
+    local port1=${ports/:*}
+    local port2=${ports/*:}
+
+    test ${port1} -ge 0 || return 3
+    test ${port1} -le 65535 || return 4
+
+    test ${port2} -ge 0 || return 5
+    test ${port2} -le 65535 || return 6
+
+    test ${port1} -le ${port2} || return 7
+
+    return 0
+}
+
+check-rule-port()
+{
+    test -n "${1}" || return 1
+    local ports=${1}
+
+    test ${ports} != any || return 0
+    check-port-nb ${ports} || check-rule-port-range ${ports} || return 1
 }

@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       Scripts
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -46,7 +45,7 @@ update-squid-conf()
 
     local squid_cache_memory_sz adapted_sz
     local total_in_memory_cached_object_sz cache_buffer_sz cpu_architecture
-    local proxy_proxy2_ratio_pct
+    local fproxy_rproxy_ratio_pct
     local tag program dir sz rest
 
     test -f ${RUN_DIR}/${TOTAL_IN_MEMORY_CACHED_OBJECT_SZ_FILENAME} || return 111
@@ -57,10 +56,8 @@ update-squid-conf()
 
     ((squid_cache_memory_sz = CACHE_IO_MEMORY_SZ + SQUID_INITIAL_PROCESS_SZ + total_in_memory_cached_object_sz))
 
-    set-proxy2-parameters-cur
-
-    proxy_proxy2_ratio_pct=$(get-proxy-proxy2-ratio-pct ${CURRENT_PROXY2_MODE})
-    cache_buffer_sz=$(get-proxy1-cache-buffer-sz ${FREE_MEMORY_SZ} ${proxy_proxy2_ratio_pct})
+    fproxy_rproxy_ratio_pct=$(get-fproxy-rproxy-ratio-pct ${CURRENT_RWEB_MODE})
+    cache_buffer_sz=$(get-fproxy-cache-buffer-sz ${FREE_MEMORY_SZ} ${fproxy_rproxy_ratio_pct})
     cpu_architecture=$(uname -m 2> /dev/null)
     
     local backup_squid_conf_file=${CONF_DIR}/${CACHE_RECONFIGURE_BACKUP_FILENAME}

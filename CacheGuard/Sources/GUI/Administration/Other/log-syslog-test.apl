@@ -3,7 +3,6 @@
 ###########################################################################
 #
 # MODULE:       GUI
-# AUTHOR(S):    CacheGuard Development Team
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -28,7 +27,7 @@ test-syslog()
 {
     execute-command "log syslog test"
 
-    echo "<div class='with-border' style='font-size:90%; font-style:italic; width:580px; margin-bottom:5px;'>A testing syslog message has been sent to all configured syslog servers. Please check your syslog servers to acknowledge the receipt.</div>"
+    echo "<div class='diagnostic-tools-msg'>A testing syslog message has been sent to all configured syslog servers. Please check your syslog servers to acknowledge the receipt.</div>"
 }
 
 LOG=/dev/null
