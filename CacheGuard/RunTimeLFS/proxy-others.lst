@@ -1,2 +1,3 @@
 etc/mime.conf
+lib/ecap_adapter_gzip.so.*
 share/icons

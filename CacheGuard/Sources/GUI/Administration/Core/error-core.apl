@@ -69,7 +69,7 @@ show-error-form()
 		do
 		    description=${Errors[${code}]}
 		    test -n "${description}" || continue
-		    echo "<tr><td>${code}</td><td>${description}</td></tr>"
+		    echo "<tr><td>${code}</td><td>$(get-magnified-error-text "${description}")</td></tr>"
 		done
 		;;
 	    Command_Warning)
@@ -78,7 +78,7 @@ show-error-form()
 		do
 		    description=${Warnings[${code}]}
 		    test -n "${description}" || continue
-		    echo "<tr><td>${code}</td><td>${description}</td></tr>"
+		    echo "<tr><td>${code}</td><td>$(get-magnified-error-text "${description}")</td></tr>"
 		done
 		;;
 	    Command_Information)

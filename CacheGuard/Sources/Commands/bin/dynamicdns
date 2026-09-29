@@ -265,6 +265,13 @@ run()
 	echo
     fi
 
+    test -n "${password}" || return 51
+
+    if ! check-allowed-argument-no-blank "${password}" ; then
+	INDIRECT_ERROR_CODE=540
+	return 254
+    fi
+
     if ! check-external-password-length "${password}" ; then
 	INDIRECT_ERROR_CODE=531
 	return 254

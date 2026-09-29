@@ -30,11 +30,12 @@
 # Andrew Pollock, February 2005
 # Modified to work on point-to-point links. Andrew Pollock, June 2005
 # Modified to support passing the parameters called with to the hooks. Andrew Pollock, November 2005
-# Modified by CacheGuard Technologies to save the resolv.conf file on a directory location than /etc
+#
+# Modified by CacheGuard Technologies to:
+# o Save the resolv.conf file on a directory location other than /etc
+# o Set a default default for the external netwrok interface only
 
 # The alias handling in here probably still sucks. -mdz
-
-CLOUD_NETWORK_MAIN_DEV=eth0
 
 [ ! -f /etc/sysconfig/dhclient ] || source /etc/sysconfig/dhclient
 [ -n "${RESOLV_CONF_DIR}" ] || RESOLV_CONF_DIR=/etc
@@ -263,9 +264,10 @@ case "$reason" in
                 fi
 
                 # set default route
-                test ${interface} != ${CLOUD_NETWORK_MAIN_DEV} || \
+                if test -z "${CLOUD_NETWORK_MAIN_DEV}" -o ${interface} == "${CLOUD_NETWORK_MAIN_DEV}" ; then
 		    ip -4 route add default via ${router} dev ${interface} \
-                    ${if_metric:+metric $if_metric} >/dev/null 2>&1
+                       ${if_metric:+metric $if_metric} >/dev/null 2>&1
+		fi
 
                 if [ -n "$if_metric" ]; then
                     if_metric=$((if_metric+1))
@@ -342,9 +344,10 @@ case "$reason" in
 
             # set default route
             for router in $new_routers; do
-                test ${interface} != ${CLOUD_NETWORK_MAIN_DEV} || \
+		if test -z "${CLOUD_NETWORK_MAIN_DEV}" -o ${interface} == "${CLOUD_NETWORK_MAIN_DEV}" ; then
 		    ip -4 route add default via ${router} dev ${interface} \
                     ${if_metric:+metric $if_metric} >/dev/null 2>&1
+		fi
 
                 if [ -n "$if_metric" ]; then
                     if_metric=$((if_metric+1))

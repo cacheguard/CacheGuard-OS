@@ -139,7 +139,6 @@ update-cloud-ip-conf1()
 	external_ip='0.0.0.0'
 	external_mk='0.0.0.0'
     else
-
 	local external_ip_px=${external_net/*inet /} ; external_ip_px=${external_ip_px/ brd*}
 	external_ip=${external_ip_px/\/*}
 	external_mk=$(get-netmask ${external_ip_px})

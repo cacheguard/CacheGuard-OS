@@ -487,6 +487,11 @@ gen-snmp.conf-constant()
     cat Constant/snmp.conf-constant-1
 }
 
+gen-pppoe-constant()
+{
+    cat Constant/pppoe-constant-1
+}
+
 gen-pam_d_sshd()
 {
     cat pam.d/sshd-1
@@ -538,6 +543,7 @@ gen-tuner-conf()
     gen-modsecurity-common-conf > ${GENERATED_DIR}/modsecurity-common.conf
     gen-modsecurity-common-rules > ${GENERATED_DIR}/modsecurity-common.rules
 
+    gen-pppoe-constant > ${GENERATED_DIR}/pppoe-constant
     gen-squid-conf-constant > ${GENERATED_DIR}/squid.conf-constant
     gen-sudoers-constant > ${GENERATED_DIR}/sudoers-constant
     gen-admin-sudoers-constant > ${GENERATED_DIR}/admin-sudoers-constant
@@ -557,6 +563,7 @@ gen-tuner-conf()
     gen-lcd4linux.conf-constant > ${GENERATED_DIR}/lcd4linux.conf-constant
     gen-snmpd.conf-constant > ${GENERATED_DIR}/snmpd.conf-constant
     gen-snmp.conf-constant > ${GENERATED_DIR}/snmp.conf-constant
+
     gen-pam_d_sshd > ${GENERATED_DIR}/pam.d.sshd
 }
 
@@ -572,6 +579,7 @@ install-tuner-conf()
     sudo install -m 444 -o root -g root ${GENERATED_DIR}/modsecurity-common.conf ${APL}${WEB_ETC_DIR}/modsecurity-common.conf
     sudo install -m 444 -o root -g root ${GENERATED_DIR}/modsecurity-common.rules ${APL}${WEB_ETC_DIR}/modsecurity-common.rules
 
+    sudo install -m 644 -o root -g root ${GENERATED_DIR}/pppoe-constant ${APL}${CONF_DIR}/pppoe-constant
     sudo install -m 444 -o root -g root ${GENERATED_DIR}/squid.conf-constant ${APL}${CONF_DIR}/squid.conf-constant
     sudo install -m 440 -o root -g root ${GENERATED_DIR}/sudoers-constant ${APL}${CONF_DIR}/sudoers-constant
     sudo install -m 444 -o root -g root ${GENERATED_DIR}/admin-sudoers-constant ${APL}${CONF_DIR}/admin-sudoers-constant

@@ -108,6 +108,12 @@ do-mkdir-system()
     sudo install -d -m 755 -o root -g root ${APL}${CLOUD_DIR}
 }
 
+do-mkdir-ppp()
+{
+    sudo install -d -m 755 -o root -g root ${APL}${ETC_PPP_DIR}
+    sudo install -d -m 755 -o root -g root ${APL}${ETC_PPP_PEERS_DIR}
+}
+
 do-mkdir-srv()
 {
     local dir
@@ -294,6 +300,7 @@ do-mkdir-embedded()
 apl-mkdirs()
 {
     do-mkdir-system
+    do-mkdir-ppp
     do-mkdir-srv
     do-mkdir-proxy
     do-mkdir-web

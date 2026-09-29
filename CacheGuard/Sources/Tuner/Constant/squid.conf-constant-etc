@@ -15,7 +15,6 @@ ipcache_high 95
 memory_replacement_policy lru
 cache_replacement_policy lru
 memory_cache_mode always
-collapsed_forwarding off
 
 icon_directory /share/icons
 error_directory /share/errors

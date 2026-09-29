@@ -71,11 +71,7 @@ get-sfq-flows-divisor()
 
 set-qos-constant()
 {
-    local flows_divisor flows divisor clients
-    local qdisc_sfq="sfq perturb 60 quantum ${NETWORK_MTU}b"
-    local simultaneous_etc_nb=$[(${SIMULTANEOUS_USERS_NB} + ${SIMULTANEOUS_RUSERS_NB}) / 5]
-
-    test ${simultaneous_etc_nb} -gt 1 || simultaneous_etc_nb=1
+    export QOS_LEAF_QDISC=sfq
 
     export QOS_ADMIN_OR_MON_MARK=0x1
     export QOS_FILE_MARK=0x3
@@ -168,15 +164,16 @@ set-qos-constant()
     export QOS_AV_FILTER_PRIO=24
     export QOS_ARP_FILTER_PRIO=26
     export QOS_DHCP_FILTER_PRIO=28
-    export QOS_VRRP_FILTER_PRIO=30
-    export QOS_ICMP_FILTER_PRIO=32
-    export QOS_AUTH_FILTER_PRIO=34
-    export QOS_NTP_FILTER_PRIO=36
-    export QOS_OCSP_FILTER_PRIO=38
-    export QOS_EMAIL_FILTER_PRIO=40
-    export QOS_IGMP_FILTER_PRIO=42
-    export QOS_IPV6_FILTER_PRIO=44
-    export QOS_SELF_FIRST_FILTER_PRIO=46
+    export QOS_CLOUD_FILTER_PRIO=30
+    export QOS_VRRP_FILTER_PRIO=32
+    export QOS_ICMP_FILTER_PRIO=34
+    export QOS_AUTH_FILTER_PRIO=36
+    export QOS_NTP_FILTER_PRIO=38
+    export QOS_OCSP_FILTER_PRIO=40
+    export QOS_EMAIL_FILTER_PRIO=42
+    export QOS_IGMP_FILTER_PRIO=44
+    export QOS_IPV6_FILTER_PRIO=46
+    export QOS_SELF_FIRST_FILTER_PRIO=48
     export QOS_FILE_FILTER_PRIO=$[${QOS_SELF_FIRST_FILTER_PRIO} + ${MAX_QOS_SHAPE_ROUTER_RULES_NB} + 2]
     export QOS_SELF_DEFAULT_FILTER_PRIO=$[${QOS_FILE_FILTER_PRIO} + 2]
 
@@ -188,50 +185,75 @@ set-qos-constant()
 
     export QOS_HTB_QUANTUM="quantum ${NETWORK_MTU}"
 
-    flows_divisor=$(get-sfq-flows-divisor ${MAX_ADMINISTRATORS_NB})
-    flows=${flows_divisor/:*}
-    divisor=${flows_divisor/*:}
-    export QOS_QDISC_SFQ_ADMIN_OR_MON="${qdisc_sfq} flows ${flows} divisor ${divisor}"
+    case ${QOS_LEAF_QDISC} in
+	sfq)
+	    local flows_divisor flows divisor clients
 
-    flows_divisor=$(get-sfq-flows-divisor ${SIMULTANEOUS_USERS_NB})
-    flows=${flows_divisor/:*}
-    divisor=${flows_divisor/*:}
-    export QOS_QDISC_SFQ_USERS="${qdisc_sfq} flows ${flows} divisor ${divisor}"
+	    local qdisc_sfq="sfq perturb 60 quantum ${NETWORK_MTU}b"
 
-    flows_divisor=$(get-sfq-flows-divisor ${SIMULTANEOUS_RUSERS_NB})
-    flows=${flows_divisor/:*}
-    divisor=${flows_divisor/*:}
-    export QOS_QDISC_SFQ_RUSERS="${qdisc_sfq} flows ${flows} divisor ${divisor}"
+	    local simultaneous_etc_nb=$[(${SIMULTANEOUS_USERS_NB} + ${SIMULTANEOUS_RUSERS_NB}) / 5]
+	    test ${simultaneous_etc_nb} -gt 1 || simultaneous_etc_nb=1
 
-    flows_divisor=$(get-sfq-flows-divisor ${MAX_RWEB_HOST_NB})
-    flows=${flows_divisor/:*}
-    divisor=${flows_divisor/*:}
-    export QOS_QDISC_SFQ_RWEB="${qdisc_sfq} flows ${flows} divisor ${divisor}"
 
-    flows_divisor=$(get-sfq-flows-divisor $[2 * ${MAX_PEERS_NB}])
-    flows=${flows_divisor/:*}
-    divisor=${flows_divisor/*:}
-    export QOS_QDISC_SFQ_PEER="${qdisc_sfq} flows ${flows} divisor ${divisor}"
+	    flows_divisor=$(get-sfq-flows-divisor ${MAX_ADMINISTRATORS_NB})
+	    flows=${flows_divisor/:*}
+	    divisor=${flows_divisor/*:}
+	    export QOS_QDISC_LEAFQ_ADMIN_OR_MON="${qdisc_sfq} flows ${flows} divisor ${divisor}"
+
+	    flows_divisor=$(get-sfq-flows-divisor ${SIMULTANEOUS_USERS_NB})
+	    flows=${flows_divisor/:*}
+	    divisor=${flows_divisor/*:}
+	    export QOS_QDISC_LEAFQ_USERS="${qdisc_sfq} flows ${flows} divisor ${divisor}"
+
+	    flows_divisor=$(get-sfq-flows-divisor ${SIMULTANEOUS_RUSERS_NB})
+	    flows=${flows_divisor/:*}
+	    divisor=${flows_divisor/*:}
+	    export QOS_QDISC_LEAFQ_RUSERS="${qdisc_sfq} flows ${flows} divisor ${divisor}"
+
+	    flows_divisor=$(get-sfq-flows-divisor ${MAX_RWEB_HOST_NB})
+	    flows=${flows_divisor/:*}
+	    divisor=${flows_divisor/*:}
+	    export QOS_QDISC_LEAFQ_RWEB="${qdisc_sfq} flows ${flows} divisor ${divisor}"
+
+	    flows_divisor=$(get-sfq-flows-divisor $[2 * ${MAX_PEERS_NB}])
+	    flows=${flows_divisor/:*}
+	    divisor=${flows_divisor/*:}
+	    export QOS_QDISC_LEAFQ_PEER="${qdisc_sfq} flows ${flows} divisor ${divisor}"
     
-    flows_divisor=$(get-sfq-flows-divisor ${MAX_ACL_AV_NB})
-    flows=${flows_divisor/:*}
-    divisor=${flows_divisor/*:}
-    export QOS_QDISC_SFQ_AV="${qdisc_sfq} flows ${flows} divisor ${divisor}"
+	    flows_divisor=$(get-sfq-flows-divisor ${MAX_ACL_AV_NB})
+	    flows=${flows_divisor/:*}
+	    divisor=${flows_divisor/*:}
+	    export QOS_QDISC_LEAFQ_AV="${qdisc_sfq} flows ${flows} divisor ${divisor}"
 
-    flows_divisor=$(get-sfq-flows-divisor ${simultaneous_etc_nb})
-    flows=${flows_divisor/:*}
-    divisor=${flows_divisor/*:}
-    export QOS_QDISC_SFQ_ETC="${qdisc_sfq} flows ${flows} divisor ${divisor}"
+	    flows_divisor=$(get-sfq-flows-divisor ${simultaneous_etc_nb})
+	    flows=${flows_divisor/:*}
+	    divisor=${flows_divisor/*:}
+	    export QOS_QDISC_LEAFQ_ETC="${qdisc_sfq} flows ${flows} divisor ${divisor}"
 
-    if test ${VPN_IPSEC_ACCESS_MODE} == True ; then
-	clients=${SIMULTANEOUS_USERS_NB}
-    else
-	clients=${VPN_IPSEC_SITE_NB}
-    fi
-    flows_divisor=$(get-sfq-flows-divisor ${clients})
-    flows=${flows_divisor/:*}
-    divisor=${flows_divisor/*:}
-    export QOS_QDISC_SFQ_IPSEC="${qdisc_sfq} flows ${flows} divisor ${divisor}"
+	    if test ${VPN_IPSEC_ACCESS_MODE} == True ; then
+		clients=${SIMULTANEOUS_USERS_NB}
+	    else
+		clients=${VPN_IPSEC_SITE_NB}
+	    fi
+	    flows_divisor=$(get-sfq-flows-divisor ${clients})
+	    flows=${flows_divisor/:*}
+	    divisor=${flows_divisor/*:}
+	    export QOS_QDISC_LEAFQ_IPSEC="${qdisc_sfq} flows ${flows} divisor ${divisor}"
+	    ;;
+	fq_codel)
+	    loca qdisc_fq_codel="fq_codel quantum ${NETWORK_MTU}"
+	    export QOS_QDISC_LEAFQ_ADMIN_OR_MON=${qdisc_fq_codel}
+	    export QOS_QDISC_LEAFQ_USERS=${qdisc_fq_codel}
+	    export QOS_QDISC_LEAFQ_RUSERS=${qdisc_fq_codel}
+	    export QOS_QDISC_LEAFQ_RWEB=${qdisc_fq_codel}
+	    export QOS_QDISC_LEAFQ_PEER=${qdisc_fq_codel}
+	    export QOS_QDISC_LEAFQ_AV=${qdisc_fq_codel}
+	    export QOS_QDISC_LEAFQ_ETC=${qdisc_fq_codel}
+	    export QOS_QDISC_LEAFQ_IPSEC=${qdisc_fq_codel}
+	    ;;
+	*)
+	    ;;
+    esac
 
     export QOS_FILTER_SYN="match u8 0x02 0xff at 33"
     export QOS_FILTER_NSYN="match u8 0x00 0x02 at 33"
@@ -269,6 +291,11 @@ set-qos-parameters()
 
     local ceil=$[${rate} * 5]
     export QOS_ETC_RATE="${rate}kbit ceil ${ceil}kbit"
+}
+
+reset-qos-index()
+{
+    rm -f /tmp/${QOS_INDEX_FILENAME}.${$}
 }
 
 commit-qos-index()
@@ -493,11 +520,11 @@ gen-tc-qos-default()
 	echo "# Default QoS for ingress traffic on the ${interface} (${idev}) interface:"
 
 	echo "class add dev ${idev} parent ${QOS_CLASS_SELF_ID} classid ${QOS_CLASS_SELF_DEFAULT_ID} htb rate ${irate}kbit ceil ${iceil}kbit ${QOS_HTB_QUANTUM} prio ${QOS_CLASS_SELF_DEFAULT_PRIO}"
-	echo "qdisc add dev ${idev} parent ${QOS_CLASS_SELF_DEFAULT_ID} handle ${handle_self} ${QOS_QDISC_SFQ_USERS}"
+	echo "qdisc add dev ${idev} parent ${QOS_CLASS_SELF_DEFAULT_ID} handle ${handle_self} ${QOS_QDISC_LEAFQ_USERS}"
 	echo "filter add dev ${idev} parent ${QOS_CLASS_SELF_ID} priority ${QOS_SELF_DEFAULT_FILTER_PRIO} matchall flowid ${QOS_CLASS_SELF_DEFAULT_ID}"
 	echo
 	echo "class add dev ${idev} parent ${QOS_CLASS_ROUTER_ID} classid ${QOS_CLASS_ROUTER_DEFAULT_ID} htb rate ${irate}kbit ceil ${iceil}kbit ${QOS_HTB_QUANTUM} prio ${QOS_CLASS_ROUTER_DEFAULT_PRIO}"
-	echo "qdisc add dev ${idev} parent ${QOS_CLASS_ROUTER_DEFAULT_ID} handle ${handle_router} ${QOS_QDISC_SFQ_USERS}"
+	echo "qdisc add dev ${idev} parent ${QOS_CLASS_ROUTER_DEFAULT_ID} handle ${handle_router} ${QOS_QDISC_LEAFQ_USERS}"
 	echo "filter add dev ${idev} parent ${QOS_HANDLE_NADMIN}: priority ${QOS_ROUTER_DEFAULT_FILTER_PRIO} matchall flowid ${QOS_CLASS_ROUTER_DEFAULT_ID}"
     fi
 
@@ -508,11 +535,11 @@ gen-tc-qos-default()
 	    echo "# Default QoS for egress traffic on the ${interface} (${odev}) interface:"
 
 	    echo "class add dev ${odev} parent ${QOS_CLASS_SELF_ID} classid ${QOS_CLASS_SELF_DEFAULT_ID} htb rate ${orate}kbit ceil ${oceil}kbit ${QOS_HTB_QUANTUM} prio ${QOS_CLASS_SELF_DEFAULT_PRIO}"
-	    echo "qdisc add dev ${odev} parent ${QOS_CLASS_SELF_DEFAULT_ID} handle ${handle_self} ${QOS_QDISC_SFQ_USERS}"
+	    echo "qdisc add dev ${odev} parent ${QOS_CLASS_SELF_DEFAULT_ID} handle ${handle_self} ${QOS_QDISC_LEAFQ_USERS}"
 	    echo "filter add dev ${odev} parent ${QOS_CLASS_SELF_ID} priority ${QOS_SELF_DEFAULT_FILTER_PRIO} matchall flowid ${QOS_CLASS_SELF_DEFAULT_ID}"
 	    echo
 	    echo "class add dev ${odev} parent ${QOS_CLASS_ROUTER_ID} classid ${QOS_CLASS_ROUTER_DEFAULT_ID} htb rate ${irate}kbit ceil ${iceil}kbit ${QOS_HTB_QUANTUM} prio ${QOS_CLASS_ROUTER_DEFAULT_PRIO}"
-	    echo "qdisc add dev ${odev} parent ${QOS_CLASS_ROUTER_DEFAULT_ID} handle ${handle_router} ${QOS_QDISC_SFQ_USERS}"
+	    echo "qdisc add dev ${odev} parent ${QOS_CLASS_ROUTER_DEFAULT_ID} handle ${handle_router} ${QOS_QDISC_LEAFQ_USERS}"
 	    echo "filter add dev ${odev} parent ${QOS_HANDLE_NADMIN}: priority ${QOS_ROUTER_DEFAULT_FILTER_PRIO} matchall flowid ${QOS_CLASS_ROUTER_DEFAULT_ID}"
 
 	    odevs1="${odevs1} ${odev}"
@@ -521,8 +548,8 @@ gen-tc-qos-default()
 
     odevs1=${odevs1:1}
 
-    gen-qos-index default-steered: sfq ${interface} ${idev} ${odevs1// /:} ${handle_self}
-    gen-qos-index default-routed: sfq ${interface} ${idev} ${odevs1// /:} ${handle_router}
+    gen-qos-index default-steered: ${QOS_LEAF_QDISC} ${interface} ${idev} ${odevs1// /:} ${handle_self}
+    gen-qos-index default-routed: ${QOS_LEAF_QDISC} ${interface} ${idev} ${odevs1// /:} ${handle_router}
 }
 
 tc-normalise-port()
@@ -782,7 +809,7 @@ gen-tc-qos-router()
 		    echo
 		    echo "# Rule '${rule_id}' on the ${interface} interface for ingress traffic:"
 		    echo "class add dev ${idev} parent ${class_parent} classid ${qosid} htb rate ${irate}kbit ceil ${iceil}kbit ${QOS_HTB_QUANTUM} prio ${class_priority}"
-		    echo "qdisc add dev ${idev} parent ${qosid} handle ${handle} ${QOS_QDISC_SFQ_USERS}"
+		    echo "qdisc add dev ${idev} parent ${qosid} handle ${handle} ${QOS_QDISC_LEAFQ_USERS}"
 
 		    if test -n "${filter_protocol}" ; then
 			echo "filter add dev ${idev} parent ${filter_parent} priority ${filter_priority} protocol ip flower${filter_protocol}${filter_back_dst_ip}${filter_back_dst_port}${filter_back_src_ip}${filter_back_src_port} flowid ${qosid}"
@@ -798,7 +825,7 @@ gen-tc-qos-router()
 		    echo
 		    echo "# Rule '${rule_id}' on the ${interface} interface for egress traffic:"
 		    echo "class add dev ${odev} parent ${class_parent} classid ${qosid} htb rate ${orate}kbit ceil ${oceil}kbit ${QOS_HTB_QUANTUM} prio ${class_priority}"
-		    echo "qdisc add dev ${odev} parent ${qosid} handle ${handle} ${QOS_QDISC_SFQ_USERS}"
+		    echo "qdisc add dev ${odev} parent ${qosid} handle ${handle} ${QOS_QDISC_LEAFQ_USERS}"
 
 		    if test -n "${filter_protocol}" ; then
 			echo "filter add dev ${odev} parent ${filter_parent} priority ${filter_priority} protocol ip flower${filter_protocol}${filter_forth_src_ip}${filter_forth_src_port}${filter_forth_dst_ip}${filter_forth_dst_port} flowid ${qosid}"
@@ -810,7 +837,7 @@ gen-tc-qos-router()
 		    fi
 		fi
 
-		gen-qos-index routed:${rule_id} sfq ${native_interface} ${idev} ${odev} ${handle}
+		gen-qos-index routed:${rule_id} ${QOS_LEAF_QDISC} ${native_interface} ${idev} ${odev} ${handle}
 
 		((QOS_HANDLE++))
 		;;
@@ -1052,22 +1079,40 @@ gen-tc-qos-etc-dhcp()
 	done
     fi
 
+    local doit
     case ${CLOUD_NAME} in
 	aws|azure)
-	    for odev in ${odevs}
-	    do
-		if nic-exist ${odev} ; then
-		    echo "filter add dev ${odev} parent ${QOS_CLASS_SELF_ID} priority ${prio} protocol ip u32 ${QOS_FILTER_UDP} match ip sport ${BOOTPC_PORT} 0xffff match ip dport ${BOOTPS_PORT} 0xffff flowid ${QOS_CLASS_ETC_ID}"
-		fi
-	    done
-
-	    if nic-exist ${idev} ; then
-		echo "filter add dev ${idev} parent ${QOS_CLASS_SELF_ID} priority ${prio} protocol ip u32 ${QOS_FILTER_UDP} match ip sport ${BOOTPS_PORT} 0xffff match ip dport ${BOOTPC_PORT} 0xffff flowid ${QOS_CLASS_ETC_ID}"
-	    fi
+	    doit=yes
 	    ;;
 	*)
 	    ;;
     esac
+
+    test -n "${doit}" || test ${IP_EXTERNAL_MODE} == 'static' || doit=yes
+
+    if test -n "${doit}" ; then
+	for odev in ${odevs}
+	do
+	    if nic-exist ${odev} ; then
+		    echo "filter add dev ${odev} parent ${QOS_CLASS_SELF_ID} priority ${prio} protocol ip u32 ${QOS_FILTER_UDP} match ip sport ${BOOTPC_PORT} 0xffff match ip dport ${BOOTPS_PORT} 0xffff flowid ${QOS_CLASS_ETC_ID}"
+	    fi
+	done
+
+	if nic-exist ${idev} ; then
+	    echo "filter add dev ${idev} parent ${QOS_CLASS_SELF_ID} priority ${prio} protocol ip u32 ${QOS_FILTER_UDP} match ip sport ${BOOTPS_PORT} 0xffff match ip dport ${BOOTPC_PORT} 0xffff flowid ${QOS_CLASS_ETC_ID}"
+	fi
+    fi
+}
+
+gen-tc-qos-etc-cloud()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    local idev=${1}
+    local odevs=${2}
+
+    local prio=${QOS_CLOUD_FILTER_PRIO}
+    local odev
 
     case ${CLOUD_NAME} in
 	azure)
@@ -1308,14 +1353,14 @@ gen-tc-qos-etc()
 
     if nic-exist ${idev} ; then
 	echo "class add dev ${idev} parent ${QOS_CLASS_SELF_ID} classid ${QOS_CLASS_ETC_ID} htb rate ${QOS_ETC_RATE} ${QOS_HTB_QUANTUM} prio ${QOS_CLASS_ETC_PRIO}"
-	echo "qdisc add dev ${idev} parent ${QOS_CLASS_ETC_ID} handle ${handle} ${QOS_QDISC_SFQ_ETC}"
+	echo "qdisc add dev ${idev} parent ${QOS_CLASS_ETC_ID} handle ${handle} ${QOS_QDISC_LEAFQ_ETC}"
     fi
 
     for odev in ${odevs}
     do
 	if nic-exist ${odev} ; then
 	    echo "class add dev ${odev} parent ${QOS_CLASS_SELF_ID} classid ${QOS_CLASS_ETC_ID} htb rate ${QOS_ETC_RATE} ${QOS_HTB_QUANTUM} prio ${QOS_CLASS_ETC_PRIO}"
-	    echo "qdisc add dev ${odev} parent ${QOS_CLASS_ETC_ID} handle ${handle} ${QOS_QDISC_SFQ_ETC}"
+	    echo "qdisc add dev ${odev} parent ${QOS_CLASS_ETC_ID} handle ${handle} ${QOS_QDISC_LEAFQ_ETC}"
 	    odevs1="${odevs1} ${odev}"
 	fi
     done
@@ -1323,6 +1368,7 @@ gen-tc-qos-etc()
 
     gen-tc-qos-etc-arp      ${idev} "${odevs}"
     gen-tc-qos-etc-dhcp     ${idev} "${odevs}"
+    gen-tc-qos-etc-cloud     ${idev} "${odevs}"
     gen-tc-qos-etc-vrrp     ${idev} "${odevs}" ${interface}
     gen-tc-qos-etc-icmp     ${idev} "${odevs}"
     gen-tc-qos-etc-auth-ip  ${idev} "${odevs}"
@@ -1330,7 +1376,7 @@ gen-tc-qos-etc()
     gen-tc-qos-etc-ocsp     ${idev} "${odevs}"
     gen-tc-qos-etc-email    ${idev} "${odevs}"
 
-    gen-qos-index etc: sfq ${interface} ${idev} ${odevs1// /:} ${handle}
+    gen-qos-index etc: ${QOS_LEAF_QDISC} ${interface} ${idev} ${odevs1// /:} ${handle}
 }
 
 gen-tc-backend-rweb-top()
@@ -1421,7 +1467,7 @@ gen-tc-backend-rweb()
 		    ceil=$(get-qos-ceil ${if_name} ingress ${rate})
 
 		    echo "class add dev ${idev} parent ${rweb_class} classid ${qosid} htb rate ${rate}kbit ceil ${ceil}kbit ${QOS_HTB_QUANTUM} prio ${QOS_CLASS_RWEB_BACKEND_PRIO}"
-		    echo "qdisc add dev ${idev} parent ${qosid} handle ${handle} ${QOS_QDISC_SFQ_RWEB}"
+		    echo "qdisc add dev ${idev} parent ${qosid} handle ${handle} ${QOS_QDISC_LEAFQ_RWEB}"
 		    echo "filter add dev ${idev} parent ${QOS_CLASS_SELF_ID} priority ${QOS_RWEB_FILTER_PRIO} protocol ip u32 match ip src ${ip}/32 match ip sport ${port} 0xffff flowid ${qosid}"
 		fi
 
@@ -1430,11 +1476,11 @@ gen-tc-backend-rweb()
 		    ceil=$(get-qos-ceil ${if_name} egress ${rate})
 
 		    echo "class add dev ${odev} parent ${rweb_class} classid ${qosid} htb rate ${rate}kbit ceil ${ceil}kbit ${QOS_HTB_QUANTUM} prio ${QOS_CLASS_RWEB_BACKEND_PRIO}"
-		    echo "qdisc add dev ${odev} parent ${qosid} handle ${handle} ${QOS_QDISC_SFQ_RWEB}"
+		    echo "qdisc add dev ${odev} parent ${qosid} handle ${handle} ${QOS_QDISC_LEAFQ_RWEB}"
 		    echo "filter add dev ${odev} parent ${QOS_CLASS_SELF_ID} priority ${QOS_RWEB_FILTER_PRIO} protocol ip handle $(printf 0x%x/${QOS_MARK_MASK} ${QOS_HANDLE} 2> /dev/null) fw flowid ${qosid}"
 		fi
 
-		gen-qos-index rweb:${ip} sfq ${if_name} ${idev} ${odev} ${handle}
+		gen-qos-index rweb:${ip} ${QOS_LEAF_QDISC} ${if_name} ${idev} ${odev} ${handle}
 		((QOS_HANDLE++))
 		;;
 	    *)
@@ -1472,7 +1518,7 @@ gen-tc-ha-share-peer()
 		    rate=$(get-qos-percent ${irate} ${qos})
 		    ceil=$(get-qos-ceil internal ingress ${rate})
 		    echo "class add dev ${IF_QOS_INTERNAL_INGRESS} parent ${QOS_CLASS_PEER_ID} classid ${qosid} htb rate ${rate}kbit ceil ${ceil}kbit ${QOS_HTB_QUANTUM} prio ${QOS_CLASS_PEER_PRIO}"
-		    echo "qdisc add dev ${IF_QOS_INTERNAL_INGRESS} parent ${qosid} handle ${QOS_HANDLE}: ${QOS_QDISC_SFQ_PEER}"
+		    echo "qdisc add dev ${IF_QOS_INTERNAL_INGRESS} parent ${qosid} handle ${QOS_HANDLE}: ${QOS_QDISC_LEAFQ_PEER}"
 		    echo "filter add dev ${IF_QOS_INTERNAL_INGRESS} parent ${QOS_CLASS_SELF_ID} priority ${QOS_PEER_FILTER_PRIO} protocol ip u32 ${QOS_FILTER_UDP} match ip sport ${PEER_HTCP_PORT} 0xffff match ip dport ${PEER_HTCP_PORT} 0xffff flowid ${qosid}"
 		    echo "filter add dev ${IF_QOS_INTERNAL_INGRESS} parent ${QOS_CLASS_SELF_ID} priority ${QOS_PEER_FILTER_PRIO} protocol ip u32 ${QOS_FILTER_TCP} match ip sport ${PEER_HTTP_PORT} 0xffff flowid ${qosid}"
 		    echo "filter add dev ${IF_QOS_INTERNAL_INGRESS} parent ${QOS_CLASS_SELF_ID} priority ${QOS_PEER_FILTER_PRIO} protocol ip u32 ${QOS_FILTER_TCP} match ip dport ${PEER_HTTP_PORT} 0xffff flowid ${qosid}"
@@ -1482,11 +1528,11 @@ gen-tc-ha-share-peer()
 		    rate=$(get-qos-percent ${orate} ${qos})
 		    ceil=$(get-qos-ceil internal egress ${rate})
 		    echo "class add dev ${IF_QOS_PEER_EGRESS} parent ${QOS_CLASS_PEER_ID} classid ${qosid} htb rate ${rate}kbit ceil ${ceil}kbit ${QOS_HTB_QUANTUM} prio ${QOS_CLASS_PEER_PRIO}"
-		    echo "qdisc add dev ${IF_QOS_PEER_EGRESS} parent ${qosid} handle ${QOS_HANDLE}: ${QOS_QDISC_SFQ_PEER}"
+		    echo "qdisc add dev ${IF_QOS_PEER_EGRESS} parent ${qosid} handle ${QOS_HANDLE}: ${QOS_QDISC_LEAFQ_PEER}"
 		    echo "filter add dev ${IF_QOS_PEER_EGRESS} parent ${QOS_CLASS_SELF_ID} priority ${QOS_PEER_FILTER_PRIO} protocol ip handle $(printf 0x%x/${QOS_MARK_MASK} ${QOS_HANDLE} 2> /dev/null) fw flowid ${qosid}"
 		fi
 
-		gen-qos-index peer:${ip} sfq internal ${IF_QOS_INTERNAL_INGRESS} ${IF_QOS_PEER_EGRESS} ${QOS_HANDLE}:
+		gen-qos-index peer:${ip} ${QOS_LEAF_QDISC} internal ${IF_QOS_INTERNAL_INGRESS} ${IF_QOS_PEER_EGRESS} ${QOS_HANDLE}:
 
 		((QOS_HANDLE++))
 		;;
@@ -1563,7 +1609,7 @@ gen-tc-previous-peer()
 		    rate=$(get-qos-percent ${irate} ${qos})
 		    ceil=$(get-qos-ceil internal ingress ${rate})
 		    echo "class add dev ${IF_QOS_INTERNAL_INGRESS} parent ${QOS_CLASS_PEER_ID} classid ${qosid} htb rate ${rate}kbit ceil ${ceil}kbit ${QOS_HTB_QUANTUM} prio ${QOS_CLASS_PEER_PRIO}"
-		    echo "qdisc add dev ${IF_QOS_INTERNAL_INGRESS} parent ${qosid} handle ${handle} ${QOS_QDISC_SFQ_PEER}"
+		    echo "qdisc add dev ${IF_QOS_INTERNAL_INGRESS} parent ${qosid} handle ${handle} ${QOS_QDISC_LEAFQ_PEER}"
 
 		    echo "filter add dev ${IF_QOS_INTERNAL_INGRESS} parent ${QOS_CLASS_SELF_ID} priority ${QOS_PEER_FILTER_PRIO} protocol ip u32 match ip src ${ip}/32 match ip dport ${PEER_HTTP_PORT} 0xffff flowid ${qosid}"
 		    echo "filter add dev ${IF_QOS_INTERNAL_INGRESS} parent ${QOS_CLASS_SELF_ID} priority ${QOS_PEER_FILTER_PRIO} protocol ip  u32 match ip src ${ip}/32 match ip dport ${WWW_PORT} 0xffff flowid ${qosid}"
@@ -1574,12 +1620,12 @@ gen-tc-previous-peer()
 		    rate=$(get-qos-percent ${orate} ${qos})
 		    ceil=$(get-qos-ceil internal egress ${rate})
 		    echo "class add dev ${IF_QOS_WEB_EGRESS} parent ${QOS_CLASS_PEER_ID} classid ${qosid} htb rate ${rate}kbit ceil ${ceil}kbit ${QOS_HTB_QUANTUM} prio ${QOS_CLASS_PEER_PRIO}"
-		    echo "qdisc add dev ${IF_QOS_WEB_EGRESS} parent ${qosid} handle ${handle} ${QOS_QDISC_SFQ_PEER}"
+		    echo "qdisc add dev ${IF_QOS_WEB_EGRESS} parent ${qosid} handle ${handle} ${QOS_QDISC_LEAFQ_PEER}"
 
 		    echo "filter add dev ${IF_QOS_WEB_EGRESS} parent ${QOS_CLASS_SELF_ID} priority ${QOS_PEER_FILTER_PRIO} protocol ip handle $(printf 0x%x/${QOS_MARK_MASK} ${QOS_HANDLE} 2> /dev/null) fw flowid ${qosid}"
 		fi
 
-		gen-qos-index peer:${ip} sfq internal ${IF_QOS_INTERNAL_INGRESS} ${IF_QOS_WEB_EGRESS} ${handle}
+		gen-qos-index peer:${ip} ${QOS_LEAF_QDISC} internal ${IF_QOS_INTERNAL_INGRESS} ${IF_QOS_WEB_EGRESS} ${handle}
 		
 		((QOS_HANDLE++))
 		;;
@@ -1660,7 +1706,7 @@ gen-tc-web-nolist()
 
     if nic-exist ${idev} ; then
 	echo "class add dev ${idev} parent ${QOS_CLASS_WEB_CLIENT_ID} classid ${qosid} htb rate ${irate}kbit ceil ${iceil}kbit ${QOS_HTB_QUANTUM} prio ${QOS_CLASS_WEB_CLIENT_PRIO}"
-	echo "qdisc add dev ${idev} parent ${qosid} handle ${handle} ${QOS_QDISC_SFQ_USERS}"
+	echo "qdisc add dev ${idev} parent ${qosid} handle ${handle} ${QOS_QDISC_LEAFQ_USERS}"
 
 	if test ${WEB_MODE} == True ; then
 	    echo "filter add dev ${idev} parent ${QOS_CLASS_SELF_ID} priority ${QOS_WEB_FILTER_PRIO} protocol ip u32 ${QOS_FILTER_TCP} match ip dport ${PROXY_PORT} 0xffff flowid ${qosid}"
@@ -1688,11 +1734,11 @@ gen-tc-web-nolist()
 
     if nic-exist ${odev} ; then
 	echo "class add dev ${odev} parent ${QOS_CLASS_WEB_CLIENT_ID} classid ${qosid} htb rate ${orate}kbit ceil ${oceil}kbit ${QOS_HTB_QUANTUM} prio ${QOS_CLASS_WEB_CLIENT_PRIO}"
-	echo "qdisc add dev ${odev} parent ${qosid} handle ${handle} ${QOS_QDISC_SFQ_USERS}"
+	echo "qdisc add dev ${odev} parent ${qosid} handle ${handle} ${QOS_QDISC_LEAFQ_USERS}"
 	echo "filter add dev ${odev} parent ${QOS_CLASS_SELF_ID} priority ${QOS_WEB_FILTER_PRIO} protocol ip handle $(printf 0x%x/${QOS_MARK_MASK} ${QOS_HANDLE} 2> /dev/null) fw flowid ${qosid}"
     fi
 
-    gen-qos-index web: sfq ${interface} ${idev} ${odev} ${handle}
+    gen-qos-index web: ${QOS_LEAF_QDISC} ${interface} ${idev} ${odev} ${handle}
 }
 
 gen-tc-web-list()
@@ -1781,7 +1827,7 @@ gen-tc-web-list()
 		    rate=$(get-qos-percent ${irate} ${qos})
 		    ceil=$(get-qos-ceil ${if_name} ingress ${rate})
 		    echo "class add dev ${idev} parent ${QOS_CLASS_WEB_CLIENT_ID} classid ${qosid} htb rate ${rate}kbit ceil ${ceil}kbit ${QOS_HTB_QUANTUM} prio ${QOS_CLASS_WEB_CLIENT_PRIO}"
-		    echo "qdisc add dev ${idev} parent ${qosid} handle ${handle} ${QOS_QDISC_SFQ_USERS}"
+		    echo "qdisc add dev ${idev} parent ${qosid} handle ${handle} ${QOS_QDISC_LEAFQ_USERS}"
 
 		    if test ${WEB_MODE} == True ; then
 			echo "filter add dev ${idev} parent ${QOS_CLASS_SELF_ID} priority ${QOS_WEB_FILTER_PRIO} protocol ip u32 ${QOS_FILTER_TCP} match ip src ${ip}/${px} match ip dport ${PROXY_PORT} 0xffff flowid ${qosid}"
@@ -1810,12 +1856,12 @@ gen-tc-web-list()
 		    rate=$(get-qos-percent ${orate} ${qos})
 		    ceil=$(get-qos-ceil ${if_name} egress ${rate})
 		    echo "class add dev ${odev} parent ${QOS_CLASS_WEB_CLIENT_ID} classid ${qosid} htb rate ${rate}kbit ceil ${ceil}kbit ${QOS_HTB_QUANTUM} prio ${QOS_CLASS_WEB_CLIENT_PRIO}"
-		    echo "qdisc add dev ${odev} parent ${qosid} handle ${handle} ${QOS_QDISC_SFQ_USERS}"
+		    echo "qdisc add dev ${odev} parent ${qosid} handle ${handle} ${QOS_QDISC_LEAFQ_USERS}"
 
 		    echo "filter add dev ${odev} parent ${QOS_CLASS_SELF_ID} priority ${QOS_WEB_FILTER_PRIO} protocol ip handle $(printf 0x%x/${QOS_MARK_MASK} ${QOS_HANDLE} 2> /dev/null) fw flowid ${qosid}"
 		fi
 
-		gen-qos-index web:${ip}/${px} sfq ${if_name} ${idev} ${odev} ${handle}
+		gen-qos-index web:${ip}/${px} ${QOS_LEAF_QDISC} ${if_name} ${idev} ${odev} ${handle}
 		((QOS_HANDLE++))
 		;;
 	    *)
@@ -1867,7 +1913,7 @@ gen-tc-tweb-nolist()
 
     if nic-exist ${idev} ; then
 	echo "class add dev ${idev} parent ${QOS_CLASS_TWEB_CLIENT_ID} classid ${qosid} htb rate ${irate}kbit ceil ${iceil}kbit ${QOS_HTB_QUANTUM} prio ${QOS_CLASS_TWEB_CLIENT_PRIO}"
-	echo "qdisc add dev ${idev} parent ${qosid} handle ${handle} ${QOS_QDISC_SFQ_USERS}"
+	echo "qdisc add dev ${idev} parent ${qosid} handle ${handle} ${QOS_QDISC_LEAFQ_USERS}"
 
 	echo "filter add dev ${idev} parent ${QOS_HANDLE_NADMIN}: priority ${QOS_TWEB_FILTER_PRIO} protocol ip u32 match ip dport ${WWW_PORT} 0xffff flowid ${qosid}"
 	echo "filter add dev ${idev} parent ${QOS_HANDLE_NADMIN}: priority ${QOS_TWEB_FILTER_PRIO} protocol ip u32 match ip dport ${HTTPS_PORT} 0xffff flowid ${qosid}"
@@ -1875,11 +1921,11 @@ gen-tc-tweb-nolist()
 
     if nic-exist ${odev} ; then
 	echo "class add dev ${odev} parent ${QOS_CLASS_TWEB_CLIENT_ID} classid ${qosid} htb rate ${orate}kbit ceil ${oceil}kbit ${QOS_HTB_QUANTUM} prio ${QOS_CLASS_TWEB_CLIENT_PRIO}"
-	echo "qdisc add dev ${odev} parent ${qosid} handle ${handle} ${QOS_QDISC_SFQ_USERS}"
+	echo "qdisc add dev ${odev} parent ${qosid} handle ${handle} ${QOS_QDISC_LEAFQ_USERS}"
 	echo "filter add dev ${odev} parent ${QOS_HANDLE_NADMIN}: priority ${QOS_TWEB_FILTER_PRIO} protocol ip handle $(printf 0x%x/${QOS_MARK_MASK} ${QOS_HANDLE} 2> /dev/null) fw flowid ${qosid}"
     fi
 
-    gen-qos-index tweb: sfq ${interface} ${idev} ${odev} ${handle}
+    gen-qos-index tweb: ${QOS_LEAF_QDISC} ${interface} ${idev} ${odev} ${handle}
 }
 
 gen-tc-tweb-list()
@@ -1939,7 +1985,7 @@ gen-tc-tweb-list()
 		    rate=$(get-qos-percent ${irate} ${qos})
 		    ceil=$(get-qos-ceil ${interface} ingress ${rate})
 		    echo "class add dev ${idev} parent ${QOS_CLASS_TWEB_CLIENT_ID} classid ${qosid} htb rate ${rate}kbit ceil ${ceil}kbit ${QOS_HTB_QUANTUM} prio ${QOS_CLASS_TWEB_CLIENT_PRIO}"
-		    echo "qdisc add dev ${idev} parent ${qosid} handle ${handle} ${QOS_QDISC_SFQ_USERS}"
+		    echo "qdisc add dev ${idev} parent ${qosid} handle ${handle} ${QOS_QDISC_LEAFQ_USERS}"
 		    echo "filter add dev ${idev} parent ${QOS_HANDLE_NADMIN}: priority ${QOS_TWEB_FILTER_PRIO} protocol ip u32 match ip src ${ip}/${px} match ip dport ${WWW_PORT} 0xffff flowid ${qosid}"
 		    echo "filter add dev ${idev} parent ${QOS_HANDLE_NADMIN}: priority ${QOS_TWEB_FILTER_PRIO} protocol ip u32 match ip src ${ip}/${px} match ip dport ${HTTPS_PORT} 0xffff flowid ${qosid}"
 		fi
@@ -1948,11 +1994,11 @@ gen-tc-tweb-list()
 		    rate=$(get-qos-percent ${orate} ${qos})
 		    ceil=$(get-qos-ceil ${interface} egress ${rate})
 		    echo "class add dev ${odev} parent ${QOS_CLASS_TWEB_CLIENT_ID} classid ${qosid} htb rate ${rate}kbit ceil ${ceil}kbit ${QOS_HTB_QUANTUM} prio ${QOS_CLASS_TWEB_CLIENT_PRIO}"
-		    echo "qdisc add dev ${odev} parent ${qosid} handle ${handle} ${QOS_QDISC_SFQ_USERS}"
+		    echo "qdisc add dev ${odev} parent ${qosid} handle ${handle} ${QOS_QDISC_LEAFQ_USERS}"
 		    echo "filter add dev ${odev} parent ${QOS_HANDLE_NADMIN}: priority ${QOS_TWEB_FILTER_PRIO} protocol ip handle $(printf 0x%x/${QOS_MARK_MASK} ${QOS_HANDLE} 2> /dev/null) fw flowid ${qosid}"
 		fi
 
-		gen-qos-index tweb:${ip}/${px} sfq ${interface} ${idev} ${odev} ${handle}
+		gen-qos-index tweb:${ip}/${px} ${QOS_LEAF_QDISC} ${interface} ${idev} ${odev} ${handle}
 
 		((QOS_HANDLE++))
 		;;
@@ -2107,7 +2153,7 @@ gen-tc-av()
 		    rate=$(get-qos-percent ${irate} ${qos})
 		    ceil=$(get-qos-ceil ${interface} ingress ${rate})
 		    echo "class add dev ${idev} parent ${QOS_CLASS_AV_ID} classid ${qosid} htb rate ${rate}kbit ceil ${ceil}kbit ${QOS_HTB_QUANTUM} prio ${QOS_CLASS_AV_PRIO}"
-		    echo "qdisc add dev ${idev} parent ${qosid} handle ${handle} ${QOS_QDISC_SFQ_AV}"
+		    echo "qdisc add dev ${idev} parent ${qosid} handle ${handle} ${QOS_QDISC_LEAFQ_AV}"
 
 		    echo "filter add dev ${idev} parent ${QOS_CLASS_SELF_ID} priority ${QOS_AV_FILTER_PRIO} protocol ip u32 match ip src ${ip}/${px} match ip dport ${AV_PORT} 0xffff flowid ${qosid}"
 		    echo "filter add dev ${idev} parent ${QOS_CLASS_SELF_ID} priority ${QOS_AV_FILTER_PRIO} protocol ip u32 match ip src ${ip}/${px} match ip dport ${AV_STREAM_MIN_PORT} 0xf000 flowid ${qosid}"
@@ -2118,12 +2164,12 @@ gen-tc-av()
 		    rate=$(get-qos-percent ${orate} ${qos})
 		    ceil=$(get-qos-ceil ${interface} egress ${rate})
 		    echo "class add dev ${odev} parent ${QOS_CLASS_AV_ID} classid ${qosid} htb rate ${rate}kbit ceil ${ceil}kbit ${QOS_HTB_QUANTUM} prio ${QOS_CLASS_AV_PRIO}"
-		    echo "qdisc add dev ${odev} parent ${qosid} handle ${handle} ${QOS_QDISC_SFQ_AV}"
+		    echo "qdisc add dev ${odev} parent ${qosid} handle ${handle} ${QOS_QDISC_LEAFQ_AV}"
 
 		    echo "filter add dev ${odev} parent ${QOS_CLASS_SELF_ID} priority ${QOS_AV_FILTER_PRIO} protocol ip handle $(printf 0x%x/${QOS_MARK_MASK} ${QOS_HANDLE} 2> /dev/null) fw flowid ${qosid}"
 		fi
 
-		gen-qos-index antivirus:${ip}/${px} sfq ${interface} ${idev} ${odev} ${handle}
+		gen-qos-index antivirus:${ip}/${px} ${QOS_LEAF_QDISC} ${interface} ${idev} ${odev} ${handle}
 
 		((QOS_HANDLE++))
 		;;
@@ -2154,7 +2200,7 @@ gen-tc-vpnipsec()
 	echo
 	echo "# QoS for IPsec ingress traffic on the external (${idev}) interface:"
 	echo "class add dev ${idev} parent ${QOS_CLASS_SELF_ID} classid ${QOS_CLASS_IPSEC_ID} htb rate ${irate}kbit ceil ${iceil}kbit ${QOS_HTB_QUANTUM} prio ${QOS_CLASS_IPSEC_PRIO}"
-	echo "qdisc add dev ${idev} parent ${QOS_CLASS_IPSEC_ID} handle ${handle} ${QOS_QDISC_SFQ_IPSEC}"
+	echo "qdisc add dev ${idev} parent ${QOS_CLASS_IPSEC_ID} handle ${handle} ${QOS_QDISC_LEAFQ_IPSEC}"
 
 	echo "filter add dev ${idev} parent ${QOS_CLASS_SELF_ID} priority ${QOS_IKE_FILTER_PRIO} protocol ip u32 ${QOS_FILTER_UDP} match ip dport ${ISAKMP_PORT} 0xffff flowid ${QOS_CLASS_IPSEC_ID}"
 	echo "filter add dev ${idev} parent ${QOS_CLASS_SELF_ID} priority ${QOS_IKE_FILTER_PRIO} protocol ip u32 ${QOS_FILTER_UDP} match ip dport ${NATT_PORT} 0xffff flowid ${QOS_CLASS_IPSEC_ID}"
@@ -2165,7 +2211,7 @@ gen-tc-vpnipsec()
 	echo
 	echo "# QoS for IPsec egress traffic on the external (${odev}) interface:"
 	echo "class add dev ${odev} parent ${QOS_CLASS_SELF_ID} classid ${QOS_CLASS_IPSEC_ID} htb rate ${orate}kbit ceil ${oceil}kbit ${QOS_HTB_QUANTUM} prio ${QOS_CLASS_IPSEC_PRIO}"
-	echo "qdisc add dev ${odev} parent ${QOS_CLASS_IPSEC_ID} handle ${handle} ${QOS_QDISC_SFQ_IPSEC}"
+	echo "qdisc add dev ${odev} parent ${QOS_CLASS_IPSEC_ID} handle ${handle} ${QOS_QDISC_LEAFQ_IPSEC}"
 
 	echo "filter add dev ${odev} parent ${QOS_CLASS_SELF_ID} priority ${QOS_IKE_FILTER_PRIO} protocol ip u32 ${QOS_FILTER_UDP} match ip sport ${ISAKMP_PORT} 0xffff flowid ${QOS_CLASS_IPSEC_ID}"
 	echo "filter add dev ${odev} parent ${QOS_CLASS_SELF_ID} priority ${QOS_IKE_FILTER_PRIO} protocol ip u32 ${QOS_FILTER_UDP} match ip sport ${NATT_PORT} 0xffff flowid ${QOS_CLASS_IPSEC_ID}"
@@ -2224,7 +2270,7 @@ gen-tc-external-rweb()
 		    rate=$(get-qos-percent ${irate} ${qos})
 		    ceil=$(get-qos-ceil external ingress ${rate})
 		    echo "class add dev ${IF_QOS_EXTERNAL_INGRESS} parent ${QOS_CLASS_RWEB_PUBLIC_ID} classid ${qosid} htb rate ${rate}kbit ceil ${ceil}kbit ${QOS_HTB_QUANTUM} prio ${QOS_CLASS_RWEB_PUBLIC_PRIO}"
-		    echo "qdisc add dev ${IF_QOS_EXTERNAL_INGRESS} parent ${qosid} handle ${handle} ${QOS_QDISC_SFQ_RUSERS}"
+		    echo "qdisc add dev ${IF_QOS_EXTERNAL_INGRESS} parent ${qosid} handle ${handle} ${QOS_QDISC_LEAFQ_RUSERS}"
 
 		    case ${protocol} in
 			http)
@@ -2242,17 +2288,17 @@ gen-tc-external-rweb()
 		    rate=$(get-qos-percent ${orate} ${qos})
 		    ceil=$(get-qos-ceil external egress ${rate})
 		    echo "class add dev ${IF_QOS_EXTERNAL_EGRESS} parent ${QOS_CLASS_RWEB_PUBLIC_ID} classid ${qosid} htb rate ${rate}kbit ceil ${ceil}kbit ${QOS_HTB_QUANTUM} prio ${QOS_CLASS_RWEB_PUBLIC_PRIO}"
-		    echo "qdisc add dev ${IF_QOS_EXTERNAL_EGRESS} parent ${qosid} handle ${handle} ${QOS_QDISC_SFQ_RUSERS}"
+		    echo "qdisc add dev ${IF_QOS_EXTERNAL_EGRESS} parent ${qosid} handle ${handle} ${QOS_QDISC_LEAFQ_RUSERS}"
 
 		    echo "filter add dev ${IF_QOS_EXTERNAL_EGRESS} parent ${QOS_CLASS_SELF_ID} priority ${QOS_RWEB_FILTER_PRIO} protocol ip handle $(printf 0x%x/${QOS_MARK_MASK} ${QOS_HANDLE} 2> /dev/null) fw flowid ${qosid}"
 		fi
 
 		case ${protocol} in
 		    http)
-			gen-qos-index rweb:${ip} sfq external ${IF_QOS_EXTERNAL_INGRESS} ${IF_QOS_EXTERNAL_EGRESS} ${handle}
+			gen-qos-index rweb:${ip} ${QOS_LEAF_QDISC} external ${IF_QOS_EXTERNAL_INGRESS} ${IF_QOS_EXTERNAL_EGRESS} ${handle}
 			;;
 		    https)
-			gen-qos-index rweb:${ip}[TLS] sfq external ${IF_QOS_EXTERNAL_INGRESS} ${IF_QOS_EXTERNAL_EGRESS} ${handle}
+			gen-qos-index rweb:${ip}[TLS] ${QOS_LEAF_QDISC} external ${IF_QOS_EXTERNAL_INGRESS} ${IF_QOS_EXTERNAL_EGRESS} ${handle}
 			;;
 		    *)
 			;;
@@ -2284,13 +2330,13 @@ gen-tc-external-web()
     local iceil=$(get-qos-ceil external ingress ${irate})
     local orate=$(get-qos-rate external egress web)
     local oceil=$(get-qos-ceil external egress ${orate})
-    local sfq_handle="$[${QOS_CHILD_QDISC_HANDLE_OFFSET} + ${QOS_HANDLE_WEB_PUBLIC}]:"
+    local leafq_handle="$[${QOS_CHILD_QDISC_HANDLE_OFFSET} + ${QOS_HANDLE_WEB_PUBLIC}]:"
 
     if nic-exist ${IF_QOS_EXTERNAL_INGRESS} ; then
 	echo
 	echo "# QoS for web ingress traffic on the external interface:"
 	echo "class add dev ${IF_QOS_EXTERNAL_INGRESS} parent ${QOS_CLASS_SELF_ID} classid ${QOS_CLASS_WEB_PUBLIC_ID} htb rate ${irate}kbit ceil ${iceil}kbit ${QOS_HTB_QUANTUM} prio ${QOS_CLASS_WEB_PUBLIC_PRIO}"
-	echo "qdisc add dev ${IF_QOS_EXTERNAL_INGRESS} parent ${QOS_CLASS_WEB_PUBLIC_ID} handle ${sfq_handle} ${QOS_QDISC_SFQ_USERS}"
+	echo "qdisc add dev ${IF_QOS_EXTERNAL_INGRESS} parent ${QOS_CLASS_WEB_PUBLIC_ID} handle ${leafq_handle} ${QOS_QDISC_LEAFQ_USERS}"
 
 	echo "filter add dev ${IF_QOS_EXTERNAL_INGRESS} parent ${QOS_CLASS_SELF_ID} priority ${QOS_WEB_FILTER_PRIO} protocol ip u32 ${QOS_FILTER_TCP} match ip sport ${WWW_PORT} 0xffff flowid ${QOS_CLASS_WEB_PUBLIC_ID}"
 	echo "filter add dev ${IF_QOS_EXTERNAL_INGRESS} parent ${QOS_CLASS_SELF_ID} priority ${QOS_WEB_FILTER_PRIO} protocol ip u32 ${QOS_FILTER_TCP} match ip sport ${HTTPS_PORT} 0xffff flowid ${QOS_CLASS_WEB_PUBLIC_ID}"
@@ -2302,7 +2348,7 @@ gen-tc-external-web()
 	echo
 	echo "# QoS for web egress traffic on the external interface:"
 	echo "class add dev ${IF_QOS_EXTERNAL_EGRESS} parent ${QOS_CLASS_SELF_ID} classid ${QOS_CLASS_WEB_PUBLIC_ID} htb rate ${orate}kbit ceil ${oceil}kbit ${QOS_HTB_QUANTUM} prio ${QOS_CLASS_WEB_PUBLIC_PRIO}"
-	echo "qdisc add dev ${IF_QOS_EXTERNAL_EGRESS} parent ${QOS_CLASS_WEB_PUBLIC_ID} handle ${sfq_handle} ${QOS_QDISC_SFQ_USERS}"
+	echo "qdisc add dev ${IF_QOS_EXTERNAL_EGRESS} parent ${QOS_CLASS_WEB_PUBLIC_ID} handle ${leafq_handle} ${QOS_QDISC_LEAFQ_USERS}"
 
 	echo "filter add dev ${IF_QOS_EXTERNAL_EGRESS} parent ${QOS_CLASS_SELF_ID} priority ${QOS_WEB_FILTER_PRIO} protocol ip u32 ${QOS_FILTER_TCP} match ip dport ${WWW_PORT} 0xffff flowid ${QOS_CLASS_WEB_PUBLIC_ID}"
 	echo "filter add dev ${IF_QOS_EXTERNAL_EGRESS} parent ${QOS_CLASS_SELF_ID} priority ${QOS_WEB_FILTER_PRIO} protocol ip u32 ${QOS_FILTER_TCP} match ip dport ${HTTPS_PORT} 0xffff flowid ${QOS_CLASS_WEB_PUBLIC_ID}"
@@ -2310,7 +2356,7 @@ gen-tc-external-web()
 	echo "filter add dev ${IF_QOS_EXTERNAL_EGRESS} parent ${QOS_CLASS_SELF_ID} priority ${QOS_WEB_FILTER_PRIO} protocol ip u32 ${QOS_FILTER_UDP} match ip dport ${DOMAIN_PORT} 0xffff flowid ${QOS_CLASS_WEB_PUBLIC_ID}"
     fi
 
-    gen-qos-index web: sfq external ${IF_QOS_EXTERNAL_INGRESS} ${IF_QOS_EXTERNAL_EGRESS} ${sfq_handle}
+    gen-qos-index web: ${QOS_LEAF_QDISC} external ${IF_QOS_EXTERNAL_INGRESS} ${IF_QOS_EXTERNAL_EGRESS} ${leafq_handle}
 
     if test -n "${PEER_NEXT_LIST}" ; then
 	echo
@@ -2332,7 +2378,7 @@ gen-tc-external-web()
 	    2)
 		qos=${elt}
 
-		sfq_handle="$[${QOS_CHILD_QDISC_HANDLE_OFFSET} + ${handle}]:"
+		leafq_handle="$[${QOS_CHILD_QDISC_HANDLE_OFFSET} + ${handle}]:"
 		classid=${QOS_HANDLE_NADMIN}:${handle}
 
 		echo
@@ -2340,7 +2386,7 @@ gen-tc-external-web()
 		    rate=$(get-qos-percent ${irate} ${qos})
 		    ceil=$(get-qos-ceil external ingress ${rate})
 		    echo "class add dev ${IF_QOS_EXTERNAL_INGRESS} parent ${QOS_CLASS_WEB_PUBLIC_ID} classid ${classid} htb rate ${rate}kbit ceil ${ceil}kbit ${QOS_HTB_QUANTUM} prio ${QOS_CLASS_WEB_PUBLIC_PRIO}"
-		    echo "qdisc add dev ${IF_QOS_EXTERNAL_INGRESS} parent ${classid} handle ${sfq_handle} ${QOS_QDISC_SFQ_USERS}"
+		    echo "qdisc add dev ${IF_QOS_EXTERNAL_INGRESS} parent ${classid} handle ${leafq_handle} ${QOS_QDISC_LEAFQ_USERS}"
 		    echo "filter add dev ${IF_QOS_EXTERNAL_INGRESS} parent ${QOS_CLASS_SELF_ID} priority ${QOS_WEB_FILTER_PRIO} protocol ip u32 ${QOS_FILTER_TCP} match ip sport ${port} 0xffff flowid ${classid}"
 		fi
 
@@ -2348,11 +2394,11 @@ gen-tc-external-web()
 		    rate=$(get-qos-percent ${orate} ${qos})
 		    ceil=$(get-qos-ceil external egress ${rate})
 		    echo "class add dev ${IF_QOS_EXTERNAL_EGRESS} parent ${QOS_CLASS_WEB_PUBLIC_ID} classid ${classid} htb rate ${rate}kbit ceil ${ceil}kbit ${QOS_HTB_QUANTUM} prio ${QOS_CLASS_WEB_PUBLIC_PRIO}"
-		    echo "qdisc add dev ${IF_QOS_EXTERNAL_EGRESS} parent ${classid} handle ${sfq_handle} ${QOS_QDISC_SFQ_USERS}"
+		    echo "qdisc add dev ${IF_QOS_EXTERNAL_EGRESS} parent ${classid} handle ${leafq_handle} ${QOS_QDISC_LEAFQ_USERS}"
 		    echo "filter add dev ${IF_QOS_EXTERNAL_EGRESS} parent ${QOS_CLASS_SELF_ID} priority ${QOS_WEB_FILTER_PRIO} protocol ip u32 ${QOS_FILTER_TCP} match ip dport ${port} 0xffff flowid ${classid}"
 		fi
 
-		gen-qos-index peer:${ip}:${port} sfq external ${IF_QOS_EXTERNAL_INGRESS} ${IF_QOS_EXTERNAL_EGRESS} ${sfq_handle}
+		gen-qos-index peer:${ip}:${port} ${QOS_LEAF_QDISC} external ${IF_QOS_EXTERNAL_INGRESS} ${IF_QOS_EXTERNAL_EGRESS} ${leafq_handle}
 
 		((handle++))
 		;;
@@ -2673,7 +2719,7 @@ gen-tc-ingress()
 		if_qos=${IF_QOS_INTERNAL_INGRESS}
 		;;
 	    external)
-		dev=${IF_EXTERNAL}
+		dev=${IF_LOGICAL_EXTERNAL}
 		if_qos=${IF_QOS_EXTERNAL_INGRESS}
 		;;
 	    auxiliary)
@@ -2870,7 +2916,7 @@ gen-tc-top()
 
 	    echo "# Ingress priority for administration traffic on the ${interface} (${idev}) interface:"
 	    echo "qdisc add dev ${idev} root handle ${QOS_HANDLE_ROOT}: prio bands 2 priomap 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1"
-	    echo "qdisc add dev ${idev} parent ${QOS_CLASS_ADMIN} handle ${QOS_HANDLE_ADMIN}: ${QOS_QDISC_SFQ_ADMIN_OR_MON}"
+	    echo "qdisc add dev ${idev} parent ${QOS_CLASS_ADMIN} handle ${QOS_HANDLE_ADMIN}: ${QOS_QDISC_LEAFQ_ADMIN_OR_MON}"
 
 	    gen-tc-ingress-admin ${idev} ${admin_ip}
 	    gen-tc-ingress-snmp-trap-ip ${idev}
@@ -2907,12 +2953,12 @@ gen-tc-top()
 
 		    echo "# Egress priority for administration traffic on the ${interface} (${odev}) interface:"
 		    echo "qdisc add dev ${odev} root handle ${QOS_HANDLE_ROOT}: prio bands 2 priomap 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1"
-		    echo "qdisc add dev ${odev} parent ${QOS_CLASS_ADMIN} handle ${QOS_HANDLE_ADMIN}: ${QOS_QDISC_SFQ_ADMIN_OR_MON}"
+		    echo "qdisc add dev ${odev} parent ${QOS_CLASS_ADMIN} handle ${QOS_HANDLE_ADMIN}: ${QOS_QDISC_LEAFQ_ADMIN_OR_MON}"
 		    echo "filter add dev ${odev} parent ${QOS_HANDLE_ROOT}: priority ${QOS_ADMIN_FILTER_PRIO} protocol ip handle ${QOS_ADMIN_OR_MON_MARK}/${QOS_MARK_MASK} fw flowid ${QOS_CLASS_ADMIN}"
 		    echo "# Non administration egress traffic goes to the flow (${QOS_CLASS_NADMIN}):"
 		    echo "filter add dev ${odev} parent ${QOS_HANDLE_ROOT}: priority ${QOS_NADMIN_FILTER_PRIO} matchall flowid ${QOS_CLASS_NADMIN}"
 		    flow_name=$(get-admin-mon-flow-name ${interface} ${odev})
-		    gen-qos-index ${flow_name}: sfq ${interface} ${idev} ${odev} ${QOS_HANDLE_ADMIN}:
+		    gen-qos-index ${flow_name}: ${QOS_LEAF_QDISC} ${interface} ${idev} ${odev} ${QOS_HANDLE_ADMIN}:
 
 		    echo
 
@@ -3024,6 +3070,8 @@ gen-tc-qos()
 
 gen-tc()
 {
+    reset-qos-index
+
     gen-tc-ingress
     gen-tc-top
     gen-tc-no-error

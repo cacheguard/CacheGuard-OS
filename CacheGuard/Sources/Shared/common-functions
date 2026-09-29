@@ -536,11 +536,17 @@ ip-is-included()
     test -n "${dnet}" || dnet=0
     test -n "${dbrd}" || dbrd=0
 
-    if test ${mk} == '255.255.255.254' ; then
-	test ${dip} -ge ${dnet} -a ${dip} -le ${dbrd}
-    else
-	test ${dip} -gt ${dnet} -a ${dip} -lt ${dbrd}
-    fi
+    case ${mk} in
+	'255.255.255.255')
+	    test ${dip} -eq ${dnet} -a ${dip} -eq ${dbrd}
+	    ;;
+	'255.255.255.254')
+	    test ${dip} -ge ${dnet} -a ${dip} -le ${dbrd}
+	    ;;
+	*)
+	    test ${dip} -gt ${dnet} -a ${dip} -lt ${dbrd}
+	    ;;
+    esac
 }
 
 ip-belongs2-network()
@@ -1436,12 +1442,7 @@ is-first-login()
     test -n "${1}" || return 1
     local user=${1}
 
-    if test ${user} == ${ADMIN_NAME} ; then
-	local machine=$(get-machine-type)
-	test -f ${BASE_DIR}/${user}/${FIRST_LOGIN}
-    else
-	test -f ${BASE_DIR}/${user}/${FIRST_LOGIN}
-    fi
+    test -f ${BASE_DIR}/${user}/${FIRST_LOGIN}
 }
 
 get-memory-sz()

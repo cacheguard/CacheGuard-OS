@@ -219,23 +219,39 @@ menuentry "Console on Serial Port: ${SERIAL_SPEED}${SERIAL_CONF}" {
 EOF
 }
 
+get-network-mask()
+{
+    test -n "${1}" || return 1
+    local px=${1}
+
+    local mask=$(( 0xffffffff << (32 - px) & 0xffffffff ))
+
+    printf '%d.%d.%d.%d\n' \
+	   $((mask >> 24 & 255)) \
+	   $((mask >> 16 & 255)) \
+	   $((mask >> 8 & 255)) \
+	   $((mask & 255))
+}
+
 gen-dhcp-conf()
 {
     local network_info=$(ip address show dev ${DHCPD_DEV} | tail -2 | head -1 | tr -s ' ')
     local inet=${network_info/ inet */inet}
     test "${inet}" == inet || return 13
 
-    local boot_file
-    local ip_mk=${network_info/*inet /}
-    ip_mk=${ip_mk/ brd*}
+    local lease_time=86400
 
-    local ip=${ip_mk/\/*}
-    local mk=${ip_mk/*\/}
+    local boot_file
+    local ip_px=${network_info/*inet /}
+    ip_px=${ip_px/ brd*}
+
+    local ip=${ip_px/\/*}
+    local px=${ip_px/*\/}
 
     local tftp_server_ip=${ip}
     local network_ip=${ip%\.*}.0
 
-    local network_mask=255.255.255.0
+    local mk=$(get-network-mask ${px})
     local min_ip=${ip%\.*}.101
     local max_ip=${ip%\.*}.200
 
@@ -254,8 +270,13 @@ gen-dhcp-conf()
     echo
     echo "filename \"${boot_file}\";"
     echo
-    echo -e "subnet ${network_ip} netmask ${network_mask} {"
+    echo -e "default-lease-time ${lease_time};"
+    echo -e "max-lease-time ${lease_time};"
+    echo
+    echo -e "subnet ${network_ip} netmask ${mk} {"
     echo -e "\trange ${min_ip} ${max_ip};"
+    echo -e "\toption subnet-mask ${mk};"
+    echo -e "\toption routers ${tftp_server_ip};"
     echo -e "\tnext-server ${tftp_server_ip};"
     echo "}"
 }

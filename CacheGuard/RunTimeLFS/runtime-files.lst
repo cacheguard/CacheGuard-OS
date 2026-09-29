@@ -162,6 +162,7 @@ usr/bin/ssh-keygen
 usr/bin/sshfs
 usr/bin/stat
 usr/bin/stdbuf
+usr/bin/strings
 usr/bin/stty
 usr/bin/su
 usr/bin/sudo
@@ -410,6 +411,13 @@ usr/sbin/dhclient
 usr/sbin/dhcpd
 usr/sbin/dmidecode
 usr/sbin/e2fsck
+usr/sbin/ebtables
+usr/sbin/ebtables-nft-restore
+usr/sbin/ebtables-nft-save
+usr/sbin/ebtables-save
+usr/sbin/ebtables-translate
+usr/sbin/ebtables-nft
+usr/sbin/ebtables-restore
 usr/sbin/efibootmgr
 usr/sbin/ethtool
 usr/sbin/fsck
@@ -478,6 +486,8 @@ usr/sbin/ntpq
 usr/sbin/parted
 usr/sbin/partprobe
 usr/sbin/poweroff
+usr/sbin/pppd
+usr/sbin/pppdump
 usr/sbin/pvcreate
 usr/sbin/pvdisplay
 usr/sbin/reboot
@@ -755,6 +765,7 @@ usr/share/man/man1/srp.1ssl
 usr/share/man/man1/ssh.1
 usr/share/man/man1/ssh-keygen.1
 usr/share/man/man1/stat.1
+usr/share/man/man1/strings.1
 usr/share/man/man1/stdbuf.1
 usr/share/man/man1/storeutl.1ssl
 usr/share/man/man1/stty.1
@@ -844,6 +855,7 @@ usr/share/man/man8/dhclient-script.8
 usr/share/man/man8/dhcpd.8
 usr/share/man/man8/dmidecode.8
 usr/share/man/man8/e2fsck.8
+usr/share/man/man8/ebtables-nft.8
 usr/share/man/man8/efibootmgr.8
 usr/share/man/man8/ethtool.8
 usr/share/man/man8/fsck.8
@@ -946,6 +958,8 @@ usr/share/man/man8/pam_unix.8
 usr/share/man/man8/parted.8
 usr/share/man/man8/partprobe.8
 usr/share/man/man8/poweroff.8
+usr/share/man/man8/pppd.8
+usr/share/man/man8/pppdump.8
 usr/share/man/man8/pvcreate.8
 usr/share/man/man8/pvdisplay.8
 usr/share/man/man8/reboot.8
@@ -974,6 +988,7 @@ usr/share/man/man8/sysctl.8
 usr/share/man/man8/tc.8
 usr/share/man/man8/tc-flow.8
 usr/share/man/man8/tc-flower.8
+usr/share/man/man8/tc-fq_codel.8
 usr/share/man/man8/tc-htb.8
 usr/share/man/man8/tc-mirred.8
 usr/share/man/man8/tc-prio.8

@@ -61,19 +61,17 @@ fi
 }
 
 case "${2}" in
-   up)
+    up)
 	log_info_msg "Adding '${VLAN_ID}' 802.1q tagged interface..."
 	802-1q-up ${1} "${VLAN_ID}"
 	evaluate_retval
-   ;;
-   
+	;;
     down)
 	log_info_msg "Removing '${VLAN_ID}' 802.1q tagged interface..."
 	802-1q-down ${1} "${VLAN_ID}"
 	evaluate_retval
 	;;
-   
-   *)
+    *)
 	echo "Usage: ${0} [interface] {up|down}"
 	exit 1
 	;;

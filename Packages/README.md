@@ -137,6 +137,7 @@ Modifications introduced by CacheGuard Technologies are provided as patch files 
 - php-8.3.13.tar.gz
 - ply-3.11.tar.gz
 - popt-1.18.tar.gz
+- ppp-2.5.4.tar.gz
 - reiserfsprogs-3.6.21.tar.bz2
 - rpcsvc-proto-1.4.3.tar.xz
 - rsync-3.2.7.tar.gz
@@ -146,8 +147,7 @@ Modifications introduced by CacheGuard Technologies are provided as patch files 
 - sqlite-src-3470000.tar.gz
 - squid-7.6.tar.gz
 - squid-dummy-auth-1.0.tar.bz2
-- squid-ecap-gzip-master-1.3-cg.patch.bz2
-- squid-ecap-gzip-master-1.3.tar.bz2
+- squid-ecap-gzip-1.6.0.9.tar.gz
 - squidGuard-1.4-cg.patch.bz2
 - squidGuard-1.4.tar.bz2
 - sshfs-3.7.3.tar.xz

@@ -89,18 +89,29 @@ install-daemon-scripts()
 
 install-network-scripts()
 {
-    local dir=NetworkScripts
+    local file dir=NetworkScripts
 
-    sudo install -m 754 -o root -g root ${dir}/link-802-3ad ${APL}/lib/services/link-802-3ad
-    sudo install -m 754 -o root -g root ${dir}/link-802-1q ${APL}/lib/services/link-802-1q
+    for file in link-802-3ad link-802-1q ipv4-dhcp ipv4-pppoe
+    do
+	sudo install -m 754 -o root -g root ${dir}/${file} ${APL}/lib/services/${file}
+    done
+
+    for file in apl_dhclient apl_pppoe_up apl_pppoe_down
+    do
+	sudo install -m 755 -o root -g root ${dir}/${file} ${APL}${LOCAL_DIR}/bin/${file}
+    done
+
     sudo install -m 755 -o root -g root ${dir}/dhclient-script ${APL}/sbin/dhclient-script
+
+    sudo install -m 644 -o root -g root ${dir}/dhclient-enter-hooks ${APL}${LOCAL_DIR}/etc
+    sudo install -m 644 -o root -g root ${dir}/dhclient-exit-hooks ${APL}${LOCAL_DIR}/etc
 }
 
 install-login-scripts()
 {
     local dir=LoginScripts
 
-    sudo install -m 755 -o root -g root ${GENERATED_DIR}/apl_bash ${APL}${USR_BIN_DIR}/apl_bash
+    sudo install -m 755 -o root -g root ${GENERATED_DIR}/apl_bash ${APL}${USR_BIN_DIR}
     sudo install -m 755 -o root -g root ${dir}/apl_chroot_bash ${APL}${LOCAL_DIR}/bin
     sudo install -m 755 -o root -g root ${dir}/apl_serial_login ${APL}${LOCAL_DIR}/bin
 }

@@ -267,8 +267,13 @@ show-report-link()
     do
 	test -n "${ips}" || continue
 
-	dev=$(get-formatted-bond-devs ${dev})
-	ext_state=$(echo-formated-state ${state})
+	if test ${dev} == ${EXTERNAL_PPPOE_IF} ; then
+	    dev="${EXTERNAL_PPPOE_IF} [${CURRENT_BOND_EXTERNALS}]"
+	else
+	    dev=$(get-formatted-bond-devs ${dev})
+	    ext_state=$(echo-formated-state ${state})
+	fi
+
 	echo -n "Link ${dev}"
 	echo-value "${ext_state}" ${REPORT_COL} -ne
 

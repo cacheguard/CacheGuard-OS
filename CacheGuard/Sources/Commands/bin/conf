@@ -369,8 +369,26 @@ show-diff()
     test "${BOND_INTERNALS}" == "${CURRENT_BOND_INTERNALS}" || echo link bond internal >> ${transaction_file}
     test "${BOND_AUXILIARIES}" == "${CURRENT_BOND_AUXILIARIES}" || echo link bond auxiliary >> ${transaction_file}
     test "${VLAN_FLOW_LIST}" == "${CURRENT_VLAN_FLOW_LIST}" || echo vlan >> ${transaction_file}
+
+    if test "${IP_EXTERNAL_MODE}" != "${CURRENT_IP_EXTERNAL_MODE}" ; then
+	echo ip external >> ${transaction_file}
+    else
+	case ${IP_EXTERNAL_MODE} in
+	    static)
+		test "${IP_EXTERNAL_IP}" == "${CURRENT_IP_EXTERNAL_IP}" -a \
+		     "${IP_EXTERNAL_MASK}" == "${CURRENT_IP_EXTERNAL_MASK}" || echo ip external >> ${transaction_file}
+		;;
+	    pppoe)
+		test "${IP_EXTRNAL_PPPOE_SERVICE_NAME}" == "${CURRENT_IP_EXTRNAL_PPPOE_SERVICE_NAME}" -a \
+		     "${IP_EXTRNAL_PPPOE_USERNAME}" == "${CURRENT_IP_EXTRNAL_PPPOE_USERNAME}" -a \
+		     "${IP_EXTRNAL_PPPOE_PASSWORD}" == "${CURRENT_IP_EXTRNAL_PPPOE_PASSWORD}" || echo ip external >> ${transaction_file}
+		;;
+	    *)
+		;;
+	esac
+    fi
+
     test "${IP_INTERNAL_IP}" == "${CURRENT_IP_INTERNAL_IP}" -a "${IP_INTERNAL_MASK}" == "${CURRENT_IP_INTERNAL_MASK}" || echo ip internal >> ${transaction_file}
-    test "${IP_EXTERNAL_IP}" == "${CURRENT_IP_EXTERNAL_IP}" -a "${IP_EXTERNAL_MASK}" == "${CURRENT_IP_EXTERNAL_MASK}" || echo ip external >> ${transaction_file}
     test "${IP_AUXILIARY_IP}" == "${CURRENT_IP_AUXILIARY_IP}" -a "${IP_AUXILIARY_MASK}" == "${CURRENT_IP_AUXILIARY_MASK}" || echo ip auxiliary >> ${transaction_file}
     test "${IP_VLAN_LIST}" == "${CURRENT_IP_VLAN_LIST}" || echo ip vlan >> ${transaction_file}
     test "${VRRP_INTERNAL_LIST}" == "${CURRENT_VRRP_INTERNAL_LIST}" || echo vrrp internal >> ${transaction_file}
@@ -1371,7 +1389,22 @@ create-conf()
     echo "ip internal ${_IP_INTERNAL_IP} ${_IP_INTERNAL_MASK}"
 
     if contextual-command-is-allowed ; then
-	echo "ip external ${_IP_EXTERNAL_IP} ${_IP_EXTERNAL_MASK}"
+	case ${_IP_EXTERNAL_MODE} in
+	    static)
+		echo "ip external ${_IP_EXTERNAL_MODE} ${_IP_EXTERNAL_IP} ${_IP_EXTERNAL_MASK}"
+		;;
+	    dhcp)
+		echo "ip external ${_IP_EXTERNAL_MODE}"
+		;;
+	    pppoe)
+		password=$(encrypt-password "clear:${_IP_EXTRNAL_PPPOE_PASSWORD}" "${PPPOE_PASSWD}")
+		password=${password/encrypted:}
+		echo "ip external ${_IP_EXTERNAL_MODE}:encrypted '${_IP_EXTRNAL_PPPOE_SERVICE_NAME}' '${_IP_EXTRNAL_PPPOE_USERNAME}' ${password}"
+		;;
+	    *)
+		;;
+	esac
+
 	echo "ip auxiliary ${_IP_AUXILIARY_IP} ${_IP_AUXILIARY_MASK}"
 	echo
 

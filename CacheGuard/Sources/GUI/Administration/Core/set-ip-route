@@ -72,6 +72,7 @@ set-routes()
 		fi
 
 		test -n "${network}" || network="0.0.0.0"
+		test -n "${netmask}" || netmask="0.0.0.0"
 
 		new_list="${new_list} ${network}/${netmask}_${gateway}"
 

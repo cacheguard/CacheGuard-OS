@@ -1,0 +1,53 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       Scripts
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+test ! -f /var/lock/apl_dhcp_external_renew || exit 11
+test ! -f ${LOCK_DIR}/apl_apply || exit 13
+
+CACHEGUARD_DIR=/etc/sysconfig/cacheguard
+source ${CACHEGUARD_DIR}/constant
+source ${ABASE_DIR}/${ENV_RDIR}/${ENV_CURRENT_NAME}
+
+test -n "${CURRENT_BOND_EXTERNALS}" || exit 0
+test "${CURRENT_IP_EXTERNAL_MODE}" == dhcp || exit 0
+test -f ${RUN_DIR}/${EXTERNAL_DHCP_IP_CONFIGURATION} || exit 15
+
+main()
+{
+    local dev
+
+    read dev < ${RUN_DIR}/${EXTERNAL_DHCP_IP_CONFIGURATION}
+    test -n "${dev}" || return 21
+
+    {
+	touch /var/lock/apl_dhcp_external_renew	
+	ifdown ${dev}
+	sleep 1
+	ifup ${dev}
+	rm -f /var/lock/apl_dhcp_external_renew
+    } > /dev/null 2>&1
+}
+
+# Main()
+
+main "${@}"

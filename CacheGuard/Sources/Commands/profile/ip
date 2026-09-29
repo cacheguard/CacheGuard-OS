@@ -68,7 +68,25 @@ __complete-ip()
 	    ;;
 	2)
 	    case ${COMP_WORDS[1]} in
-		internal|external|auxiliary)
+		external)
+		    case ${COMP_WORDS[2]} in
+			d|dh|dhc|dhcp)
+			    COMPREPLY=(dhcp)
+			    ;;
+			p|pp|ppp|pppo|pppoe)
+			    COMPREPLY=(pppoe)
+			    ;;
+			s|st|sta|stat|stati|static)
+			    COMPREPLY=(static)
+			    ;;
+			'')
+			    COMPREPLY=('' '<RET>' dhcp pppoe static)
+			    ;;
+			*)
+			    ;;
+		    esac
+		    ;;
+		internal|auxiliary)
 		    COMPREPLY=('' '<RET>' '<ip>')
 		    ;;
 		name|via)
@@ -123,10 +141,36 @@ __complete-ip()
 		COMPREPLY=('' '<RET>' '<ip>')
 	    fi
 	    ;;
-	
+
 	3)
 	    case ${COMP_WORDS[1]} in
-		internal|external|auxiliary)
+		external)
+		    case ${COMP_WORDS[2]} in
+			pppoe)
+			    COMPREPLY=('' '<service-name>')
+			    ;;
+			static)
+			    COMPREPLY=('' '<ip>')
+			    ;;
+			dhcp)
+			    case ${COMP_WORDS[3]} in
+				r|re|ren|rene|renew)
+				    COMPREPLY=(renew)
+				    ;;
+				'')
+				    COMPREPLY=('' '<RET>' renew)
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
+		internal|auxiliary)
 		    COMPREPLY=('' '<RET>' '<network-mask>')
 		    ;;
 		route)
@@ -182,9 +226,40 @@ __complete-ip()
 	
 	4)
 	    case ${COMP_WORDS[1]} in
+		external)
+		    case ${COMP_WORDS[2]} in
+			dhcp)
+			    case ${COMP_WORDS[3]} in
+				renew)
+				    case ${COMP_WORDS[4]} in
+					r|re|rep|repo|repor|report)
+					    COMPREPLY=(report)
+					    ;;
+					'')
+					    COMPREPLY=('' '<RET>' report)
+					    ;;
+					*)
+					    COMPREPLY=()
+					    ;;
+				    esac
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			pppoe)
+			    COMPREPLY=('' '<username>')
+			    ;;			    
+			static)
+			    COMPREPLY=('' '<RET>' '<network-mask>')
+			    ;;
+			*)
+			    ;;
+		    esac
+		    ;;
 		route)
 		    if test ${COMP_WORDS[2]} == add -o \
-			${COMP_WORDS[2]} == del -o \
 			${COMP_WORDS[2]:0:4} == "add:" -o \
 			${COMP_WORDS[2]:0:7} == "insert:" ; then
 			
@@ -193,6 +268,12 @@ __complete-ip()
 			else
 			    COMPREPLY=('' '<network-mask>')
 			fi
+		    elif test ${COMP_WORDS[2]} == del ; then
+			if test ${COMP_WORDS[3]} == default ; then
+			    COMPREPLY=('' '<RET>' '<gateway-ip>')
+			else
+			    COMPREPLY=('' '<network-mask>')
+			fi			
 		    else
 			COMPREPLY=()
 		    fi
@@ -235,9 +316,18 @@ __complete-ip()
 	    ;;
 	5)
 	    case ${COMP_WORDS[1]} in
+		external)
+		    case ${COMP_WORDS[2]} in
+			pppoe)
+			    COMPREPLY=('' '<RET>' '<password>')
+			    ;;
+			*)
+			    COMPREPLY=()
+			    ;;
+		    esac
+		    ;;
 		route)
 		    if test ${COMP_WORDS[2]} == add -o \
-			${COMP_WORDS[2]} == del -o \
 			${COMP_WORDS[2]:0:4} == "add:" -o \
 			${COMP_WORDS[2]:0:7} == "insert:" ; then
 
@@ -246,6 +336,12 @@ __complete-ip()
 			else
 			    COMPREPLY=('' '<gateway-ip>')
 			fi
+		    elif test ${COMP_WORDS[2]} == del ; then
+			 if test ${COMP_WORDS[3]} != default ; then
+			     COMPREPLY=('' '<RET>' '<gateway-ip>')
+			 else
+			     COMPREPLY=()
+			 fi
 		    else
 			COMPREPLY=()
 		    fi

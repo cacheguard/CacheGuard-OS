@@ -1080,7 +1080,7 @@ run()
 
 		    test -n "${admin_user}" || return 1
 		    test ${#admin_user} -le ${MAX_LEN} || return 159
-		    check-allowed-argument ${admin_user} || return 1
+		    check-allowed-argument-no-blank ${admin_user} || return 1
 		    user-has-admin-rights || return 31
 		    check-lock || return 123
 

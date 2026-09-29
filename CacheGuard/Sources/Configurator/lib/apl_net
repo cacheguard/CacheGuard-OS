@@ -313,7 +313,7 @@ set-rweb-ip()
     local http_name_list http_name_ip_list https_name_ip_list
     local rweb_site_ip_list
 
-    local rweb_site_https=False
+    local rweb_site_https='False'
 
     case ${state} in
 	new)
@@ -331,7 +331,7 @@ set-rweb-ip()
 	    ;;
     esac
 
-    local elt i=0 range
+    local elt range i=0
     local name protocol ip tls
 
     for elt in ${rweb_site_list}
@@ -353,11 +353,20 @@ set-rweb-ip()
 	    4)
 		! check-expr-ip ${name} || rweb_site_ip_list="${rweb_site_ip_list} ${name}"
 
-		if test ${ip_external_ip} != ${ip} && ! member "${alias_ip_list}" ${ip} ; then
-		    if test ${HA_MODE} == True ; then
-			member "${vrrp_external_ip_list}" ${ip} || alias_ip_list="${alias_ip_list} ${ip}"
-		    else
-			alias_ip_list="${alias_ip_list} ${ip}"
+		if test ${IP_EXTERNAL_MODE} == 'static' ; then
+		    if test ${ip_external_ip} != ${ip} && ! member "${alias_ip_list}" ${ip} ; then
+			if test ${HA_MODE} == True ; then
+			    member "${vrrp_external_ip_list}" ${ip} || alias_ip_list="${alias_ip_list} ${ip}"
+			else
+			    alias_ip_list="${alias_ip_list} ${ip}"
+			fi
+		    fi
+		else
+		    ip=${ip_external_ip}
+
+		    if test "${ip}" == '0.0.0.0' ; then
+			((i++))
+			continue
 		    fi
 		fi
 
@@ -934,7 +943,7 @@ set-network-if-parameters()
     fi
 
     if test ${VLAN_MODE} == False ; then
-	
+
 	export IF_WEB=${IF_INTERNAL}
 	export IF_RWEB=${IF_INTERNAL}
 	export IF_AV=${IF_INTERNAL}
@@ -1039,6 +1048,18 @@ set-network-if-parameters()
     else
 	CURRENT_AUXILIARY_IS_ACTIVE=yes
     fi
+
+    if test ${IP_EXTERNAL_MODE} == 'pppoe' ; then
+	IF_LOGICAL_EXTERNAL=${EXTERNAL_PPPOE_IF}
+    else
+	IF_LOGICAL_EXTERNAL=${IF_EXTERNAL}
+    fi
+
+    if test ${CURRENT_IP_EXTERNAL_MODE} == 'pppoe' ; then
+	CURRENT_IF_LOGICAL_EXTERNAL=${CURRENT_EXTERNAL_PPPOE_IF}
+    else
+	CURRENT_IF_LOGICAL_EXTERNAL=${CURRENT_IF_EXTERNAL}
+    fi
 }
 
 get-broadcast-address()
@@ -1057,7 +1078,7 @@ get-broadcast-address()
     fi
 }
 
-set-network-ip-native-parameters()
+set-network-ip-external-parameters()
 {
     export IP_EXTERNAL_NET=$(ipcalc -s ${IP_EXTERNAL_IP} ${IP_EXTERNAL_MASK} -n) ; IP_EXTERNAL_NET=${IP_EXTERNAL_NET/NETWORK=}
     export IP_EXTERNAL_PRF=$(ipcalc -s ${IP_EXTERNAL_IP} ${IP_EXTERNAL_MASK} -p) ; IP_EXTERNAL_PRF=${IP_EXTERNAL_PRF/PREFIX=}
@@ -1066,6 +1087,11 @@ set-network-ip-native-parameters()
     export CURRENT_IP_EXTERNAL_NET=$(ipcalc -s ${CURRENT_IP_EXTERNAL_IP} ${CURRENT_IP_EXTERNAL_MASK} -n) ; CURRENT_IP_EXTERNAL_NET=${CURRENT_IP_EXTERNAL_NET/NETWORK=}
     export CURRENT_IP_EXTERNAL_PRF=$(ipcalc -s ${CURRENT_IP_EXTERNAL_IP} ${CURRENT_IP_EXTERNAL_MASK} -p) ; CURRENT_IP_EXTERNAL_PRF=${CURRENT_IP_EXTERNAL_PRF/PREFIX=}
     export CURRENT_IP_EXTERNAL_BRD=$(get-broadcast-address ${CURRENT_IP_EXTERNAL_IP} ${CURRENT_IP_EXTERNAL_MASK})
+}
+
+set-network-ip-native-parameters()
+{
+    set-network-ip-external-parameters
 
     export IP_AUXILIARY_NET=$(ipcalc -s ${IP_AUXILIARY_IP} ${IP_AUXILIARY_MASK} -n) ; IP_AUXILIARY_NET=${IP_AUXILIARY_NET/NETWORK=}
     export IP_AUXILIARY_PRF=$(ipcalc -s ${IP_AUXILIARY_IP} ${IP_AUXILIARY_MASK} -p) ; IP_AUXILIARY_PRF=${IP_AUXILIARY_PRF/PREFIX=}
@@ -1363,12 +1389,423 @@ set-network-ip-vlan-parameters()
     export IP_LOCAL_IP_LIST=${ip_local_ip_list}
 }
 
+set-current-external-ip-mk-variables()
+{
+    if test -z "${CURRENT_IF_EXTERNAL}" ; then
+	CURRENT_EXTERNAL_IP='0.0.0.0'
+	CURRENT_IP_EXTERNAL_MASK='0.0.0.0'
+	return 11
+    fi
+
+    local net=$(ip address show dev ${CURRENT_IF_EXTERNAL} 2> /dev/null | tail -2 | head -1)
+
+    if test "${net/*net */net}" != net ; then
+	CURRENT_IP_EXTERNAL_IP='0.0.0.0'
+	CURRENT_IP_EXTERNAL_MASK='0.0.0.0'
+	return 13
+    fi
+
+    source ${APPLIANCE_DIR}/lib/lib-ip
+    local ip_px ip px
+
+    ip_px=${net/*inet /}
+    ip_px=${ip_px/ brd*}
+
+    ip=${ip_px/\/*}
+    mk=$(get-netmask ${ip_px})
+
+    if test -z "${ip}" -o -z "${mk}"  ; then
+	CURRENT_IP_EXTERNAL_IP='0.0.0.0'
+	CURRENT_IP_EXTERNAL_MASK='0.0.0.0'
+	return 15
+    fi
+
+    CURRENT_IP_EXTERNAL_IP=${ip}
+    CURRENT_IP_EXTERNAL_MASK=${mk}
+}
+
+remove-default-from-routing-table()
+{
+    test -n "${1}" || return 0
+    local in_routes=${1}
+
+    local elt range i=0
+    local ip netmask gateway weight pinged
+    local out_routes
+
+    for elt in ${in_routes}
+    do
+	range=$[${i} % 5]
+	case ${range} in
+	    0)
+		ip=${elt}
+		;;
+	    1)
+		netmask=${elt}
+		;;
+	    2)
+		gateway=${elt}
+		;;
+	    3)
+		weight=${elt}
+		;;
+	    4)
+		pinged=${elt}
+
+		test ${ip} == '0.0.0.0' -a ${netmask} == '0.0.0.0' || \
+		    out_routes="${out_routes} ${ip} ${netmask} ${gateway} ${weight} ${pinged}"
+		;;
+	    *)
+		return 1
+		;;
+	esac
+	((i++))
+    done
+
+    echo ${out_routes:1}
+}
+
+update-external-ip-variables-from-dhcp()
+{
+    local ret
+
+    if test -f ${RUN_DIR}/${EXTERNAL_DHCP_IP_CONFIGURATION} ; then
+
+	local line i=0
+
+	while read line
+	do
+	    case ${i} in
+		0|1)
+		    ;;
+		2)
+		    if check-expr-ip ${line} ; then
+			IP_EXTERNAL_IP=${line}
+		    else
+			IP_EXTERNAL_IP='0.0.0.0'
+		    fi
+		    ;;
+		3)
+		    if check-expr-ip ${line} ; then
+			IP_EXTERNAL_MASK=${line}
+		    else
+			IP_EXTERNAL_MASK='0.0.0.0'
+		    fi
+		    ;;
+		4)
+		    local ip routes
+
+		    for ip in ${line}
+		    do
+			! check-expr-ip ${ip} || routes="${routes} 0.0.0.0 0.0.0.0 ${ip} 50 ${ip}"
+		    done
+		    routes=${routes:1}
+
+		    IP_ROUTE_LIST=$(remove-default-from-routing-table "${IP_ROUTE_LIST}")
+
+		    if test -z "${IP_ROUTE_LIST}" ; then
+			IP_ROUTE_LIST=${routes}
+		    else
+			IP_ROUTE_LIST="${IP_ROUTE_LIST} ${routes}"
+		    fi
+		    ;;
+		5)
+		    ;;
+		*)
+		    break
+		    ;;
+	    esac
+	    ((i++))
+	done < ${RUN_DIR}/${EXTERNAL_DHCP_IP_CONFIGURATION}
+	ret=0
+    else
+	IP_EXTERNAL_IP='0.0.0.0'
+	IP_EXTERNAL_MASK='0.0.0.0'
+	IP_ROUTE_LIST=$(remove-default-from-routing-table "${IP_ROUTE_LIST}")
+	ret=11
+    fi
+
+    set-network-ip-parameters
+    set-network-routes-parameters
+
+    return ${ret}
+}
+
+update-external-dynamic-ip-flags()
+{
+    test -n "${1}" || return 1
+    local mode=${1}
+    local conditional=${2}
+
+    local go
+
+    if test -n "${conditional}" ; then
+
+	test "${IP_EXTERNAL_IP}" == "${CURRENT_IP_EXTERNAL_IP}" -a \
+	     "${IP_EXTERNAL_MASK}" == "${CURRENT_IP_EXTERNAL_MASK}" -a \
+	     "${IP_ROUTE_LIST}" == "${CURRENT_IP_ROUTE_LIST}" || go=yes
+    else
+	go=yes
+    fi
+
+    test -n "${go}" || return 0
+
+    FLAG_TC=1
+    FLAG_IPTABLES=1
+    FLAG_IKE=1
+    FLAG_HEALTH=1
+    FLAG_PATH=1
+
+    case ${mode} in
+	dhcp)
+	    FLAG_NETWORK_DHCP_ROUTE_CONFIGURATION=1
+	    ;;
+	pppoe)
+	    FLAG_NETWORK_PPPOE_ROUTE_CONFIGURATION=1
+	    ;;
+	*)
+	    ;;
+    esac
+
+    if test "${CURRENT_RWEB_MODE}" == True ; then
+	FLAG_HTTPD=1
+    fi
+
+    if test "${CURRENT_ADMIN_EXTERNAL}" == True ; then
+	FLAG_SNMPD=1
+	FLAG_WADMIN=1
+	FLAG_SSH=1
+	test "${CURRENT_ADMIN_WAUDIT}" == False || FLAG_HTTPD=1
+    fi
+
+    if test "${CURRENT_AV_MODE}" = True -a "${CURRENT_AV_EXTERNAL}" == True ; then
+	FLAG_AV=1
+    fi
+}
+
+update-external-dhcp-ip()
+{
+    if test -n "${DHCLIENT_HOOK_EVENT}" ; then
+
+	local error message
+
+	case ${DHCLIENT_HOOK_EVENT} in
+	    error)
+		error=${DHCLIENT_HOOK_ERROR_CODE}
+		test -n "${error}" || error=255
+		log "Internal unexpected error during a DHCP request"
+		log-result ${error}
+		return 11
+		;;
+	    modified)
+		log "New external DHCP IP configuration detected"
+		log-result ${?}
+		;;
+	    failed)
+		log "DHCP request has failed"
+		log-result 21
+		return 13
+		;;
+	    *)
+		log "Internal unmanaged error during a DHCP request"
+		log-result 31
+		return 15
+		;;
+	esac
+    else
+	test ${CURRENT_IP_EXTERNAL_MODE} != 'dhcp' -o ${IF_EXTERNAL} != ${CURRENT_IF_EXTERNAL} || return 0
+    fi
+
+    local dev tmp_lease_file=/tmp/apl-apply-dhcp-lease.${$}
+    local timeout=35 ret=11 pid
+
+    log "Requesting the external DHCP server"
+
+    rm -f ${RUN_DIR}/${EXTERNAL_DHCP_DONE}
+
+    for dev in ${BOND_EXTERNALS}
+    do
+	rm -f "${tmp_lease_file}.${dev}"
+
+	iptables -A OUTPUT -o ${dev} -p udp --sport ${BOOTPC_PORT} --dport ${BOOTPS_PORT} -j ACCEPT
+	iptables -A INPUT -i ${dev} -p udp --sport ${BOOTPS_PORT} --dport ${BOOTPC_PORT} -j ACCEPT
+
+	timeout --signal=TERM --kill-after=3s ${timeout}s \
+		dhclient \
+		-q -4 -d --no-pid \
+		-cf /etc/dhclient-probe.conf \
+		-sf ${LOCAL_DIR}/bin/apl_dhclient \
+		-lf ${tmp_lease_file}.${dev} \
+		${dev} > /dev/null 2>&1 &
+	pid=${!}
+
+	while kill -0 "${pid}" 2>/dev/null
+	do
+	    if test -f ${RUN_DIR}/${EXTERNAL_DHCP_DONE} ; then
+		kill "${pid}" 2>/dev/null
+		ret=0
+		break 2
+	    fi
+	    usleep 200000
+	done
+    done
+
+    log-result ${ret}
+
+    rm -f \
+       ${RUN_DIR}/${EXTERNAL_DHCP_DONE} \
+       ${tmp_lease_file}.*
+
+    update-external-ip-variables-from-dhcp
+    update-external-dynamic-ip-flags dhcp variables
+}
+
+update-external-ip-variables-from-pppoe()
+{
+    local ret
+
+    if test -f ${RUN_DIR}/${EXTERNAL_PPPOE_IP_CONFIGURATION}.new ; then
+
+	local line i=0
+
+	while read line
+	do
+	    case ${i} in
+		0|1)
+		    ;;
+		2)
+		    if check-expr-ip ${line} ; then
+			IP_EXTERNAL_IP=${line}
+			IP_EXTERNAL_MASK='255.255.255.255'
+		    else
+			IP_EXTERNAL_IP='0.0.0.0'
+			IP_EXTERNAL_MASK='0.0.0.0'
+		    fi
+		    ;;
+		3)
+		    local peer=${line}
+		    local route
+
+	 	    ! check-expr-ip ${peer} || route="0.0.0.0 0.0.0.0 ${peer} 50 ${peer}"   
+
+		    IP_ROUTE_LIST=$(remove-default-from-routing-table "${IP_ROUTE_LIST}")
+
+		    if test -z "${IP_ROUTE_LIST}" ; then
+			IP_ROUTE_LIST=${route}
+		    else
+			test -z "${route}" || IP_ROUTE_LIST="${IP_ROUTE_LIST} ${route}"
+		    fi
+		    break
+		    ;;
+		*)
+		    break
+		    ;;
+	    esac
+	    ((i++))
+	done < ${RUN_DIR}/${EXTERNAL_PPPOE_IP_CONFIGURATION}.new
+	ret=0
+    else
+	IP_EXTERNAL_IP='0.0.0.0'
+	IP_EXTERNAL_MASK='0.0.0.0'
+	IP_ROUTE_LIST=$(remove-default-from-routing-table "${IP_ROUTE_LIST}")
+	ret=11
+    fi
+
+    set-network-ip-parameters
+    set-network-routes-parameters
+
+    return ${ret}
+}
+
+activate-pppoe-interface()
+{
+    test ${IP_EXTERNAL_MODE} == 'pppoe' || return 0
+
+    local timeout=200000 i=0 n=100
+    local ret=0
+
+    log "Waiting the PPPoE interface to comme up"
+
+    while true
+    do
+	test ! -f ${RUN_DIR}/${EXTERNAL_PPPOE_DONE} || break
+	test ${i} -lt ${n} || break
+	usleep ${timeout}
+	((i++))
+    done
+
+    if test -f ${RUN_DIR}/${EXTERNAL_PPPOE_DONE} ; then
+	rm -f ${RUN_DIR}/${EXTERNAL_PPPOE_DONE}
+	update-external-ip-variables-from-pppoe
+	ret=${?}
+    else
+	ret=21
+    fi
+
+    log-result ${ret}
+    return ${ret}
+}
+
+update-external-pppoe-ip()
+{
+    if test -n "${PPPOE_HOOK_EVENT}" ; then
+
+	case ${PPPOE_HOOK_EVENT} in
+	    modified)
+		log "New external PPPoE IP configuration detected"
+		log-result ${?}
+		;;
+	    *)
+		log "Internal unmanaged error during PPPoE request"
+		log-result 11
+		return 11
+		;;
+	esac
+    else
+	IP_EXTERNAL_IP='0.0.0.0'
+	IP_EXTERNAL_MASK='0.0.0.0'
+	IP_ROUTE_LIST=$(remove-default-from-routing-table "${IP_ROUTE_LIST}")
+
+	set-network-ip-parameters
+	set-network-routes-parameters
+    fi
+
+    update-external-dynamic-ip-flags pppoe
+}
+
+update-external-dynamic-ip()
+{
+    case ${IP_EXTERNAL_MODE} in
+	dhcp)
+	    update-external-dhcp-ip
+	    ;;
+	pppoe)
+	    update-external-pppoe-ip
+	    ;;
+	*)
+	    return 0
+	    ;;
+    esac
+}
+
 set-network-ip-parameters()
 {
+    if test "${IP_EXTRNAL_PPPOE_SERVICE_NAME}" != "${CURRENT_IP_EXTRNAL_PPPOE_SERVICE_NAME}" -o \
+	    "${IP_EXTRNAL_PPPOE_USERNAME}" != "${CURRENT_IP_EXTRNAL_PPPOE_USERNAME}" -o \
+	    "${IP_EXTRNAL_PPPOE_PASSWORD}" != "${CURRENT_IP_EXTRNAL_PPPOE_PASSWORD}" ; then
+	IP_EXTRNAL_PPPOE_CONFIGURATION_MODIFIED=True
+    else
+	IP_EXTRNAL_PPPOE_CONFIGURATION_MODIFIED=False
+    fi
+
     set-network-ip-native-parameters
     set-network-ip-vlan-parameters
 
-    if test ${HA_MODE} == True ; then ARP_IGNORE=1 ; else ARP_IGNORE=0 ; fi
+    if test ${HA_MODE} == True ; then
+	ARP_IGNORE=1
+    else
+	ARP_IGNORE=0
+    fi
 
     export MULTICAST_NET=224.0.0.0/240.0.0.0
     export ALL_HOSTS_MULTICAST_IP=224.0.0.1
@@ -1422,11 +1859,23 @@ set-net-constant()
     set-ports-nb
 }
 
+set-network-global-parameters()
+{
+    if test ${IP_EXTERNAL_MODE} == 'pppoe' ; then
+	NETWORK_MTU=$((NETWORK_MTU - 8))
+	CONFIGURE_AFTER_NETWORK=True
+    else
+	CONFIGURE_AFTER_NETWORK=False
+    fi
+}
+
 set-network-parameters()
 {
+    set-net-constant
+    set-network-global-parameters
     set-network-if-parameters
     set-network-ip-parameters
-    set-net-constant
+    set-network-routes-parameters
 }
 
 set-gateway-weights()
@@ -1471,7 +1920,7 @@ set-gateway-weights()
 		    gw=${gw_wt/:*}
 		    wt=${gw_wt/*:}
 		    if test ${wt} != 0 ; then
-			if ip-is-included ${gw} ${IP_EXTERNAL_NET} ${IP_EXTERNAL_BRD} ${IP_EXTERNAL_MASK}; then
+			if ip-is-included ${gw} ${IP_EXTERNAL_NET} ${IP_EXTERNAL_BRD} ${IP_EXTERNAL_MASK} ; then
 			    external_gw_wt_list="${external_gw_wt_list} ${gw_wt}"
 			fi
 		    fi
@@ -1580,7 +2029,9 @@ get-connected-if()
     else
 	
 	if test ${VLAN_MODE} == False ; then
-	    echo ${IF_INTERNAL}
+	    if ip-is-included ${ip} ${IP_INTERNAL_NET} ${IP_INTERNAL_BRD} ${IP_INTERNAL_MASK} ; then
+		echo ${IF_INTERNAL}
+	    fi
 	else
 	    if ip-is-included ${ip} ${IP_WEB_NET} ${IP_WEB_BRD} ${IP_WEB_MASK} ; then
 		echo ${IF_WEB}
@@ -1796,7 +2247,7 @@ gen-network-interface-conf()
     local arp=${6}
     local gw=${7}
 
-    local services
+    local services srv 
 
     local device=${master/\.*} vlan
     local alias_id=$(get-alias-dev-id "${master}")
@@ -1825,18 +2276,40 @@ gen-network-interface-conf()
 	fi
     fi
 
-    if test -n "${ip}" -a -n "${prefix}" -a -n "${broadcast}" ; then
-	echo "IP=${ip}"
-	echo "PREFIX=${prefix}"
-	echo "BROADCAST=${broadcast}"
-
-	test -z "${gw}" || echo "GATEWAY=${gw}"
-
-	if test -z "${services}" ; then
-	    services="ipv4-static"
-	else
-	    services="${services} ipv4-static"
+    if test ${master} == ${IF_EXTERNAL} ; then
+	case ${IP_EXTERNAL_MODE} in
+	    static)
+		if test -n "${ip}" -a -n "${prefix}" -a -n "${broadcast}" ; then
+		    echo "IP=${ip}"
+		    echo "PREFIX=${prefix}"
+		    echo "BROADCAST=${broadcast}"
+		    test -z "${gw}" || echo "GATEWAY=${gw}"
+		    srv='ipv4-static'
+		fi
+		;;
+	    dhcp)
+		srv='ipv4-dhcp'
+		;;
+	    pppoe)
+		srv='ipv4-pppoe'
+		;;
+	    *)
+		;;
+	esac
+    else
+	if test -n "${ip}" -a -n "${prefix}" -a -n "${broadcast}" ; then
+	    echo "IP=${ip}"
+	    echo "PREFIX=${prefix}"
+	    echo "BROADCAST=${broadcast}"
+	    test -z "${gw}" || echo "GATEWAY=${gw}"
+	    srv='ipv4-static'
 	fi
+    fi
+
+    if test -z "${services}" ; then
+	services="${srv}"
+    else
+	services="${services} ${srv}"
     fi
 
     echo "SERVICE='${services}'"
@@ -1878,6 +2351,7 @@ gen-network-interface()
 	    return 1
 	    ;;
     esac
+
     gen-network-interface-conf ${master} "${bonding}" ${ip} ${broadcast} ${prefix} ${arp}
 }
 
@@ -2137,7 +2611,7 @@ safe-generate-network-ip()
 		    ;;
 	    esac
 	    ;;
-	"")
+	'')
 	    if test ${APL_ROLE} == 'gateway' ; then
 		gen-network-interface external > ifconfig.${IF_EXTERNAL}.work
 		mv -f ifconfig.${IF_EXTERNAL}.work ifconfig.${IF_EXTERNAL}.new
@@ -2157,7 +2631,7 @@ safe-generate-network-ip()
     local elt i=0 range vlan ip netmask broadcast prefix
 
     if test ${IF_INTERNAL} != "${BOND_INTERNALS}" ; then
-	gen-network-interface-conf ${IF_INTERNAL} "${BOND_INTERNALS}" "" "" "" ${ARP_IGNORE} > ifconfig.${IF_INTERNAL}.work
+	gen-network-interface-conf ${IF_INTERNAL} "${BOND_INTERNALS}" '' '' '' ${ARP_IGNORE} > ifconfig.${IF_INTERNAL}.work
 	mv -f ifconfig.${IF_INTERNAL}.work ifconfig.${IF_INTERNAL}.new
     fi
 
@@ -2220,26 +2694,69 @@ gen-network-static-route-conf()
     local gw_wt_pg_list=${3}
     local tname=${4}
 
-    local rtype device
+    local rtype device disabled
 
     if test ${gw_wt_pg_list:0:5} == local ; then
 	rtype="local-default"
+    elif test ${ip} == "0.0.0.0" -a ${mk} == "0.0.0.0" ; then
+	rtype="default"
+    elif test ${mk} == "255.255.255.255" ; then
+	rtype="host"
     else
-	if test ${ip} == "0.0.0.0" -a ${mk} == "0.0.0.0" ; then
-	    rtype="default"
-	else
-	    rtype="network"
-	fi
+	rtype="network"
     fi
 
+    case ${IP_EXTERNAL_MODE} in
+	dhcp|pppoe)
+	    case ${rtype} in
+		default)
+		    local gw_wt_pg gw
+
+		    for gw_wt_pg in ${gw_wt_pg_list//:/ }
+		    do
+			gw=${gw_wt_pg/\/*}
+			if ip-is-included ${gw} ${IP_EXTERNAL_NET} ${IP_EXTERNAL_BRD} ${IP_EXTERNAL_MASK} ; then
+			    disabled=yes
+			    break
+			else
+			    if test ${IP_EXTERNAL_MASK} == '255.255.255.255' ; then
+				device=$(get-connected-if ${gw})
+				if test -z "${device}" ; then
+				    disabled=yes
+				    break
+				fi
+			    fi
+			fi
+		    done
+		    ;;
+		host)
+		    disabled=yes
+		    ;;
+		*)
+		    ;;
+	    esac
+	    ;;
+	static)
+	    ;;
+	*)
+	    ;;
+    esac
+
+    test -z "${disabled}" || echo "DISABLED=yes"
     echo "ONBOOT=yes"
     echo "SERVICE=ipv4-static-route"
     echo "TYPE=${rtype}"
     test -z "${tname}" || echo "TABLE=${tname}"
 
-    if test ${gw_wt_pg_list:0:5} = local ; then
+    if test ${gw_wt_pg_list:0:5} == local ; then
 	device=${gw_wt_pg_list:6}
 	echo "IFACE=${device}"
+	return 0
+    elif test ${gw_wt_pg_list:0:4} == host ; then
+	device=${gw_wt_pg_list:5}
+	echo "IFACE=${device}"
+	echo "IP=${ip}"
+	echo "PREFIX=32"
 	return 0
     fi
 
@@ -2247,7 +2764,9 @@ gen-network-static-route-conf()
 
     first_gw_wt_pg=${gw_wt_pg_list/:*}
     first_gw=${first_gw_wt_pg/\/*}
+
     device=$(get-connected-if ${first_gw})
+    test -n "${device}" || device=${IF_EXTERNAL}
 
     echo "IFACE=${device}"
 
@@ -2274,7 +2793,6 @@ gen-network-static-route-conf()
 safe-generate-network-static-route-tproxy()
 {
     test ${TPROXY_MODE} == True || return 0
-
     gen-network-static-route-conf 0.0.0.0 0.0.0.0 local:${IF_WEB} ${TRANSPARENT_ROUTE_TABLE_NAME} > ifconfig.route${ROUTE_NB}.work
     mv -f ifconfig.route${ROUTE_NB}.work ifconfig.route${ROUTE_NB}.new
     ((ROUTE_NB++))
@@ -2441,6 +2959,14 @@ safe-generate-network-static-route-multi-gateways()
 	for gw_wt in ${EXTERNAL_GATEWAY_WEIGHTS}
 	do
 	    gw=${gw_wt/:*}
+
+	    if test ${IP_EXTERNAL_MASK} == '255.255.255.255' ; then
+		gen-network-static-route-conf ${gw} 255.255.255.255 host:${IF_EXTERNAL} ${EXTERNAL_ROUTE_TABLE_PNAME}${index} > ifconfig.route${ROUTE_NB}.work
+		mv -f ifconfig.route${ROUTE_NB}.work ifconfig.route${ROUTE_NB}.new
+		((ROUTE_NB++))
+		((ROUTE_TABLE++))
+	    fi
+
 	    gen-network-static-route-conf 0.0.0.0 0.0.0.0 ${gw} ${EXTERNAL_ROUTE_TABLE_PNAME}${index} > ifconfig.route${ROUTE_NB}.work
 	    mv -f ifconfig.route${ROUTE_NB}.work ifconfig.route${ROUTE_NB}.new
 	    ((ROUTE_NB++))
@@ -2454,6 +2980,14 @@ safe-generate-network-static-route-multi-gateways()
 	for gw_wt in ${DEFAULT_NOSTANDBY_GATEWAY_WEIGHTS}
 	do
 	    gw=${gw_wt/:*}
+
+	    if test ${IP_EXTERNAL_MASK} == '255.255.255.255' ; then
+		gen-network-static-route-conf ${gw} 255.255.255.255 host:${IF_EXTERNAL} ${STICKY_DEFAULT_ROUTE_TABLE_PNAME}${index} > ifconfig.route${ROUTE_NB}.work
+		mv -f ifconfig.route${ROUTE_NB}.work ifconfig.route${ROUTE_NB}.new
+		((ROUTE_NB++))
+		((ROUTE_TABLE++))
+	    fi
+
 	    gen-network-static-route-conf 0.0.0.0 0.0.0.0 ${gw} ${STICKY_DEFAULT_ROUTE_TABLE_PNAME}${index} > ifconfig.route${ROUTE_NB}.work
 	    mv -f ifconfig.route${ROUTE_NB}.work ifconfig.route${ROUTE_NB}.new
 	    ((ROUTE_NB++))
@@ -2465,8 +2999,9 @@ safe-generate-network-static-route-multi-gateways()
 
 safe-generate-network-static-route-regular()
 {
-    local i=0 elt range
+    local elt range i=0
     local ip mk gw_wt_pg_list
+    local gw_wt_pg gw
 
     for elt in ${IP_ROUTE_GW_WT_PG_LIST}
     do
@@ -2492,6 +3027,19 @@ safe-generate-network-static-route-regular()
 		    esac
 		fi
 
+		if test ${IP_EXTERNAL_MASK} == '255.255.255.255' ; then
+		    for gw_wt_pg in ${gw_wt_pg_list//:/ }
+		    do
+			gw=${gw_wt_pg/\/*}
+			device=$(get-connected-if ${gw})
+			if test -z "${device}" ; then
+			    gen-network-static-route-conf ${gw} 255.255.255.255 host:${IF_EXTERNAL} > ifconfig.route${ROUTE_NB}.work
+			    mv -f ifconfig.route${ROUTE_NB}.work ifconfig.route${ROUTE_NB}.new
+			    ((ROUTE_NB++))
+			fi
+		    done
+		fi
+
 		gen-network-static-route-conf ${ip} ${mk} ${gw_wt_pg_list} > ifconfig.route${ROUTE_NB}.work
 		mv -f ifconfig.route${ROUTE_NB}.work ifconfig.route${ROUTE_NB}.new
 		((ROUTE_NB++))
@@ -2514,6 +3062,12 @@ safe-generate-network-static-route()
     # safe-generate-network-static-route-ipsec
     safe-generate-network-static-route-multi-gateways
     safe-generate-network-static-route-regular
+}
+
+safe-generate-network-routing()
+{
+    safe-generate-network-static-route || return 11
+    safe-generate-network-route-rule || return 13
 }
 
 gen-network-route-rule()
@@ -2619,6 +3173,66 @@ backup-ifconfig-files()
     done
 }
 
+backup-ifconfig-route-files()
+{
+    local net nets
+
+    cd ${CONF_DIR}
+
+    nets=$(ls -1 ifconfig.route* 2> /dev/null)
+
+    for net in ${nets}
+    do
+	cp -f ${net} ${net}.old
+    done
+}
+
+generate-dhclient-script()
+{
+    local enter_hook_file=dhclient-enter-hooks
+    local exit_hook_file=dhclient-exit-hooks
+
+    local doit
+
+    case ${CLOUD_NAME} in
+	aws|azure)
+	    ;;
+	*)
+	    case ${IP_EXTERNAL_MODE} in
+		dhcp)
+		    doit=yes
+		    ;;
+		static|pppoe)
+		    ;;
+		*)
+		    ;;
+	    esac
+	    ;;
+    esac
+
+    if test -n "${doit}" ; then
+	mkdir -p /etc/dhcp
+	install ${LOCAL_DIR}/etc/${enter_hook_file} /etc/dhcp/${enter_hook_file}
+	install ${LOCAL_DIR}/etc/${exit_hook_file} /etc/dhcp/${exit_hook_file}
+    else
+	rm -f \
+	   ${RUN_DIR}/${EXTERNAL_DHCP_IP_CONFIGURATION},${EXTERNAL_DHCP_DONE}} \
+	   /etc/dhcp/{${enter_hook_file},${exit_hook_file}} \
+	   /var/db/dhclient.leases
+	test ! -d /etc/dhcp || rmdir /etc/dhcp
+    fi
+}
+
+cleanup-pppoe-runtime-files()
+{
+    test ${IP_EXTERNAL_MODE} != pppoe || return 0
+
+    rm -f \
+       ${RUN_DIR}/${EXTERNAL_PPPOE_IP_CONFIGURATION}.old \
+       ${RUN_DIR}/${EXTERNAL_PPPOE_IP_CONFIGURATION}.new \
+       ${RUN_DIR}/${EXTERNAL_PPPOE_DONE}
+}
+
 safe-generate-network-conf()
 {
     cd ${CONF_DIR}
@@ -2626,8 +3240,9 @@ safe-generate-network-conf()
     backup-ifconfig-files
     safe-generate-network-ip
     safe-generate-network-alias-ip
-    safe-generate-network-static-route
-    safe-generate-network-route-rule
+    safe-generate-network-routing
+    generate-dhclient-script
+    cleanup-pppoe-runtime-files
 }
 
 clean-current-network-devices()
@@ -2681,6 +3296,36 @@ update-link-mac()
     else
 	rm -f ${HARD_DIR}/hw-links.new
     fi
+}
+
+is-dn-present-in-snmp-conf()
+{
+    test -n "${SNMP_TRAP_SERVER_DN_LIST}"
+}
+
+is-dn-present-in-ipsec-site-conf()
+{
+    test -n "${VPN_IPSEC_SITE_DN_LIST}"
+}
+
+is-dn-present-in-access()
+{
+    test \
+	-n "${ACCESS_FILE_IF_DN_LIST}" -o \
+	-n "${ACCESS_MON_IF_DN_LIST}" -o \
+	-n "${KERBEROS_SERVER_DN_LIST}" -o \
+	-n "${SYSLOG_SERVER_DN_LIST}"
+}
+
+is-dn-present()
+{
+    ! is-dn-present-in-access || return 0
+    ! is-dn-present-in-snmp-conf || return 0
+    ! is-dn-present-in-ipsec-site-conf || return 0
+
+    test -z "${EMAIL_ACCOUNT_SERVER_FQDN}" || return 0
+
+    return 11
 }
 
 set-net-names-list()
@@ -2944,6 +3589,12 @@ set-net-names-list()
 
     KERBEROS_SERVER_IP_LIST=${kerberos_server_ip_list:1}
     KERBEROS_SERVER_DN_LIST=${kerberos_server_dn_list:1}
+
+    if is-dn-present ; then
+	DN_IS_PRESENT=True
+    else
+	DN_IS_PRESENT=False
+    fi
 }
 
 gen-route-table-names()
@@ -3030,6 +3681,34 @@ get-lan-address-of()
 gen-sysconfig-path()
 {
     echo "INTERVAL=${PATH_CHECK_INTERVAL}"
+}
+
+gen-pppoe-secret()
+{
+    echo "\"${IP_EXTRNAL_PPPOE_USERNAME}\" * \"${IP_EXTRNAL_PPPOE_PASSWORD}\""
+}
+
+gen-pppoe-conf()
+{
+    local dev=${1}
+
+    local mtu=${NETWORK_MTU}
+    local mru=${mtu}
+
+    test -n "${dev}" || dev=${IF_EXTERNAL}
+
+    cat pppoe-constant
+    echo
+
+    test -z "${IP_EXTRNAL_PPPOE_SERVICE_NAME}" || echo "pppoe-service \"${IP_EXTRNAL_PPPOE_SERVICE_NAME}\""
+    cat << EOT
+user "${IP_EXTRNAL_PPPOE_USERNAME}"
+
+ifname ${EXTERNAL_PPPOE_IF}
+nic-${dev}
+mtu ${mtu}
+mru ${mru}
+EOT
 }
 
 LIB_APL_NET=Yes

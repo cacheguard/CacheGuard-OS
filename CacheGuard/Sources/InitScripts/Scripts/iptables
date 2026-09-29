@@ -23,10 +23,6 @@
 
 source /lib/lsb/init-functions
 
-CACHEGUARD_DIR=/etc/sysconfig/cacheguard
-source ${CACHEGUARD_DIR}/constant
-source ${APPLIANCE_DIR}/etc/role
-
 IPTABLES_CONFIG=/etc/sysconfig/iptables
 
 test -x /usr/sbin/xtables-legacy-multi || exit 1
@@ -97,7 +93,7 @@ case "${1}" in
 	exit ${RETVAL}
 	;;
     panic)
-	echo $"Changing target policies to DROP..."
+	log_info_msg $"Changing target policies to DROP..."
 	iftable filter -P INPUT DROP && \
 	    iftable raw    -P PREROUTING DROP && \
 	    iftable raw    -P OUTPUT DROP && \
@@ -120,9 +116,9 @@ case "${1}" in
 	done && RETVAL=0 || RETVAL=1
 	exit ${RETVAL}
 	;;
-    
+
     *)
-	echo "Usage: ${0} {start|stop|restart|status|save}"
+	echo "Usage: ${0} {start|stop|restart|save|panic|status}"
 	exit 1
 	;;
 esac

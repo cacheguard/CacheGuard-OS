@@ -655,16 +655,17 @@ install-all-etc()
     sudo install -m 644 -o root -g root ${MAIN_MIB_NAME} ${APL}${GUI_MIB_DIR}/${MAIN_MIB_NAME}
     sudo install -m 644 -o root -g root ${MAIN_MIB_NAME} ${APL}/usr/share/snmp/mibs/${MAIN_MIB_NAME}
 
-    for password_file in ${BACKUP_PASSWD} \
-			 ${APPLIANCE_PASSWD} \
-			 ${IPSEC_PASSWD} \
-			 ${FILE_PASSWD} \
-			 ${AD_WEBGATEWAY_PASSWD} \
-			 ${LDAP_PASSWD} \
-			 ${EMAIL_PASSWD} \
-			 ${SNMP_PASSWD} \
+    for password_file in ${APPLIANCE_PASSWD} \
+			 ${BACKUP_PASSWD} \
 			 ${WAF_REPUTATION_RBL_PASSWD} \
-			 ${DYNDNS_PASSWD}
+			 ${EMAIL_PASSWD} \
+			 ${FILE_PASSWD} \
+			 ${LDAP_PASSWD} \
+			 ${AD_WEBGATEWAY_PASSWD} \
+			 ${IPSEC_PASSWD} \
+			 ${SNMP_PASSWD} \
+			 ${DYNDNS_PASSWD} \
+			 ${PPPOE_PASSWD}
     do
 	test -s Passwords/${password_file} || head -c 12 /dev/urandom | base64 > Passwords/${password_file}
     done
@@ -675,13 +676,14 @@ install-all-etc()
     sudo install -m 440 -o ${ADMIN_UID} -g ${USERS_GID} Passwords/${IPSEC_PASSWD} ${APL}${ADMIN_DIR}${PRIVATE_DIR}/.${IPSEC_PASSWD}
 
     for password_file in ${APPLIANCE_PASSWD} \
-			 ${FILE_PASSWD} \
-			 ${AD_WEBGATEWAY_PASSWD} \
-			 ${LDAP_PASSWD} \
-			 ${EMAIL_PASSWD} \
-			 ${SNMP_PASSWD} \
 			 ${WAF_REPUTATION_RBL_PASSWD} \
-			 ${DYNDNS_PASSWD}
+			 ${EMAIL_PASSWD} \
+			 ${FILE_PASSWD} \
+			 ${LDAP_PASSWD} \
+			 ${AD_WEBGATEWAY_PASSWD} \
+			 ${SNMP_PASSWD} \
+			 ${DYNDNS_PASSWD} \
+			 ${PPPOE_PASSWD}
     do
 	sudo install -m 400 -o ${ADMIN_UID} -g ${USERS_GID} Passwords/${password_file} ${APL}${ADMIN_DIR}${PRIVATE_DIR}/.${password_file}
     done
@@ -747,6 +749,7 @@ install-azure-files()
 {
     sudo install -m 644 -o root -g root ${GENERATED_DIR}/waagent.conf ${APL}/etc/waagent.conf
     sudo install -m 644 -o root -g root dhclient.conf ${APL}/etc/dhclient.conf
+    sudo install -m 644 -o root -g root dhclient-probe.conf ${APL}/etc/dhclient-probe.conf
 }
 
 install-other-files()

@@ -225,11 +225,14 @@ chmod-conf-files()
     chmod 400		${CONF_DIR}/sysctl.conf \
 			${CONF_DIR}/sysnetctl.conf \
 			${CONF_DIR}/sysconfig.iptables \
+			${CONF_DIR}/sysconfig.ebtables \
 			${CONF_DIR}/ntp.conf \
 			${CONF_DIR}/dhcpd.conf \
 			${CONF_DIR}/login.access \
 			${CONF_DIR}/sshd_config
-    chmod 600		${CONF_DIR}/lcd4linux.conf
+
+    chmod 600		${CONF_DIR}/lcd4linux.conf \
+	  		${CONF_DIR}/pppoe.secret
 }
 
 make-directories()
@@ -261,8 +264,14 @@ make-links()
 
     ln -sf ${CONF_DIR}/network				/etc/sysconfig/network
     ln -sf ${CONF_DIR}/network.lo			/etc/sysconfig/network.lo
+    ln -sf ${CONF_DIR}/sysconfig.ebtables		/etc/sysconfig/ebtables
     ln -sf ${CONF_DIR}/sysconfig.iptables		/etc/sysconfig/iptables
     ln -sf ${CONF_DIR}/sysconfig.tc			/etc/sysconfig/tc
+
+    ln -sf ${CONF_DIR}/pppoe.secret			${ETC_PPP_DIR}/pap-secrets
+    ln -sf ${CONF_DIR}/pppoe.secret			${ETC_PPP_DIR}/chap-secrets
+    ln -sf ${CONF_DIR}/pppoe.conf			${ETC_PPP_PEERS_DIR}/${EXTERNAL_PPPOE_PEER_NAME}
+
     ln -sf ${CONF_DIR}/sysconfig.ntpd			/etc/sysconfig/ntpd
     ln -sf ${CONF_DIR}/sysconfig.dhcpd			/etc/sysconfig/dhcpd
     ln -sf ${CONF_DIR}/sysconfig.ocspd			/etc/sysconfig/ocspd
@@ -291,6 +300,7 @@ make-links()
     ln -sf ${CONF_DIR}/snmp.conf			/etc/snmp/snmp.conf
     ln -sf ${CONF_DIR}/sshd_config			/etc/sshd_config
     ln -sf ${CONF_DIR}/keepalived.conf			/usr/etc/keepalived/keepalived.conf
+
     ln -sf ${CONF_DIR}/issue				${LOCAL_DIR}/etc/banner
     ln -sf ${CONF_DIR}/clamd.conf			${LOCAL_DIR}/etc/clamd.conf
     ln -sf ${CONF_DIR}/freshclam.conf			${LOCAL_DIR}/etc/freshclam.conf
@@ -429,7 +439,7 @@ main()
     set-implicit-parameters
     gen-ssl-objects
     set-tls-certificates force
-    set-classic-config-files ${context} force online
+    set-classic-config-files ${context} force
     make-links
     reset-all-logs
     init-etc-db-files

@@ -2853,7 +2853,7 @@ echo-vpn-ipsec-vias()
 	role_prio=${via#*_}
 	role=${role_prio/_*}
 	prio=${role_prio/*_}
-
+	echo-blank-command
 	echo-value "${gateway} ${role} ${prio}"
     done
 }
@@ -2874,7 +2874,7 @@ show-vpn-ipsec-via-all1()
 	return 0
     fi
 
-    local elt range i=0
+    local elt range i=0 n=0
     local ipsec_type vpn_id vias
 
     for elt in ${vpns}
@@ -2888,6 +2888,7 @@ show-vpn-ipsec-via-all1()
 		vpn_id=${elt}
 		;;
 	    2)
+		test ${n} -eq 0 || echo-blank-command
 		case ${ipsec_type} in
 		    site)
 			echo-value "${ipsec_type} ${vpn_id}:"
@@ -2902,6 +2903,7 @@ show-vpn-ipsec-via-all1()
 
 		vias=$(colon2space ${elt})
 		echo-vpn-ipsec-vias ${vias}
+		((n++))
 		;;
 	    *)
 		return 255

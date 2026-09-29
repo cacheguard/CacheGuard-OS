@@ -54,10 +54,10 @@ gen-unlinked-library-list()
 gen-library-list()
 {
     test -n "${1}" || return 1
-    local bianries_file=${1}
+    local binaries_file=${1}
     local unlinked_libraries_file=${2}
 
-    test -f ${bianries_file} || return 11
+    test -f ${binaries_file} || return 11
 
     local binary
     local library_name dumy library_path address
@@ -70,7 +70,7 @@ gen-library-list()
 	test "${binary:0:1}" != '#' || continue
 
 	ldd ${binary} 2> /dev/null
-    done < ${bianries_file} | sort -u > ${libraries_file}.1
+    done < ${binaries_file} | sort -u > ${libraries_file}.1
 
     while read library_name dumy library_path address
     do

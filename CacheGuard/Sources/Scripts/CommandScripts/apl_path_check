@@ -23,7 +23,7 @@
 
 case "${3}" in
     active)
-	LOCK_POSTFIX=${3}
+	LOCK_POSTFIX=active
 	;;
     *)
 	LOCK_POSTFIX=passive
@@ -38,6 +38,7 @@ source ${CACHEGUARD_DIR}/constant
 source ${APPLIANCE_DIR}/etc/role
 source ${LOCAL_DIR}/lib/apl_functions
 source ${APPLIANCE_DIR}/lib/lib-list
+source ${APPLIANCE_DIR}/lib/lib-ip
 source ${ABASE_DIR}/${ENV_RDIR}/${ENV_CURRENT_NAME}
 source ${ABASE_DIR}/${ENV_RDIR}/${ENV_NAME}
 
@@ -50,6 +51,29 @@ set-environment()
 	REPORTS=${REPORTS//:/ }
     else
 	CALLER_PID=${$}
+    fi
+
+    if test ${CURRENT_IP_EXTERNAL_MODE} == 'pppoe' -a -f ${RUN_DIR}/${EXTERNAL_PPPOE_IP_CONFIGURATION}.new ; then
+
+	local line i=0
+
+	while read line
+	do
+	    case ${i} in
+		0|1|2)
+		    ;;
+		3)
+		    local peer=${line}
+	 	    ! check-expr-ip ${peer} || PPPOE_PEER=${peer}
+		    break
+		    ;;
+		*)
+		    break
+		    ;;
+	    esac
+	    ((i++))
+	done < ${RUN_DIR}/${EXTERNAL_PPPOE_IP_CONFIGURATION}.new
+	ret=0
     fi
 
     trap "clean-end-cb" USR1 INT QUIT TERM
@@ -185,6 +209,9 @@ get-formatted-hops()
     done
 
     hops="${hops:1}"
+
+    test ${i} -ne 2 || hops=${hops/ weight *}
+
     echo -n ${hops}
 }
 
@@ -477,6 +504,7 @@ iptables-update-mangle-sdefault-routing()
 check-gateways()
 {
     local mode
+    local handle_host_route
 
     case "${1}" in
 	active|passive)
@@ -498,7 +526,7 @@ check-gateways()
     fi
 
     local route_file gateways
-    local dev ip prefix table network gateway pinged
+    local rtype dev ip prefix table network gateway pinged
     local dev_gateway_pinged dev_gateway_pinged_list
     local neighbour mac
     local line len pattern
@@ -516,34 +544,58 @@ check-gateways()
 
     for route_file in ${route_files}
     do
-	unset dev pinged ip table prefix
+	unset rtype dev pinged ip table prefix
 	while read line
 	do
-	    # We suppose that the order for variables in route files is as follows:
-	    # IFACE, IP, PREFIX, TABLE, PINGED, STATIC_GATEWAY(S)
+	    # STATIC_GATEWAY and STATIC_GATEWAYS variables must be last ones in route files!
 
 	    test -n "${line}" || continue
 	    test "${line:0:1}" != '#' || continue
-	    if test "${line:0:6}" == 'IFACE=' ; then
+
+	    if test "${line:0:5}" == 'TYPE=' ; then
+		rtype=${line:5}
+	    elif test "${line:0:6}" == 'IFACE=' ; then
 		dev=${line:6}
 	    elif test "${line:0:3}" == 'IP=' ; then
 		ip=${line:3}
 	    elif test "${line:0:7}" == 'PREFIX=' ; then
 		prefix=${line:7}
+
+		if test -n "${handle_host_route}" ; then
+		    if test ${rtype} == 'host' ; then
+
+			member "${all_gateways}" ${ip} || all_gateways="${all_gateways} ${ip}"
+			dev_gateway_pinged_list="${dev_gateway_pinged_list} ${dev}/${ip}/${ip}"
+
+			if test ${mode} == active ; then
+			    network=$(get-formatted-network "${ip}" "${prefix}")
+			    table=main
+			    routes="${routes} ${dev} ${network} ${ip}:50 ${table}"
+			fi
+
+			break
+		    fi
+		fi
+
 	    elif test "${line:0:6}" == 'TABLE=' ; then
 		table=${line:6}
 	    elif test "${line:0:7}" == 'PINGED=' ; then
 		pinged=${line:7}
+
 	    elif test "${line:0:15}" == 'STATIC_GATEWAY=' ; then
 		gateway=${line:15}
+
 		member "${all_gateways}" ${gateway} || all_gateways="${all_gateways} ${gateway}"
+
 		test -n "${table}" -o -z "${pinged}" || dev_gateway_pinged_list="${dev_gateway_pinged_list} ${dev}/${gateway}/${pinged}"
 		if test ${mode} == active ; then
 		    network=$(get-formatted-network "${ip}" "${prefix}")
 		    test -n "${table}" || table=main
 		    routes="${routes} ${dev} ${network} ${gateway}:50 ${table}"
 		fi
+
 		break
+
 	    elif test "${line:0:16}" == 'STATIC_GATEWAYS=' ; then
 		gateways="${line:17}"
 		len=${#gateways}
@@ -597,6 +649,8 @@ check-gateways()
 	gateway_pinged=${dev_gateway_pinged#*\/}
 	gateway=${gateway_pinged/\/*}
 	pinged=${gateway_pinged/*\/}
+
+	test "${PPPOE_PEER}" != "${gateway}" || dev=${EXTERNAL_PPPOE_IF}
 
 	if test "${pinged}" == "${gateway}" ; then
 	    nping \
@@ -669,8 +723,8 @@ check-gateways()
     ###############################
 
     test ${mode} == active || return 0
-
     routes=${routes:1}
+
     unavailable_gateways=$(uniq-elt ${unavailable_gateways:1})
     available_gateways=$(minus-list "${all_gateways}" "${unavailable_gateways}")
 
@@ -686,6 +740,7 @@ check-gateways()
     local available_gateway hops
     local elt1 range1 i1
     local weight1 gateway1 gateways1 standby1
+    local dynamic_gateways=$(get-dynamic-gateways)
 
     i=0
     for elt in ${routes}
@@ -703,6 +758,8 @@ check-gateways()
 		;;
 	    3)
 		table=${elt}
+
+		test "${PPPOE_PEER}" != "${gateways/:*}" || dev=${EXTERNAL_PPPOE_IF}
 
 		if test ${table} != main ; then
 
@@ -724,11 +781,40 @@ check-gateways()
 		    fi
 		fi
 
+		gateways=${gateways//:/ }
+
+		#####################################################
+		# For dynamically created default routes DO NOTHING #
+		#####################################################
+
+		if test ${CURRENT_IP_EXTERNAL_MODE} != 'static' -a \
+			${network} == '0.0.0.0/0' ; then
+		    i1=0
+		    for elt1 in ${gateways}
+		    do
+			range1=$[${i1} % 2]
+			case ${range1} in
+			    0)
+				gateway1=${elt1}
+				;;
+			    1)
+				if member "${dynamic_gateways}" ${gateway1} ; then
+				    ((i++))
+				    continue 2
+				fi
+				;;
+			    *)
+				return 255
+				;;
+			esac
+			((i1++))
+		    done
+		fi
+
 		######################################
 		# The MAIN table is NOT mono gateway #
 		######################################
 
-		gateways=${gateways//:/ }
 		unset gateways1 standby1
 		i1=0
 

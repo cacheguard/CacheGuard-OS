@@ -1492,7 +1492,7 @@ get-multi-gateways-route-list()
     local routes=${1}
 
     local ip mk gw wt pg
-    local i=0 elt range
+    local elt range i=0
     local result
 
     local uniq_ip_mk_list
@@ -2379,13 +2379,19 @@ get-system-load()
 
     total=$(echo "${load1} + ${load2} + ${load3}" | bc)
 
-    load1=$(echo "${load1} * 100.00 / ${total}" | bc)
-    load2=$(echo "${load2} * 100.00 / ${total}" | bc)
-    load3=$(echo "${load3} * 100.00 / ${total}" | bc)
+    if test "${total}" == '0' ; then
+	load1=0
+	load2=0
+	load3=0
+    else
+	load1=$(echo "${load1} * 100.00 / ${total}" | bc)
+	load2=$(echo "${load2} * 100.00 / ${total}" | bc)
+	load3=$(echo "${load3} * 100.00 / ${total}" | bc)
 
-    load1=$(round-float ${load1})
-    load2=$(round-float ${load2})
-    load3=$(round-float ${load3})
+	load1=$(round-float ${load1})
+	load2=$(round-float ${load2})
+	load3=$(round-float ${load3})
+    fi
 
     echo ${load1}:${load2}:${load3}
 }

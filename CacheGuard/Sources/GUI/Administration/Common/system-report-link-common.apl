@@ -26,9 +26,13 @@ get-html-bond-devs()
     test -n "${1}" || return 1
     dev=${1}
 
-    local devs=$(get-bond-devs ${dev})
+    if test ${dev} == ${EXTERNAL_PPPOE_IF} ; then
+	dev="${EXTERNAL_PPPOE_IF} [${CURRENT_BOND_EXTERNALS}]"
+    else
+	local devs=$(get-bond-devs ${dev})
+	test "${devs/:}" == "${dev}" || dev="${devs/:*}<br />[${devs/*:}]"
+    fi
 
-    test "${devs/:}" == "${dev}" || dev="${devs/:*}<br />[${devs/*:}]"
     echo "<td align='center'>${dev}</td>"
 }
 

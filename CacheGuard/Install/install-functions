@@ -1742,8 +1742,6 @@ initial-interval 5;
 initial-delay 0;
 script "/sbin/dhclient-script";
 EOF
-    echo "script \"/sbin/dhclient-script\";" >> ${INSTALL_DIR}/dhclient.conf
-
     if test -n "${nic}" ; then
 	nic_name=$(get-nic-name ${nic})
 	dhclient -1 -4 -v -lf ${INSTALL_DIR}/dhclient.leases -cf ${INSTALL_DIR}/dhclient.conf --no-pid ${nic_name} 2> /tmp/dhcp.info
@@ -4193,8 +4191,8 @@ dialog-read-passwords()
     while true
     do
 	${DIALOG} --backtitle "${INSTALL_BACKTITLE} ${APL_ROLE^} Installation" --title "Administrator password" --help-button ${@} --insecure --passwordform "\nPlease enter the administrator (user admin) password \n(use Up/Down arrow keys):" 0 0 2 \
-	    "Password:"  1 1  "" 1 24 32 0 \
-	    "Retype password:"  2 1  "" 2 24 32 0 2> /tmp/${ADMIN_PASSWORD_FILE}
+	    "Password:" 1 1  "" 1 24 32 0 \
+	    "Retype password:" 2 1  "" 2 24 32 0 2> /tmp/${ADMIN_PASSWORD_FILE}
 	ret=${?}
 	if test ${ret} -eq ${DIALOG_HELP} ; then
 	    ${DIALOG} --backtitle "${INSTALL_BACKTITLE} Installation" --title "Administrator Password" --msgbox "\nThere are 3 levels of administration with the present OS. The first level is the appliance administration level. This level is bound to the user \"${ADMIN_NAME}\" and is the only recommended level to use to administrate your appliance. The two other levels are Linux administration levels bound to the users \"${SUPERADMIN_NAME}\" and \"root\". These levels are there for maintenance purpose and should never be used unless you know exactly what you do.\n\n The \"${SUPERADMIN_NAME}\" default password is the same as the one configured for the user \"${ADMIN_NAME}\". The \"root\" default password is the same as for the user \"${ADMIN_NAME}\" followed by the configured Users Capacity (${USERS_NB} here). It is highly recommended to change these default passwords once the OS is installed on your machine." 0 0

@@ -628,6 +628,15 @@ document.addEventListener( 'change', function( event ) {
 	    authenticateKerberosADSelectCB( element.id, element.dataset.rdnId, element.dataset.loginId, element.dataset.password1Id, element.dataset.password2Id );
 	    break;
 
+	case 'ip-external-mode':
+	    ipExternalModeCB( element.id,
+			      element.dataset.ipId,
+			      element.dataset.mkId,
+			      element.dataset.pppoeServiceNameId,
+			      element.dataset.pppoeUsernameId,
+			      element.dataset.pppoePasswordId );
+	    break;
+
         default:
 	    break;
         }

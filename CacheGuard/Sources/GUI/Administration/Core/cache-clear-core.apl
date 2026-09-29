@@ -37,8 +37,8 @@ show-cache-clear-form()
 
     shortcutMenuItem[0]="mode-feature"
     shortcutMenuItem[1]="cache-size"
-    shortcutMenuTitle[0]="Activate the caching"
-    shortcutMenuTitle[1]="Configure the caching"
+    shortcutMenuTitle[0]="Activate the Caching"
+    shortcutMenuTitle[1]="Configure the Caching"
 
     show-title "Clear Web Cache" "${state}" "cache"
     show-form "${width}" "${state}" show-cache-clear-log

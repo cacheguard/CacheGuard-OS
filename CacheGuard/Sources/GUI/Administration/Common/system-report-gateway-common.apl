@@ -29,7 +29,7 @@ show-system-report-gateway()
 
     if test ! -s ${RUN_DIR}/${GATEWAYS_STATE_FILENAME} ; then
 	echo "<div class='core-form'>"
-	echo-unavailable-message "the gateway health monitoring is not yet available."
+	echo-unavailable-message "the gateway health monitoring is not available."
         echo "</div>"
 	return 0
     fi

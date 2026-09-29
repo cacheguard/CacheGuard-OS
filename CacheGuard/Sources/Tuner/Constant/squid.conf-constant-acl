@@ -5,21 +5,7 @@ acl has-request has request
 
 acl http-status-ok http_status 200
 acl transfer-encoding-chunked rep_header Transfer-Encoding -i chunked
-acl compressible rep_mime_type \
-    -i text/plain \
-    -i text/html \
-    -i text/css \
-    -i text/javascript \
-    -i application/javascript \
-    -i application/json \
-    -i application/ld+json \
-    -i application/manifest+json \
-    -i application/xml \
-    -i application/xhtml+xml \
-    -i application/rss+xml \
-    -i application/soap+xml \
-    -i text/xml \
-    -i image/svg+xml
+acl compressible rep_mime_type -i ^application/atom+xml ^application/dash+xml ^application/javascript ^application/json ^application/ld+json ^application/manifest+json ^application/opensearchdescription+xml ^application/rdf+xml ^application/rss+xml ^application/schema+json ^application/soap+xml ^application/vnd.apple.installer+xml ^application/vnd.apple.mpegurl ^application/vnd.geo+json ^application/vnd.google-earth.kml+xml ^application/vnd.mozilla.xul+xml ^application/x-apple-plist ^application/x-javascript ^application/x-mpegurl ^application/x-ns-proxy-autoconfig ^application/x-protobuffer ^application/x-web-app-manifest+json ^application/x-www-form-urlencoded ^application/xop+xml ^application/xhtml+xml ^application/xml ^application/x-yaml ^application/x-cdf ^application/x-sdch-dictionary ^application/x-steam-manifest ^audio/x-mpegurl ^image/svg+xml ^image/x-icon ^text/ ^video/abst ^video/vnd.mpeg.dash.mpd
 
 acl already-encoded rep_header Content-Encoding .+
 
@@ -33,7 +19,6 @@ acl to-localhost-1 dst 127.0.0.1/32
 acl to-localhost-2 dst 127.0.0.2/32
 acl to-localhost-3 dst 127.0.0.3/32
 acl to-localnet dst 127.0.0.0/8
-acl to-ms-windows-update dstdomain -n .microsoft.com .windows.com .windowsupdate.com
 
 acl purge method PURGE
 acl connect method CONNECT

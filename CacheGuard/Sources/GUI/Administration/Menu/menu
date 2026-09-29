@@ -82,6 +82,7 @@
 3 2 _ITEM_  GENERAL System_Operations Load_OS_Patch /gui/system-patch.apl
 3 2 _ITEM_  GENERAL System_Operations Logs_Rotation /gui/log-rotate.apl
 3 2 _ITEM_  GENERAL System_Operations Reboot_|_Halt_|_HA_State /gui/power.apl
+1 1 _ITEM_  GENERAL System_Operations Renew_DHCP_Lease /gui/ip-external-dhcp-renew.apl
 3 2 _ITEM_  GENERAL System_Operations Save_Logs /gui/log-save.apl
 3 2 _ITEM_  GENERAL System_Operations Update_URL_Lists /gui/urllist-update.apl
 3 2 _END_   GENERAL System_Operations
@@ -199,6 +200,7 @@
 3 2 _ITEM_  SECURITY Passwords Email_Password /gui/password-email.apl
 3 3 _ITEM_  SECURITY Passwords File_Server_Accounts /gui/password-file.apl
 3 1 _ITEM_  SECURITY Passwords LDAP_Bind_Password /gui/password-ldap.apl
+3 3 _ITEM_  SECURITY Passwords PPPoE_Password /gui/password-pppoe.apl
 3 3 _ITEM_  SECURITY Passwords SNMP_Agent_Password /gui/password-snmp.apl
 3 3 _END_   SECURITY Passwords
 

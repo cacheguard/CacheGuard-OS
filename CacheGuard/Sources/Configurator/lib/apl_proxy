@@ -151,7 +151,6 @@ set-proxy-parameters-cur()
 
 gen-squid-acl-etc()
 {
-    echo "acl from-ext-ip src ${IP_EXTERNAL_IP}/32"
     echo "acl from-web-ip src ${IP_WEB_IP}/32"
     echo "acl to-web-ip dst ${IP_WEB_IP}/32"
 }
@@ -168,7 +167,7 @@ gen-squid-acl-web()
 
     test ${WEB_MODE} == True || return 0
 
-    echo "acl proxy_port myport ${PROXY_PORT}"
+    echo "acl proxy_port localport ${PROXY_PORT}"
 
     for elt in ${ACCESS_WEB_IF_IP_PX_LIST}
     do
@@ -229,8 +228,8 @@ gen-squid-acl-tweb()
 
     test ${TRANSPARENT_MODE} == True || return 0
 
-    echo "acl thttp_port myport ${WWW_PORT}"
-    echo "acl thttps_port myport ${HTTPS_PORT}"
+    echo "acl thttp_port localport ${WWW_PORT}"
+    echo "acl thttps_port localport ${HTTPS_PORT}"
 
     for elt in ${TRANSPARENT_IF_IP_PX_LIST}
     do
@@ -323,7 +322,7 @@ gen-squid-acl-peer()
     local acl_not_peers
     local ip
 
-    echo "acl peer_port myport ${PEER_HTTP_PORT}"
+    echo "acl peer_port localport ${PEER_HTTP_PORT}"
 
     for elt in ${PEER_SHARE_LIST} ${PEER_HA_LIST}
     do
@@ -641,19 +640,23 @@ gen-squid-general-av-compress()
     fi
 
     if test ${COMPRESS_MODE} == True ; then
-	local ecap_options="maxsize=$[16 * 1024 * 1024] level=6 bypass=on routing=off"
+	local ecap_options="maxsize=$[16 * 1024 * 1024] level=6 errlogname=/var/log/compress-error.log complogname=/var/log/compress.log"
+
+	if test ${APPLIANCE_DEBUG_LEVEL} -eq 0 ; then
+	    ecap_options="${ecap_options} bypass=on errlog=0 complog=0"
+	else
+	    ecap_options="${ecap_options} bypass=off errlog=1 complog=1"
+	fi
+
 	echo "ecap_enable on"
 	echo "loadable_modules /lib/ecap_adapter_gzip.so"
-	echo "ecap_service compress_response respmod_precache ecap://localhost/compress ${ecap_options}"
-
+	echo "ecap_service compress_response respmod_precache ecap://www.thecacheworks.com/ecap_gzip_deflate ${ecap_options}"
 	if test ${AV_MODE} == False ; then
 	    echo "adaptation_access compress_response deny connect"
 	    test ${EMBEDDED_VPNSUBSCR_IS_ACTIVE} == False || echo "adaptation_access compress_response deny to-site-${_EMBEDDED_VPNSUBSCR_TO_SITE_NB}"
 	    gen-peer-adaptation-exclusion compress_response
-	    echo "adaptation_access compress_response deny to-ms-windows-update"
-	    echo "adaptation_access compress_response deny transfer-encoding-chunked"
 	    echo "adaptation_access compress_response deny already-encoded"
-	    echo "adaptation_access compress_response allow compressible http-status-ok"
+	    echo "adaptation_access compress_response allow compressible"
 	fi
     fi
 
@@ -675,10 +678,8 @@ gen-squid-general-av-compress()
     echo "adaptation_access antivirus_response allow all"
 
     echo "adaptation_access compress_response deny connect"
-    echo "adaptation_access compress_response deny to-ms-windows-update"
-    echo "adaptation_access compress_response deny transfer-encoding-chunked"
     echo "adaptation_access compress_response deny already-encoded"
-    echo "adaptation_access compress_response allow compressible http-status-ok"
+    echo "adaptation_access compress_response allow compressible"
 }
 
 gen-squid-ssl-mediate()

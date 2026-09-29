@@ -117,6 +117,7 @@ PACKAGES[${i}]="iptables clean 1" ; ((i++))
 PACKAGES[${i}]="ipset clean 1" ; ((i++))
 PACKAGES[${i}]="openssh clean 1" ; ((i++))
 PACKAGES[${i}]="nmap clean 1" ; ((i++))
+PACKAGES[${i}]="ppp clean 1" ; ((i++))
 
 # Hardware Monitoring
 PACKAGES[${i}]="lm-sensors clean 1" ; ((i++))
@@ -141,7 +142,7 @@ PACKAGES[${i}]="clamav clean 1 cg" ; ((i++))
 PACKAGES[${i}]="c_icap clean 1" ; ((i++))
 PACKAGES[${i}]="c_icap_modules clean 1" ; ((i++))
 PACKAGES[${i}]="squid clean 1" ; ((i++))
-PACKAGES[${i}]="squid-ecap-gzip-master clean 1 cg" ; ((i++))
+PACKAGES[${i}]="squid-ecap-gzip clean 1 cg" ; ((i++))
 PACKAGES[${i}]="squid-dummy-auth clean 1" ; ((i++))
 PACKAGES[${i}]="squidGuard clean 1 cg" ; ((i++))
 PACKAGES[${i}]="tpm2-tss clean 1" ; ((i++))
@@ -1269,6 +1270,27 @@ build1_nmap()
 	make install
 }
 
+build1_ppp()
+{
+    configure-message &&
+	./configure \
+	    --prefix=/usr \
+	    --sysconfdir=/etc \
+	    --localstatedir=/var \
+	    --sbindir=/usr/sbin \
+	    --libdir=/usr/lib \
+	    --with-openssl \
+	    --disable-static \
+	    --disable-ipv6cp \
+	    --enable-mslanman \
+	    --disable-multilink \
+	    --enable-peap &&
+	compile-message &&
+	make &&
+	install-message &&
+	make install
+}
+
 build1_lm-sensors()
 {
     compile-message &&
@@ -1653,12 +1675,25 @@ build1_squid()
 	make install-pinger
 }
 
-build1_squid-ecap-gzip-master()
+build1_squid-ecap-gzip()
 {
+    local arch
+
+    case ${SYS_ARCHITECTURE} in
+	x86_64)
+	    arch=64
+	    ;;
+	*)
+	    arch=32
+	    ;;
+    esac	    
+
+    rm -f ${PROXY_DIR}/lib/ecap_adapter_gzip.*
+
     configure-message &&
-	./configure \
-	    --prefix=${PROXY_DIR} \
-	    --disable-static &&
+	./configure "CXXFLAGS=-m${arch}" \
+		    --prefix=${PROXY_DIR} \
+		    --disable-static &&
 	compile-message &&
 	make &&
 	install-message &&

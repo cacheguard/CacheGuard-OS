@@ -1,0 +1,91 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       InitScript
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+source /lib/lsb/init-functions
+
+EBTABLES_CONFIG=/etc/sysconfig/ebtables
+
+test -x /usr/sbin/xtables-nft-multi || exit 1
+test -L /usr/sbin/ebtables || exit 3
+test -L /usr/sbin/ebtables-restore || exit 5
+test -L /usr/sbin/ebtables-save || exit 7
+test -L ${EBTABLES_CONFIG} || exit 9
+
+EBTABLES=ebtables
+EBTABLES_RESTORE=ebtables-restore
+EBTABLES_SAVE=ebtables-save
+SERV=FirewallEB
+
+case "${1}" in
+    start)
+	log_info_msg "Starting ${SERV}..."
+	${EBTABLES} -F && ${EBTABLES} -X && ${EBTABLES} -Z && \
+	    ${EBTABLES} -t filter -F && ${EBTABLES} -t filter -X && ${EBTABLES} -t filter -Z &&
+	    cat ${EBTABLES_CONFIG} | ${EBTABLES_RESTORE} &&
+	    RETVAL=0 || RETVAL=1
+	evaluate_retval
+	exit ${RETVAL}
+	;;
+    stop)
+	log_info_msg "Stopping ${SERV}..."
+	${EBTABLES} -t filter -F && \
+	    ${EBTABLES} -t filter -X
+	RETVAL=0 || RETVAL=1
+	evaluate_retval
+	exit ${RETVAL}
+	;;
+    restart)
+	${0} stop
+	sleep 1
+	${0} start
+	;;
+    save)
+	log_info_msg "Saving current rules to ${EBTABLES_CONFIG}..."
+	touch ${EBTABLES_CONFIG}
+	chmod 600 ${EBTABLES_CONFIG}
+	${EBTABLES_SAVE} -c > ${EBTABLES_CONFIG} \
+	    2>/dev/null && \
+	    RETVAL=0 || RETVAL=1
+	evaluate_retval
+	exit ${RETVAL}
+	;;
+    panic)
+	log_info_msg $"Changing target policies to DROP..."
+	${EBTABLES} -t filter -P INPUT DROP && \
+	    ${EBTABLES} -t filter -P OUTPUT DROP && \
+	    ${EBTABLES} -t filter -P FORWARD DROP && 
+	    RETVAL=0 || RETVAL=1
+	evaluate_retval
+	exit ${RETVAL}
+	;;
+    status)
+	echo $"Table: filter"
+	${EBTABLES} -t filter --list && \
+	    RETVAL=0 || RETVAL=1
+	exit ${RETVAL}
+	;;
+    *)
+	echo "Usage: ${0} {start|stop|restart|save|panic|status}"
+	exit 1
+	;;
+esac

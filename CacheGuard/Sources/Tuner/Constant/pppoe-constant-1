@@ -1,0 +1,10 @@
+plugin pppoe.so
+noauth
+
+lcp-echo-interval 10
+lcp-echo-failure 3
+persist
+maxfail 0
+holdoff 5
+
+defaultroute

@@ -109,35 +109,31 @@ length-list()
 record-member()
 {
     test -n "${1}" || return 1
-    test -n "${2}" || return 1
-    test -n "${3}" || return 1
+    test -n "${2}" || return 2
+    test -n "${3}" || return 3
 
     local field_num=${1}
     local list=${2}
     local record=${3}
     
     local field_num1=$[${field_num} - 1]
-    local len_record=0 elt_rec
+    local len_record=$(record1-length-list "${record}")
 
-    for elt_rec in ${record}
-    do
-	len_record=$[${len_record} + 1]
-    done
-    test -n "${len_record}" || exit 255
-    
-    local i=0
-    local fields
-    local len_fields=0 elt range
+    local elt range fields
+    local len_fields=0 i=0
+
     for elt in ${list}
     do
 	if test ${len_fields} -lt ${len_record} ; then
 	    fields="${fields} ${elt}"
-	    len_fields=$[${len_fields} + 1]
+	    ((len_fields++))
 	fi
 	
       range=$[${i} % ${field_num}]
+
       if test ${range} = ${field_num1} ; then
-	  if test "+${fields}+" == "+ ${record}+" ; then return 0 ; fi
+	  fields=${fields:1}
+	  test "${fields}" != "${record}" || return 0
 	  unset fields
 	  len_fields=0
       fi
@@ -145,28 +141,23 @@ record-member()
       ((i++))
     done
 
-    return 1
-}
-
-record3-member()
-{
-    record-member 3 "${1}" "${2}"
+    return 11
 }
 
 remove()
 {
     test -n "${1}" || return 1
-    if test -z "${2}" ; then echo "${1}" ;  return 2 ; fi
-    
+    if test -z "${2}" ; then echo "${1}" ; return 2 ; fi
+
     local in_list=${1}
-    local record=${2}
+    local in_elt=${2}
 
     local out_list elt
     local found
 
     for elt in ${in_list}
     do
-	if test "${elt}" != "${record}" ; then
+	if test "${elt}" != "${in_elt}" ; then
 	    out_list="${out_list} ${elt}"
 	else
 	    found=yes

@@ -74,11 +74,14 @@ start-network()
 
     log_info_msg "Getting dynamic IP addresses..."
 
-    echo "RESOLV_CONF_DIR=${CLOUD_RESOLV_DIR}" > /etc/sysconfig/dhclient
+    cat << EOT > /etc/sysconfig/dhclient
+RESOLV_CONF_DIR=${CLOUD_RESOLV_DIR}
+CLOUD_NETWORK_MAIN_DEV=${CLOUD_NETWORK_MAIN_DEV}
+EOT
 
     case ${APL_ROLE} in
 	gateway)
-	    ip link show dev ${CLOUD_NETWORK_SECOND_DEV} > /dev/null 2> /dev/null
+	    ip link show dev ${CLOUD_NETWORK_SECOND_DEV} > /dev/null 2>&1
 
 	    if test ${?} -eq 0 ; then
 		retval=1
@@ -131,7 +134,9 @@ start-network()
 	usleep ${usleep}
     done
 
-    test ${retval} -ne 0 || cp -f ${CLOUD_RESOLV_DIR}/resolv.conf ${CONF_DIR}/resolv.conf
+    if test ${retval} -eq 0 -a -f ${CLOUD_RESOLV_DIR}/resolv.conf ; then
+	cp -f ${CLOUD_RESOLV_DIR}/resolv.conf ${CONF_DIR}/resolv.conf
+    fi
 
     [ ${retval} -eq 0 ]
     evaluate_retval

@@ -26,11 +26,11 @@ set-ports()
     local transaction=/tmp/${TRANSACTION_FILE}.wadmin.${REMOTE_USER}.${$}
     local i=0
 
-    echo "port wadmin ${VALUES[${i}]}"	>> ${transaction} ; ((i++))
+    echo "port wadmin ${VALUES[${i}]}" > ${transaction} ; ((i++))
 
     if gui-contextual-is-allowed ; then
 
-	echo "port proxy ${VALUES[${i}]}"	 > ${transaction} ; ((i++))
+	echo "port proxy ${VALUES[${i}]}"	>> ${transaction} ; ((i++))
 	echo "port thttp ${VALUES[${i}]}"	>> ${transaction} ; ((i++))
 	echo "port thttps ${VALUES[${i}]}"	>> ${transaction} ; ((i++))
 	echo "port antivirus ${VALUES[${i}]}"	>> ${transaction} ; ((i++))

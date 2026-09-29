@@ -27,11 +27,27 @@ show-rweb-site-form()
     local page_ref=$(get-arg-value "${get_args}" page)
 
     local width=${DEFAULT_LIST_FORM_WIDTH}
-    local state
+    local state ip_tip
 
-    local ip1=$(ipcalc -s ${IP_EXTERNAL_IP} ${IP_EXTERNAL_MASK} -n) ; ip1=${ip1/NETWORK=}
-    local ip2=$(ipcalc -s ${IP_EXTERNAL_IP} ${IP_EXTERNAL_MASK} -b) ; ip2=${ip2/BROADCAST=}
-    local ip_tip="${ip1} < IP < ${ip2}"
+    case ${IP_EXTERNAL_MODE} in
+	static)
+	    case ${IP_EXTERNAL_MASK} in
+		'255.255.255.255'|'255.255.255.254')
+		    ip_tip=${IP_EXTERNAL_IP}
+		    ;;
+		*)
+		    local ip1=$(ipcalc -s ${IP_EXTERNAL_IP} ${IP_EXTERNAL_MASK} -n) ; ip1=${ip1/NETWORK=}
+		    local ip2=$(ipcalc -s ${IP_EXTERNAL_IP} ${IP_EXTERNAL_MASK} -b) ; ip2=${ip2/BROADCAST=}
+		    ip_tip="${ip1} < IP < ${ip2}"
+		    ;;
+	    esac
+	    ;;
+	dhcp|pppoe)
+	    ip_tip='0.0.0.0'
+	    ;;
+	*)
+	    ;;
+    esac
 
     itemWidth[1]=40
     itemWidth[2]=10

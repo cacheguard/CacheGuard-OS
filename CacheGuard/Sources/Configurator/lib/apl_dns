@@ -386,33 +386,6 @@ gen-names-resolved-lists()
     test -z "${error_list}" -a ${ipsec_ret} -eq 0
 }
 
-is-dn-present-in-snmp-conf()
-{
-    test -n "${SNMP_TRAP_SERVER_DN_LIST}"
-}
-
-is-dn-present-in-ipsec-site-conf()
-{
-    test -n "${VPN_IPSEC_SITE_DN_LIST}"
-}
-
-is-dn-present-in-access()
-{
-    test \
-	-n "${ACCESS_FILE_IF_DN_LIST}" -o \
-	-n "${ACCESS_MON_IF_DN_LIST}" -o \
-	-n "${KERBEROS_SERVER_DN_LIST}" -o \
-	-n "${SYSLOG_SERVER_DN_LIST}"
-}
-
-is-dn-present()
-{
-    is-dn-present-in-access || \
-	is-dn-present-in-snmp-conf || \
-	is-dn-present-in-ipsec-site-conf || \
-	    test -n "${EMAIL_ACCOUNT_SERVER_FQDN}"
-}
-
 set-conf-not-resolved()
 {
     touch ${USERENV_DIR}/${ENV_NOT_RESOLVED_NAME}
@@ -433,7 +406,7 @@ do-accessed-names-resolution()
 {
     test "${STATE_CFG_IPTABLES}" == modified -o "${STATE_CFG_TC}" == modified || return 0
 
-    if test ! is-dn-present ; then
+    if test ${DN_IS_PRESENT} == False ; then
 	set-conf-resolved
 	return 0
     fi

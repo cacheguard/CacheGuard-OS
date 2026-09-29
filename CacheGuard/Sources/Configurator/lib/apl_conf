@@ -43,6 +43,7 @@ SERVICE_NAME_KEY[${_i}]="path"			; SERVICE_NAME_VALUE[${_i}]="Path Check"		; ((_
 SERVICE_NAME_KEY[${_i}]="slapd"			; SERVICE_NAME_VALUE[${_i}]="LDAP Proxy"		; ((_i++))
 SERVICE_NAME_KEY[${_i}]="squid"			; SERVICE_NAME_VALUE[${_i}]="Proxy" 			; ((_i++))
 SERVICE_NAME_KEY[${_i}]="iptables"		; SERVICE_NAME_VALUE[${_i}]="Firewall"			; ((_i++))
+SERVICE_NAME_KEY[${_i}]="ebtables"		; SERVICE_NAME_VALUE[${_i}]="FirewallEB"		; ((_i++))
 SERVICE_NAME_KEY[${_i}]="sysctl"		; SERVICE_NAME_VALUE[${_i}]="Kernel Tuner"		; ((_i++))
 SERVICE_NAME_KEY[${_i}]="sysnetctl"		; SERVICE_NAME_VALUE[${_i}]="Kernel Network Tuner"	; ((_i++))
 SERVICE_NAME_KEY[${_i}]="rsyslogd"		; SERVICE_NAME_VALUE[${_i}]="System Logger" 		; ((_i++))
@@ -96,7 +97,6 @@ set-implicit-parameters()
     set-admin-parameters
     set-usage-parameters
     set-network-parameters
-    set-network-routes-parameters
     set-ipsec-parameters
     set-qos-parameters
     set-access-list-parameters
@@ -644,15 +644,19 @@ set-flag-service-start-stop()
     FLAG_TC=0 FLAG_TC_RELOAD=0
     FLAG_LOCALNET=0 FLAG_LOCALNET_RELOAD=0
     FLAG_NETWORK=0 FLAG_NETWORK_RELOAD=0
+    FLAG_NETWORK_DHCP_ROUTE_CONFIGURATION=0 FLAG_NETWORK_PPPOE_ROUTE_CONFIGURATION=0
     FLAG_NETWORK_IO=0 FLAG_NETWORK_IO_RELOAD=0
     FLAG_NETWORK_STATISTICS=0
     FLAG_IPTABLES=0 FLAG_IPTABLES_RELOAD=0
+    FLAG_EBTABLES=0 FLAG_EBTABLES_RELOAD=0
     FLAG_IKE=0 FLAG_IKE_RELOAD=0
     FLAG_LCD4LINUX=0 FLAG_LCD4LINUX_RELOAD=0
     FLAG_CRON=0 FLAG_CRON_RELOAD=0
     FLAG_SSLMEDIATE_EXCEPTIONS=0
     FLAG_OCSP=0 FLAG_OCSP_RELOAD=0
     FLAG_SMANAGER=0 FLAG_SMANAGER_RELOAD=0
+
+    test -z "${DHCLIENT_HOOK_EVENT}" || return 0
 
     if test "${SYSLOG_CA}" != "${CURRENT_SYSLOG_CA}" ; then
 	FLAG_SYSLOG=1
@@ -758,6 +762,7 @@ set-flag-service-start-stop()
 	FLAG_SSH=1
 	FLAG_WADMIN=1
 	FLAG_HTTPD=1
+	FLAG_SNMPD=1
     fi
 
     if test "${ADMIN_VPN_IPSEC}" != "${CURRENT_ADMIN_VPN_IPSEC}" ; then
@@ -766,6 +771,7 @@ set-flag-service-start-stop()
 	FLAG_SSH=1
 	FLAG_WADMIN=1
 	FLAG_HTTPD=1
+	FLAG_SNMPD=1
     fi
 
     if test "${ADMIN_EXTERNAL}" != "${CURRENT_ADMIN_EXTERNAL}" ; then
@@ -774,6 +780,7 @@ set-flag-service-start-stop()
 	FLAG_SSH=1
 	FLAG_WADMIN=1
 	FLAG_HTTPD=1
+	FLAG_SNMPD=1
     fi
 
     if test "${ADMIN_AUXILIARY}" != "${CURRENT_ADMIN_AUXILIARY}" ; then
@@ -782,6 +789,7 @@ set-flag-service-start-stop()
 	FLAG_WADMIN=1
 	FLAG_HTTPD=1
 	FLAG_SSH=1
+	FLAG_SNMPD=1
     fi
 
     if test "${ADMIN_WAUDIT}" != "${CURRENT_ADMIN_WAUDIT}" ; then
@@ -1119,18 +1127,46 @@ set-flag-service-start-stop()
     fi
 
     if test "${IP_EXTERNAL_IP}" != "${CURRENT_IP_EXTERNAL_IP}" -o \
-	"${IP_EXTERNAL_MASK}" != "${CURRENT_IP_EXTERNAL_MASK}" ; then
+	    "${IP_EXTERNAL_MASK}" != "${CURRENT_IP_EXTERNAL_MASK}" -o \
+	    "${IP_EXTERNAL_MODE}" != "${CURRENT_IP_EXTERNAL_MODE}" ; then
 	FLAG_TC=1
 	FLAG_IPTABLES=1
 	FLAG_NETWORK=1
 	FLAG_KEEPALIVED=1
-	FLAG_OCSP=1
-	FLAG_WADMIN=1
+	FLAG_IKE=1
+	FLAG_SNMPD=1
 	FLAG_SSH=1
+	FLAG_WADMIN=1
 	FLAG_AV=1
-	FLAG_FRESH_AV=1
-	FLAG_SQUID=1
-	FLAG_HTTPD=1
+
+	if test "${CURRENT_RWEB_MODE}" == True ; then
+	    FLAG_HTTPD=1
+	fi
+
+	if test "${CURRENT_ADMIN_EXTERNAL}" == True ; then
+	    FLAG_SNMPD=1
+	    FLAG_WADMIN=1
+	    FLAG_SSH=1
+	    test "${CURRENT_ADMIN_WAUDIT}" == False || FLAG_HTTPD=1
+	fi
+    fi
+
+    if test "${IP_EXTERNAL_MODE}" != "${CURRENT_IP_EXTERNAL_MODE}" ; then
+	test "${IP_EXTERNAL_MODE}" != 'pppoe' -a "${CURRENT_IP_EXTERNAL_MODE}" != 'pppoe' || \
+	    FLAG_EBTABLES=1
+    fi
+
+    if test "${CURRENT_IP_EXTERNAL_MODE}" == 'pppoe' ; then
+	if test ${IP_EXTRNAL_PPPOE_CONFIGURATION_MODIFIED} == True ; then
+	    FLAG_TC=1
+	    FLAG_IPTABLES=1
+	    FLAG_NETWORK=1
+	    FLAG_KEEPALIVED=1
+	    FLAG_WADMIN=1
+	    FLAG_SSH=1
+	    FLAG_AV=1
+	    FLAG_HTTPD=1
+	fi
     fi
 
     if test "${IF_AUXILIARY}" != "${CURRENT_IF_AUXILIARY}" ; then
@@ -1161,7 +1197,6 @@ set-flag-service-start-stop()
     if test "${IP_ROUTE_LIST}" != "${CURRENT_IP_ROUTE_LIST}" ; then
 	FLAG_NETWORK=1
 	FLAG_IKE_RELOAD=1
-	FLAG_FRESH_AV=1
     fi
 
     if test "${IP_VIA_LIST}" != "${CURRENT_IP_VIA_LIST}" ; then
@@ -2224,9 +2259,6 @@ check-memory()
 
 check-ram-capacity()
 {
-    # Hack for 2.5.3 only (to remove in 2.5.4)
-    test ! -f /root/apply-patch/PATCH.env || return 0
-
     test "${PATCH_RETUNE}" != 'yes' || return 0
 
     local ret
@@ -2280,7 +2312,9 @@ commit-classic-conf()
 	done
     done
 
-    chmod 600 lcd4linux.conf
+    chmod 600 \
+	  lcd4linux.conf \
+	  pppoe.secret
 
     news=$(find ${CONF_RUN_DIR} -maxdepth 1 -type f -name "*.new" 2> /dev/null)
     for new in ${news}
@@ -2497,6 +2531,112 @@ restore-network-device()
     copy-network-device-from old
 }
 
+set-network-dependent-classic-config-files()
+{
+    test -n "${1}" || return 1
+    local mode=${1}
+
+    cd ${CONF_DIR}
+
+    if test ${FLAG_IPTABLES} -eq 1 -o \
+	    ${mode} == force -o \
+	    "${STATE_CFG_IPTABLES}" == modified ; then
+
+	STATE_CFG_IPTABLES=modified
+
+	safe-generate	gen-iptables-raw		sysconfig.iptables.raw		|| return 151
+	safe-generate	gen-iptables-nat		sysconfig.iptables.nat		|| return 153
+	safe-generate	gen-iptables-mangle		sysconfig.iptables.mangle	|| return 155
+	safe-generate	gen-iptables-filter		sysconfig.iptables.filter	|| return 157
+	safe-generate	gen-iptables-apl		sysconfig.iptables.apl		|| return 159
+	safe-generate	gen-iptables			sysconfig.iptables		|| return 161
+    fi
+
+    if test ${FLAG_TC} -eq 1 -o \
+	    ${mode} == force -o \
+	    "${STATE_CFG_TC}" == modified ; then
+
+	STATE_CFG_TC=modified
+
+	safe-generate	gen-tc				sysconfig.tc			|| return 163
+    fi
+
+    if test ${APL_ROLE} == gateway ; then
+	if test ${FLAG_IKE} -eq 1 -o ${FLAG_IKE_RELOAD} -eq 1 -o \
+		${mode} == force -o \
+		"${STATE_CFG_IKE}" == modified ; then
+
+	    STATE_CFG_IKE=modified
+
+	    safe-generate	gen-sysconfig-ipsec		sysconfig.ipsec			|| return 165
+	    safe-generate	gen-ipsec-global-conf		ipsec.global.conf		|| return 167
+	    safe-generate	gen-ipsec-ca-conf		ipsec.ca.conf			|| return 169
+	    safe-generate	gen-ipsec-charon-conf		ipsec.charon.conf		|| return 171
+	    safe-generate	gen-ipsec-dhcp-conf		ipsec.dhcp.conf			|| return 173
+	    safe-generate	gen-ipsec-ha-conf		ipsec.ha.conf			|| return 175
+	    safe-generate	gen-ipsec-whitelist-conf	ipsec.whitelist.conf		|| return 177
+	    safe-generate	gen-ipsec-charon-logging	ipsec.charon-logging.conf	|| return 179
+	    safe-generate	gen-ipsec-secrets		ipsec.secrets			|| return 181
+	    safe-generate-ipsec-connection-conf							|| return 183
+	fi
+    fi
+
+    if test ${FLAG_HTTPD} -eq 1 -o ${FLAG_HTTPD_RELOAD} -eq 1 -o \
+	    ${mode} == force -o \
+	    "${STATE_CFG_HTTPD}" == modified ; then
+
+	STATE_CFG_HTTPD=modified
+
+	safe-generate	gen-httpd-conf			httpd.conf				|| return 185
+    fi
+
+    if test ${FLAG_SNMPD} -eq 1 -o \
+	    ${mode} == force -o \
+	    "${STATE_CFG_SNMPD}" == modified ; then
+
+	STATE_CFG_SNMPD=modified
+
+	safe-generate	gen-snmpd-conf			snmpd.conf				|| return 187
+	safe-generate	gen-snmp-conf			snmp.conf				|| return 189
+	safe-generate	gen-var-snmpd-conf		var.snmpd.conf				|| return 191
+	safe-generate	gen-sysconfig-snmpd		sysconfig.snmpd				|| return 193
+    fi
+
+    if test ${FLAG_WADMIN} -eq 1 -o \
+	    ${mode} == force -o \
+	    ${FLAG_WADMIN_RELOAD} -eq 1 -o \
+	    "${STATE_CFG_WADMIN}" == modified ; then
+
+	STATE_CFG_WADMIN=modified
+
+	safe-generate	gen-wadmin-conf			${WADMIND_NAME}.conf			|| return 195
+    fi
+
+    if test ${FLAG_SSH} -eq 1 -o \
+	    ${mode} == force -o \
+	    "${STATE_CFG_SSH}" == modified ; then
+
+	STATE_CFG_SSH=modified
+
+	safe-generate	gen-sshd-conf			sshd_config				|| return 197
+    fi
+
+    if test ${FLAG_AV} -eq 1 -o \
+	    ${mode} == force -o \
+	    "${STATE_CFG_AV}" == modified ; then
+
+	STATE_CFG_AV=modified
+
+	safe-generate	gen-clamd-conf			clamd.conf				|| return 199
+    fi
+
+    if test ${FLAG_NETWORK_PPPOE_ROUTE_CONFIGURATION} -eq 1 ; then
+	STATE_CFG_NETWORK=modified
+	backup-ifconfig-route-files
+	safe-generate-network-static-route							|| return 201
+    fi
+}
+
 set-classic-config-files1()
 {
     test -n "${1}" || return 1
@@ -2524,8 +2664,15 @@ set-classic-config-files1()
 	    "${STATE_CFG_NETWORK}" == modified ; then
 
 	STATE_CFG_NETWORK=modified
-
 	safe-generate-network-conf							|| return 15
+
+    else
+
+	if test ${FLAG_NETWORK_DHCP_ROUTE_CONFIGURATION} -eq 1 ; then
+	    STATE_CFG_NETWORK=modified
+	    backup-ifconfig-route-files
+	    safe-generate-network-routing						|| return 17
+	fi
     fi
 
     if test ${FLAG_LOCALNET} -eq 1 -o ${mode} == force -o \
@@ -2533,22 +2680,22 @@ set-classic-config-files1()
 
 	STATE_CFG_LOCALNET=modified
 
-	safe-generate	gen-loopback-conf		network.lo			|| return 17
+	safe-generate	gen-loopback-conf		network.lo			|| return 21
     fi
 
-    safe-generate	gen-network			network				|| return 19
-    safe-generate	gen-route-table-names		rt_tables			|| return 21
-    safe-generate	gen-hosts			hosts				|| return 23
-    safe-generate	gen-at-allow			admin.at.allow			|| return 25
-    safe-generate	gen-modprobe-bonding-conf	modprobe.bonding.conf		|| return 27
-    safe-generate	gen-issue			issue				|| return 29
+    safe-generate	gen-network			network				|| return 23
+    safe-generate	gen-route-table-names		rt_tables			|| return 25
+    safe-generate	gen-hosts			hosts				|| return 27
+    safe-generate	gen-at-allow			admin.at.allow			|| return 29
+    safe-generate	gen-modprobe-bonding-conf	modprobe.bonding.conf		|| return 31
+    safe-generate	gen-issue			issue				|| return 33
 
     if test ${FLAG_SYSCTL} -eq 1 -o ${mode} == force -o \
 	    "${STATE_CFG_SYSCTL}" == modified ; then
 
 	STATE_CFG_SYSCTL=modified
 
-	safe-generate	gen-sysctl			sysctl.conf			|| return 31
+	safe-generate	gen-sysctl			sysctl.conf			|| return 35
     fi
 
     if test ${FLAG_SYSNETCTL} -eq 1 -o ${mode} == force -o \
@@ -2556,28 +2703,7 @@ set-classic-config-files1()
 
 	STATE_CFG_SYSNETCTL=modified
 
-	safe-generate	gen-sysnetctl			sysnetctl.conf			|| return 33
-    fi
-
-    if test ${FLAG_IPTABLES} -eq 1 -o ${mode} == force -o \
-	    "${STATE_CFG_IPTABLES}" == modified ; then
-
-	STATE_CFG_IPTABLES=modified
-
-	safe-generate	gen-iptables-raw		sysconfig.iptables.raw		|| return 35
-	safe-generate	gen-iptables-nat		sysconfig.iptables.nat		|| return 37
-	safe-generate	gen-iptables-mangle		sysconfig.iptables.mangle	|| return 39
-	safe-generate	gen-iptables-filter		sysconfig.iptables.filter	|| return 41
-	safe-generate	gen-iptables-apl		sysconfig.iptables.apl		|| return 43
-	safe-generate	gen-iptables			sysconfig.iptables		|| return 45
-    fi
-
-    if test ${FLAG_TC} -eq 1 -o ${mode} == force \
-	    -o "${STATE_CFG_TC}" == modified ; then
-
-	STATE_CFG_TC=modified
-
-	safe-generate	gen-tc				sysconfig.tc			|| return 47
+	safe-generate	gen-sysnetctl			sysnetctl.conf			|| return 37
     fi
 
     if test ${FLAG_NTP} -eq 1 -o ${mode} == force -o \
@@ -2585,8 +2711,8 @@ set-classic-config-files1()
 
 	STATE_CFG_NTP=modified
 
-	safe-generate	gen-ntp-conf			ntp.conf			|| return 49
-	safe-generate	gen-sysconfig-ntpd		sysconfig.ntpd			|| return 51
+	safe-generate	gen-ntp-conf			ntp.conf			|| return 39
+	safe-generate	gen-sysconfig-ntpd		sysconfig.ntpd			|| return 41
     fi
 
     if test ${FLAG_SQUID} -eq 1 -o \
@@ -2595,11 +2721,11 @@ set-classic-config-files1()
 
 	STATE_CFG_SQUID=modified
 
-	safe-generate	gen-squid-no-cache-dir		squid.conf-no-cache-dir		|| return 53
-	safe-generate	gen-squid-cache-dir		squid.conf-cache-dir		|| return 55
-	safe-generate	gen-squid-conf			squid.conf			|| return 57
-	safe-generate   gen-suspend-squid-conf		squid.conf.${SUSPEND}		|| return 59
-	safe-generate   gen-sysconfig-squid		sysconfig.squid			|| return 60
+	safe-generate	gen-squid-no-cache-dir		squid.conf-no-cache-dir		|| return 43
+	safe-generate	gen-squid-cache-dir		squid.conf-cache-dir		|| return 45
+	safe-generate	gen-squid-conf			squid.conf			|| return 47
+	safe-generate   gen-suspend-squid-conf		squid.conf.${SUSPEND}		|| return 49
+	safe-generate   gen-sysconfig-squid		sysconfig.squid			|| return 51
     fi
 
     if test ${FLAG_KERBEROS} -eq 1 -o \
@@ -2607,9 +2733,9 @@ set-classic-config-files1()
 
 	STATE_CFG_KERBEROS=modified
 
-	safe-generate	gen-kerberos-conf global	global.krb5.conf		|| return 61
-	safe-generate	gen-kerberos-conf proxy		proxy.krb5.conf			|| return 63
-	safe-generate	gen-kerberos-conf web		web.krb5.conf			|| return 65
+	safe-generate	gen-kerberos-conf global	global.krb5.conf		|| return 53
+	safe-generate	gen-kerberos-conf proxy		proxy.krb5.conf			|| return 55
+	safe-generate	gen-kerberos-conf web		web.krb5.conf			|| return 57
     fi
 
     if test ${FLAG_LDAP_PROXY} -eq 1 -o ${mode} == force -o \
@@ -2617,7 +2743,7 @@ set-classic-config-files1()
 
 	STATE_CFG_LDAP_PROXY=modified
 
-	safe-generate	gen-slapd-conf			slapd.conf			|| return 67
+	safe-generate	gen-slapd-conf			slapd.conf			|| return 59
     fi
 
     if test ${FLAG_GUARD} -eq 1 -o \
@@ -2626,8 +2752,8 @@ set-classic-config-files1()
 
 	STATE_CFG_GUARD=modified
 
-	safe-generate	gen-guard-conf			squidGuard.conf			|| return 69
-	safe-generate	gen-suspend-squidGuard-conf	squidGuard.conf.${SUSPEND}	|| return 71
+	safe-generate	gen-guard-conf			squidGuard.conf			|| return 61
+	safe-generate	gen-suspend-squidGuard-conf	squidGuard.conf.${SUSPEND}	|| return 63
     fi
     
     if test ${FLAG_ICAP} -eq 1 -o \
@@ -2635,16 +2761,8 @@ set-classic-config-files1()
 
 	STATE_CFG_ICAP=modified
 
-	safe-generate	gen-virus-scan-conf		virus_scan.conf			|| return 73
-	safe-generate	gen-c-icap-conf			c-icap.conf			|| return 75
-    fi
-
-    if test ${FLAG_AV} -eq 1 -o \
-	    ${mode} == force -o "${STATE_CFG_AV}" == modified ; then
-
-	STATE_CFG_AV=modified
-
-	safe-generate	gen-clamd-conf			clamd.conf			|| return 77
+	safe-generate	gen-virus-scan-conf		virus_scan.conf			|| return 65
+	safe-generate	gen-c-icap-conf			c-icap.conf			|| return 67
     fi
 
     if test ${FLAG_FRESH_AV} -eq 1 -o \
@@ -2652,70 +2770,32 @@ set-classic-config-files1()
 
 	STATE_CFG_FRESH_AV=modified
 
-	safe-generate	gen-freshclam-conf		freshclam.conf			|| return 79
+	safe-generate	gen-freshclam-conf		freshclam.conf			|| return 69
     fi
 
-    safe-generate	gen-resolv-conf			resolv.conf			|| return 81
-    safe-generate	gen-login-access		login.access			|| return 83
-
-    if test ${FLAG_SSH} -eq 1 -o ${mode} == force -o \
-	    "${STATE_CFG_SSH}" == modified ; then
-
-	STATE_CFG_SSH=modified
-
-	safe-generate	gen-sshd-conf			sshd_config			|| return 85
-    fi
-
-    if test ${FLAG_WADMIN} -eq 1 -o \
-	    ${FLAG_WADMIN_RELOAD} -eq 1 -o \
-	    ${mode} == force -o \
-	    "${STATE_CFG_WADMIN}" == modified ; then
-
-	STATE_CFG_WADMIN=modified
-
-	safe-generate	gen-wadmin-conf			${WADMIND_NAME}.conf		|| return 89
-    fi
-
-    if test ${FLAG_HTTPD} -eq 1 -o \
-	    ${FLAG_HTTPD_RELOAD} -eq 1 -o \
-	    ${mode} == force -o "${STATE_CFG_HTTPD}" == modified ; then
-
-	STATE_CFG_HTTPD=modified
-
-	safe-generate	gen-httpd-conf			httpd.conf			|| return 91
-    fi
+    safe-generate	gen-resolv-conf			resolv.conf			|| return 71
+    safe-generate	gen-login-access		login.access			|| return 73
 
     if test ${FLAG_KEEPALIVED} -eq 1 -o \
 	    ${mode} == force -o "${STATE_CFG_KEEPALIVED}" == modified ; then
 
 	STATE_CFG_KEEPALIVED=modified
 
-	safe-generate	gen-keepalived-conf		keepalived.conf			|| return 93
+	safe-generate	gen-keepalived-conf		keepalived.conf			|| return 75
     fi
 
-    safe-generate	gen-sudoers			sudoers				|| return 95
-    safe-generate	gen-admin-sudoers		admin.sudoers			|| return 97
-    safe-generate	gen-health-check-srv		${SERVICES_HEALTH_FILENAME}	|| return 99
-    safe-generate	gen-ha-pac			ha.pac				|| return 101
-
-    if test ${FLAG_SNMPD} -eq 1 -o \
-	    ${mode} == force -o "${STATE_CFG_SNMPD}" == modified ; then
-
-	STATE_CFG_SNMPD=modified
-
-	safe-generate	gen-snmpd-conf			snmpd.conf			|| return 103
-	safe-generate	gen-snmp-conf			snmp.conf			|| return 105
-	safe-generate	gen-var-snmpd-conf		var.snmpd.conf			|| return 107
-	safe-generate	gen-sysconfig-snmpd		sysconfig.snmpd			|| return 109
-    fi
+    safe-generate	gen-sudoers			sudoers				|| return 77
+    safe-generate	gen-admin-sudoers		admin.sudoers			|| return 79
+    safe-generate	gen-health-check-srv		${SERVICES_HEALTH_FILENAME}	|| return 81
+    safe-generate	gen-ha-pac			ha.pac				|| return 83
 
     if test ${FLAG_DHCP} -eq 1 -o ${mode} == force -o \
 	    "${STATE_CFG_DHCP}" == modified ; then
 
 	STATE_CFG_DHCP=modified
 
-	safe-generate	gen-sysconfig-dhcpd		sysconfig.dhcpd			|| return 111
-	safe-generate	gen-dhcpd-conf			dhcpd.conf			|| return 113
+	safe-generate	gen-sysconfig-dhcpd		sysconfig.dhcpd			|| return 85
+	safe-generate	gen-dhcpd-conf			dhcpd.conf			|| return 87
     fi
 
     if test ${FLAG_NS} -eq 1 -o ${mode} == force -o \
@@ -2723,7 +2803,7 @@ set-classic-config-files1()
 
 	STATE_CFG_NS=modified
 
-	safe-generate	gen-named-conf			named.conf			|| return 115
+	safe-generate	gen-named-conf			named.conf			|| return 89
     fi
 
     if test ${FLAG_OCSP} -eq 1 -o ${mode} == force -o \
@@ -2731,7 +2811,7 @@ set-classic-config-files1()
 
 	STATE_CFG_OCSP=modified
 
-	safe-generate	gen-sysconfig-ocspd		sysconfig.ocspd			|| return 117
+	safe-generate	gen-sysconfig-ocspd		sysconfig.ocspd			|| return 91
     fi
 
     if test ${FLAG_SMANAGER} -eq 1 -o ${mode} == force -o \
@@ -2739,53 +2819,46 @@ set-classic-config-files1()
 
 	STATE_CFG_SMANAGER=modified
 
-	safe-generate	gen-sysconfig-smanager		sysconfig.smanager		|| return 119
+	safe-generate	gen-sysconfig-smanager		sysconfig.smanager		|| return 93
     fi
 
-    safe-generate	gen-admin-hosts			${WADMIND_NAME}.hosts		|| return 121
-    safe-generate	gen-httpd-hosts			httpd.hosts			|| return 123
-    safe-generate	gen-squid-hosts			squid.hosts			|| return 125
-    safe-generate	gen-hostname			hostname			|| return 127
-    safe-generate	gen-domainname			domainname			|| return 129
-    safe-generate	gen-wadmin-rules		${WADMIN_NAME}.rules		|| return 131
-    safe-generate	gen-waudit-rules		${WAUDIT_NAME}.rules		|| return 133
-    safe-generate	gen-ldap-conf			ldap.conf			|| return 135
+    safe-generate	gen-admin-hosts			${WADMIND_NAME}.hosts		|| return 95
+    safe-generate	gen-httpd-hosts			httpd.hosts			|| return 97
+    safe-generate	gen-squid-hosts			squid.hosts			|| return 99
+    safe-generate	gen-hostname			hostname			|| return 101
+    safe-generate	gen-domainname			domainname			|| return 103
+    safe-generate	gen-wadmin-rules		${WADMIN_NAME}.rules		|| return 105
+    safe-generate	gen-waudit-rules		${WAUDIT_NAME}.rules		|| return 107
+    safe-generate	gen-ldap-conf			ldap.conf			|| return 109
 
     if test ${FLAG_LCD4LINUX} -eq 1 -o ${mode} == force -o \
 	"${STATE_CFG_LCD4LINUX}" == modified ; then
 
 	STATE_CFG_LCD4LINUX=modified
 
-	safe-generate	gen-lcd4linux-conf		lcd4linux.conf			|| return 137
+	safe-generate	gen-lcd4linux-conf		lcd4linux.conf			|| return 111
     fi
 
-    if test ${APL_ROLE} == gateway ; then
-	if test ${FLAG_IKE} -eq 1 -o ${FLAG_IKE_RELOAD} -eq 1 -o ${mode} == force -o \
-		"${STATE_CFG_IKE}" == modified ; then
+    safe-generate	gen-pppoe-secret			pppoe.secret			|| return 113
+    safe-generate	gen-pppoe-conf				pppoe.conf			|| return 115
 
-	    STATE_CFG_IKE=modified
+    if test ${FLAG_EBTABLES} -eq 1 -o ${mode} == force -o \
+	    "${STATE_CFG_EBTABLES}" == modified ; then
 
-	    safe-generate	gen-sysconfig-ipsec		sysconfig.ipsec			|| return 139
-	    safe-generate	gen-ipsec-global-conf		ipsec.global.conf		|| return 141
-	    safe-generate	gen-ipsec-ca-conf		ipsec.ca.conf			|| return 143
-	    safe-generate	gen-ipsec-charon-conf		ipsec.charon.conf		|| return 145
-	    safe-generate	gen-ipsec-dhcp-conf		ipsec.dhcp.conf			|| return 147
-	    safe-generate	gen-ipsec-ha-conf		ipsec.ha.conf			|| return 149
-	    safe-generate	gen-ipsec-whitelist-conf	ipsec.whitelist.conf		|| return 151
-	    safe-generate	gen-ipsec-charon-logging	ipsec.charon-logging.conf	|| return 153
-	    safe-generate	gen-ipsec-secrets		ipsec.secrets			|| return 155
-	    safe-generate-ipsec-connection-conf							|| return 157
-	fi
+	STATE_CFG_EBTABLES=modified
+	safe-generate	gen-ebtables				sysconfig.ebtables		|| return 117
     fi
 
-    safe-generate	gen-sysconfig-health			sysconfig.health		|| return 201
-    safe-generate	gen-sysconfig-path			sysconfig.path			|| return 203
+    safe-generate	gen-sysconfig-health			sysconfig.health		|| return 119
+    safe-generate	gen-sysconfig-path			sysconfig.path			|| return 121
 
-    safe-generate	gen-php-ini				php.ini				|| return 205
+    safe-generate	gen-php-ini				php.ini				|| return 123
 
-    safe-generate	gen-embedded-vpnsubscr-web-conf		${EMBEDDED_VPNSUBSCR_NAME}.conf		|| return 207
-    safe-generate	gen-embedded-vpnsubscr-php-constant	${EMBEDDED_VPNSUBSCR_NAME}-constant.php	|| return 209
-    safe-generate	gen-sysconfig-vpnsubscr			sysconfig.vpnsubscr			|| return 211
+    safe-generate	gen-embedded-vpnsubscr-web-conf		${EMBEDDED_VPNSUBSCR_NAME}.conf		|| return 125
+    safe-generate	gen-embedded-vpnsubscr-php-constant	${EMBEDDED_VPNSUBSCR_NAME}-constant.php	|| return 127
+    safe-generate	gen-sysconfig-vpnsubscr			sysconfig.vpnsubscr			|| return 129
+
+    test ${CONFIGURE_AFTER_NETWORK} == True || set-network-dependent-classic-config-files ${mode}
 
     return 0
 }
@@ -2797,7 +2870,9 @@ commit-conf1()
 
     commit-copy-conf || return 11
 
-    if test ${FLAG_NETWORK} -eq 1 -o ${mode} == force ; then
+    if test ${FLAG_NETWORK} -eq 1 -o \
+	    ${FLAG_NETWORK_DHCP_ROUTE_CONFIGURATION} -eq 1 -o \
+	    ${mode} == force ; then
 	commit-network-conf || return 11
     fi
 
@@ -2836,7 +2911,7 @@ set-classic-config-files()
     local mode=${2}
 
     local ret
-    
+
     case ${context} in
 	apply|configure)
 	    log "Building the configuration"
@@ -3258,6 +3333,37 @@ build-os-configuration()
     return 0
 }
 
+build-after-network-os-configuration()
+{
+    test -n "${1}" || return 1
+    local mode=${1}
+
+    test ${CONFIGURE_AFTER_NETWORK} == True || return 0
+
+    case ${IP_EXTERNAL_MODE} in
+	pppoe)
+	    activate-pppoe-interface
+	    ;;
+	*)
+	    ;;
+    esac
+
+    log "Building network dependent configuration"
+    set-network-dependent-classic-config-files ${mode}
+    log-result ${?}
+
+    log "Committing the network configuration"
+    commit-network-conf
+    log-result ${?}
+
+    log "Committing the network dependent configuration"
+    commit-classic-conf
+    log-result ${?}
+    
+    clean-backup-conf
+    return ${?}
+}
+
 service-icap1()
 {
     test -n "${1}" || return 1
@@ -3600,9 +3706,9 @@ service-dhcp()
 service-conf-dhcp()
 {
     local mode=${1}
+
     if test "${mode}" != force ; then
-	test "${DHCP_IS_ACTIVE}" != "${CURRENT_DHCP_IS_ACTIVE}" -o \
-	    "${STATE_CFG_DHCP}" == modified || return 0
+	test "${DHCP_IS_ACTIVE}" != "${CURRENT_DHCP_IS_ACTIVE}" || return 0
     fi
 
     STATE_CFG_DHCP=modified
@@ -3835,6 +3941,24 @@ service-conf-keepalived()
 	activate-service keepalived
     else
 	deactivate-service keepalived
+    fi
+}
+
+service-conf-ebtables()
+{
+    local mode=${1}
+
+    if test "${mode}" != force ; then
+	test "${IP_EXTERNAL_MODE}" != "${CURRENT_IP_EXTERNAL_MODE}" -o \
+	     "${STATE_CFG_EBTABLES}" == modified || return 0
+    fi
+
+    STATE_CFG_EBTABLES=modified
+
+    if test "${IP_EXTERNAL_MODE}" == 'pppoe' ; then
+	activate-service ebtables
+    else
+	deactivate-service ebtables
     fi
 }
 
@@ -4405,6 +4529,27 @@ service-iptables()
     service-iptables1 ${action}
 }
 
+service-ebtables1()
+{
+    test -n "${1}" || return 1
+    local action=${1}
+
+    STATE_SRV_EBTABLES=${action}
+
+    service ebtables ${action}
+}
+
+service-ebtables()
+{
+    test -n "${FLAG_EBTABLES}" || return 0
+    test ${FLAG_EBTABLES} -eq 1 || return 0
+
+    test -n "${1}" || return 1
+    local action=${1}
+
+    service-ebtables1 ${action}
+}
+
 service-tc1()
 {
     test -n "${1}" || return 1
@@ -4418,7 +4563,6 @@ service-tc1()
 service-tc()
 {
     test -n "${FLAG_TC}" || return 0
-
     test ${FLAG_TC} -eq 1 || return 0
 
     test -n "${1}" || return 1
@@ -4627,6 +4771,7 @@ set-services-conf()
     test -n "${1}" || return 1
     local mode=${1}
 
+    service-conf-ebtables ${mode}
     service-conf-rlogger ${mode}
     service-conf-path ${mode}
     service-conf-keepalived ${mode}
@@ -4654,6 +4799,7 @@ set-services-conf()
 services-start-network()
 {
     service-sysctl start
+    service-ebtables start
     service-iptables start
     service-localnet start
     service-network start
@@ -4695,12 +4841,6 @@ services-start-services()
     service-path start
 }
 
-services-start()
-{
-    services-start-network
-    services-start-services
-}
-
 services-stop()
 {
     service-health stop
@@ -4728,6 +4868,7 @@ services-stop()
     service-network stop
     service-localnet stop
     service-iptables stop
+    service-ebtables stop
     service-rlogger stop
     service-syslog stop
 
@@ -4741,6 +4882,7 @@ services-stop()
 firewall-if-modified-restart()
 {
     test "${STATE_CFG_IPTABLES}" == modified -o "${STATE_CFG_TC}" == modified || return 0
+    test "${IP_EXTERNAL_MODE}" == 'pppoe' -o ${DN_IS_PRESENT} == 'True' || return 0
 
     service tc stop
     service iptables stop
@@ -4754,6 +4896,7 @@ services-state-start()
     test -z "${STATE_SRV_SYSCTL}"	|| service-sysctl1 start
     test -z "${STATE_SRV_SYSLOG}"	|| service-syslog1 start
     test -z "${STATE_SRV_RLOGGER}"	|| service-rlogger1 start
+    test -z "${STATE_SRV_EBTABLES}"	|| service-ebtables1 start
     test -z "${STATE_SRV_IPTABLES}"	|| service-iptables1 start
     test -z "${STATE_SRV_LOOPBACK}"	|| service-localnet1 start
     test -z "${STATE_SRV_NETWORK}"	|| service-network1 start
@@ -4810,6 +4953,7 @@ services-state-stop()
     test -z "${STATE_SRV_NETWORK}"	|| service-network1 stop
     test -z "${STATE_SRV_LOOPBACK}"	|| service-localnet1 stop
     test -z "${STATE_SRV_IPTABLES}"	|| service-iptables1 stop
+    test -z "${STATE_SRV_EBTABLES}"	|| service-ebtables1 stop
     test -z "${STATE_SRV_RLOGGER}"	|| service-rlogger1 stop
     test -z "${STATE_SRV_SYSLOG}"	|| service-syslog1 stop
 }
@@ -5073,8 +5217,7 @@ end-restore()
 
 restore-system()
 {
-    log "Begining the restore operation"
-    log-result 0
+    log "Begining the restore operation" ; log-result 0
 
     log "Stopping all services"
     apl_service stop < /dev/console
@@ -5136,15 +5279,17 @@ apl-apply()
     verify-new-usage || end-apply 13
     verify-new-embedded-usage || end-apply 15
     check-ram-capacity || end-apply 17
+    set-system-clock
 
-    set-clock
+    update-external-dynamic-ip || end-apply 19
 
     if check-new-restore ; then
-	restore-system || end-apply 19
+	restore-system || end-apply 21
     else
 	services-stop
 	apl-apply-core apply
 	services-start-network
+	build-after-network-os-configuration auto
 	do-names-resolution
 	firewall-if-modified-restart
 	services-start-services

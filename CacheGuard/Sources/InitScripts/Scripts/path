@@ -61,7 +61,7 @@ stop-pc()
 	usleep 300000
 	while true
 	do
-	    test -f /var/lock/apl_path_check || break
+	    test -f /var/lock/apl_path_check_active || break
 	    test ${i} -lt ${retry} || break
 	    usleep 500000
 	    ((i++))
@@ -69,7 +69,7 @@ stop-pc()
 
 	if test ${i} -eq ${retry} ; then
 	    killall -s KILL apl_path_check 2> /dev/null
-	    rm -f /var/lock/apl_path_check
+	    rm -f /var/lock/apl_path_check_active
 	fi
 
 	kill -KILL ${pid} 2> /dev/null
@@ -78,6 +78,7 @@ stop-pc()
 	[ ${retval} -eq 0 ] && rm -f /var/lock/${PROG} && rm -f /var/run/${PROG}.pid
     fi
 
+    rm -f /var/lock/apl_path_check_active
     rm -f ${RUN_DIR}/${GATEWAYS_STATE_FILENAME}
 
     return ${retval}

@@ -1,0 +1,88 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       Scripts
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+CACHEGUARD_DIR=/etc/sysconfig/cacheguard
+source ${CACHEGUARD_DIR}/constant
+
+##################################################
+# Caution: use '_' and not '-' in function names #
+##################################################
+
+apl_main()
+{
+    if test -z "${interface}" ; then
+	rm -f ${RUN_DIR}/${EXTERNAL_DHCP_IP_CONFIGURATION}
+	return 11
+    fi
+
+    if test -z "${reason}" ; then
+	rm -f ${RUN_DIR}/${EXTERNAL_DHCP_IP_CONFIGURATION}
+	return 13
+    fi
+
+    local tmp_dhcp_ip_configuration=/tmp/dhcp-ip-configuration.${$}
+
+    case ${reason} in
+	MEDIUM|ARPCHECK|ARPSEND|PREINIT)
+            ;;
+	BOUND|RENEW|REBIND|REBOOT)
+	    if test -n "${new_ip_address}" -a -n "${new_subnet_mask}" ; then
+
+		local end
+
+		if test -n "${new_dhcp_lease_time}" ; then
+		    local now=$(date +%s 2>/dev/null)
+		    end=$((now + new_dhcp_lease_time))
+		fi
+
+		cat << EOT > ${tmp_dhcp_ip_configuration}
+${interface}
+${new_dhcp_server_identifier}
+${new_ip_address}
+${new_subnet_mask}
+${new_routers}
+${end}
+EOT
+		mv -f ${tmp_dhcp_ip_configuration} ${RUN_DIR}/${EXTERNAL_DHCP_IP_CONFIGURATION}
+		test ${reason} != BOUND || touch ${RUN_DIR}/${EXTERNAL_DHCP_DONE}
+	    else
+		rm -f ${RUN_DIR}/${EXTERNAL_DHCP_IP_CONFIGURATION}
+	    fi
+	    ;;
+	EXPIRE|FAIL)
+	    rm -f ${RUN_DIR}/${EXTERNAL_DHCP_IP_CONFIGURATION}
+	    ;;
+	RELEASE|STOP)
+            ;;
+	TIMEOUT)
+            ;;
+	PREINIT6|BOUND6|RENEW6|REBIND6|DEPREF6|EXPIRE6|RELEASE6|STOP6)
+            ;;
+	*)
+	    ;;
+    esac
+
+    return ${exit_status}
+}
+
+apl_main "${@}"

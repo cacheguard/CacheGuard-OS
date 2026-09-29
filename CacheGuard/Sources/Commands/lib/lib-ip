@@ -30,6 +30,7 @@ host-ip-address()
 
     test ${ip} != 0.0.0.0 || return 0
     test ${netmask} != 255.255.255.254 || return 0
+    test ${netmask} != 255.255.255.255 || return 0
 
     local netinfo=$(ipcalc -s ${ip} ${netmask} -p -b -n)
 
@@ -192,4 +193,76 @@ get-prefered-vrrp-ip()
     else
 	echo ${prefered_backup_ip}
     fi
+}
+
+get-dhcp-routers()
+{
+    test ${CURRENT_IP_EXTERNAL_MODE} == 'dhcp' || return 0
+    test -f ${RUN_DIR}/${EXTERNAL_DHCP_IP_CONFIGURATION} || return 0
+
+    local routers line i=0
+
+    while read line
+    do
+	case ${i} in
+	    0|1|2|3)
+		;;
+	    4)
+		routers=${line}
+		break
+		;;
+	    5)
+		break
+		;;
+	    *)
+		break
+		;;
+	esac
+	((i++))
+    done < ${RUN_DIR}/${EXTERNAL_DHCP_IP_CONFIGURATION}
+
+    echo ${routers}
+}
+
+get-pppoe-peer()
+{
+    test ${CURRENT_IP_EXTERNAL_MODE} == 'pppoe' || return 0
+    test -f ${RUN_DIR}/${EXTERNAL_PPPOE_IP_CONFIGURATION}.new || return 0
+
+    local peer line i=0
+
+    while read line
+    do
+	case ${i} in
+	    0|1|2)
+		;;
+	    3)
+		peer=${line}
+		break
+		;;
+	    4)
+		break
+		;;
+	    *)
+		break
+		;;
+	esac
+	((i++))
+    done < ${RUN_DIR}/${EXTERNAL_PPPOE_IP_CONFIGURATION}.new
+
+    echo ${peer}
+}
+
+get-dynamic-gateways()
+{
+    case ${CURRENT_IP_EXTERNAL_MODE} in
+	dhcp)
+	    get-dhcp-routers
+	    ;;
+	pppoe)
+	    get-pppoe-peer
+	    ;;
+	*)
+	    ;;
+    esac
 }

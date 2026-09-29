@@ -19,6 +19,8 @@ ipv6
 
 ifb
 
+pppoe
+
 nf_conntrack_tftp
 nf_conntrack_ftp
 nf_conntrack_sip

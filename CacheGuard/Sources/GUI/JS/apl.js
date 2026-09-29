@@ -4262,6 +4262,58 @@ function authenticateKerberosADSelectCB( modes_id, rdn_id, login_id, password1_i
     }
 }
 
+function ipExternalModeCB( modes_id, ip_id, mk_id, pppoe_service_name_id, pppoe_username_id, pppoe_password_id )
+{
+    var modes = document.getElementById( modes_id );
+    var ip = document.getElementById( ip_id );
+    var mk = document.getElementById( mk_id );
+    var pppoe_service_name = document.getElementById( pppoe_service_name_id );
+    var pppoe_username = document.getElementById( pppoe_username_id );
+    var pppoe_password = document.getElementById( pppoe_password_id );
+
+    if (modes == null) return false;
+    if (ip == null) return false;
+    if (mk == null) return false;
+    if (pppoe_service_name == null) return false;
+    if (pppoe_username == null) return false;
+    if (pppoe_password == null) return false;
+
+    var mode = modes.options[modes.selectedIndex].value;
+
+    switch (mode) {
+    case 'static':
+	ip.disabled = false;
+	mk.disabled = false;
+	pppoe_service_name.disabled = true;
+	pppoe_username.disabled = true;
+	pppoe_password.disabled = true;
+	ip.focus( );
+	ip.setSelectionRange( ip.value.length, ip.value.length );
+	break;
+
+    case 'dhcp':
+	ip.disabled = true;
+	mk.disabled = true;
+	pppoe_service_name.disabled = true;
+	pppoe_username.disabled = true;
+	pppoe_password.disabled = true;
+	break;
+
+    case 'pppoe':
+	ip.disabled = true;
+	mk.disabled = true;
+	pppoe_service_name.disabled = false;
+	pppoe_username.disabled = false;
+	pppoe_password.disabled = false;
+	pppoe_username.focus( );
+	pppoe_username.setSelectionRange( pppoe_username.value.length, pppoe_username.value.length );
+	break;
+
+    default:
+	break;
+    }
+}
+
 function firewallSelectProtocolCB( protocol_id, dst_ports_id, dst_pat_port_id)
 {
     var protocol = document.getElementById( protocol_id );

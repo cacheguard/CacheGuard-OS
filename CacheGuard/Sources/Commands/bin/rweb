@@ -392,11 +392,15 @@ get-rweb-external-ip()
 {
     local ip
 
-    if test ${HA_MODE} == False ; then
-	ip=${IP_EXTERNAL_IP}
+    if test ${IP_EXTERNAL_MODE} == static ; then
+	if test ${HA_MODE} == False ; then
+	    ip=${IP_EXTERNAL_IP}
+	else
+	    ip=$(get-prefered-vrrp-ip "${VRRP_EXTERNAL_LIST}")
+	    test -n "${ip}" || ip=${IP_EXTERNAL_IP}
+	fi
     else
-	ip=$(get-prefered-vrrp-ip "${VRRP_EXTERNAL_LIST}")
-	test -n "${ip}" || ip=${IP_EXTERNAL_IP}
+	ip='0.0.0.0'
     fi
 
     echo ${ip}

@@ -198,6 +198,23 @@ transaction-exec-command()
 			;;
 		esac
 		;;
+	    ip)
+		case ${ARGS[1]} in
+		    external)
+			case ${ARGS[2]} in
+			    pppoe)
+				echo "${tag}${ARGS[0]} ${ARGS[1]} ${ARGS[2]} '${ARGS[3]}' '${ARGS[4]}' ..." >&2
+				;;
+			    *)
+				echo "${tag}${ARGS[@]}" >&2
+				;;
+			esac
+			;;
+		    *)
+			echo "${tag}${ARGS[@]}" >&2
+			;;
+		esac
+		;;
 	    manager)
 		case ${ARGS[1]} in
 		    sync)
@@ -394,7 +411,7 @@ run()
 		fi
 
 		case ${apl_command} in
-		    password|access|admin|authenticate|dynamicdns|email|manager|vpnipsec|waf)
+		    access|admin|authenticate|dynamicdns|email|ip|manager|password|vpnipsec|waf)
 			args=("${apl_command}")
 			word=""
 			quoted=0

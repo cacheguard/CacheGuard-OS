@@ -574,9 +574,35 @@ nic-state-is-up()
 	return 0
     elif test ${state:0:30} == "<BROADCAST,MULTICAST,MASTER,UP" ; then
 	return 0
+    elif test ${state:0:41} == "<POINTOPOINT,MULTICAST,NOARP,UP,LOWER_UP>" ; then
+	return 0
     fi
 
     return 31
+}
+
+get-state-external-form()
+{
+    test -n "${1}" || return 1
+    local in_state=${1}
+
+    local out_state
+
+    if nic-state-is-up "${in_state}" ; then
+	out_state=OK
+    else
+	out_state=K0
+    fi
+
+    echo ${out_state}
+}
+
+is-monitored-device()
+{
+    test -n "${1}" || return 1
+    local dev=${1}
+
+    test "${dev:0:3}" == "eth" -o "${dev:0:4}" == "bond" -o "${dev:0:3}" == "ppp"
 }
 
 check-links()
@@ -584,51 +610,61 @@ check-links()
     local tmp_file_in=/tmp/ip.address.${$}
     local tmp_file_out=/tmp/${LINKS_STATE_FILENAME}.${$}
 
+    local arg1 arg2 arg3 arg4
+    local dev link state ip len
+    local monitored_dev_name monitored_dev_state monitored_dev_ip
+    local step
+
     ip address show > ${tmp_file_in}
     rm -f ${tmp_file_out}
 
-    local arg1 arg2 arg3 arg4
-    local dev link state ip len i=0
-
+    unset monitored_dev_name
     while read arg1 arg2 arg3 arg4
     do
 	if [[ "${arg1}" =~ ^[1-9][0-9]*[:]$ ]] ; then
+
 	    len=${#arg2} ; ((len--))
 	    dev=${arg2:0:${len}}
 	    dev=${dev/@*/}
-	    test "${dev:0:3}" == "eth" -o "${dev:0:4}" == "bond" || continue
 
-	    state=${arg3}
-
-	    if nic-state-is-up "${state}" ; then
-		state=OK
-	    else
-		state=K0
+	    if ! is-monitored-device ${dev} ; then
+		unset monitored_dev_name
+		step='dev'
+		continue
 	    fi
 
-	    test ${i} -eq 0 || echo
-	    echo -n ${dev} ${state}
-	    ((i++))
-	else
-	    case "${arg1}" in
-		link/ether)
-		    continue
-		    ;;
-		inet)
-		    test "${dev:0:3}" == "eth" -o "${dev:0:4}" == "bond" || continue
-		    echo -n " ${arg2}"
-		    ;;
-		*)
-		    ;;
-	    esac
+	    if test -n "${monitored_dev_name}" ; then
+		if test "${step}" == 'link' ; then
+		    echo "${monitored_dev_name} ${monitored_dev_state}"
+		fi
+	    fi
+
+	    step='dev'
+	    state=${arg3}
+	    monitored_dev_name=${dev}
+	    monitored_dev_state=$(get-state-external-form "${state}")
+
+	elif test "${arg1:0:5}" == 'link/' ; then
+
+	    step='link'
+	    continue
+
+	elif test "${arg1}" == 'inet' ; then
+	    step='inet'
+	    test -n "${monitored_dev_name}" || continue
+	    monitored_dev_ip=${arg2}
+	    echo "${monitored_dev_name} ${monitored_dev_state} ${monitored_dev_ip}"
 	fi
     done < ${tmp_file_in} > ${tmp_file_out}
-    echo >> ${tmp_file_out}
+
+    if test -n "${monitored_dev_name}" ; then
+	test "${step}" != 'link' || echo "${monitored_dev_name} ${monitored_dev_state}" >> ${tmp_file_out}
+    fi
 
     for dev in ${NETWORK_DEVICES}
     do
 	link=$(ip link show dev ${dev} 2> /dev/null)
-	test ${?} -eq 0 || echo ${dev} KO
+	test ${?} -eq 0 || echo "${dev} KO"
     done >> ${tmp_file_out}
 
     rm -f ${tmp_file_in}

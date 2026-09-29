@@ -157,8 +157,8 @@ set-fw-rule-parameters()
     export FW_OCSP_CONNLIMIT="-p tcp --syn --dport ${OCSP_PORT} -m connlimit --connlimit-saddr --connlimit-above ${SINGLE_IP_OCSP_CONNLIMIT} --connlimit-mask 32"
     export FW_TCP_MSS="-p tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu"
     export FW_IPSEC_POLICY="-m policy --pol ipsec --dir"
-    export FW_IPSEC_POLICY_IN="-i ${IF_EXTERNAL} ${FW_IPSEC_POLICY} in"
-    export FW_IPSEC_POLICY_OUT="-o ${IF_EXTERNAL} ${FW_IPSEC_POLICY} out"
+    export FW_IPSEC_POLICY_IN="-i ${IF_LOGICAL_EXTERNAL} ${FW_IPSEC_POLICY} in"
+    export FW_IPSEC_POLICY_OUT="-o ${IF_LOGICAL_EXTERNAL} ${FW_IPSEC_POLICY} out"
 }
 
 gen-iptables-log1()
@@ -397,12 +397,12 @@ gen-iptables-transparent()
 	if test -z "${TRANSPARENT_IF_IP_MK_LIST}" ; then
 	    for rweb_ip in ${RWEB_HTTP_IP_LIST}
 	    do
-		echo "[0:0] -A PREROUTING ! -i ${IF_EXTERNAL} -d ${rweb_ip} -p tcp -m tcp --dport ${WWW_PORT} -j RETURN"
+		echo "[0:0] -A PREROUTING ! -i ${IF_LOGICAL_EXTERNAL} -d ${rweb_ip} -p tcp -m tcp --dport ${WWW_PORT} -j RETURN"
 		test ${VPN_IPSEC_MODE} == False || echo "[0:0] -A PREROUTING ${FW_IPSEC_POLICY_IN} -d ${rweb_ip} -p tcp -m tcp --dport ${WWW_PORT} -j RETURN"
 	    done
 	    for rweb_ip in ${RWEB_HTTPS_IP_LIST}
 	    do
-		echo "[0:0] -A PREROUTING ! -i ${IF_EXTERNAL} -d ${rweb_ip} -p tcp -m tcp --dport ${HTTPS_PORT} -j RETURN"
+		echo "[0:0] -A PREROUTING ! -i ${IF_LOGICAL_EXTERNAL} -d ${rweb_ip} -p tcp -m tcp --dport ${HTTPS_PORT} -j RETURN"
 		test ${VPN_IPSEC_MODE} == False || echo "[0:0] -A PREROUTING ${FW_IPSEC_POLICY_IN} -d ${rweb_ip} -p tcp -m tcp --dport ${HTTPS_PORT} -j RETURN"
 	    done
 	else
@@ -447,9 +447,9 @@ gen-iptables-transparent()
     if test ${HA_MODE} == False ; then
 	if test -z "${TRANSPARENT_IF_IP_MK_LIST}" ; then
 
-	    echo "[0:0] -A PREROUTING ! -i ${IF_EXTERNAL} -p tcp -d ${IP_WEB_IP} -m tcp --dport ${WWW_PORT} -j RETURN"
-	    echo "[0:0] -A PREROUTING ! -i ${IF_EXTERNAL} -p tcp -m tcp --dport ${WWW_PORT} -j ${http_target}"
-	    echo "[0:0] -A PREROUTING ! -i ${IF_EXTERNAL} -p tcp -m tcp --dport ${HTTPS_PORT} -j ${https_target}"
+	    echo "[0:0] -A PREROUTING ! -i ${IF_LOGICAL_EXTERNAL} -p tcp -d ${IP_WEB_IP} -m tcp --dport ${WWW_PORT} -j RETURN"
+	    echo "[0:0] -A PREROUTING ! -i ${IF_LOGICAL_EXTERNAL} -p tcp -m tcp --dport ${WWW_PORT} -j ${http_target}"
+	    echo "[0:0] -A PREROUTING ! -i ${IF_LOGICAL_EXTERNAL} -p tcp -m tcp --dport ${HTTPS_PORT} -j ${https_target}"
 
 	    if test ${VPN_IPSEC_MODE} == True ; then
 		echo "[0:0] -A PREROUTING ${FW_IPSEC_POLICY_IN} -p tcp -d ${IP_WEB_IP} -m tcp --dport ${WWW_PORT} -j RETURN"
@@ -488,13 +488,13 @@ gen-iptables-transparent()
 	fi
     else
 	if test -z "${TRANSPARENT_IF_IP_MK_LIST}" ; then
-	    echo "[0:0] -A PREROUTING ! -i ${IF_EXTERNAL} -p tcp -d ${IP_WEB_IP} -m tcp --dport ${WWW_PORT} -j RETURN"
+	    echo "[0:0] -A PREROUTING ! -i ${IF_LOGICAL_EXTERNAL} -p tcp -d ${IP_WEB_IP} -m tcp --dport ${WWW_PORT} -j RETURN"
 	    for vrrp_ip in ${VRRP_WEB_IP_LIST}
 	    do
-		echo "[0:0] -A PREROUTING ! -i ${IF_EXTERNAL} -p tcp -d ${vrrp_ip} -m tcp --dport ${WWW_PORT} -j RETURN"
+		echo "[0:0] -A PREROUTING ! -i ${IF_LOGICAL_EXTERNAL} -p tcp -d ${vrrp_ip} -m tcp --dport ${WWW_PORT} -j RETURN"
 	    done
-	    echo "[0:0] -A PREROUTING ! -i ${IF_EXTERNAL} -p tcp -m tcp --dport ${WWW_PORT} -j ${http_target}"
-	    echo "[0:0] -A PREROUTING ! -i ${IF_EXTERNAL} -p tcp -m tcp --dport ${HTTPS_PORT} -j ${https_target}"
+	    echo "[0:0] -A PREROUTING ! -i ${IF_LOGICAL_EXTERNAL} -p tcp -m tcp --dport ${WWW_PORT} -j ${http_target}"
+	    echo "[0:0] -A PREROUTING ! -i ${IF_LOGICAL_EXTERNAL} -p tcp -m tcp --dport ${HTTPS_PORT} -j ${https_target}"
 
 	    if test ${VPN_IPSEC_MODE} == True ; then
 		echo "[0:0] -A PREROUTING ${FW_IPSEC_POLICY_IN} -p tcp -d ${IP_WEB_IP} -m tcp --dport ${WWW_PORT} -j RETURN"
@@ -692,7 +692,7 @@ gen-iptables-raw-conntrack-file()
 		apl_ip=${IP_FILE_IP}
 		;;
 	    external)
-		dev=${IF_EXTERNAL}
+		dev=${IF_LOGICAL_EXTERNAL}
 		apl_ip=${IP_EXTERNAL_IP}
 		;;
 	    auxiliary)
@@ -774,7 +774,7 @@ gen-iptables-raw-conntrack-forward()
 	case "${rset}" in
 	    external)
 		rules=${FW_EXTERNAL_RULE_LIST}
-		input_dev=${IF_EXTERNAL}
+		input_dev=${IF_LOGICAL_EXTERNAL}
 		;;
 	    web)
 		rules=${FW_WEB_RULE_LIST}
@@ -994,8 +994,8 @@ gen-iptables-nat-vrrp-dns()
 	do
 	    echo
 	    echo "# NAT rules for DNS traffic in web and HA mode:"
-	    echo "[0:0] -A PREROUTING ! -i ${IF_EXTERNAL} -p udp -d ${ip} --dport ${DOMAIN_PORT} -j DNAT --to-destination ${IP_WEB_IP}:${DOMAIN_PORT}"
-	    echo "[0:0] -A PREROUTING ! -i ${IF_EXTERNAL} -p tcp -d ${ip} --dport ${DOMAIN_PORT} -j DNAT --to-destination ${IP_WEB_IP}:${DOMAIN_PORT}"
+	    echo "[0:0] -A PREROUTING ! -i ${IF_LOGICAL_EXTERNAL} -p udp -d ${ip} --dport ${DOMAIN_PORT} -j DNAT --to-destination ${IP_WEB_IP}:${DOMAIN_PORT}"
+	    echo "[0:0] -A PREROUTING ! -i ${IF_LOGICAL_EXTERNAL} -p tcp -d ${ip} --dport ${DOMAIN_PORT} -j DNAT --to-destination ${IP_WEB_IP}:${DOMAIN_PORT}"
 
 	    if test ${VPN_IPSEC_MODE} == True ; then
 		echo "[0:0] -A PREROUTING ${FW_IPSEC_POLICY_IN} -p udp -d ${ip} --dport ${DOMAIN_PORT} -j DNAT --to-destination ${IP_WEB_IP}:${DOMAIN_PORT}"
@@ -1010,8 +1010,8 @@ gen-iptables-nat-vrrp-dns()
 	    echo
 	    echo "# NAT rules for DNS traffic in rweb and HA mode:"
 	    
-	    echo "[0:0] -A PREROUTING ! -i ${IF_EXTERNAL} -p udp -d ${ip} --dport ${DOMAIN_PORT} -j DNAT --to-destination ${IP_WEB_IP}:${DOMAIN_PORT}"
-	    echo "[0:0] -A PREROUTING ! -i ${IF_EXTERNAL} -p tcp -d ${ip} --dport ${DOMAIN_PORT} -j DNAT --to-destination ${IP_WEB_IP}:${DOMAIN_PORT}"
+	    echo "[0:0] -A PREROUTING ! -i ${IF_LOGICAL_EXTERNAL} -p udp -d ${ip} --dport ${DOMAIN_PORT} -j DNAT --to-destination ${IP_WEB_IP}:${DOMAIN_PORT}"
+	    echo "[0:0] -A PREROUTING ! -i ${IF_LOGICAL_EXTERNAL} -p tcp -d ${ip} --dport ${DOMAIN_PORT} -j DNAT --to-destination ${IP_WEB_IP}:${DOMAIN_PORT}"
 
 	    if test ${VPN_IPSEC_MODE} == True ; then
 		echo "[0:0] -A PREROUTING ${FW_IPSEC_POLICY_IN} -p udp -d ${ip} --dport ${DOMAIN_PORT} -j DNAT --to-destination ${IP_WEB_IP}:${DOMAIN_PORT}"
@@ -1051,7 +1051,7 @@ gen-iptables-nat-forward()
 	case ${rset} in
 	    external)
 		rules=${FW_EXTERNAL_RULE_LIST}
-		input_dev=${IF_EXTERNAL}
+		input_dev=${IF_LOGICAL_EXTERNAL}
 		;;
 	    web)
 		rules=${FW_WEB_RULE_LIST}
@@ -1263,26 +1263,26 @@ gen-iptables-snat()
 
     if test ${TPROXY_MODE} == False ; then
 	echo
-	echo "# Source NAT outgoing from the external interface (${IF_EXTERNAL}):"
+	echo "# Source NAT outgoing from the external interface (${IF_LOGICAL_EXTERNAL}):"
 	test ${VPN_IPSEC_MODE} == False || echo "[0:0] -A POSTROUTING ${FW_IPSEC_POLICY_OUT} -j ACCEPT"
-	echo "[0:0] -A POSTROUTING -o ${IF_EXTERNAL} -j SNAT --to-source ${IP_EXTERNAL_IP}"
+	echo "[0:0] -A POSTROUTING -o ${IF_LOGICAL_EXTERNAL} -j SNAT --to-source ${IP_EXTERNAL_IP}"
     else
 	echo
 	echo ":TPROXY_SNAT - [0:0]"
 	echo
 	echo "# Source NAT rule in full transparent mode (with source IP preservation):"
-	echo "[0:0] -A TPROXY_SNAT -o ${IF_EXTERNAL} -p tcp -m tcp --dport ${WWW_PORT} -j RETURN"
-	echo "[0:0] -A TPROXY_SNAT -o ${IF_EXTERNAL} -p tcp -m tcp --dport ${HTTPS_PORT} -j RETURN"
+	echo "[0:0] -A TPROXY_SNAT -o ${IF_LOGICAL_EXTERNAL} -p tcp -m tcp --dport ${WWW_PORT} -j RETURN"
+	echo "[0:0] -A TPROXY_SNAT -o ${IF_LOGICAL_EXTERNAL} -p tcp -m tcp --dport ${HTTPS_PORT} -j RETURN"
 	test ${VPN_IPSEC_MODE} == False || echo "[0:0] -A TPROXY_SNAT ${FW_IPSEC_POLICY_OUT} -j RETURN"
-	echo "[0:0] -A TPROXY_SNAT -o ${IF_EXTERNAL} -j SNAT --to-source ${IP_EXTERNAL_IP}"
-	echo "[0:0] -A POSTROUTING -o ${IF_EXTERNAL} -j TPROXY_SNAT"
+	echo "[0:0] -A TPROXY_SNAT -o ${IF_LOGICAL_EXTERNAL} -j SNAT --to-source ${IP_EXTERNAL_IP}"
+	echo "[0:0] -A POSTROUTING -o ${IF_LOGICAL_EXTERNAL} -j TPROXY_SNAT"
     fi
 }
 
 gen-iptables-rweb-dnat()
 {
-    test ${HA_MODE} == False || return 0
     test ${RWEB_MODE} == True || return 0
+    test ${HA_MODE} == False || return 0
 
     local rweb_site_ip
 
@@ -1290,8 +1290,8 @@ gen-iptables-rweb-dnat()
     do
 	test ${rweb_site_ip} != ${IP_EXTERNAL_IP} || continue
 	echo
-	echo "# Destination NAT rule to ${IP_EXTERNAL_IP} for the exposed rweb IP ${rweb_site_ip} in HA mode:"
-	echo "[0:0] -A OUTPUT -o ${IF_EXTERNAL} -p tcp -m tcp -d ${rweb_site_ip} -m multiport --dports ${WEB_PORTS} -j DNAT --to-destination ${IP_EXTERNAL_IP}"
+	echo "# Destination NAT rule to ${IP_EXTERNAL_IP} for the exposed rweb IP ${rweb_site_ip}:"
+	echo "[0:0] -A OUTPUT -o ${IF_LOGICAL_EXTERNAL} -p tcp -m tcp -d ${rweb_site_ip} -m multiport --dports ${WEB_PORTS} -j DNAT --to-destination ${IP_EXTERNAL_IP}"
     done
 }
 
@@ -1331,27 +1331,27 @@ gen-iptables-mangle-qos-web()
 
 	if test ${HA_MODE} == False ; then
 	    if test ${WEB_MODE} == True ; then
-		gen-qos-mark-out "! -o ${IF_EXTERNAL} -p tcp -s ${IP_WEB_IP} -m multiport --sports ${WWW_PORT},${PROXY_PORT}" ${QOS_HANDLE}
+		gen-qos-mark-out "! -o ${IF_LOGICAL_EXTERNAL} -p tcp -s ${IP_WEB_IP} -m multiport --sports ${WWW_PORT},${PROXY_PORT}" ${QOS_HANDLE}
 	    fi
 
 	    if test ${DNS_MODE} == True ; then
-		gen-qos-mark-out "! -o ${IF_EXTERNAL} -p udp -s ${IP_WEB_IP} --sport ${DOMAIN_PORT}" ${QOS_HANDLE}
-		gen-qos-mark-out "! -o ${IF_EXTERNAL} -p tcp -s ${IP_WEB_IP} --sport ${DOMAIN_PORT}" ${QOS_HANDLE}
+		gen-qos-mark-out "! -o ${IF_LOGICAL_EXTERNAL} -p udp -s ${IP_WEB_IP} --sport ${DOMAIN_PORT}" ${QOS_HANDLE}
+		gen-qos-mark-out "! -o ${IF_LOGICAL_EXTERNAL} -p tcp -s ${IP_WEB_IP} --sport ${DOMAIN_PORT}" ${QOS_HANDLE}
 	    fi
 	else
 	    if test ${WEB_MODE} == True ; then
-		gen-qos-mark-out "! -o ${IF_EXTERNAL} -p tcp -s ${IP_WEB_IP} --sport ${WWW_PORT}" ${QOS_HANDLE}
+		gen-qos-mark-out "! -o ${IF_LOGICAL_EXTERNAL} -p tcp -s ${IP_WEB_IP} --sport ${WWW_PORT}" ${QOS_HANDLE}
 	    fi
 
 	    for vrrp_ip in ${VRRP_WEB_IP_LIST}
 	    do
 		if test ${WEB_MODE} == True ; then
-		    gen-qos-mark-out "! -o ${IF_EXTERNAL} -p tcp -s ${vrrp_ip} -m multiport --sports ${WWW_PORT},${PROXY_PORT}" ${QOS_HANDLE}
+		    gen-qos-mark-out "! -o ${IF_LOGICAL_EXTERNAL} -p tcp -s ${vrrp_ip} -m multiport --sports ${WWW_PORT},${PROXY_PORT}" ${QOS_HANDLE}
 		fi
 
 		if test ${DNS_MODE} == True ; then
-		    gen-qos-mark-out "! -o ${IF_EXTERNAL} -p udp -s ${vrrp_ip} --sport ${DOMAIN_PORT}" ${QOS_HANDLE}
-		    gen-qos-mark-out "! -o ${IF_EXTERNAL} -p tcp -s ${vrrp_ip} --sport ${DOMAIN_PORT}" ${QOS_HANDLE}
+		    gen-qos-mark-out "! -o ${IF_LOGICAL_EXTERNAL} -p udp -s ${vrrp_ip} --sport ${DOMAIN_PORT}" ${QOS_HANDLE}
+		    gen-qos-mark-out "! -o ${IF_LOGICAL_EXTERNAL} -p tcp -s ${vrrp_ip} --sport ${DOMAIN_PORT}" ${QOS_HANDLE}
 		fi
 	    done
 	fi
@@ -1360,11 +1360,11 @@ gen-iptables-mangle-qos-web()
 	if test ${WEB_MODE} == True -a ${RWEB_MODE} == True ; then
 	    for rweb_ip in ${RWEB_HTTP_IP_LIST}
 	    do
-		gen-qos-mark-out "! -o ${IF_EXTERNAL} -p tcp -s ${rweb_ip} --sport ${WWW_PORT}" ${QOS_HANDLE}
+		gen-qos-mark-out "! -o ${IF_LOGICAL_EXTERNAL} -p tcp -s ${rweb_ip} --sport ${WWW_PORT}" ${QOS_HANDLE}
 	    done
 	    for rweb_ip in ${RWEB_HTTPS_IP_LIST}
 	    do
-		gen-qos-mark-out "! -o ${IF_EXTERNAL} -p tcp -s ${rweb_ip} --sport ${HTTPS_PORT}" ${QOS_HANDLE}
+		gen-qos-mark-out "! -o ${IF_LOGICAL_EXTERNAL} -p tcp -s ${rweb_ip} --sport ${HTTPS_PORT}" ${QOS_HANDLE}
 	    done
 	fi
 
@@ -1483,7 +1483,7 @@ gen-iptables-mangle-qos-tweb()
     echo "# Mark outgoing traffic to allowed clients of the transparent web proxy:"
 
     if test -z "${TRANSPARENT_IF_IP_MK_LIST}" ; then
-	gen-qos-mark-out "! -o ${IF_EXTERNAL} ${command}" ${QOS_HANDLE}
+	gen-qos-mark-out "! -o ${IF_LOGICAL_EXTERNAL} ${command}" ${QOS_HANDLE}
 	((QOS_HANDLE++))
 	return 0
     fi
@@ -1572,7 +1572,7 @@ gen-iptables-mangle-qos-av()
 			fi
 			;;
 		    external)
-			odev="-o ${IF_EXTERNAL}"
+			odev="-o ${IF_LOGICAL_EXTERNAL}"
 
 			if test ${HA_MODE} == False ; then
 			    ip_list=${IP_EXTERNAL_IP}
@@ -1649,7 +1649,7 @@ gen-iptables-mangle-qos-backend-rweb()
 			src_ip=${IP_RWEB_IP}
 			;;
 		    external)
-			odev="-o ${IF_EXTERNAL}"
+			odev="-o ${IF_LOGICAL_EXTERNAL}"
 			src_ip=${IP_EXTERNAL_IP}
 			;;
 		    vpnipsec)
@@ -1677,7 +1677,7 @@ gen-iptables-mangle-qos-external-rweb()
     test ${RWEB_MODE} == True || return 0
 
     echo
-    echo "# Mark outgoing web traffic from the external interface (${IF_EXTERNAL}):"
+    echo "# Mark outgoing web traffic from the external interface (${IF_LOGICAL_EXTERNAL}):"
 
     local elt i=0 range
     local ip_protocol
@@ -1695,10 +1695,10 @@ gen-iptables-mangle-qos-external-rweb()
 	    1)
 		case ${protocol} in
 		    http)
-			gen-qos-mark-out "-o ${IF_EXTERNAL} -p tcp -s ${ip} --sport ${WWW_PORT}" ${QOS_HANDLE}
+			gen-qos-mark-out "-o ${IF_LOGICAL_EXTERNAL} -p tcp -s ${ip} --sport ${WWW_PORT}" ${QOS_HANDLE}
 			;;
 		    https)
-			gen-qos-mark-out "-o ${IF_EXTERNAL} -p tcp -s ${ip} --sport ${HTTPS_PORT}" ${QOS_HANDLE}
+			gen-qos-mark-out "-o ${IF_LOGICAL_EXTERNAL} -p tcp -s ${ip} --sport ${HTTPS_PORT}" ${QOS_HANDLE}
 			;;
 		    *)
 			;;
@@ -1802,7 +1802,7 @@ gen-iptables-mangle-qos-mon-agent()
 		mon_ip=${IP_MON_IP}
 		;;
 	    external)
-		odev="-o ${IF_EXTERNAL}"
+		odev="-o ${IF_LOGICAL_EXTERNAL}"
 		mon_ip=${IP_EXTERNAL_IP}
 		;;
 	    auxiliary)
@@ -1849,7 +1849,7 @@ gen-iptables-mangle-qos-mon-trap()
 		    mon_ip=${IP_MON_IP}
 		    ;;
 		external)
-		    odev="-o ${IF_EXTERNAL}"
+		    odev="-o ${IF_LOGICAL_EXTERNAL}"
 		    mon_ip=${IP_EXTERNAL_IP}
 		    ;;
 		auxiliary)
@@ -1952,7 +1952,7 @@ gen-iptables-mangle-qos-admin()
 		;;
 	    external)
 		test ${ADMIN_EXTERNAL} == True || continue
-		odev="-o ${IF_EXTERNAL}"
+		odev="-o ${IF_LOGICAL_EXTERNAL}"
 		apl_ip=${IP_EXTERNAL_IP}
 		;;
 	    auxiliary)
@@ -1995,7 +1995,7 @@ gen-iptables-mangle-qos-file()
 		;;
 	    external)
 		qos_mark=${QOS_FILE_MARK}
-		odev="-o ${IF_EXTERNAL}"
+		odev="-o ${IF_LOGICAL_EXTERNAL}"
 		;;
 	    auxiliary)
 		test -n "${AUXILIARY_IS_ACTIVE}" || continue
@@ -2427,12 +2427,12 @@ gen-iptables-mangle-sticky-ipsec-route()
     case ${state} in
 	new)
 	    local vpn_ipsec_access_mode=${VPN_IPSEC_ACCESS_MODE}
-	    local if_external=${IF_EXTERNAL}
+	    local if_external=${IF_LOGICAL_EXTERNAL}
 	    local ip_external_ip=${IP_EXTERNAL_IP}
 	    ;;
 	cur)
 	    local vpn_ipsec_access_mode=${CURRENT_VPN_IPSEC_ACCESS_MODE}
-	    local if_external=${CURRENT_IF_EXTERNAL}
+	    local if_external=${CURRENT_IF_LOGICAL_EXTERNAL}
 	    local ip_external_ip=${CURRENT_IP_EXTERNAL_IP}
 	    ;;
 	*)
@@ -2513,11 +2513,11 @@ gen-iptables-mangle-sticky-rweb-route()
 
     case ${state} in
 	new)
-	    local if_external=${IF_EXTERNAL}
+	    local if_external=${IF_LOGICAL_EXTERNAL}
 	    local rweb_site_list=${_RWEB_SITE_LIST}
 	    ;;
 	cur)
-	    local if_external=${CURRENT_IF_EXTERNAL}
+	    local if_external=${CURRENT_IF_LOGICAL_EXTERNAL}
 	    local rweb_site_list=${CURRENT_RWEB_SITE_LIST}
 	    ;;
 	*)
@@ -2592,7 +2592,7 @@ gen-iptables-mangle-sticky-ip-route()
 	case ${state} in
 	    new)
 		local ha_mode=${HA_MODE}
-		local if_external=${IF_EXTERNAL} ip_external_ip=${IP_EXTERNAL_IP} ip_external_net=${IP_EXTERNAL_NET} ip_external_mask=${IP_EXTERNAL_MASK}
+		local if_external=${IF_LOGICAL_EXTERNAL} ip_external_ip=${IP_EXTERNAL_IP} ip_external_net=${IP_EXTERNAL_NET} ip_external_mask=${IP_EXTERNAL_MASK}
 		local av_external=${AV_EXTERNAL} av_mode=${AV_MODE} av_port=${AV_PORT}
 		local ocsp_mode=${OCSP_MODE} ocsp_port=${OCSP_PORT}
 		local admin_external=${ADMIN_EXTERNAL} admin_ssh=${ADMIN_SSH} admin_snmp=${ADMIN_SNMP}
@@ -2600,7 +2600,7 @@ gen-iptables-mangle-sticky-ip-route()
 		;;
 	    cur)
 		local ha_mode=${CURRENT_HA_MODE}
-		local if_external=${CURRENT_IF_EXTERNAL} ip_external_ip=${CURRENT_IP_EXTERNAL_IP} ip_external_net=${CURRENT_IP_EXTERNAL_NET} ip_external_mask=${CURRENT_IP_EXTERNAL_MASK}
+		local if_external=${CURRENT_IF_LOGICAL_EXTERNAL} ip_external_ip=${CURRENT_IP_EXTERNAL_IP} ip_external_net=${CURRENT_IP_EXTERNAL_NET} ip_external_mask=${CURRENT_IP_EXTERNAL_MASK}
 		local av_external=${CURRENT_AV_EXTERNAL} av_mode=${CURRENT_AV_MODE} av_port=${CURRENT_AV_PORT}
 		local ocsp_mode=${CURRENT_OCSP_MODE} ocsp_port=${CURRENT_OCSP_PORT}
 		local admin_external=${CURRENT_ADMIN_EXTERNAL} admin_ssh=${CURRENT_ADMIN_SSH} admin_snmp=${CURRENT_ADMIN_SNMP}
@@ -2892,10 +2892,10 @@ gen-iptables-mangle-return-route()
 
     case ${state} in
 	new)
-	    local if_external=${IF_EXTERNAL}
+	    local if_external=${IF_LOGICAL_EXTERNAL}
 	    ;;
 	cur)
-	    local if_external=${CURRENT_IF_EXTERNAL}
+	    local if_external=${CURRENT_IF_LOGICAL_EXTERNAL}
 	    ;;
 	*)
 	    return 255
@@ -3289,7 +3289,7 @@ gen-iptables-filter-input-output-multicast-vrrp-1()
 gen-iptables-filter-input-output-multicast-vrrp()
 {
     test -z "${VRRP_EXTERNAL_IP_LIST}" || \
-	gen-iptables-filter-input-output-multicast-vrrp-1 ${IF_EXTERNAL} ${IP_EXTERNAL_IP} ${IP_EXTERNAL_NET} ${IP_EXTERNAL_MASK}
+	gen-iptables-filter-input-output-multicast-vrrp-1 ${IF_LOGICAL_EXTERNAL} ${IP_EXTERNAL_IP} ${IP_EXTERNAL_NET} ${IP_EXTERNAL_MASK}
 
     test -z "${AUXILIARY_IS_ACTIVE}" -o -z "${VRRP_AUXILIARY_IP_LIST}" || \
 	gen-iptables-filter-input-output-multicast-vrrp-1 ${IF_AUXILIARY} ${IP_AUXILIARY_IP} ${IP_AUXILIARY_NET} ${IP_AUXILIARY_MASK}
@@ -3399,7 +3399,7 @@ gen-iptables-filter-input-output-broadcast()
     echo
     echo "# Drop incoming broadcast traffic destined to the appliance:"
 
-    test ${APL_ROLE} == 'manager' -o ${IP_EXTERNAL_MASK} == 255.255.255.254 || echo "[0:0] -A INPUT -i ${IF_EXTERNAL} -d ${IP_EXTERNAL_BRD} -j ${FW_DROP_BROADCAST}"
+    test ${APL_ROLE} == 'manager' -o ${IP_EXTERNAL_MASK} == 255.255.255.254 || echo "[0:0] -A INPUT -i ${IF_LOGICAL_EXTERNAL} -d ${IP_EXTERNAL_BRD} -j ${FW_DROP_BROADCAST}"
     test -z "${AUXILIARY_IS_ACTIVE}" -o ${IP_AUXILIARY_MASK} == 255.255.255.254 || echo "[0:0] -A INPUT -i ${IF_AUXILIARY} -d ${IP_AUXILIARY_BRD} -j ${FW_DROP_BROADCAST}"
 
     if test ${VLAN_MODE} == False ; then
@@ -3516,7 +3516,7 @@ gen-iptables-filter-input-flood()
 
     if test ${ADMIN_SSH} == True ; then
 	test ${ADMIN_INTERNAL} == False || gen-iptables-filter-input-flood-dev ${IF_ADMIN} ${IP_ADMIN_IP} ${SSH_PORT} FLOODMGT
-	test ${ADMIN_EXTERNAL} == False || gen-iptables-filter-input-flood-dev ${IF_EXTERNAL} ${IP_EXTERNAL_IP} ${SSH_PORT} FLOODMGT
+	test ${ADMIN_EXTERNAL} == False || gen-iptables-filter-input-flood-dev ${IF_LOGICAL_EXTERNAL} ${IP_EXTERNAL_IP} ${SSH_PORT} FLOODMGT
 	test -z "${AUXILIARY_IS_ACTIVE}" || test ${ADMIN_AUXILIARY} == False || gen-iptables-filter-input-flood-dev ${IF_AUXILIARY} ${IP_AUXILIARY_IP} ${SSH_PORT} FLOODMGT
 
 	if test ${VPN_IPSEC_MODE} == True -a ${ADMIN_VPN_IPSEC} == True ; then
@@ -3527,7 +3527,7 @@ gen-iptables-filter-input-flood()
 
     if test ${ADMIN_WADMIN} == True ; then
 	test ${ADMIN_INTERNAL} == False || gen-iptables-filter-input-flood-dev ${IF_ADMIN} ${IP_ADMIN_IP} ${WADMIN_PORT} FLOODMGT
-	test ${ADMIN_EXTERNAL} == False || gen-iptables-filter-input-flood-dev ${IF_EXTERNAL} ${IP_EXTERNAL_IP} ${WADMIN_PORT} FLOODMGT
+	test ${ADMIN_EXTERNAL} == False || gen-iptables-filter-input-flood-dev ${IF_LOGICAL_EXTERNAL} ${IP_EXTERNAL_IP} ${WADMIN_PORT} FLOODMGT
 	test -z "${AUXILIARY_IS_ACTIVE}" || test ${ADMIN_AUXILIARY} == False || gen-iptables-filter-input-flood-dev ${IF_AUXILIARY} ${IP_AUXILIARY_IP} ${WADMIN_PORT} FLOODMGT
 
 	if test ${VPN_IPSEC_MODE} == True -a ${ADMIN_VPN_IPSEC} == True ; then
@@ -3553,8 +3553,8 @@ gen-iptables-filter-input-flood()
 	fi
 
 	if test ${ADMIN_EXTERNAL} == True ; then
-	    test ${SNMP_TCP} == False || gen-iptables-filter-input-flood-dev ${IF_EXTERNAL} ${IP_EXTERNAL_IP} ${SNMP_PORT} FLOODMGT
-	    test ${SNMP_TLS} == False || gen-iptables-filter-input-flood-dev ${IF_EXTERNAL} ${IP_EXTERNAL_IP} ${SNMP_TLS_PORT} FLOODMGT
+	    test ${SNMP_TCP} == False || gen-iptables-filter-input-flood-dev ${IF_LOGICAL_EXTERNAL} ${IP_EXTERNAL_IP} ${SNMP_PORT} FLOODMGT
+	    test ${SNMP_TLS} == False || gen-iptables-filter-input-flood-dev ${IF_LOGICAL_EXTERNAL} ${IP_EXTERNAL_IP} ${SNMP_TLS_PORT} FLOODMGT
 	fi
 
 	if test -n "${AUXILIARY_IS_ACTIVE}" -a ${ADMIN_AUXILIARY} == True ; then
@@ -3567,7 +3567,7 @@ gen-iptables-filter-input-flood()
 
     if test ${ADMIN_WAUDIT} == True ; then
 	test ${ADMIN_INTERNAL} == False || gen-iptables-filter-input-flood-dev ${IF_ADMIN} ${IP_ADMIN_IP} ${WAUDIT_PORT} FLOODMGT
-	test ${ADMIN_EXTERNAL} == False || gen-iptables-filter-input-flood-dev ${IF_EXTERNAL} ${IP_EXTERNAL_IP} ${WAUDIT_PORT} FLOODMGT
+	test ${ADMIN_EXTERNAL} == False || gen-iptables-filter-input-flood-dev ${IF_LOGICAL_EXTERNAL} ${IP_EXTERNAL_IP} ${WAUDIT_PORT} FLOODMGT
 	test -z "${AUXILIARY_IS_ACTIVE}" || test ${ADMIN_AUXILIARY} == False || gen-iptables-filter-input-flood-dev ${IF_AUXILIARY} ${IP_AUXILIARY_IP} ${WAUDIT_PORT} FLOODMGT
 
 	if test ${VPN_IPSEC_MODE} == True -a ${ADMIN_VPN_IPSEC} == True ; then
@@ -3583,7 +3583,7 @@ gen-iptables-filter-input-flood()
 
     if test ${DNS_MODE} == True ; then
 
-	echo "[0:0] -A INPUT ! -i ${IF_EXTERNAL} -p udp --dport ${DOMAIN_PORT} -m state --state NEW -j UDPFLOOD"
+	echo "[0:0] -A INPUT ! -i ${IF_LOGICAL_EXTERNAL} -p udp --dport ${DOMAIN_PORT} -m state --state NEW -j UDPFLOOD"
 	gen-iptables-filter-input-flood-port ${DOMAIN_PORT} FLOODWEB
 	test ${SINGLE_IP_DNS_CONNLIMIT} -eq 0 || echo "[0:0] -A INPUT ${FW_DNS_CONNLIMIT} -j ${FW_REJECT_LIMIT}"
 
@@ -3596,9 +3596,9 @@ gen-iptables-filter-input-flood()
 
     if test ${TPROXY_MODE} == True ; then
 
-	echo "[0:0] -A INPUT ! -i ${IF_EXTERNAL} -p tcp --syn --dport ${WWW_PORT} -j SYNFLOODWEB"
-	echo "[0:0] -A INPUT ! -i ${IF_EXTERNAL} -p tcp --tcp-flags RST RST --dport ${WWW_PORT} -j RSTFLOODWEB"
-	test ${SINGLE_IP_WEB_CONNLIMIT} -eq 0 || echo "[0:0] -A INPUT ! -i ${IF_EXTERNAL} -p tcp --syn --dport ${WWW_PORT} -j CONNLIMITWEB"
+	echo "[0:0] -A INPUT ! -i ${IF_LOGICAL_EXTERNAL} -p tcp --syn --dport ${WWW_PORT} -j SYNFLOODWEB"
+	echo "[0:0] -A INPUT ! -i ${IF_LOGICAL_EXTERNAL} -p tcp --tcp-flags RST RST --dport ${WWW_PORT} -j RSTFLOODWEB"
+	test ${SINGLE_IP_WEB_CONNLIMIT} -eq 0 || echo "[0:0] -A INPUT ! -i ${IF_LOGICAL_EXTERNAL} -p tcp --syn --dport ${WWW_PORT} -j CONNLIMITWEB"
 
 	if test ${VPN_IPSEC_MODE} == True ; then
 	    echo "[0:0] -A INPUT ${FW_IPSEC_POLICY_IN} -p tcp --syn --dport ${WWW_PORT} -j SYNFLOODWEB"
@@ -3606,9 +3606,9 @@ gen-iptables-filter-input-flood()
 	    test ${SINGLE_IP_WEB_CONNLIMIT} -eq 0 || echo "[0:0] -A INPUT ${FW_IPSEC_POLICY_IN} -p tcp --syn --dport ${WWW_PORT} -j CONNLIMITWEB"
 	fi
 
-	echo "[0:0] -A INPUT ! -i ${IF_EXTERNAL} -p tcp --syn --dport ${HTTPS_PORT} -j SYNFLOODWEB"
-	echo "[0:0] -A INPUT ! -i ${IF_EXTERNAL} -p tcp --tcp-flags RST RST --dport ${HTTPS_PORT} -j RSTFLOODWEB"
-	test ${SINGLE_IP_WEB_CONNLIMIT} -eq 0 || echo "[0:0] -A INPUT ! -i ${IF_EXTERNAL} -p tcp --syn --dport ${HTTPS_PORT} -j CONNLIMITWEB"
+	echo "[0:0] -A INPUT ! -i ${IF_LOGICAL_EXTERNAL} -p tcp --syn --dport ${HTTPS_PORT} -j SYNFLOODWEB"
+	echo "[0:0] -A INPUT ! -i ${IF_LOGICAL_EXTERNAL} -p tcp --tcp-flags RST RST --dport ${HTTPS_PORT} -j RSTFLOODWEB"
+	test ${SINGLE_IP_WEB_CONNLIMIT} -eq 0 || echo "[0:0] -A INPUT ! -i ${IF_LOGICAL_EXTERNAL} -p tcp --syn --dport ${HTTPS_PORT} -j CONNLIMITWEB"
 
 	if test ${VPN_IPSEC_MODE} == True ; then
 	    echo "[0:0] -A INPUT ${FW_IPSEC_POLICY_IN} -p tcp --syn --dport ${HTTPS_PORT} -j SYNFLOODWEB"
@@ -3616,8 +3616,8 @@ gen-iptables-filter-input-flood()
 	    test ${SINGLE_IP_WEB_CONNLIMIT} -eq 0 || echo "[0:0] -A INPUT ${FW_IPSEC_POLICY_IN} -p tcp --syn --dport ${HTTPS_PORT} -j CONNLIMITWEB"
 	fi
     else
-	gen-iptables-filter-input-flood-dev "!${IF_EXTERNAL}" ${IP_WEB_IP} ${WWW_PORT} FLOODWEB
-	test ${SINGLE_IP_WEB_CONNLIMIT} -eq 0 || echo "[0:0] -A INPUT ! -i ${IF_EXTERNAL} -p tcp --syn -d ${IP_WEB_IP} --dport ${WWW_PORT} -j CONNLIMITWEB"
+	gen-iptables-filter-input-flood-dev "!${IF_LOGICAL_EXTERNAL}" ${IP_WEB_IP} ${WWW_PORT} FLOODWEB
+	test ${SINGLE_IP_WEB_CONNLIMIT} -eq 0 || echo "[0:0] -A INPUT ! -i ${IF_LOGICAL_EXTERNAL} -p tcp --syn -d ${IP_WEB_IP} --dport ${WWW_PORT} -j CONNLIMITWEB"
 
 	if test ${VPN_IPSEC_MODE} == True ; then
 	    echo "[0:0] -A INPUT ${FW_IPSEC_POLICY_IN} -p tcp --syn -d ${IP_WEB_IP} --dport ${WWW_PORT} -j SYNFLOODWEB"
@@ -3629,7 +3629,7 @@ gen-iptables-filter-input-flood()
     if test ${WEB_MODE} == True ; then
 
 	gen-iptables-filter-input-flood-port ${PROXY_PORT} FLOODWEB
-	test ${SINGLE_IP_WEB_CONNLIMIT} -eq 0 || echo "[0:0] -A INPUT ! -i ${IF_EXTERNAL} -p tcp --syn --dport ${PROXY_PORT} -j CONNLIMITWEB"
+	test ${SINGLE_IP_WEB_CONNLIMIT} -eq 0 || echo "[0:0] -A INPUT ! -i ${IF_LOGICAL_EXTERNAL} -p tcp --syn --dport ${PROXY_PORT} -j CONNLIMITWEB"
 
 	if test ${VPN_IPSEC_MODE} == True ; then
 	    echo "[0:0] -A INPUT ${FW_IPSEC_POLICY_IN} -p tcp --syn --dport ${PROXY_PORT} -j SYNFLOODWEB"
@@ -3641,7 +3641,7 @@ gen-iptables-filter-input-flood()
     if test ${TRANSPARENT_MODE} == True -a ${TNAT_MODE} == True ; then
 
 	gen-iptables-filter-input-flood-port ${THTTP_PORT} FLOODWEB
-	test ${SINGLE_IP_WEB_CONNLIMIT} -eq 0 || echo "[0:0] -A INPUT ! -i ${IF_EXTERNAL} -p tcp --syn --dport ${THTTP_PORT} -j CONNLIMITWEB"
+	test ${SINGLE_IP_WEB_CONNLIMIT} -eq 0 || echo "[0:0] -A INPUT ! -i ${IF_LOGICAL_EXTERNAL} -p tcp --syn --dport ${THTTP_PORT} -j CONNLIMITWEB"
 
 	if test ${VPN_IPSEC_MODE} == True ; then
 	    echo "[0:0] -A INPUT ${FW_IPSEC_POLICY_IN} -p tcp --syn --dport ${THTTP_PORT} -j SYNFLOODWEB"
@@ -3650,7 +3650,7 @@ gen-iptables-filter-input-flood()
 	fi
 
 	gen-iptables-filter-input-flood-port ${THTTPS_PORT} FLOODWEB
-	test ${SINGLE_IP_WEB_CONNLIMIT} -eq 0 || echo "[0:0] -A INPUT ! -i ${IF_EXTERNAL} -p tcp --syn --dport ${THTTPS_PORT} -j CONNLIMITWEB"
+	test ${SINGLE_IP_WEB_CONNLIMIT} -eq 0 || echo "[0:0] -A INPUT ! -i ${IF_LOGICAL_EXTERNAL} -p tcp --syn --dport ${THTTPS_PORT} -j CONNLIMITWEB"
 
 	if test ${VPN_IPSEC_MODE} == True ; then
 	    echo "[0:0] -A INPUT ${FW_IPSEC_POLICY_IN} -p tcp --syn --dport ${THTTPS_PORT} -j SYNFLOODWEB"
@@ -4015,8 +4015,8 @@ gen-iptables-filter-dns()
     echo
 
     if test -z "${mk}" ; then
-	local idev="! -i ${IF_EXTERNAL}"
-	local odev="! -o ${IF_EXTERNAL}"
+	local idev="! -i ${IF_LOGICAL_EXTERNAL}"
+	local odev="! -o ${IF_LOGICAL_EXTERNAL}"
 
 	echo "# DNS access from all zones except the external:"
     else
@@ -4073,17 +4073,17 @@ gen-iptables-filter-web-external()
 	for ip in ${RWEB_HTTP_IP_LIST}
 	do
 	    echo
-	    echo "# Incoming HTTP rweb access to ${IF_EXTERNAL}:${ip}:"
-	    echo "[0:0] -A INPUT -i ${IF_EXTERNAL} -p tcp -m state --state NEW,ESTABLISHED -d ${ip} --dport ${WWW_PORT} -j ACCEPT"
-	    echo "[0:0] -A OUTPUT -o ${IF_EXTERNAL} -p tcp -m state --state ESTABLISHED -s ${ip} --sport ${WWW_PORT} -j ACCEPT"
+	    echo "# Incoming HTTP rweb access to ${IF_LOGICAL_EXTERNAL}:${ip}:"
+	    echo "[0:0] -A INPUT -i ${IF_LOGICAL_EXTERNAL} -p tcp -m state --state NEW,ESTABLISHED -d ${ip} --dport ${WWW_PORT} -j ACCEPT"
+	    echo "[0:0] -A OUTPUT -o ${IF_LOGICAL_EXTERNAL} -p tcp -m state --state ESTABLISHED -s ${ip} --sport ${WWW_PORT} -j ACCEPT"
 	done
 	
 	for ip in ${RWEB_HTTPS_IP_LIST}
 	do
 	    echo
-	    echo "# Incoming HTTPS rweb access to ${IF_EXTERNAL}:${ip}:"
-	    echo "[0:0] -A INPUT -i ${IF_EXTERNAL} -p tcp -m state --state NEW,ESTABLISHED -d ${ip} --dport ${HTTPS_PORT} -j ACCEPT"
-	    echo "[0:0] -A OUTPUT -o ${IF_EXTERNAL} -p tcp -m state --state ESTABLISHED -s ${ip} --sport ${HTTPS_PORT} -j ACCEPT"
+	    echo "# Incoming HTTPS rweb access to ${IF_LOGICAL_EXTERNAL}:${ip}:"
+	    echo "[0:0] -A INPUT -i ${IF_LOGICAL_EXTERNAL} -p tcp -m state --state NEW,ESTABLISHED -d ${ip} --dport ${HTTPS_PORT} -j ACCEPT"
+	    echo "[0:0] -A OUTPUT -o ${IF_LOGICAL_EXTERNAL} -p tcp -m state --state ESTABLISHED -s ${ip} --sport ${HTTPS_PORT} -j ACCEPT"
 	done
     fi
 
@@ -4114,9 +4114,9 @@ gen-iptables-filter-web-external()
 		;;
 	    2)
 		echo
-		echo "# Outgoing access from ${IF_EXTERNAL}:${IP_EXTERNAL_IP} to next peer ${ip}:${port}:"
-		echo "[0:0] -A OUTPUT -o ${IF_EXTERNAL} -p tcp -m state --state NEW,ESTABLISHED -s ${IP_EXTERNAL_IP} --sport 1024:65535 -d ${ip} --dport ${port} -j ACCEPT"
-		echo "[0:0] -A INPUT -i ${IF_EXTERNAL} -p tcp -m state --state ESTABLISHED -s ${ip} --sport ${port} -d ${IP_EXTERNAL_IP} --dport 1024:65535 -j ACCEPT"
+		echo "# Outgoing access from ${IF_LOGICAL_EXTERNAL}:${IP_EXTERNAL_IP} to next peer ${ip}:${port}:"
+		echo "[0:0] -A OUTPUT -o ${IF_LOGICAL_EXTERNAL} -p tcp -m state --state NEW,ESTABLISHED -s ${IP_EXTERNAL_IP} --sport 1024:65535 -d ${ip} --dport ${port} -j ACCEPT"
+		echo "[0:0] -A INPUT -i ${IF_LOGICAL_EXTERNAL} -p tcp -m state --state ESTABLISHED -s ${ip} --sport ${port} -d ${IP_EXTERNAL_IP} --dport 1024:65535 -j ACCEPT"
 		qos=${elt}
 		;;
 	    *)
@@ -4139,8 +4139,8 @@ gen-iptables-filter-rweb-web-client()
 	do
 	    echo
 	    echo "# Incoming HTTP rweb access to ${rweb_ip} from internal zones:"
-	    echo "[0:0] -A INPUT ! -i ${IF_EXTERNAL} -p tcp -m state --state NEW,ESTABLISHED -d ${rweb_ip} --dport ${WWW_PORT} -j ACCEPT"
-	    echo "[0:0] -A OUTPUT ! -o ${IF_EXTERNAL} -p tcp -m state --state ESTABLISHED -s ${rweb_ip} --sport ${WWW_PORT} -j ACCEPT"
+	    echo "[0:0] -A INPUT ! -i ${IF_LOGICAL_EXTERNAL} -p tcp -m state --state NEW,ESTABLISHED -d ${rweb_ip} --dport ${WWW_PORT} -j ACCEPT"
+	    echo "[0:0] -A OUTPUT ! -o ${IF_LOGICAL_EXTERNAL} -p tcp -m state --state ESTABLISHED -s ${rweb_ip} --sport ${WWW_PORT} -j ACCEPT"
 
 	    if test ${VPN_IPSEC_MODE} == True ; then
 		echo "[0:0] -A INPUT ${FW_IPSEC_POLICY_IN} -p tcp -m state --state NEW,ESTABLISHED -d ${rweb_ip} --dport ${WWW_PORT} -j ACCEPT"
@@ -4152,8 +4152,8 @@ gen-iptables-filter-rweb-web-client()
 	do
 	    echo
 	    echo "# Incoming HTTPS rweb access to ${rweb_ip} from internal zones:"
-	    echo "[0:0] -A INPUT ! -i ${IF_EXTERNAL} -p tcp -m state --state NEW,ESTABLISHED -d ${rweb_ip} --dport ${HTTPS_PORT} -j ACCEPT"
-	    echo "[0:0] -A OUTPUT ! -o ${IF_EXTERNAL} -p tcp -m state --state ESTABLISHED -s ${rweb_ip} --sport ${HTTPS_PORT} -j ACCEPT"
+	    echo "[0:0] -A INPUT ! -i ${IF_LOGICAL_EXTERNAL} -p tcp -m state --state NEW,ESTABLISHED -d ${rweb_ip} --dport ${HTTPS_PORT} -j ACCEPT"
+	    echo "[0:0] -A OUTPUT ! -o ${IF_LOGICAL_EXTERNAL} -p tcp -m state --state ESTABLISHED -s ${rweb_ip} --sport ${HTTPS_PORT} -j ACCEPT"
 
 	    if test ${VPN_IPSEC_MODE} == True ; then
 	    echo "[0:0] -A INPUT ${FW_IPSEC_POLICY_IN} -p tcp -m state --state NEW,ESTABLISHED -d ${rweb_ip} --dport ${HTTPS_PORT} -j ACCEPT"
@@ -4270,8 +4270,8 @@ gen-iptables-filter-web-self1()
 	    odev=${FW_IPSEC_POLICY_OUT}
 	    ;;
 	*)
-	    idev="! -i ${IF_EXTERNAL}"
-	    odev="! -o ${IF_EXTERNAL}"
+	    idev="! -i ${IF_LOGICAL_EXTERNAL}"
+	    odev="! -o ${IF_LOGICAL_EXTERNAL}"
 	    ;;
     esac
 
@@ -4317,8 +4317,8 @@ gen-iptables-filter-tweb-client()
 	echo
 	echo "# Allow transparent web proxy access from all zones except the external (mode tnat ${tnat}):"
 
-	echo "[0:0] -A INPUT ! -i ${IF_EXTERNAL} -p tcp -m state --state NEW,ESTABLISHED --sport 1024:65535 -m multiport --dports ${ports} -j ACCEPT"
-	echo "[0:0] -A OUTPUT ! -o ${IF_EXTERNAL} -p tcp -m state --state ESTABLISHED --dport 1024:65535 -m multiport --sports ${ports} -j ACCEPT"
+	echo "[0:0] -A INPUT ! -i ${IF_LOGICAL_EXTERNAL} -p tcp -m state --state NEW,ESTABLISHED --sport 1024:65535 -m multiport --dports ${ports} -j ACCEPT"
+	echo "[0:0] -A OUTPUT ! -o ${IF_LOGICAL_EXTERNAL} -p tcp -m state --state ESTABLISHED --dport 1024:65535 -m multiport --sports ${ports} -j ACCEPT"
 
 	if test ${VPN_IPSEC_MODE} == True ; then
 	    echo "[0:0] -A INPUT ${FW_IPSEC_POLICY_IN} -p tcp -m state --state NEW,ESTABLISHED --sport 1024:65535 -m multiport --dports ${ports} -j ACCEPT"
@@ -4399,8 +4399,8 @@ gen-iptables-filter-web-client()
 	echo
 	echo "# Web proxy access from all zones except the external:"
 
-	echo "[0:0] -A INPUT ! -i ${IF_EXTERNAL} -p tcp -m state --state NEW,ESTABLISHED --sport 1024:65535 --dport ${PROXY_PORT} -j ACCEPT"
-	echo "[0:0] -A OUTPUT ! -o ${IF_EXTERNAL} -p tcp -m state --state ESTABLISHED --sport ${PROXY_PORT} --dport 1024:65535 -j ACCEPT"
+	echo "[0:0] -A INPUT ! -i ${IF_LOGICAL_EXTERNAL} -p tcp -m state --state NEW,ESTABLISHED --sport 1024:65535 --dport ${PROXY_PORT} -j ACCEPT"
+	echo "[0:0] -A OUTPUT ! -o ${IF_LOGICAL_EXTERNAL} -p tcp -m state --state ESTABLISHED --sport ${PROXY_PORT} --dport 1024:65535 -j ACCEPT"
 
 	if test ${VPN_IPSEC_MODE} == True ; then
 	    echo "[0:0] -A INPUT ${FW_IPSEC_POLICY_IN} -p tcp -m state --state NEW,ESTABLISHED --sport 1024:65535 --dport ${PROXY_PORT} -j ACCEPT"
@@ -4573,9 +4573,9 @@ gen-iptables-filter-rweb-backend()
 			    ${WWW_PORT}|${HTTPS_PORT})
 				;;
 			    *)
-				echo "# Access to the external backend web server ${ip}:${port} from the appliance via ${IF_EXTERNAL}:"
-				echo "[0:0] -A OUTPUT -o ${IF_EXTERNAL} -p tcp -m state --state NEW,ESTABLISHED -s ${IP_EXTERNAL_IP} -d ${ip} --dport ${port} -j ACCEPT"
-				echo "[0:0] -A INPUT -i ${IF_EXTERNAL} -p tcp -m state --state ESTABLISHED -s ${ip} --sport ${port} -d ${IP_EXTERNAL_IP} -j ACCEPT"
+				echo "# Access to the external backend web server ${ip}:${port} from the appliance via ${IF_LOGICAL_EXTERNAL}:"
+				echo "[0:0] -A OUTPUT -o ${IF_LOGICAL_EXTERNAL} -p tcp -m state --state NEW,ESTABLISHED -s ${IP_EXTERNAL_IP} -d ${ip} --dport ${port} -j ACCEPT"
+				echo "[0:0] -A INPUT -i ${IF_LOGICAL_EXTERNAL} -p tcp -m state --state ESTABLISHED -s ${ip} --sport ${port} -d ${IP_EXTERNAL_IP} -j ACCEPT"
 				;;
 			esac
 			;;
@@ -4656,7 +4656,7 @@ gen-iptables-filter-av()
 			;;
 
 		    external)
-			dev=${IF_EXTERNAL}
+			dev=${IF_LOGICAL_EXTERNAL}
 
 			if test ${HA_MODE} == False ; then
 			    av_ips=${IP_EXTERNAL_IP}
@@ -4852,7 +4852,7 @@ gen-iptables-filter-admin()
 			admin_ip=${IP_ADMIN_IP}
 			;;
 		    external)
-			dev=${IF_EXTERNAL}
+			dev=${IF_LOGICAL_EXTERNAL}
 			admin_ip=${IP_EXTERNAL_IP}
 			;;
 		    auxiliary)
@@ -4933,7 +4933,7 @@ gen-iptables-filter-manager-on-gateway()
 			admin_ip=${IP_ADMIN_IP}
 			;;
 		    external)
-			dev=${IF_EXTERNAL}
+			dev=${IF_LOGICAL_EXTERNAL}
 			admin_ip=${IP_EXTERNAL_IP}
 			;;
 		    auxiliary)
@@ -5019,7 +5019,7 @@ gen-iptables-filter-file()
 		apl_ip=${IP_FILE_IP}
 		;;
 	    external)
-		dev="${IF_EXTERNAL}"
+		dev="${IF_LOGICAL_EXTERNAL}"
 		apl_ip=${IP_EXTERNAL_IP}
 		;;
 	    auxiliary)
@@ -5069,7 +5069,7 @@ gen-iptables-filter-mon-agent()
 		mon_ip=${IP_MON_IP}
 		;;
 	    external)
-		dev=${IF_EXTERNAL}
+		dev=${IF_LOGICAL_EXTERNAL}
 		mon_ip=${IP_EXTERNAL_IP}
 		;;	    
 	    auxiliary)
@@ -5143,7 +5143,7 @@ gen-iptables-filter-mon-trap()
 		    mon_ip=${IP_MON_IP}
 		    ;;
 		external)
-		    dev=${IF_EXTERNAL}
+		    dev=${IF_LOGICAL_EXTERNAL}
 		    mon_ip=${IP_EXTERNAL_IP}
 		    ;;
 		auxiliary)
@@ -5260,11 +5260,11 @@ gen-iptables-filter-ns-ip()
 
     if test "${SELF_NS}" == True -o "${DNS_MODE}" == True ; then
 	echo
-	echo "# Outgoing TCP/UDP DNS requests from the appliance via ${IF_EXTERNAL}:"
-	echo "[0:0] -A OUTPUT -o ${IF_EXTERNAL} -p udp -m state --state NEW,ESTABLISHED -m udp --dport ${DOMAIN_PORT} -j ACCEPT"
-	echo "[0:0] -A INPUT -i ${IF_EXTERNAL} -p udp -m state --state ESTABLISHED -m udp --sport ${DOMAIN_PORT} -j ACCEPT"
-	echo "[0:0] -A OUTPUT -o ${IF_EXTERNAL} -p tcp -m state --state NEW,ESTABLISHED -m tcp --dport ${DOMAIN_PORT} -j ACCEPT"
-	echo "[0:0] -A INPUT -i ${IF_EXTERNAL} -p tcp -m state --state ESTABLISHED -m tcp --sport ${DOMAIN_PORT} -j ACCEPT"
+	echo "# Outgoing TCP/UDP DNS requests from the appliance via ${IF_LOGICAL_EXTERNAL}:"
+	echo "[0:0] -A OUTPUT -o ${IF_LOGICAL_EXTERNAL} -p udp -m state --state NEW,ESTABLISHED -m udp --dport ${DOMAIN_PORT} -j ACCEPT"
+	echo "[0:0] -A INPUT -i ${IF_LOGICAL_EXTERNAL} -p udp -m state --state ESTABLISHED -m udp --sport ${DOMAIN_PORT} -j ACCEPT"
+	echo "[0:0] -A OUTPUT -o ${IF_LOGICAL_EXTERNAL} -p tcp -m state --state NEW,ESTABLISHED -m tcp --dport ${DOMAIN_PORT} -j ACCEPT"
+	echo "[0:0] -A INPUT -i ${IF_LOGICAL_EXTERNAL} -p tcp -m state --state ESTABLISHED -m tcp --sport ${DOMAIN_PORT} -j ACCEPT"
     fi
 
     for ip in ${NAME_SERVER_LIST}
@@ -5296,9 +5296,9 @@ gen-iptables-filter-ipsec-access()
     test ${VPN_IPSEC_ACCESS_MODE} == True || return 0
 
     echo
-    echo "# UDP encapsulatd IPsec traffic in access mode on the the ${IF_EXTERNAL}:"
-    echo "[0:0] -A INPUT -i ${IF_EXTERNAL} -p udp -m multiport --dports ${ISAKMP_PORT},${NATT_PORT} -m conntrack --ctstate NEW,ESTABLISHED -j ACCEPT"
-    echo "[0:0] -A OUTPUT -o ${IF_EXTERNAL} -p udp -m multiport --sports ${ISAKMP_PORT},${NATT_PORT} -m conntrack --ctstate ESTABLISHED -j ACCEPT"
+    echo "# UDP encapsulatd IPsec traffic in access mode on the the ${IF_LOGICAL_EXTERNAL}:"
+    echo "[0:0] -A INPUT -i ${IF_LOGICAL_EXTERNAL} -p udp -m multiport --dports ${ISAKMP_PORT},${NATT_PORT} -m conntrack --ctstate NEW,ESTABLISHED -j ACCEPT"
+    echo "[0:0] -A OUTPUT -o ${IF_LOGICAL_EXTERNAL} -p udp -m multiport --sports ${ISAKMP_PORT},${NATT_PORT} -m conntrack --ctstate ESTABLISHED -j ACCEPT"
 }
 
 gen-iptables-filter-ipsec-site()
@@ -5334,9 +5334,9 @@ gen-iptables-filter-ipsec-site()
 		    dst_ip=$(echo-firewall-destination-ip ${ip})
 
 		    echo
-		    echo "# UDP encapsulatd IPsec traffic for the '${id}' VPN site on the the ${IF_EXTERNAL}:"
-		    echo "[0:0] -A INPUT -i ${IF_EXTERNAL} -p udp${src_ip} -m multiport --dports ${ISAKMP_PORT},${NATT_PORT} -m conntrack --ctstate NEW,ESTABLISHED -j ACCEPT"
-		    echo "[0:0] -A OUTPUT -o ${IF_EXTERNAL} -p udp${dst_ip} -m multiport --sports ${ISAKMP_PORT},${NATT_PORT} -m conntrack --ctstate NEW,ESTABLISHED -j ACCEPT"
+		    echo "# UDP encapsulatd IPsec traffic for the '${id}' VPN site on the the ${IF_LOGICAL_EXTERNAL}:"
+		    echo "[0:0] -A INPUT -i ${IF_LOGICAL_EXTERNAL} -p udp${src_ip} -m multiport --dports ${ISAKMP_PORT},${NATT_PORT} -m conntrack --ctstate NEW,ESTABLISHED -j ACCEPT"
+		    echo "[0:0] -A OUTPUT -o ${IF_LOGICAL_EXTERNAL} -p udp${dst_ip} -m multiport --sports ${ISAKMP_PORT},${NATT_PORT} -m conntrack --ctstate NEW,ESTABLISHED -j ACCEPT"
 		done
 		;;
 	    *)
@@ -5505,6 +5505,18 @@ gen-iptables-filter-input-output-source-code()
     esac
 }
 
+gen-iptables-filter-input-output-dhcp-client()
+{
+    test -z "${CLOUD_NAME}" || return 0
+    test ${IP_EXTERNAL_MODE} == 'dhcp' || return 0
+
+    echo
+    echo "# DHCP client traffic on the external interface:"
+
+    echo "[0:0] -A OUTPUT -o ${IF_LOGICAL_EXTERNAL} -p udp --sport ${BOOTPC_PORT} --dport ${BOOTPS_PORT} -j ACCEPT"
+    echo "[0:0] -A INPUT -i ${IF_LOGICAL_EXTERNAL} -p udp --sport ${BOOTPS_PORT} --dport ${BOOTPC_PORT} -j ACCEPT"
+}
+
 gen-iptables-filter-input-output-cloud()
 {
     if test -n "${CLOUD_NAME}" ; then
@@ -5535,6 +5547,7 @@ gen-iptables-filter-input-output-cloud()
 
 gen-iptables-filter-input-output()
 {
+    gen-iptables-filter-input-output-dhcp-client
     gen-iptables-filter-input-output-cloud
     gen-iptables-filter-input-output-loopback
     gen-iptables-filter-input-output-multicast
@@ -5624,21 +5637,21 @@ gen-iptables-filter-forward-default-illegal()
 
 gen-iptables-filter-forward-default-traceroute()
 {
-    echo "[0:0] -A FORWARD -o ${IF_EXTERNAL} -p icmp --icmp-type time-exceeded -j ${FW_DROP_TRACEROUTE}"
+    echo "[0:0] -A FORWARD -o ${IF_LOGICAL_EXTERNAL} -p icmp --icmp-type time-exceeded -j ${FW_DROP_TRACEROUTE}"
     test ${VPN_IPSEC_MODE} == True || return 0
     echo "[0:0] -A FORWARD ${FW_IPSEC_POLICY_OUT} -p icmp --icmp-type time-exceeded -j ${FW_DROP_TRACEROUTE}"
 }
 
 gen-iptables-filter-forward-default-flood()
 {
-    echo "[0:0] -A FORWARD -i ${IF_EXTERNAL} -p tcp --syn -j SYNFLOODOTHER"
-    echo "[0:0] -A FORWARD -o ${IF_EXTERNAL} -p tcp --syn -j SYNFLOODOTHER"
+    echo "[0:0] -A FORWARD -i ${IF_LOGICAL_EXTERNAL} -p tcp --syn -j SYNFLOODOTHER"
+    echo "[0:0] -A FORWARD -o ${IF_LOGICAL_EXTERNAL} -p tcp --syn -j SYNFLOODOTHER"
 
-    echo "[0:0] -A FORWARD -i ${IF_EXTERNAL} -p tcp --tcp-flags RST RST -j RSTFLOODOTHER"
-    echo "[0:0] -A FORWARD -o ${IF_EXTERNAL} -p tcp --tcp-flags RST RST -j RSTFLOODOTHER"
+    echo "[0:0] -A FORWARD -i ${IF_LOGICAL_EXTERNAL} -p tcp --tcp-flags RST RST -j RSTFLOODOTHER"
+    echo "[0:0] -A FORWARD -o ${IF_LOGICAL_EXTERNAL} -p tcp --tcp-flags RST RST -j RSTFLOODOTHER"
 
-    echo "[0:0] -A FORWARD -i ${IF_EXTERNAL} -p udp -m state --state NEW -j UDPFLOODOTHER"
-    echo "[0:0] -A FORWARD -o ${IF_EXTERNAL} -p udp -m state --state NEW -j UDPFLOODOTHER"
+    echo "[0:0] -A FORWARD -i ${IF_LOGICAL_EXTERNAL} -p udp -m state --state NEW -j UDPFLOODOTHER"
+    echo "[0:0] -A FORWARD -o ${IF_LOGICAL_EXTERNAL} -p udp -m state --state NEW -j UDPFLOODOTHER"
 
     if test ${SINGLE_IP_TCP_CONNLIMIT} -gt 0 ; then
 	echo "[0:0] -A FORWARD ${FW_TCP_CONNLIMIT} -j ${FW_REJECT_LIMIT}"
@@ -5726,7 +5739,7 @@ gen-iptables-filter-forward()
 	case "${rset}" in
 	    external)
 		rules=${FW_EXTERNAL_RULE_LIST}
-		input_dev=${IF_EXTERNAL}
+		input_dev=${IF_LOGICAL_EXTERNAL}
 		;;
 	    web)
 		rules=${FW_WEB_RULE_LIST}
@@ -6052,7 +6065,8 @@ gen-iptables-filter()
 
     gen-iptables-filter-input-output
     gen-iptables-filter-forward
-    is-dn-present || gen-iptables-filter-log
+
+    test ${DN_IS_PRESENT} == 'True' || gen-iptables-filter-log
 }
 
 gen-icmp-tables()
@@ -6220,7 +6234,7 @@ gen-iptables()
     echo -e "\nCOMMIT\n"
     cat sysconfig.iptables.filter.new \
 	sysconfig.iptables.apl.new
-    echo -e "\nCOMMIT\n"
+    echo -e "\nCOMMIT"
 }
 
 gen-iptables-resolved()
@@ -6262,6 +6276,33 @@ fw-allow-ns-only()
     done
 
     return 0
+}
+
+gen-ebtables-pppoe()
+{
+    test ${IP_EXTERNAL_MODE} == 'pppoe' || return 0
+
+    cat << EOT
+*filter
+:INPUT ACCEPT
+:OUTPUT ACCEPT
+:FORWARD ACCEPT
+-N PPPOE_EXTERNAL
+
+-A PPPOE_EXTERNAL -p 0x8863 -j ACCEPT
+-A PPPOE_EXTERNAL -p 0x8864 -j ACCEPT
+-A PPPOE_EXTERNAL -j DROP
+
+-A INPUT -i eth0 -j PPPOE_EXTERNAL
+-A OUTPUT -o eth0 -j PPPOE_EXTERNAL
+
+COMMIT
+EOT
+}
+
+gen-ebtables()
+{
+    gen-ebtables-pppoe
 }
 
 LIB_APL_FW=Yes

@@ -170,6 +170,7 @@ add-link()
 	ln -sf ../init.d/tc K78tc
 	ln -sf ../init.d/cloud-network K82cloud-network
 	ln -sf ../init.d/iptables K84iptables
+	ln -sf ../init.d/ebtables _K85ebtables
 	ln -sf ../init.d/waagent K86waagent
 	ln -sf ../init.d/smartd K88smartd
 	ln -sf ../init.d/rlogger _K89rlogger
@@ -193,6 +194,7 @@ add-link()
     ln -sf ../init.d/appliance S08appliance
     ln -sf ../init.d/rlogger _S11rlogger
     ln -sf ../init.d/smartd S12smartd
+    ln -sf ../init.d/ebtables _S13ebtables
     ln -sf ../init.d/iptables S14iptables
     ln -sf ../init.d/tc S24tc
 

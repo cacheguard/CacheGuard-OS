@@ -26,7 +26,7 @@ get-html-bold-command()
     test -n "${1}" || return 1
     local cmd=${1}
 
-    cmd="<a href='${DOC_COMMAND_DIR}/${cmd}.html' target='_blank'>${cmd}</a>"
+    cmd="<a href='${DOC_COMMAND_DIR}/${cmd}.html' target='_blank'><u>${cmd}</u></a>"
 
     echo ${cmd}
 }
@@ -71,13 +71,12 @@ get-magnified-error-text()
 	wrd=${wrd:1:${len}}
 	wrd=$(get-magnified-command ${wrd})
 
-	out_txt="${out_txt} [${wrd}]"
+	out_txt="${out_txt} ${wrd}"
     done
 
     test ${TERM} == ${WADMIN_TERM} || out_txt="${out_txt} To do, so use the $(get-terminal-bold-text help) command followed by the command name."
 
-    out_txt=${out_txt:1}
-    echo ${out_txt}
+    echo ${out_txt:1}
 }
 
 display-error()
@@ -85,15 +84,16 @@ display-error()
     test -n "${1}" || return 1
     local err=${1}
     local txt=${2}
+    local notag=${3}
 
     local txt tag com trx
 
     txt="${txt}${Errors[${err}]}"
 
     if test ${TERM} == ${WADMIN_TERM} ; then
-	tag="${ERROR_TAG}"
+	test -n "${notag}" || tag="${ERROR_TAG} "
     else
-	tag='***'
+	test -n "${notag}" || tag='*** '
 	com=$(file-basename ${ARGS[0]})
 	test -z "${TRANSACTION}" || trx=" ($(get-magnified-command "${com}") command)"
     fi
@@ -108,7 +108,7 @@ display-error()
 	fi
     fi
 
-    echo -e "${tag} Error ${err}${trx} - ${txt}" >&2
+    echo -e "${tag}Error ${err}${trx} - ${txt}" >&2
 }
 
 error()

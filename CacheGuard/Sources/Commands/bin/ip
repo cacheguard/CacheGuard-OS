@@ -59,14 +59,64 @@ show-ip-external()
 {
     echo-command-form "ip external"
     echo-mark-cur
-    echo-value "${CURRENT_IP_EXTERNAL_IP} ${CURRENT_IP_EXTERNAL_MASK}"
 
-    if test "${CURRENT_IP_EXTERNAL_IP}" != "${IP_EXTERNAL_IP}" -o \
-	"${CURRENT_IP_EXTERNAL_MASK}" != "${IP_EXTERNAL_MASK}" ; then
-	echo-command-form "ip external"
-	echo-mark-new
-	echo-value "${IP_EXTERNAL_IP} ${IP_EXTERNAL_MASK}"
+    
+    case ${CURRENT_IP_EXTERNAL_MODE} in
+	static)
+	    echo-value "${CURRENT_IP_EXTERNAL_MODE} ${CURRENT_IP_EXTERNAL_IP} ${CURRENT_IP_EXTERNAL_MASK}"
+	    ;;
+	dhcp)
+	    echo-value "${CURRENT_IP_EXTERNAL_MODE} (${CURRENT_IP_EXTERNAL_IP} ${CURRENT_IP_EXTERNAL_MASK})"
+	    ;;
+	pppoe)
+	    echo-value "${CURRENT_IP_EXTERNAL_MODE} '${CURRENT_IP_EXTRNAL_PPPOE_SERVICE_NAME}' '${CURRENT_IP_EXTRNAL_PPPOE_USERNAME}' ..."
+	    echo-blank-command
+	    echo-value "(${CURRENT_IP_EXTERNAL_IP} ${CURRENT_IP_EXTERNAL_MASK})"
+	    ;;
+	*)
+	    ;;
+    esac
+
+    local modified
+
+    if test "${CURRENT_IP_EXTERNAL_MODE}" != "${IP_EXTERNAL_MODE}" ; then
+	modified=yes
+    else
+	case ${IP_EXTERNAL_MODE} in
+	    static)
+		test "${CURRENT_IP_EXTERNAL_IP}" == "${IP_EXTERNAL_IP}" -a \
+		     "${CURRENT_IP_EXTERNAL_MASK}" == "${IP_EXTERNAL_MASK}" || modified=yes
+		;;
+	    dhcp)
+		;;
+	    pppoe)
+		test "${CURRENT_IP_EXTRNAL_PPPOE_SERVICE_NAME}" == "${IP_EXTRNAL_PPPOE_SERVICE_NAME}" -a \
+		     "${CURRENT_IP_EXTRNAL_PPPOE_USERNAME}" == "${IP_EXTRNAL_PPPOE_USERNAME}" -a \
+		     "${CURRENT_IP_EXTRNAL_PPPOE_PASSWORD}" == "${IP_EXTRNAL_PPPOE_PASSWORD}" || modified=yes
+		;;
+	    *)
+		;;
+	esac
     fi
+
+    test -n "${modified}" || return 0
+
+    echo-command-form "ip external"
+    echo-mark-new
+
+    case ${IP_EXTERNAL_MODE} in
+	static)
+	    echo-value "${IP_EXTERNAL_MODE} ${IP_EXTERNAL_IP} ${IP_EXTERNAL_MASK}"
+	    ;;
+	dhcp)
+	    echo-value "${IP_EXTERNAL_MODE}"
+	    ;;
+	pppoe)
+	    echo-value "${IP_EXTERNAL_MODE} '${IP_EXTRNAL_PPPOE_SERVICE_NAME}' '${IP_EXTRNAL_PPPOE_USERNAME}' ..."
+	    ;;
+	*)
+	    ;;
+    esac
 }
 
 show-ip-auxiliary()
@@ -396,46 +446,56 @@ show-route()
     echo-end-show
 }
 
-route-remove()
+dhcp-external-renew()
 {
-    test -n "${1}" || return 1
-    test -n "${2}" || return 2
-    local in_list=${1}
-    local record=${2}
+    user-has-admin-rights || return 31
+    check-lock || return 123
 
-    local out_list
-    local f1 f2 f3 f4 f5
-    local elt i=0 range
+    supervisor-action "dhcp-external-renew"
+    test ${?} -eq 0 || return 104
 
-    for elt in ${in_list}
-    do
-	range=$[${i} % 5]
-	case ${range} in
-	    0)
-		f1=${elt}
-		;;
-	    1)
-		f2=${elt}
-		;;
-	    2)
-		f3=${elt}
-		;;
-	    3)
-		f4=${elt}
-		;;
-	    4)
-		f5=${elt}
-		test "${f1} ${f2} ${f3}" == "${record}" || out_list="${out_list} ${f1} ${f2} ${f3} ${f4} ${f5}"
-		;;
-	    *)
-		return 1
-		;;
-	esac
-	i=$[${i} + 1]
-    done
-    out_list="${out_list:1}"
-    echo "${out_list}"
     return 0
+}
+
+remove-dhcp-default-routes()
+{
+    if test ! -f /var/run/${EXTERNAL_DHCP_IP_CONFIGURATION} ; then
+	echo ${IP_ROUTE_LIST}
+	return 0
+    fi
+
+    local gws=$(get-dhcp-routers)
+
+    if test -z "${gws}" ; then
+	echo ${IP_ROUTE_LIST}
+	return 0
+    fi
+
+    local gw ip_route_list=${IP_ROUTE_LIST}
+
+    for gw in ${gws}
+    do
+	ip_route_list=$(remove-record-from-list 5 3 "0.0.0.0 0.0.0.0 ${gw}" "${ip_route_list}")
+    done
+
+    echo ${ip_route_list}
+}
+
+remove-pppoe-default-route()
+{
+    if test ! -f /var/run/${EXTERNAL_PPPOE_IP_CONFIGURATION}.new ; then
+	echo ${IP_ROUTE_LIST}
+	return 0
+    fi
+
+    local peer=$(get-pppoe-peer)
+
+    if test -z "${peer}" ; then
+	echo ${IP_ROUTE_LIST}
+	return 0
+    fi
+
+    remove-record-from-list 5 3 "0.0.0.0 0.0.0.0 ${peer}" "${IP_ROUTE_LIST}"
 }
 
 get-default-gateways()
@@ -590,8 +650,10 @@ manage-route()
 	    fi
 
 	    gw=${3}
+	    if test ${operation} != del -o -n "${gw}" ; then
+		check-ip ${gw} || return 12
+	    fi
 
-	    check-ip ${gw} || return 12
 	    check-net-ip-address ${ip} ${mk} || return 70
 
 	    case "${operation}" in
@@ -607,7 +669,12 @@ manage-route()
 
 		    ;;
 		del)
-		    export IP_ROUTE_LIST=$(route-remove "${IP_ROUTE_LIST}" "${ip} ${mk} ${gw}")
+		    export IP_ROUTE_LIST
+		    if test -n "${gw}" ; then
+			IP_ROUTE_LIST=$(remove-record-from-list 5 3 "${ip} ${mk} ${gw}" "${IP_ROUTE_LIST}")
+		    else
+			IP_ROUTE_LIST=$(remove-record-from-list 5 2 "${ip} ${mk}" "${IP_ROUTE_LIST}")
+		    fi
 		    ;;
 
 		add|insert)
@@ -686,7 +753,9 @@ show-via1()
 		;;
 	    2)
 		prio=${elt}
+		test ${n} -eq 0 || echo-blank-command
 		echo-value "${gateway} ${role} ${prio}"
+		((n++))
 		;;
 	    *)
 		return 255
@@ -770,6 +839,290 @@ show-ip-neighbour()
     echo-end-show
 }
 
+echo-dhcp-report()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    local field=${1}
+    local ftype=${2}
+    local value=${3}
+    shift 3
+    local comment=${*}
+
+    test -z "${comment}" || comment=" ${comment}"
+
+    if test ${TERM} == ${WADMIN_TERM} ; then
+	echo "<tr>"
+	echo "<td>${field}</td>"
+
+	case ${ftype} in
+	    value)
+		echo "<td>${value}</td>"
+		;;
+	    state)
+		case ${value} in
+		    OK)
+			echo "<td><img src='${IMAGE_DIR}/ok.png' /></td>"
+			;;
+		    KO)
+			echo "<td><img src='${IMAGE_DIR}/ko.png' />${comment}</td>"
+			;;
+		    *)
+			echo "<td><img src='${IMAGE_DIR}/rotating_arrow.gif' />${comment}</td>"
+			;;
+		esac
+		;;
+	    *)
+		echo "<td><img src='${IMAGE_DIR}/error.png' />${comment}</td>"
+		;;
+	esac
+
+	echo "</tr>"
+    else
+	echo -n "${field}"
+	case ${ftype} in
+	    value)
+		echo -e "\e[${COLUMNS}D\e[${PRINT_COL}C${value}"
+		;;
+	    state)
+		echo -ne "\e[${COLUMNS}D\e[${PRINT_COL}C"
+		case ${value} in
+		    OK)
+			echo -ne "[${STATE_OK}]"
+			;;
+		    KO)
+			echo -ne "[${STATE_OK}]"
+			;;
+		    *)
+			echo -ne "[${STATE_OO}]"
+			;;
+		esac
+		echo "${comment}"
+		;;
+	    *)
+		echo -e "\e[${COLUMNS}D\e[${PRINT_COL}C..."
+		;;
+	esac
+    fi
+}
+
+get-external-dhcp-reason-text()
+{
+    test -n "${1}" || return 1
+    local reason=${1}
+
+    reason=${reason,,}
+    reason=${reason^}
+
+    echo ${reason}
+}
+
+gen-external-dhcp-renew-report()
+{
+    local dhcp_state apply_state
+
+    test -n "${COLUMNS}" || COLUMNS=80
+
+    if test -f /var/run/${EXTERNAL_DHCP_DONE} ; then
+	dhcp_state="OO In progress..."
+	apply_state="XX Waiting..."
+    else
+	if test -f /var/run/${EXTERNAL_DHCP_STATE} ; then
+
+	    local dhcp_reason
+
+	    read dhcp_reason < /var/run/${EXTERNAL_DHCP_STATE}
+	    echo-dhcp-report "Last DHCP Event" value $(get-external-dhcp-reason-text ${dhcp_reason})
+
+	    case ${dhcp_reason} in
+		MEDIUM|ARPCHECK|ARPSEND|PREINIT)
+		    dhcp_state="XX In progress..."
+		    apply_state="XX Waiting..."
+		    ;;
+		BOUND|RENEW|REBIND)
+		    if test -f /var/run/${EXTERNAL_DHCP_IP_CONFIGURATION} ; then
+
+			local line i=0
+			local dv sv ip mk gws ld
+
+			while read line
+			do
+			    case ${i} in
+				0)
+				    dv=${line}
+				    ;;
+				1)
+				    sv=${line}
+				    ;;
+				2)
+				    ip=${line}
+				    ;;
+				3)
+				    mk=${line}
+				    ;;
+				4)
+				    gws=${line}
+				    ;;
+				5)
+				    ld=${line}
+				    ld=$(get-date-from-epoch-seconds ${ld})
+				    test -n "${ld}" || ld='unknown'
+				    break
+				    ;;
+				*)
+				    break
+				    ;;
+			    esac
+			    ((i++))
+			done < /var/run/${EXTERNAL_DHCP_IP_CONFIGURATION}
+
+			echo-dhcp-report "Physical NIC" value ${dv}
+			echo-dhcp-report "DHCP Server IP" value ${sv}
+			echo-dhcp-report "Acquired IP" value ${ip}
+			echo-dhcp-report "Acquired Mask" value ${mk}
+			echo-dhcp-report "Acquired Router(s)" value "${gws// /, }"
+			echo-dhcp-report "Lease End Date" value ${ld}
+		    fi
+
+		    dhcp_state="OK Done"
+		    if test -f ${ADMIN_LOCK_DIR}/apl_apply ; then
+			apply_state="XX In progress..."
+		    else
+			apply_state="OK Done"
+		    fi
+		    ;;
+		REBOOT)
+		    dhcp_state="XX In progress..."
+		    apply_state="XX Waiting..."
+		    ;;
+		FAIL)
+		    dhcp_state="KO Failed"
+		    apply_state="XX Waiting..."
+		    ;;
+		EXPIRE)
+		    dhcp_state="KO Expired"
+		    apply_state="XX Waiting..."
+		    ;;
+		RELEASE|STOP)
+		    dhcp_state="XX In progress..."
+		    apply_state="XX Waiting..."
+		    ;;
+		TIMEOUT)
+		    dhcp_state="KO Failed"
+		    apply_state="XX In progress..."
+		    ;;
+		PREINIT6|BOUND6|RENEW6|REBIND6|DEPREF6|EXPIRE6|RELEASE6|STOP6)
+		    dhcp_state="KO In error[11]"
+		    ;;
+		*)
+		    dhcp_state="KO In error[13]"
+		    apply_state="XX Waiting..."
+		    ;;
+	    esac
+	else
+	    dhcp_state="KO In error[21]"
+	fi
+    fi
+
+    echo-dhcp-report "Request State" state ${dhcp_state}
+    echo-dhcp-report "Apply State" state ${apply_state}
+}
+
+display-external-dhcp-renew-report()
+{
+    if test ${TERM} == ${WADMIN_TERM} ; then
+	gen-external-dhcp-renew-report
+    else
+	echo-begin-show
+	gen-external-dhcp-renew-report
+	echo-end-show
+    fi
+}
+
+manage-external-dhcp()
+{
+    local action=${1}
+    local key=${2}
+
+    case ${action} in
+	renew)
+	    if test ${CURRENT_IP_EXTERNAL_MODE} != dhcp ; then
+		INDIRECT_ERROR_CODE=539
+		return 254
+	    fi
+
+	    case ${key} in
+		report)
+		    display-external-dhcp-renew-report
+		    ;;
+		'')
+		    dhcp-external-renew
+		    ;;
+		*)
+		    return 1
+		    ;;
+	    esac
+	    ;;
+	'')
+	    export IP_EXTERNAL_MODE=${ip_external_mode}
+	    SAVENV=1
+	    ;;
+	*)
+	    return 1
+	    ;;
+    esac    
+}
+
+manage-external-pppoe()
+{
+    local encrypted=${1}
+
+    local service_name=${ARGS[1]}
+    local username=${ARGS[2]}
+    local password=${ARGS[3]}
+
+    if ! check-pppoe-service-name "${service_name}" ; then
+	INDIRECT_ERROR_CODE=541
+	return 254
+    fi
+
+    if ! check-pppoe-username "${username}" ; then
+	INDIRECT_ERROR_CODE=542
+	return 254
+    fi
+
+    if test -n "${username}" ; then
+	if test -n "${encrypted}" ; then
+	    password=$(decrypt-password "encrypted:${password}" "${PPPOE_PASSWD}")
+	else
+	    if test -z "${password}" -a ${TERM} != ${WADMIN_TERM} ; then
+		test "${__BATCH_MODE}" != yes || error 111
+		test -z "${TRANSACTION}" || return 106
+
+		echo -n "Please enter the PPPoE password: "
+		stty -echo
+		read password
+		stty echo
+		echo
+	    fi
+	fi
+    else
+	unset password
+    fi
+
+    if ! check-pppoe-password "${password}" ; then
+	INDIRECT_ERROR_CODE=543
+	return 254
+    fi
+
+    export IP_EXTERNAL_MODE='pppoe'
+    export IP_EXTRNAL_PPPOE_SERVICE_NAME=${service_name}
+    export IP_EXTRNAL_PPPOE_USERNAME=${username}
+    export IP_EXTRNAL_PPPOE_PASSWORD=${password}
+
+    SAVENV=1
+}
+
 run()
 {
     local interface=${ARGS[1]}
@@ -836,7 +1189,7 @@ run()
 
     case ${interface} in
 	internal)
-	;;
+	    ;;
 
 	external|auxiliary|vlan)
 	    contextual-command-is-allowed || return 209
@@ -847,9 +1200,37 @@ run()
 	    ;;
     esac
 
-    local ip=${ARGS[2]}
-    local px=${ip/*\/}
-    local mk
+    local ip px mk
+    local ip_external_mode
+
+    case ${interface} in
+	external)
+	    ip_external_mode=${ARGS[2]}
+	    case ${ip_external_mode} in
+		static)
+		    test -n "${ARGS[3]}" || return 1
+		    shift-args
+		    ;;
+		dhcp)
+		    shift-args 2
+		    manage-external-dhcp ${ALLARGS}
+		    return ${?}
+		    ;;
+		pppoe|pppoe:encrypted)
+		    shift-args 2
+		    manage-external-pppoe ${ip_external_mode/pppoe}
+		    return ${?}
+		    ;;
+		*)
+		    ;;
+	    esac
+	    ;;
+	*)
+	    ;;
+    esac
+
+    ip=${ARGS[2]}
+    px=${ip/*\/}
 
     if test ${ip} != ${px} ; then
 	check-prefix ${px} || return 158
@@ -865,10 +1246,10 @@ run()
 
     if test -z "${px}" ; then
 	if test -n "${ARGS[3]}" ; then
-	    local mk=${ARGS[3]}
+	    mk=${ARGS[3]}
 	    check-mask ${mk} || return 13
 	else
-	    local mk=255.255.255.0
+	    mk=255.255.255.0
 	fi
     else
 	if test ${px} == 32 ; then
@@ -876,12 +1257,19 @@ run()
 	elif test ${px} == 0 ; then
 	    mk='0.0.0.0'
 	else
-	    local mk=$(ipcalc -s ${ip}/${px} -m)
+	    mk=$(ipcalc -s ${ip}/${px} -m)
 	    mk=${mk/NETMASK=/}
 	fi
     fi
 
     host-ip-address ${ip} ${mk} || return 62
+
+    if test ${interface} != external ; then
+	if test ${mk} == 255.255.255.255 ; then
+	    INDIRECT_ERROR_CODE=538
+	    return 254
+	fi
+    fi
 
     case ${interface} in
 	internal)
@@ -889,8 +1277,21 @@ run()
 	    export IP_INTERNAL_MASK=${mk}
 	    ;;
 	external)
+	    export IP_EXTERNAL_MODE=static
 	    export IP_EXTERNAL_IP=${ip}
 	    export IP_EXTERNAL_MASK=${mk}
+
+	    case ${CURRENT_IP_EXTERNAL_MODE} in
+		dhcp)
+		    export IP_ROUTE_LIST=$(remove-dhcp-default-routes)
+		    ;;
+		pppoe)
+
+export IP_ROUTE_LIST=$(remove-pppoe-default-route)
+
+		    ;;
+		*)
+	    esac
 	    ;;
 	auxiliary)
 	    export IP_AUXILIARY_IP=${ip}

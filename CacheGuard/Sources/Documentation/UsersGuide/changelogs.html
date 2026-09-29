@@ -1,6 +1,16 @@
 <a name='main' class='doc-title'></a>
 <h1>Change Logs & Release Notes</h1>
 
+<a name='2.6.2' class='doc-title'></a><h3>Version UF-2.6.2 (29 September 2026)</h3>
+<ul>
+  <li>The DHCP range configuration bug introduced in version UF-2.6.1 has been fixed.</li>
+  <li>The HTTP Compression mode has been fixed to do not close the transfer with outstanding read data remaining and to compress data in case where the caching is enabled.</li>
+  <li>The appliance now supports host-routed /32 (255.255.255.255 network mask) configurations on its external network interface with an off-link default gateway.</li>
+  <li>DHCP and PPPoE support have been added for the external network interface.</li>
+  <li>The bug in the Administration Web GUI of an appliance installed as a Manager that prevented its IP address from being modified has been fixed.</li>
+  <li>Minor bug fixes have been applied.</li>
+</ul>
+
 <a name='2.6.1' class='doc-title'></a><h3>Version UF-2.6.1 (7 September 2026)</h3>
 <ul>
   <li>The arbitrary command injection vulnerability that could be exploited during configuration loading by an administrator has been fixed.</li>

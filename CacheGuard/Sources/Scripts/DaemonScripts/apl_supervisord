@@ -311,8 +311,13 @@ start-loop()
 	    2fa-update-timestamp)
 		apl-2fa-update-timestamp ${user} &
 		;;
+
 	    kerberos-keytab-report)
 		apl-kerberos-keytab-report &
+		;;
+
+	    dhcp-external-renew)
+		apl_dhcp_external_renew &
 		;;
 	    *)
 		;;

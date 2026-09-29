@@ -43,7 +43,7 @@ set-dhcp-parameters1()
 	return 0
     fi
 
-    if test ${ip_web_ip} != 0.0.0.0 ; then
+    if test ${ip_web_ip} != '0.0.0.0' ; then
 	echo True
 	return 0
     fi
@@ -127,6 +127,8 @@ gen-dhcpd-range-conf()
     ranges=${ranges:1}
 
     test -n "${ranges}" || return 0
+
+    i=0
 
     echo -e "\tpool {"
     test -z "${DHCP_PEER_LIST}" || echo -e "\t\tfailover peer \"${SHOSTNAME}\";"

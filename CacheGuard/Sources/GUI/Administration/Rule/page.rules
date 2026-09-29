@@ -46,7 +46,7 @@ antivirus-whitelist-domainname	(\?page:[[:digit:]]{0,3}-[[:digit:]]{0,3})? (\&en
 
 antivirus-whitelist-signature	nil operation=(clear|load)(\&protocol=(_ftp|_sftp|_tftp)\&server=[[:print:]]{0,192}\&filename=[[:print:]]{0,384})?
 
-apply				(\?(template|gateway|manager)?:[[:print:]]{0,66})? (check=on)?
+apply				(\?(template|gateway|manager)?:[[:print:]]{0,66})? (\&check=on)?
 
 authenticate			nil dummy=on(\&ldap=on)?(\&kerberos=on)?(\&web=on)?(\&rweb=on)?
 
@@ -58,7 +58,7 @@ authenticate-kerberos-ad	nil service_name=[[:print:]]{0,192}\&ad=(on|off)(\&rdn=
 
 authenticate-kerberos-server	(\?page:[[:digit:]]{0,3}-[[:digit:]]{0,3})? (\&entry_[0-9]{1,2}=(old|anew)\&server_[0-9]{1,2}=[[:print:]]{0,192}(\&del_[0-9]{1,2}=on)?){0,7}
 
-authenticate-kerberos-rweb	(\?page:[[:digit:]]{0,3}-[[:digit:]]{0,3})? (entry_[0-9]{1,4}=(old|anew)\&site_name_[0-9]{1,4}=[[:print:]]{0,192}\&canonical_name_[0-9]{1,4}=[[:print:]]{0,42}(\&del_[0-9]{1,4}=on)?)+
+authenticate-kerberos-rweb	(\?page:[[:digit:]]{0,3}-[[:digit:]]{0,3})? (\&entry_[0-9]{1,4}=(old|anew)\&site_name_[0-9]{1,4}=[[:print:]]{0,192}\&canonical_name_[0-9]{1,4}=[[:print:]]{0,42}(\&del_[0-9]{1,4}=on)?)+
 
 authenticate-kerberos-create	nil login=[[:print:]]{0,192}\&password=[[:print:]]{0,192}
 
@@ -86,7 +86,7 @@ dashboard-reset-save		nil nil
 
 dhcp-peer			(\?page:[[:digit:]]{0,3}-[[:digit:]]{0,3})? (\&entry_[0-9]{1,2}=(old|anew)\&role_[0-9]{1,2}=(active|passive)\&ip_[0-9]{1,2}=[[:print:]]{0,45}(\&del_[0-9]{1,2}=on)?){0,2}
 
-dhcp-fixed			(\?page:[[:digit:]]{0,3}-[[:digit:]]{0,3})? (entry_[0-9]{1,3}=(old|anew)\&hostname_[0-9]{1,3}=[[:print:]]{0,192}\&interface_[0-9]{1,3}=(internal|auxiliary)\&mac_[0-9]{1,3}=[[:print:]]{0,51}\&ip_[0-9]{1,3}=[[:print:]]{0,45}(\&del_[0-9]{1,3}=on)?)+
+dhcp-fixed			(\?page:[[:digit:]]{0,3}-[[:digit:]]{0,3})? (\&entry_[0-9]{1,3}=(old|anew)\&hostname_[0-9]{1,3}=[[:print:]]{0,192}\&interface_[0-9]{1,3}=(internal|auxiliary)\&mac_[0-9]{1,3}=[[:print:]]{0,51}\&ip_[0-9]{1,3}=[[:print:]]{0,45}(\&del_[0-9]{1,3}=on)?)+
 
 dhcp-report			(\?page:[[:digit:]]{0,3}-[[:digit:]]{0,3})? nil
 
@@ -110,7 +110,7 @@ file-exchange
 
 file-operation			nil operation=(clear|load|save|del)(\&protocol=(_ftp|_sftp|_tftp)\&server=[[:print:]]{0,192}\&dirname=[[:print:]]{0,384}((admin_snmp_certificate|tls_ca_third|tls_server|tls_ca_system|tls_client|waf_rweb_custom|antivirus_whitelist_signature|manager_ssh)=on)*)?
 
-first-login			nil (password1=[[:print:]]{0,96}\&password2=[[:print:]]{0,96})?
+first-login			nil (\&password1=[[:print:]]{0,96}\&password2=[[:print:]]{0,96})?
 
 guard-settings			nil dummy=on(\&ip=on)?
 
@@ -130,7 +130,9 @@ edit-guard-policy		(\?[[:print:]]{0,192})? policy_name=[[:print:]]{0,192}(\&filt
 
 guard-rule			(\?page:[[:digit:]]{0,3}-[[:digit:]]{0,3})? (\&entry_[0-9]{1,2}=(old|anew|inew|move[[:digit:]]{1,3})\&policy_name_[0-9]{1,2}=[[:print:]]{0,192}\&operation_[0-9]{1,2}=(allow|deny)(\&del_[0-9]{1,2}=on)?){0,99}
 
-ip				nil (external_ip=[[:print:]]{0,45}\&external_mk=[[:print:]]{0,45}\&)internal_ip=[[:print:]]{0,45}\&internal_mk=[[:print:]]{0,45}(\&auxiliary_ip=[[:print:]]{0,45}\&auxiliary_mk=[[:print:]]{0,45}(\&internal_8021q_vlan_[0-9]{1,2}=[0-9]{1,4}\&internal_8021q_ip_[0-9]{1,2}=[[:print:]]{0,45}\&internal_8021q_mask_[0-9]{1,2}=[[:print:]]{0,45}){1,16})?
+ip				nil ((ip_external_mode=static\&external_ip=[[:print:]]{0,45}\&external_mk=[[:print:]]{0,45}\&)|(ip_external_mode=dhcp\&)|(ip_external_mode=pppoe\&pppoe_service_name=[[:print:]]{0,192}\&pppoe_username=[[:print:]]{0,192}\&pppoe_password=[[:print:]]{0,192}\&))?internal_ip=[[:print:]]{0,45}\&internal_mk=[[:print:]]{0,45}(\&auxiliary_ip=[[:print:]]{0,45}\&auxiliary_mk=[[:print:]]{0,45}(\&internal_8021q_vlan_[0-9]{1,2}=[0-9]{1,4}\&internal_8021q_ip_[0-9]{1,2}=[[:print:]]{0,45}\&internal_8021q_mask_[0-9]{1,2}=[[:print:]]{0,45}){1,16})?
+
+ip-external-dhcp-renew		nil nil
 
 ip-name				(\?page:[[:digit:]]{0,3}-[[:digit:]]{0,3})? (\&entry_[0-9]{1,2}=(old|anew)\&name_[0-9]{1,3}=[[:print:]]{0,192}\&ip_[0-9]{1,3}=[[:print:]]{0,45}(\&del_[0-9]{1,3}=on)?)+
 
@@ -138,11 +140,11 @@ ip-route			(\?page:[[:digit:]]{0,3}-[[:digit:]]{0,3})? (\&entry_[0-9]{1,2}=(old|
 
 ip-via				(\?page:[[:digit:]]{0,3}-[[:digit:]]{0,3})? (\&entry_[0-9]{1,2}=(old|anew)\&gateway_[0-9]{1,2}=[[:print:]]{0,45}\&role_[0-9]{1,2}=(master|backup)\&priority_[0-9]{1,2}=[[:print:]]{0,9}(\&del_[0-9]{1,3}=on)?){0,99}
 
-license			nil (accept=on)?
+license				nil (\&accept=on)?
 
 link-bond			nil (external=eth[0-9]{1,2}(\&external_[0-9]{1,2}=eth[0-9]{1,2}){0,11}\&)?internal=eth[0-9]{1,2}(\&internal_[0-9]{1,2}=eth[0-9]{1,2}){0,11}(\&auxiliary=(eth[0-9]{1,2}|none)(\&auxiliary_[0-9]{1,2}=eth[0-9]{1,2}){0,11})?
 
-log-syslog			(\?page:[[:digit:]]{0,3}-[[:digit:]]{0,3})? (entry_[0-9]{1}=(old|anew)\&protocol_[0-9]{1}=(tcp|tls|udp)\&server_[0-9]{1}=[[:print:]]{0,192}\&port_[0-9]{1}=[[:print:]]{0,15}(\&del_[0-9]{1}=on)?){0,7}
+log-syslog			(\?page:[[:digit:]]{0,3}-[[:digit:]]{0,3})? (\&entry_[0-9]{1}=(old|anew)\&protocol_[0-9]{1}=(tcp|tls|udp)\&server_[0-9]{1}=[[:print:]]{0,192}\&port_[0-9]{1}=[[:print:]]{0,15}(\&del_[0-9]{1}=on)?){0,7}
 
 log-type			nil log_web=(on|off)\&syslog_web=(on|off)\&log_rweb=(on|off)\&syslog_rweb=(on|off)\&log_guard=(on|off)\&syslog_guard=(on|off)\&log_antivirus=(on|off)\&syslog_antivirus=(on|off)\&log_avserver=(on|off)\&syslog_avserver=(on|off)\&log_waf=(on|off)\&syslog_waf=(on|off)\&log_firewall=(on|off)\&syslog_firewall=(on|off)
 
@@ -150,7 +152,7 @@ log-rotate			nil nil
 
 log-save			nil type=(web|rweb|guard|waf|antivirus|avserver|firewall|vpnipsec|system)\&serial=[0-9]{1,2}\&protocol=(_ftp|_sftp|_tftp)?\&server=[[:print:]]{0,192}\&filename=[[:print:]]{0,384}
 
-manager-gateway		(\?page:[[:digit:]]{0,3}-[[:digit:]]{0,3})? (\&entry_[0-9]{1,3}=(old|anew)\&gateway_id_[0-9]{1,3}=[[:print:]]{0,66}\&domain_id_[0-9]{1,3}=[[:print:]]{0,66}\&ip_[0-9]{1,3}=[[:print:]]{0,45}(\&del_[0-9]{1,3}=on)?)+
+manager-gateway			(\?page:[[:digit:]]{0,3}-[[:digit:]]{0,3})? (\&entry_[0-9]{1,3}=(old|anew)\&gateway_id_[0-9]{1,3}=[[:print:]]{0,66}\&domain_id_[0-9]{1,3}=[[:print:]]{0,66}\&ip_[0-9]{1,3}=[[:print:]]{0,45}(\&del_[0-9]{1,3}=on)?)+
 
 manager-gateway-operation	(\?(pull|push|apply),key:[[:print:]]{0,66})? operation=(pull|push|apply)\&scope=(all|gateway|domain%3A[[:print:]]{1,66})(\&gateway=[[:print:]]{1,66}%3A([a-zA-Z0-9_\-]){1,66},([0-9\.]){7,45})?
 
@@ -161,7 +163,7 @@ manager-sync-report-dashboard	(\?[[:digit:]]{0,16})?
 
 manager-ssh			nil operation=(generate|load|save)(\&key_type=(public|private)\&protocol=(_ftp|_sftp|_tftp)?\&server=[[:print:]]{0,192}\&filename=[[:print:]]{0,384})?
 
-manager-template			(\?page:[[:digit:]]{0,3}-[[:digit:]]{0,3})? (\&entry_[0-9]{1,3}=(old|anew)\&template_id_[0-9]{1,3}=[[:print:]]{0,66}\&source_[0-9]{1,3}=((TEMPLATE|GATEWAY)>[[:print:]]{1,66})?(\&del_[0-9]{1,3}=on)?)+
+manager-template		(\?page:[[:digit:]]{0,3}-[[:digit:]]{0,3})? (\&entry_[0-9]{1,3}=(old|anew)\&template_id_[0-9]{1,3}=[[:print:]]{0,66}\&source_[0-9]{1,3}=((TEMPLATE|GATEWAY)>[[:print:]]{1,66})?(\&del_[0-9]{1,3}=on)?)+
 
 mode-feature			nil dummy=on(\&mode_anonymous=on)?(\&mode_av=on)?(\&mode_firewall=on)?(\&mode_web=on)?(\&mode_compress=on)?(\&mode_ocsp=on)?(\&mode_rweb=on)?(\&mode_sslmediate=on)?(\&mode_log=on)?(\&mode_guard=on)?(\&mode_vpnipsec=on)?(\&mode_authenticate=on)?(\&mode_waf=on)?(\&mode_cache=on)?
 
@@ -178,6 +180,8 @@ diagnostic-tools
 
 ntp				(\?page:[[:digit:]]{0,3}-[[:digit:]]{0,3})? (\&entry_[0-9]{1,2}=(old|anew)\&server_[0-9]{1,2}=[[:print:]]{0,192}(\&del_[0-9]{1,2}=on)?){0,7}
 
+password-ad-account		nil password1=[[:print:]]{0,96}\&password2=[[:print:]]{0,96}
+
 password-email			nil email_password=[[:print:]]{0,192}
 
 password-file			(\?page:[[:digit:]]{0,3}-[[:digit:]]{0,3})? (\&entry_[0-9]{1,2}=(old|anew)\&protocol_[0-9]{1,2}=(_ftp|_sftp)\&server_[0-9]{1,2}=[[:print:]]{0,192}\&login_[0-9]{1,2}=[[:print:]]{0,96}\&password_[0-9]{1,2}=[[:print:]]{0,96}(\&del_[0-9]{1,2}=on)?){0,99}
@@ -186,7 +190,7 @@ password-ldap			nil bind_password=[[:print:]]{0,192}
 
 password-login			nil (password=[[:print:]]{0,96}\&)?password1=[[:print:]]{0,96}\&password2=[[:print:]]{0,96}(gui=on)?
 
-password-ad-account		nil password1=[[:print:]]{0,96}\&password2=[[:print:]]{0,96}
+password-pppoe			nil password=[[:print:]]{0,192}
 
 password-snmp			nil password1=[[:print:]]{0,96}\&password2=[[:print:]]{0,96}
 
@@ -253,7 +257,7 @@ urllist-antivirus-report-dashboard	(\?[[:digit:]]{0,16})?
 system-report-gateway
 
 system-report-link
-system-report-link-gateway-dashboard (\?[[:digit:]]{0,16})?
+system-report-link-gateway-dashboard	(\?[[:digit:]]{0,16})?
 
 system-report-connection
 system-report-connection-dashboard	(\?[[:digit:]]{0,16})?

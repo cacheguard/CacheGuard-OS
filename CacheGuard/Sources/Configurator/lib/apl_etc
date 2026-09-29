@@ -232,7 +232,7 @@ set-local-time()
     log-result ${?}
 }
 
-set-clock()
+set-system-clock()
 {
     test -f ${TMP_DIR}/${CLOCK_2SAVE} || return 0
 

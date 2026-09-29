@@ -90,20 +90,17 @@ apply-link()
 	    802-3ad-up ${bond} "${BONDING}"
 	    evaluate_retval
 	    ;;
-	
 	down)
 	    log_info_msg "Removing '${BONDING}' from the ${bond} interface..."
 	    802-3ad-down ${bond} "${BONDING}"
 	    evaluate_retval
 	    ;;
-	
 	*)
 	    echo "Usage: ${0} [interface] {up|down}"
 	    exit 1
 	    ;;
     esac
 }
-
 
 # Main
 

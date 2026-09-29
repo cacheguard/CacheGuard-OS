@@ -54,11 +54,6 @@ show-rweb-settings()
         return 1
     fi
 
-    local ip1=$(ipcalc -s ${IP_EXTERNAL_IP} ${IP_EXTERNAL_MASK} -n) ; ip1=${ip1/NETWORK=}
-    local ip2=$(ipcalc -s ${IP_EXTERNAL_IP} ${IP_EXTERNAL_MASK} -b) ; ip2=${ip2/BROADCAST=}
-    local ip_tip="${ip1} < IP < ${ip2}"
-    local ip_tip_width=260
-
     local width i=0
 
     itemWidth[0]=40

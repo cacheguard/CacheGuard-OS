@@ -705,6 +705,13 @@ gen-httpd-proxy-rweb-vhost-conf()
 
 gen-httpd-proxy-rweb-general-conf()
 {
+    if test ${IP_EXTERNAL_MODE} != 'static' ; then
+	test ${IP_EXTERNAL_IP} != '0.0.0.0' || return 11
+	test -z "${RWEB_HTTP_IP_LIST}" || echo "Listen ${IP_EXTERNAL_IP}:${WWW_PORT}"
+	test -z "${RWEB_HTTPS_IP_LIST}" || echo "Listen ${IP_EXTERNAL_IP}:${HTTPS_PORT}"
+	return 0
+    fi
+
     local ip
 
     for ip in ${RWEB_HTTP_IP_LIST}
@@ -748,6 +755,14 @@ gen-httpd-proxy-rweb-conf()
 		tls=${elt}
 		;;
 	    4)
+		if test ${IP_EXTERNAL_MODE} != 'static' ; then
+		    ip=${IP_EXTERNAL_IP}
+		    if test ${ip} == '0.0.0.0' ; then
+			((i++))
+			continue
+		    fi
+		fi
+
 		case ${protocol} in
 		    http)
 			gen-httpd-proxy-rweb-vhost-conf ${name} ${protocol} ${tls} ${ip} ${WWW_PORT}

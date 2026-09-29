@@ -58,7 +58,6 @@ restore-syslinux()
 
 # Main()
 
-
 LOG_DIR=${COMPILE_LOG_DIR}-${SYS_ARCHITECTURE}
 mkdir -vp ${LOG_DIR}
 

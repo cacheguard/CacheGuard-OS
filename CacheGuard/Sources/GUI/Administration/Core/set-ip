@@ -25,18 +25,40 @@ set-ip()
 {
     local transaction=/tmp/${TRANSACTION_FILE}.wadmin.${REMOTE_USER}.${$}
 
-    local i range
+    local i n range j=0
     local vlan ip netmask
 
     if gui-contextual-is-allowed ; then
-	
-	echo "ip external ${VALUES[0]} ${VALUES[1]}"   > ${transaction}
-	echo "ip internal ${VALUES[2]} ${VALUES[3]}"  >> ${transaction}
-	echo "ip auxiliary ${VALUES[4]} ${VALUES[5]}" >> ${transaction}
 
-	for((i=6 ; i<${ATTRIBUTE_NB} ; i++))
+	local ip_external_mode=${VALUES[0]}
+
+	case ${ip_external_mode} in
+	    static)
+		echo "ip external ${ip_external_mode} ${VALUES[1]} ${VALUES[2]}" > ${transaction}
+		echo "ip internal ${VALUES[3]} ${VALUES[4]}"  >> ${transaction}
+		echo "ip auxiliary ${VALUES[5]} ${VALUES[6]}" >> ${transaction}
+		n=7
+		;;
+	    dhcp)
+		echo "ip external ${ip_external_mode}" > ${transaction}
+		echo "ip internal ${VALUES[1]} ${VALUES[2]}"  >> ${transaction}
+		echo "ip auxiliary ${VALUES[3]} ${VALUES[4]}" >> ${transaction}
+		n=5
+		;;
+	    pppoe)
+		echo "ip external ${ip_external_mode} '${VALUES[1]}' '${VALUES[2]}' '${VALUES[3]}'" > ${transaction}
+		echo "ip internal ${VALUES[4]} ${VALUES[5]}"  >> ${transaction}
+		echo "ip auxiliary ${VALUES[6]} ${VALUES[7]}" >> ${transaction}
+		n=8
+		;;
+	    *)
+		return 1
+		;;
+	esac
+
+	for((i=n ; i<ATTRIBUTE_NB ; i++))
 	do
-	    range=$[${i} % 3]
+	    range=$[${j} % 3]
 	    case ${range} in
 		0)
 		    vlan=${VALUES[${i}]}
@@ -52,6 +74,7 @@ set-ip()
 		    return 1
 		    ;;
 	    esac
+	    ((j++))
 	done
     else
 	echo "ip internal ${VALUES[0]} ${VALUES[1]}" > ${transaction}

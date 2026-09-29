@@ -1,0 +1,69 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       Scripts
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+source /lib/lsb/init-functions
+source ${IFCONFIG}
+
+dhcp-up()
+{
+    test -n "${1}" || return 1
+    local dev=${1}
+
+    dhclient -4 -q ${dev} 2> /dev/null    
+}
+
+dhcp-down()
+{
+    test -n "${1}" || return 1
+    local dev=${1}
+
+    dhclient -4 -q -r ${dev} 2> /dev/null
+
+    local pid=$(cat /var/run/dhclient.pid 2>/dev/null)
+    rm -f /var/run/dhclient.pid
+
+    if test -n "${pid}" && kill -0 "${pid}" 2>/dev/null ; then
+        kill "${pid}" 2>/dev/null
+    else
+	killall --quiet -KILL dhclient
+    fi
+
+    return 0
+}
+
+case "${2}" in
+    up)
+	log_info_msg "Starting DHCP client for ${1}..."
+	dhcp-up ${1}
+	evaluate_retval
+	;;
+    down)
+	log_info_msg "Stopping DHCP client for ${1}..."
+	dhcp-down ${1}
+	evaluate_retval
+	;;
+    *)
+	echo "Usage: ${0} [interface] {up|down}"
+	exit 1
+	;;
+esac

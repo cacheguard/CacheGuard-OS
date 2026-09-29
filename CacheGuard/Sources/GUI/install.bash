@@ -168,7 +168,7 @@ gen-firewall-rules()
 
 	echo
 	echo "SecRule REQUEST_METHOD \"^POST$\" id:${WAF_RULE_ID},severity:6,allow,chain"
-	echo "SecRule REQUEST_BODY \"^${GUI_CSRF_ATTRIBUTE}=[[:print:]]{64,128}${post}\" chain"
+	echo "SecRule REQUEST_BODY \"^${GUI_CSRF_ATTRIBUTE}=${WAF_PRINTABLE_REGEXP}{64,128}\&${post}\" chain"
 	echo "SecRule REQUEST_URI \"^/${GUI_DIR_NAME}/submit-${cgi}\.${GUI_EXT_NAME}${query}$\""
 	((WAF_RULE_ID++))
     done
@@ -367,11 +367,12 @@ gen-waf-rules-constant()
 		if test ${post} == nil ; then
 		    unset post
 		else
-		    post=${post//\//%2F}
+		    post="${post//\//%2F}"
+		    test "${post:0:3}" == '(\&' || post="\&${post}"
 		fi
 		echo
 		echo "SecRule REQUEST_METHOD \"^POST$\" id:${WAF_RULE_ID},severity:6,allow,chain"
-		echo "SecRule REQUEST_BODY \"^${GUI_CSRF_ATTRIBUTE}=[[:print:]]{64,128}${post}\" chain"
+		echo "SecRule REQUEST_BODY \"^${GUI_CSRF_ATTRIBUTE}=${WAF_PRINTABLE_REGEXP}{64,128}${post}\" chain"
 		echo "SecRule REQUEST_URI \"^/${GUI_DIR_NAME}/submit-${cgi}\.${GUI_EXT_NAME}${query}$\""
 		((WAF_RULE_ID++))
 	    fi
@@ -1135,6 +1136,7 @@ install-gui-etc()
 
 # Main()
 
+WAF_PRINTABLE_REGEXP="[\x20-\x25\x27-\x7E]"
 HELP_DIR=Help
 CORE_DIR=Core
 DASHBOARD_DIR=Dashboard

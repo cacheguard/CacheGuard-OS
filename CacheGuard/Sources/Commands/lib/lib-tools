@@ -83,6 +83,11 @@ get-terminal-bold-text()
 {
     test -n "${1}" || return 1
 
+    if test -n "${TRANSACTION}" ; then
+	echo "${1}"
+	return 0
+    fi
+
     local normal="\e[0m"
     local bold="\e[1m"
 
