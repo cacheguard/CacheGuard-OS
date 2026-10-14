@@ -23,6 +23,7 @@
 
 CACHEGUARD_DIR=/etc/sysconfig/cacheguard
 source ${CACHEGUARD_DIR}/constant
+source ${ETC_DHCP_DIR}/dhclient-functions
 
 ##################################################
 # Caution: use '_' and not '-' in function names #
@@ -34,61 +35,83 @@ apl_set_ip_configurtion()
     local event=${1}
     local code=${2}
 
-    su - ${ADMIN_NAME} --command 'cancel' 2> /dev/null
+    case ${event} in
+	modified)
+	    setup_external_dhcp_ip_configuration
+	    rm -f ${RUN_DIR}/${EXTERNAL_DHCP_IP_CONFIGURATION}.failed
+	    ;;
+	error|failed)
+	    case ${DHCP_CONTEXT} in
+		run)
+		    return 31
+		    ;;
+		boot)
+		    touch ${RUN_DIR}/${EXTERNAL_DHCP_IP_CONFIGURATION}.failed
+		    ;;
+		*)
+		    return 33
+		    ;;
+	    esac
+	    ;;
+	*)
+	    return 35
+	    ;;
+    esac
 
-    DHCLIENT_HOOK_EVENT=${event} DHCLIENT_HOOK_ERROR_CODE=${code} apl_apply > /dev/null 2>&1 &
+    case ${DHCP_CONTEXT} in
+	run)
+	    test ! -f ${LOCK_DIR}/apl_apply || return 0
+	    su - ${ADMIN_NAME} --command 'cancel' 2> /dev/null
+	    DHCLIENT_HOOK_EVENT=${event} DHCLIENT_HOOK_ERROR_CODE=${code} apl_apply > /dev/null 2>&1 &
+	    ;;
+	boot)
+	    rm -f /var/run/${DYNAMIC_IP_BOOTING}
+	    apl_network_dependent_configure
+	    ;;
+	*)
+	    return 255
+	    ;;
+    esac
 }
 
 apl_set_ip_configurtion_if_modified()
 {
+    local doit
+
     if test -z "${old_ip_address}" -o -z "${old_subnet_mask}" -o -z "${old_routers}" ; then
-	apl_set_ip_configurtion modified
+	doit=yes
     else
-	test \
-	    "${new_ip_address}" == "${old_ip_address}" -a \
-	    "${new_subnet_mask}" == "${old_subnet_mask}" -a \
-	    "${new_routers}" == "${old_routers}" || \
-	    apl_set_ip_configurtion modified
+	if test -f ${RUN_DIR}/${EXTERNAL_DHCP_IP_CONFIGURATION}.failed ; then
+	    doit=yes
+	elif test "${new_ip_address}" == "${old_ip_address}" -a \
+		  "${new_subnet_mask}" == "${old_subnet_mask}" -a \
+		  "${new_routers}" == "${old_routers}" ; then
+
+	    setup_external_dhcp_ip_configuration
+
+	else
+	    doit=yes
+	fi
     fi
+
+    test -z "${doit}" || apl_set_ip_configurtion modified
 }
 
 apl_save_dhcp_state()
 {
     test -n "${reason}" || return 11
 
-    local tmp_dhcp_ip_configuration=/tmp/dhcp-ip-configuration.${$}
-
     echo ${reason} > ${RUN_DIR}/${EXTERNAL_DHCP_STATE}
-
-    case ${reason} in
-	BOUND|RENEW|REBIND|REBOOT)
-
-	    local end
-
-	    if test -n "${new_dhcp_lease_time}" ; then
-		local now=$(date +%s 2>/dev/null)
-		end=$((now + new_dhcp_lease_time))
-	    fi
-
-	    cat << EOT > ${tmp_dhcp_ip_configuration}
-${interface}
-${new_dhcp_server_identifier}
-${new_ip_address}
-${new_subnet_mask}
-${new_routers}
-${end}
-EOT
-	    mv -f ${tmp_dhcp_ip_configuration} ${RUN_DIR}/${EXTERNAL_DHCP_IP_CONFIGURATION}
-	    ;;
-	FAIL)
-	    ;;
-	*)
-	    ;;
-    esac
 }
 
 apl_main()
 {
+    if test -f /var/run/${DYNAMIC_IP_BOOTING} ; then
+	DHCP_CONTEXT=boot
+    else
+	DHCP_CONTEXT=run
+    fi
+
     if test -z "${1}" ; then
 	exit_status=11
 	apl_set_ip_configurtion error ${exit_status}
@@ -117,9 +140,12 @@ apl_main()
     apl_save_dhcp_state
 
     case ${reason} in
-	MEDIUM|ARPCHECK|ARPSEND|PREINIT)
+	PREINIT)
+	    rm -f ${RUN_DIR}/${EXTERNAL_DHCP_DONE}
+	    ;;
+	MEDIUM|ARPCHECK|ARPSEND|EXPIRE)
             ;;
-	BOUND|RENEW|REBIND|REBOOT|EXPIRE)
+	BOUND|RENEW|REBIND|REBOOT)
 	    apl_set_ip_configurtion_if_modified
 	    ;;
 	FAIL)

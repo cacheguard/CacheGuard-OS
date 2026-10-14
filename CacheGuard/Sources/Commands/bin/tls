@@ -697,15 +697,15 @@ tls-in-use()
 manage-tls-server-component()
 {
     test -n "${1}" || return 1
-    test -n "${2}" || return 1
-    test -n "${3}" || return 1
+    test -n "${2}" || return 2
+    test -n "${3}" || return 3
     local tls=${1}
     local op=${2}
-    local extension=${3}
+    local component=${3}
 
     case ${op} in
 	show)
-	    case ${extension} in
+	    case ${component} in
 		key)
 		    tls-key-exist ${tls} || tls-tmp-key-exist ${tls} || return 74
 		    show-tls-server-key ${tls}
@@ -727,7 +727,7 @@ manage-tls-server-component()
 	    esac
 	    ;;
 	save)
-	    case ${extension} in
+	    case ${component} in
 		key)
 		    tls-key-exist ${tls} || tls-tmp-key-exist ${tls} || return 74
 		    ;;
@@ -742,33 +742,60 @@ manage-tls-server-component()
 		    ;;
 	    esac
 	    ;;
-	load)
+	load|inject)
 	    ;;
 	*)
 	    return 1
 	    ;;
     esac
 
-    local proto=${4}
-    local ip=${5}
-    local fn=${6}
-
-    test -n "${proto}" || return 1
-    test -n "${ip}" || return 1
-    test -n "${fn}" || return 1
-
-    check-file-protocol ${proto} || return 63
-    check-ip-name ${ip} || return 113
-    check-filename ${fn} || return 19
-    check-file-ip ${ip} || return 27
-
     user-has-admin-rights || return 31
 
     case ${op} in
-	load)
-	    if test ${extension} == 'csr' ; then
+	load|save)
+	    local proto=${4}
+	    local ip=${5}
+	    local fn=${6}
+
+	    test -n "${proto}" || return 1
+	    test -n "${ip}" || return 1
+	    test -n "${fn}" || return 1
+
+	    check-file-protocol ${proto} || return 63
+	    check-ip-name ${ip} || return 113
+	    check-filename ${fn} || return 19
+	    check-file-ip ${ip} || return 27
+	    ;;
+	inject)
+	    local fn=${4}
+	    test -n "${fn}" || return 1
+	    test -f ${ADMIN_TMP_DIR}/${fn} || return 104
+	    ;;
+	*)
+	    return 255
+	    ;;
+    esac
+
+    case ${op} in
+	load|inject)
+	    if test ${component} == 'csr' ; then
 		! tls-in-use ${tls} || return 142
-		local days=${7}
+
+		local days ocsp
+
+		case ${op} in
+		    load)
+			days=${7}
+			ocsp=${8}
+			;;
+		    inject)
+			days=${5}
+			ocsp=${6}
+			;;
+		    *)
+			return 255
+			;;
+		esac
 
 		if test -n "${days}" ; then
 		    if test ${days} != 'default' ; then
@@ -776,14 +803,27 @@ manage-tls-server-component()
 			test ${days} -ge ${TLS_DAYS_MIN} -a ${days} -le ${TLS_DAYS_MAX} || return 192
 		    fi
 
-		    local ocsp=${8}
+
 		    test -z "${ocsp}" || test ${ocsp} == ocsp  || return 1
 		fi
 	    fi
 
-	    local tmp_file=${TMP_DIR}/work.${LOADED}.${TLS_SERVER}.${extension}.${tls}
-	    load-files ${proto} ${ip} "${fn} ${tmp_file}" '' ascii
-	    local ret=${?}
+	    local tmp_file=${TMP_DIR}/work.${LOADED}.${TLS_SERVER}.${component}.${tls}
+	    local ret
+
+	    case ${op} in
+		load)
+		    load-files ${proto} ${ip} "${fn} ${tmp_file}" '' ascii
+		    ret=${?}
+		    ;;
+		inject)
+		    cp -f ${TMP_DIR}/${fn} ${tmp_file}
+		    ret=${?}
+		    ;;
+		*)
+		    return 255
+		    ;;
+	    esac
 
 	    if test ${ret} -eq 0 ; then
 
@@ -792,7 +832,7 @@ manage-tls-server-component()
 		    return 220
 		fi
 
-		case ${extension} in
+		case ${component} in
 		    certificate)
 			openssl x509 -in ${tmp_file} -noout > /dev/null 2>&1
 			if test ${?} -ne 0 ; then
@@ -840,7 +880,7 @@ manage-tls-server-component()
 		return ${ret}
 	    fi
 
-	    if test ${extension} == 'csr' ; then
+	    if test ${component} == 'csr' ; then
 		rm -f ${TMP_DIR}/${LOADED}.${TLS_SERVER}.days.${tls}
 
 		if test -n "${days}" ; then
@@ -857,7 +897,7 @@ manage-tls-server-component()
 	    fi
 	    ;;
         save)
-	    local file=$(get-tls-server-component-file ${tls} ${extension})
+	    local file=$(get-tls-server-component-file ${tls} ${component})
 	    save-files ${proto} ${ip} "${file} ${fn}" "" ascii
 	    ;;
 	*)
@@ -1860,7 +1900,7 @@ manage-server()
 	    SAVENV=1
 	    ;;
 
-	add|del|generate|fingerprint|load|save|show|revoke)
+	add|del|generate|fingerprint|load|save|inject|show|revoke)
 
 	    case ${key} in
 		revoke)
@@ -1872,7 +1912,7 @@ manage-server()
 
 	    local tls=${2}
 	    test -n "${tls}" || return 1
-	    shift ; shift
+	    shift 2
 
 	    check-id-length "${tls}" || return 127
 	    check-tls-id ${tls} || return 213
@@ -1954,7 +1994,7 @@ manage-server()
 		    return 0
 		    ;;
 
-		load|save|show)
+		load|inject|save|show)
 		    manage-tls-server-component ${tls} ${key} "${@}"
 		    ;;
 		*)

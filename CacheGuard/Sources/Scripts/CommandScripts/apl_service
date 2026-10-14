@@ -23,148 +23,198 @@
 
 CACHEGUARD_DIR=/etc/sysconfig/cacheguard
 source ${CACHEGUARD_DIR}/constant
-source ${APPLIANCE_DIR}/etc/role
-source ${HARD_DIR}/model.conf
-source ${LOCAL_DIR}/lib/apl_common
 
-gen-stop-srv()
+revert-list()
 {
-    local srv
+    test -n "${1}" || return 0
+    local in_list=${*}
 
-    unset STOP_SERVICES
+    local elt out_list
 
-    for srv in ${START_SERVICES}
+    for elt in ${in_list}
     do
-	STOP_SERVICES="${srv} ${STOP_SERVICES}"
+	out_list="${elt} ${out_list}"
     done
 
-    local len=${#STOP_SERVICES}
-    ((len--))
-    STOP_SERVICES="${STOP_SERVICES:0:${len}}"
+    echo ${out_list}
 }
 
-start-srv()
+set-environment()
 {
-    local mode=${1}
-    test -n "${mode}" || mode=all
+    test -n "${1}" || return 1
+    local action=${1}
+    local group=${2}
 
-    local srv file
+    case ${action} in
+	start|stop|restart)
+	    case ${group} in
+		basic|firewall|appliance|health)
+		    ;;
+		'')
+		    ;;
+		*)
+		    return 11
+		    ;;
+	    esac
+	    ;;
+	*)
+	    local service=${action}
+	    action=${group}
 
-    for srv in ${START_SERVICES}
-    do
-	case ${mode} in
-	    daemon-only)
-		! member "${BASIC_NETWORK_SERVICES}" "${srv}" || continue
-		;;
+	    test -x /etc/rc.d/init.d/${service} || return 21
+	    case ${action} in
+		start|stop|restart|status)
+		    ;;
+		*)
+		    return 23
+		    ;;
+	    esac
+	    ;;
+    esac
 
-	    network-only)
-		member "${BASIC_NETWORK_SERVICES}" "${srv}" || continue
-		;;
+    local basic_network_services="
+sysctl
+ebtables
+localnet
+cloud-network
+waagent
+network
+sysnetctl
+statistics
+"
+    local system_services="rsyslogd rlogger smanager"
+    local network_services="ocspd iked named ntpd dhcpd"
+    local firewall_services="iptables tc"
+
+    local appliance_services="
+sshd
+${WADMIND_NAME}
+freshclam clamd
+slapd
+c-icap
+httpd
+squid
+htcacheclean
+keepalived
+crond
+anacron
+snmpd
+lcd4linux
+"
+    local health_services="path health"
+
+    basic_network_services=$(echo ${basic_network_services})
+    appliance_services=$(echo ${appliance_services})
+
+    BASIC_START_SERVICES="${basic_network_services} ${system_services} ${network_services}"
+    FIREWALL_START_SERVICES="${firewall_services}"
+    APPLIANCE_START_SERVICES="${appliance_services}"
+    HEALTH_START_SERVICES="${health_services}"
+}
 	    
-	    *)
-		;;
-	esac
+apl-services()
+{
+    test -n "${1}" || return 1
+    local action=${1}
+    local group=${2}
+    local no_health_services=${3}
 
-	for file in /etc/rc.d/rcS.d/S[0-9][0-9]${srv} /etc/rc.d/rc3.d/S[0-9][0-9]${srv}
+    local service services
+
+    if test -z "${group}" ; then
+
+	services="basic firewall appliance health"
+	test ${action} == start || services=$(revert-list ${services})
+
+	for service in ${services}
+	do
+	    apl-services ${action} ${service} no
+	done
+
+	return 0
+    fi
+
+    local file files1 files2
+
+    case ${group} in
+	basic)
+	    services=${BASIC_START_SERVICES}
+	    test -n "${no_health_services}" -o -n "${NO_HEALTH_SERVICES}" || services="${services} ${HEALTH_START_SERVICES}"
+	    test ${action} == stop || touch /var/run/${DYNAMIC_IP_BOOTING}
+	    ;;
+	firewall)
+	    services=${FIREWALL_START_SERVICES}
+	    ;;
+	appliance)
+	    services=${APPLIANCE_START_SERVICES}
+	    test -n "${no_health_services}" -o -n "${NO_HEALTH_SERVICES}" || services="${services} ${HEALTH_START_SERVICES}"
+		;;
+	health)
+	    services=${HEALTH_START_SERVICES}
+	    ;;
+	'')
+	    return 255
+	    ;;
+	*)
+	    return 21
+	    ;;
+    esac
+
+    case ${action} in
+	start)
+	    files1="/etc/rc.d/rcS.d/S[0-9][0-9]"
+	    files2="/etc/rc.d/rc3.d/S[0-9][0-9]"
+	    ;;
+	stop)
+	    files1="/dev/null"
+	    files2="/etc/rc.d/rc0.d/K[0-9][0-9]"
+	    services=$(revert-list ${services})
+	    ;;
+	*)
+	    ;;
+    esac
+
+    for service in ${services}
+    do
+	for file in ${files1}${service} ${files2}${service}
 	do
 	    if test -f ${file} ; then
-		/etc/rc.d/init.d/${srv} start
+		/etc/rc.d/init.d/${service} ${action}
 		break
 	    fi
 	done
     done
+
+    test ${group} != 'basic' -o ${action} != start || rm -f /var/run/${DYNAMIC_IP_BOOTING}
 }
 
-ifstart-srv()
+main()
 {
-    local srv file
+    test -n "${1}" || return 1
+    local action=${1}
+    local group=${2}
 
-    for srv in ${IFSTART_SERVICES}
-    do
-	for file in /etc/rc.d/rc3.d/S[0-9][0-9]${srv}
-	do
-	    if test -f ${file} ; then
-		/etc/rc.d/init.d/${srv} status > /dev/null
-		if test ${?} -ne 0 ; then
-		    /etc/rc.d/init.d/${srv} start
-		    break
-		fi
-	    fi
-	done
-    done
-}
+    case ${action} in
+	start)
+	    apl-services start ${group} || return ${?}
+	    ;;
+	stop)
+	    apl-services stop ${group} || return ${?}
+	    ;;
+	restart)
+	    apl-services stop ${group} || return ${?}
+	    apl-services start ${group} || return ${?}
+	    ;;
+	*)
+	    local service=${action}
+	    local action=${group}
 
-status-srv()
-{
-    local srv
-    for srv in ${APPLIANCE_SERVICES}
-    do
-	/etc/rc.d/init.d/${srv} status
-    done
-}
-
-stop-srv()
-{
-    local mode=${1}
-    test -n "${mode}" || mode=all
-    
-    gen-stop-srv
-
-    local srv file
-
-    for srv in ${STOP_SERVICES}
-    do
-	case ${mode} in
-	    daemon-only)
-		! member "${BASIC_NETWORK_SERVICES}" "${srv}" || continue
-		;;
-
-	    network-only)
-		member "${BASIC_NETWORK_SERVICES}" "${srv}" || continue
-		;;
-
-	    *)
-		;;
-	esac
-	    
-	for file in /etc/rc.d/rc0.d/K[0-9][0-9]${srv}
-	do
-	    if test -f ${file} ; then
-		/etc/rc.d/init.d/${srv} stop
-		break
-	    fi
-	done
-    done
+	    /etc/rc.d/init.d/${service} ${action}
+	    ;;
+    esac
 }
 
 # Main()
 
-APPLIANCE_SERVICES="ocspd iked freshclam clamd slapd c-icap squid httpd htcacheclean keepalived crond anacron path health"
-ADMIN_SERVICES="sshd ${WADMIND_NAME} snmpd"
-BASIC_NETWORK_SERVICES="iptables localnet cloud-network waagent network sysnetctl tc"
-NETWORK_SERVICES="${BASIC_NETWORK_SERVICES} dhcpd named ntpd"
-START_SERVICES="${NETWORK_SERVICES} ${ADMIN_SERVICES} ${APPLIANCE_SERVICES}"
-IFSTART_SERVICES="${ADMIN_SERVICES} ${APPLIANCE_SERVICES}"
-
-case ${1} in
-    start)
-	start-srv ${2}
-	;;
-    ifstart)
-	ifstart-srv ${2}
-	;;
-    stop)
-	stop-srv ${2}
-	;;
-    restart)
-	stop-srv ${2}
-	start-srv ${2}
-	;;
-    status)
-	status-srv ${2}
-	;;
-    *)
-	test -x /etc/rc.d/init.d/${1} || exit 1
-	/etc/rc.d/init.d/${1} ${2}
-	;;
-esac
+set-environment "${@}" || exit ${?}
+main "${@}" || exit ${?}

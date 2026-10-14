@@ -28,7 +28,8 @@
     --unavailable-bg-color:gainsboro;
     --widget-bg:gainsboro;
     --hover-bg:whitesmoke;
-    --title-bg:lavender;
+    --main-title-bg:lavender;
+    --secondary-title-bg:#D9E8E6;
     --panel-bg:white;
 
     --left-menu-width:230px;
@@ -123,11 +124,11 @@ input[type="file"]::file-selector-button {
 }
 
 input[type="file"]::file-selector-button:hover {
-    background-color:var(--title-bg);
+    background-color:var(--main-title-bg);
 }
 
 input[type="file"]::file-selector-button:active {
-    background-color:var(--title-bg);
+    background-color:var(--main-title-bg);
 }
 
 input[type="file"]:hover {
@@ -236,7 +237,7 @@ table {
 table th.table-header {
     font-size:1.1rem;
     font-weight:500;
-    background:var(--title-bg);
+    background:var(--main-title-bg);
     border:none;
     border-radius:var(--box-border-radius);
     padding:10px 5px;
@@ -286,7 +287,7 @@ select.table-form-action {
 }
 
 .table-form-action:hover {
-    background-color:var(--title-bg);
+    background-color:var(--main-title-bg);
 }
 
 button.select-items {
@@ -545,7 +546,7 @@ table.highlight-report th:first-child {
 }
 
 table.highlight-report td.highlight {
-    background-color:var(--title-bg);
+    background-color:var(--main-title-bg);
 }
 
 table.highlight-report tr {
@@ -669,7 +670,7 @@ table.highlight-list th.table-header {
 }
 
 table.highlight-list td.highlight {
-    background-color:var(--title-bg);
+    background-color:var(--main-title-bg);
 }
 
 table.highlight-list th,
@@ -852,7 +853,7 @@ table.highlight-multi-form button img {
 }
 
 table.highlight-multi-form tr.highlight > td {
-    background:var(--title-bg);
+    background:var(--main-title-bg);
     height:24px;
     border-radius:var(--box-border-radius);
     border:none;
@@ -1067,7 +1068,7 @@ pre.ssh-key {
 }
 
 .form-button:hover:not(:disabled) {
-    background-color:var(--title-bg);
+    background-color:var(--main-title-bg);
     cursor:pointer;
 }
 
@@ -1114,12 +1115,12 @@ pre.ssh-key {
 }
 
 .form-refresh-checkbox + label:hover {
-    background-color:var(--title-bg);
+    background-color:var(--main-title-bg);
 }
 
 .form-refresh-checkbox:checked + label {
     background-image:url("/image/loading.gif");
-    background-color:var(--title-bg);
+    background-color:var(--main-title-bg);
     cursor:pointer;
 }
 
@@ -1160,7 +1161,7 @@ pre.ssh-key {
     display:flex;
     align-items:center;
     flex-wrap:wrap;
-    background-color:var(--hover-bg);
+    background-color:var(--secondary-title-bg);
     height:auto;
     min-height:88px;
     padding:0;
@@ -1245,16 +1246,16 @@ pre.ssh-key {
 }
 
 .table-title {
-    background-color:var(--title-bg);
+    background-color:var(--secondary-title-bg);
     color:var(--text-color);
     font-style:inherit;
-    font-size:1.2rem;
+    font-size:1.1rem;
     text-align:center;
-    margin:2px 0 5px 0;
-    padding:10px;
+    margin:2px 0 2px 0;
+    padding:5px;
     border:none;
     border-radius:var(--box-border-radius);
-    line-height:32px;
+    line-height:30px;
 }
 
 .table-title.compact {
@@ -1333,7 +1334,7 @@ div.item-board h4 {
 
 .icon-board-title {
     font-size:1.2rem;
-    background:linear-gradient(to right, var(--title-bg), var(--panel-bg));
+    background:linear-gradient(to right, var(--main-title-bg), var(--panel-bg));
     display:flex;
     align-items:center;
     justify-content:left;
@@ -1374,8 +1375,21 @@ div.item-board h4 {
 }
 
 .box-unavailable {
-    margin:2px;
-    padding:2px;
+    width:100%;
+    height:100%;
+    display:flex;
+    padding:20px;
+    justify-content:center;
+    align-items:center;
+    box-sizing:border-box;
+}
+
+.box-unavailable img {
+    max-width:min(80%, 300px);
+    max-height:80%;
+    width:auto;
+    height:auto;
+    object-fit:contain;
 }
 
 .box-usage {
@@ -1466,11 +1480,11 @@ div.item-board h4 {
 .shortcut-bar {
     display:flex;
     flex-wrap:wrap;
-    background-color:var(--title-bg);
+    background-color:var(--main-title-bg);
     color:var(--text-color);
     font-size:1.1rem;
-    min-height:32px;
-    line-height:32px;
+    min-height:30px;
+    line-height:30px;
     padding:3px 5px 3px 5px;
     margin:0;
     min-width:var(--bar-min-width);
@@ -1555,7 +1569,7 @@ div.item-board h4 {
     margin:0;
     padding:5px;
     margin:0;
-    background-color:var(--title-bg);
+    background-color:var(--main-title-bg);
     border-radius:var(--box-border-radius);
 }
 

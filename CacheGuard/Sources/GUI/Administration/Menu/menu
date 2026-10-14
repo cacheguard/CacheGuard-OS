@@ -78,11 +78,11 @@
 3 2 _ITEM_  GENERAL System_Operations Antivirus_SDB_Updating /gui/antivirus-update.apl
 3 2 _ITEM_  GENERAL System_Operations Backup_&_Restore /gui/system-backup.apl
 1 1 _ITEM_  GENERAL System_Operations Clear_Web_Cache /gui/cache-clear.apl
+1 1 _ITEM_  GENERAL System_Operations Connect_External_Network /gui/ip-external-connect.apl
 1 1 _ITEM_  GENERAL System_Operations Kerberos_Initialization /gui/authenticate-kerberos-create.apl
 3 2 _ITEM_  GENERAL System_Operations Load_OS_Patch /gui/system-patch.apl
 3 2 _ITEM_  GENERAL System_Operations Logs_Rotation /gui/log-rotate.apl
 3 2 _ITEM_  GENERAL System_Operations Reboot_|_Halt_|_HA_State /gui/power.apl
-1 1 _ITEM_  GENERAL System_Operations Renew_DHCP_Lease /gui/ip-external-dhcp-renew.apl
 3 2 _ITEM_  GENERAL System_Operations Save_Logs /gui/log-save.apl
 3 2 _ITEM_  GENERAL System_Operations Update_URL_Lists /gui/urllist-update.apl
 3 2 _END_   GENERAL System_Operations
@@ -128,7 +128,7 @@
 3 1 _END_   NETWORK High_Availability
 
 3 3 _BEGIN_ NETWORK IP_&_Link_Configuration
-3 1 _ITEM_  NETWORK IP_&_Link_Configuration 802.1q_VLAN_Tags /gui/vlan.apl
+3 1 _ITEM_  NETWORK IP_&_Link_Configuration 802.1Q_VLAN_Tags /gui/vlan.apl
 3 3 _ITEM_  NETWORK IP_&_Link_Configuration IP_Addresses /gui/ip.apl
 3 3 _ITEM_  NETWORK IP_&_Link_Configuration Links_Bonding /gui/link-bond.apl
 3 3 _ITEM_  NETWORK IP_&_Link_Configuration Listening_Ports /gui/port.apl

@@ -1,0 +1,61 @@
+#!/bin/bash
+
+###########################################################################
+#
+# MODULE:       Scripts
+# COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
+# COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+###########################################################################
+
+##################################################
+# Caution: use '_' and not '-' in function names #
+##################################################
+
+setup_external_dhcp_ip_configuration()
+{
+    test -n "${interface}" || return 255
+
+    local tmp_dhcp_ip_configuration=/tmp/dhcp-ip-configuration.${$}
+    local now=$(date +%s 2>/dev/null) end
+
+    if test -n "${new_dhcp_lease_time}" ; then
+	end=$((now + new_dhcp_lease_time))
+    else
+	end=${now}
+    fi
+
+    local dhcp_server_identifier='0.0.0.0'
+    local ip_address='0.0.0.0'
+    local subnet_mask='0.0.0.0'
+    local routers
+
+    test -z "${new_dhcp_server_identifier}" || dhcp_server_identifier=${new_dhcp_server_identifier}
+    test -z "${new_ip_address}" || ip_address=${new_ip_address}
+    test -z "${new_subnet_mask}" || subnet_mask=${new_subnet_mask}
+    test -z "${new_routers}" || routers=${new_routers}
+
+    cat << EOT > ${tmp_dhcp_ip_configuration}
+${interface}
+${dhcp_server_identifier}
+${ip_address}
+${subnet_mask}
+${routers}
+${end}
+EOT
+    mv -f ${tmp_dhcp_ip_configuration} ${RUN_DIR}/${EXTERNAL_DHCP_IP_CONFIGURATION}
+    touch ${RUN_DIR}/${EXTERNAL_DHCP_DONE}
+}

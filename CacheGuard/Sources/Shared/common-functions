@@ -1938,3 +1938,31 @@ get-limited-character-count-in-file()
 
     echo ${count}
 }
+
+get-characters-in-file()
+{
+    test -n "${1}" || return 1
+    local file=${1}
+
+    if test ! -f ${file} ; then
+	echo 0
+	return 11
+    fi
+
+    local f1 f2 f3 f4 size fn
+
+    ls -l ${file} 2> /dev/null | \
+	while read f1 f2 f3 f4 size fn
+	do
+	    test -n "${size}" || continue
+	    echo ${size}
+	    break
+	done
+
+    return 0
+}
+
+is-virtual-machine()
+{
+    grep --quiet '^flags.*[[:space:]]hypervisor' /proc/cpuinfo > /dev/null 2>&1
+}

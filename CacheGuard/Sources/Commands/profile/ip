@@ -79,8 +79,11 @@ __complete-ip()
 			s|st|sta|stat|stati|static)
 			    COMPREPLY=(static)
 			    ;;
-			'')
-			    COMPREPLY=('' '<RET>' dhcp pppoe static)
+			c|co|con|conn|conne|connec|connect)
+			    COMPREPLY=(connect)
+			    ;;
+			    '')
+			    COMPREPLY=('' '<RET>' connect dhcp pppoe static)
 			    ;;
 			*)
 			    ;;
@@ -159,6 +162,19 @@ __complete-ip()
 				    ;;
 				'')
 				    COMPREPLY=('' '<RET>' renew)
+				    ;;
+				*)
+				    COMPREPLY=()
+				    ;;
+			    esac
+			    ;;
+			connect)
+			    case ${COMP_WORDS[3]} in
+				r|re|rep|repo|repor|report)
+				    COMPREPLY=(report)
+				    ;;
+				'')
+				    COMPREPLY=('' '<RET>' report)
 				    ;;
 				*)
 				    COMPREPLY=()

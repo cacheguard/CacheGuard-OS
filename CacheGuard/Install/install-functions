@@ -1466,19 +1466,13 @@ set-admin-environment()
 	    ;;
     esac
 
-    # The first time the machine starts, to the init process named is disabled even if the apl_configure program can activated it in the appliance service. That's why for a gateway in a public cloud we must activate it here to allow the registration program to resolve the public registration service name to an IP address.
+    # On first startup, an appliance running in a public cloud environment must have its DNS server enabled so that the registration program can resolve the public registration service's hostname to an IP address.
 
-    case ${CLOUD_NAME} in
-	aws|azure)
-	    case ${APL_ROLE} in
-		gateway)
-		    name_server_list='127.0.0.1'
-		    ;;
-		manager)
-		    ;;
-		*)
-		    ;;
-	    esac
+    case ${APL_ROLE} in
+	gateway)
+	    name_server_list='127.0.0.1'
+	    ;;
+	manager)
 	    ;;
 	*)
 	    ;;
@@ -1597,10 +1591,10 @@ set-test-configuration()
 
     case ${TEST_SRC_PROTOCOL} in
 	nfs)
-	    sed -i -e "/.*swap.*swap.*/a ${TEST_SRC_IP}:${TEST_SRC_DIR} /usr/src nfs4 soft,timeo=10,retry=0,defaults,user,exec 0 2" ${APL}/etc/fstab
+	    sed -i -e "/.*swap.*swap.*/a ${TEST_SRC_IP}:${TEST_SRC_DIR} /usr/src nfs4 soft,timeo=10,retry=0,defaults,user,exec 0 0" ${APL}/etc/fstab
 	    ;;
 	sshfs)
-	    sed -i -e "/.*swap.*swap.*/a sshfs#${TEST_SRC_ACCOUNT}@${TEST_SRC_IP}:${TEST_SRC_DIR} /usr/src fuse3 sshfs_sync,no_readahead,sync_readdir,reconnect,delay_connect,allow_other 0 2" ${APL}/etc/fstab
+	    sed -i -e "/.*swap.*swap.*/a sshfs#${TEST_SRC_ACCOUNT}@${TEST_SRC_IP}:${TEST_SRC_DIR} /usr/src fuse3 allow_other,sshfs_sync,no_readahead,sync_readdir,reconnect,delay_connect,ServerAliveInterval=5,ServerAliveCountMax=1 0 0" ${APL}/etc/fstab
 
 	    install -d -m 700 -o root -g root  ${APL}/root/.ssh
 	    install -v -m 600 -o root -g root ${INSTALL_DIR}/id_rsa ${APL}/root/.ssh

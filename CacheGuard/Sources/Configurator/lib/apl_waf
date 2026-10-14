@@ -125,14 +125,15 @@ gen-waf-setup-rules()
     local reputation_timeout=${dos_timeout}
 
     if test ${in_app} == ${TECHNICAL_NAME} ; then
+	
 	local waf_response_body=512
-	local waf_request_body_files=$[128 * 1024]
+	local waf_request_body_files=${in_files_size}
 	local waf_request_body_no_files=$[128 * 1024]
 	local waf_num_arg=${in_num_arg}
 	local waf_arg_name_length=128
 	local waf_arg_length=1024
 	local waf_total_arg_length=$[${waf_num_arg} + (${waf_arg_length} + ${waf_arg_name_length}) * ${waf_num_arg}]
-	local waf_files_size=${in_files_size}
+	local waf_files_size=$[${in_files_size} * 1024]
 	local waf_combined_files_sizes=${waf_files_size}
 
 	local denyurl=${in_denyurl/*:}
@@ -777,28 +778,27 @@ gen-waf-rules()
 	"${WADMIN_NAME}")
 
 	    waf_dos_limit="1500 60 30"
-	    local conf_file_sz=$[64 * 1024]
+	    local conf_file_sz=64
 	    local waf_num_arg=$[32 * 256]
 
 	    if test ${APL_ROLE} == 'manager' ; then
 		local manager_factor=$[${MANAGER_TEMPLATE_NB} + ${MANAGER_GATEWAY_NB}]
 		((conf_file_sz *= manager_factor))
 	    fi
-
 	    gen-generic-rules ${waf_num_arg} ${conf_file_sz} "${waf_dos_limit}" "/${GUI_DIR_NAME}/${GUI_HOME_PAGE}.apl?not-found"
-	    echo "SecRuleRemoveById 950109"
+	    echo "SecRuleRemoveById 200004 950109"
 	    gen-tranform-rule
 	    echo "include ${GUI_DIR}/etc/${in_type}.rules"
 	    ;;
 	"${WAUDIT_NAME}")
 	    waf_dos_limit="1000 60 60"
-	    gen-generic-rules 16 0 "${waf_dos_limit}" "/${GUI_DIR_NAME}/${GUI_HOME_PAGE}.apl?not-found"
+	    gen-generic-rules 16 8 "${waf_dos_limit}" "/${GUI_DIR_NAME}/${GUI_HOME_PAGE}.apl?not-found"
 	    gen-tranform-rule
 	    echo "include ${WEB_SERVER_DIR}/etc/${in_type}.rules"
 	    ;;
 	webserver)
 	    waf_dos_limit="1000 60 60"
-	    gen-generic-rules 8 0 "${waf_dos_limit}"
+	    gen-generic-rules 8 8 "${waf_dos_limit}"
 	    gen-tranform-rule
 	    echo "include ${WEB_SERVER_DIR}/etc/${in_type}.rules"
 	    ;;

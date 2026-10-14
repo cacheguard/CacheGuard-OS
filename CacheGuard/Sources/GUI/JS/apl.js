@@ -1290,13 +1290,20 @@ function TLSOperationSelectCB( component_id, operation_id, days_id, ocsp_id )
     var days = document.getElementById( days_id );
     var ocsp = document.getElementById( ocsp_id );
 
-
     if (components == null) return false;
     if (operations == null) return false;
     if (days == null) return false;
     if (ocsp == null) return false;
 
-    var operation = operations.options[operations.selectedIndex].value;
+    if (operations.tagName === "SELECT") {
+	var operation = operations.options[operations.selectedIndex].value;
+    }
+    else if (operations.tagName === "INPUT") {
+	operation = operations.value;
+    }
+    else {
+	return false;
+    }
 
     switch (operation) {
     case 'save':
@@ -1306,6 +1313,7 @@ function TLSOperationSelectCB( component_id, operation_id, days_id, ocsp_id )
 
     default:
 	var component = components.options[components.selectedIndex].value;
+
 	switch (component) {
 	case 'csr':
 	    days.disabled = false;
@@ -2213,6 +2221,7 @@ function activateContent( root = document, loadedPage )
 	break;
 
     case 'conf-load-save-core':
+    case 'tls-server-manage-core':
 	const form = document.getElementById( element.dataset.formId );
 	if ( form ) {
             form.submit( );
@@ -2687,8 +2696,8 @@ function postContent( form_id, confirmation )
         url: page,
         type: 'POST',
         data: postData,
-        processData: false,
-        contentType: false,
+        processData: processData,
+        contentType: contentType,
 
         success: function( resultData, status ) {
             switch ( status ) {

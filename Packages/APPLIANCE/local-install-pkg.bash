@@ -1394,7 +1394,8 @@ build1_bind()
 	compile-message &&
 	make &&
 	install-message &&
-	make install
+	make install &&
+	install -v -m 644 -o root -g root bind.keys ${LOCAL_DIR}/etc/bind.keys
 }
 
 build1_net-snmp()

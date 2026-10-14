@@ -24,19 +24,19 @@
 source functions
 source /home/${ADMIN_NAME}/${ENV_RDIR}/${ENV_CURRENT_NAME}
 
-show-ip-external-dhcp-renew-report()
+show-ip-external-connect-report()
 {
-    if test ${CURRENT_IP_EXTERNAL_MODE} != 'dhcp' ; then
+    if test ${CURRENT_IP_EXTERNAL_MODE} == 'static' ; then
 	echo-unavailable-message "this report is not available."
 	return 0
     fi
 
     echo "<table class='highlight-form'>"
-    execute-command-with-output "ip external dhcp renew report"
+    execute-command-with-output "ip external connect report"
     echo "</table>"
 }
 
 # Main()
 
 gui-run-authentication
-show-ip-external-dhcp-renew-report
+show-ip-external-connect-report

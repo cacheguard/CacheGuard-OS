@@ -159,6 +159,18 @@ set-fw-rule-parameters()
     export FW_IPSEC_POLICY="-m policy --pol ipsec --dir"
     export FW_IPSEC_POLICY_IN="-i ${IF_LOGICAL_EXTERNAL} ${FW_IPSEC_POLICY} in"
     export FW_IPSEC_POLICY_OUT="-o ${IF_LOGICAL_EXTERNAL} ${FW_IPSEC_POLICY} out"
+
+    if test ${IP_EXTERNAL_MODE} == 'pppoe' ; then
+	EBTABLES_IS_ACTIVE=True
+    else
+	EBTABLES_IS_ACTIVE=False
+    fi
+
+    if test ${CURRENT_IP_EXTERNAL_MODE} == 'pppoe' ; then
+	CURRENT_EBTABLES_IS_ACTIVE=True
+    else
+	CURRENT_EBTABLES_IS_ACTIVE=False
+    fi
 }
 
 gen-iptables-log1()
@@ -6293,8 +6305,8 @@ gen-ebtables-pppoe()
 -A PPPOE_EXTERNAL -p 0x8864 -j ACCEPT
 -A PPPOE_EXTERNAL -j DROP
 
--A INPUT -i eth0 -j PPPOE_EXTERNAL
--A OUTPUT -o eth0 -j PPPOE_EXTERNAL
+-A INPUT -i ${IF_EXTERNAL} -j PPPOE_EXTERNAL
+-A OUTPUT -o ${IF_EXTERNAL} -j PPPOE_EXTERNAL
 
 COMMIT
 EOT

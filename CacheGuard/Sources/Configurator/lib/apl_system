@@ -515,11 +515,6 @@ apl-manage-patch()
 	    log-result ${ret}
 	    services="${service} ${services}"
 	done < /root/apply-patch/services
-    else
-	log "Stopping all services (may take some time)"
-	apl_service stop < /dev/console
-	ret=${?}
-	log-result ${ret}
     fi
 
     log "Updating health checks"
@@ -566,11 +561,6 @@ PATCH_RETUNE=${PATCH_RETUNE} apl-configure-core"
 	    ret=${?}
 	    log-result ${ret}
 	done
-    else
-	log "Starting all services (may take some time)"
-	apl_service start < /dev/console
-	ret=${?}
-	log-result ${ret}
     fi
 
     test ! -x /root/apply-patch/post-start.bash || /root/apply-patch/post-start.bash
@@ -1025,6 +1015,7 @@ restore-system-files()
 clean-restore-files()
 {
     local backup_archive=${TMP_DIR}/${LOADED}.backup
+
     rm -f \
        ${backup_archive} \
        ${backup_archive}.enc \

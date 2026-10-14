@@ -30,12 +30,20 @@ apl-main()
     test -n "${2}" || return 2
     test -n "${3}" || return 3
     test -n "${4}" || return 4
-    test -n "${5}" || return 5
+    test -n "${5}" || return 
     local ppp_dev=${1}
     local eth_dev=${2}
     local speed=${3}
     local ip=${4}
-    local router=${5}
+    local peer_ip=${5}
+
+    local pppoe_context
+
+    if test -f /var/run/${DYNAMIC_IP_BOOTING} ; then
+	pppoe_context=boot
+    else
+	pppoe_context=run
+    fi
 
     rm -f ${RUN_DIR}/${EXTERNAL_PPPOE_DONE}
 
@@ -47,30 +55,52 @@ apl-main()
     fi
 
     local tmp_pppoe_ip_configuration=/tmp/pppoe-ip-configuration.${$}
+    local now=$(date +%s 2>/dev/null)
 
     cat << EOT > ${tmp_pppoe_ip_configuration}
 ${ppp_dev}
 ${eth_dev}
 ${ip}
-${router}
+${peer_ip}
+${now}
 EOT
     mv -f ${tmp_pppoe_ip_configuration} ${RUN_DIR}/${EXTERNAL_PPPOE_IP_CONFIGURATION}.new
     chmod 644 ${RUN_DIR}/${EXTERNAL_PPPOE_IP_CONFIGURATION}.new
 
-    touch ${RUN_DIR}/${EXTERNAL_PPPOE_DONE}
-
-    test ! -f ${LOCK_DIR}/apl_apply || return 0
+    echo 'working' > ${RUN_DIR}/${EXTERNAL_PPPOE_DONE}
 
     if test -f ${RUN_DIR}/${EXTERNAL_PPPOE_IP_CONFIGURATION}.old ; then
-	diff --brief \
-	     ${RUN_DIR}/${EXTERNAL_PPPOE_IP_CONFIGURATION}.old \
-	     ${RUN_DIR}/${EXTERNAL_PPPOE_IP_CONFIGURATION}.new > /dev/null 2>&1
-	test ${?} -ne 0 || return 0
+
+	local lines
+	declare -a lines
+
+	mapfile -t lines < ${RUN_DIR}/${EXTERNAL_PPPOE_IP_CONFIGURATION}.old
+
+	local old_ip=${lines[2]}
+	local old_peer_ip=${lines[3]}
+
+	if test "${ip}" == "${old_ip}" -a "${peer_ip}" == "${old_peer_ip}" ; then
+	    echo 'finished' > ${RUN_DIR}/${EXTERNAL_PPPOE_DONE}
+	    return 0
+	fi
     fi
 
-    su - ${ADMIN_NAME} --command 'cancel' 2> /dev/null
-
-    PPPOE_HOOK_EVENT='modified' apl_apply > /dev/null 2>&1 &
+    case ${pppoe_context} in
+	run)
+	    echo 'finished' > ${RUN_DIR}/${EXTERNAL_PPPOE_DONE}
+	    test ! -f ${LOCK_DIR}/apl_apply || return 0
+	    su - ${ADMIN_NAME} --command 'cancel' 2> /dev/null
+	    PPPOE_HOOK_EVENT='modified' apl_apply > /dev/null 2>&1 &
+	    ;;
+	boot)
+	    rm -f /var/run/${DYNAMIC_IP_BOOTING}
+	    apl_network_dependent_configure
+	    echo 'finished' > ${RUN_DIR}/${EXTERNAL_PPPOE_DONE}
+	    ;;
+	*)
+	    return 255
+	    ;;
+    esac
 }
 
 apl-main "${@}"

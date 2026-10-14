@@ -108,6 +108,11 @@ do-mkdir-system()
     sudo install -d -m 755 -o root -g root ${APL}${CLOUD_DIR}
 }
 
+do-mkdir-dhcp()
+{
+    sudo install -d -m 755 -o root -g root ${APL}${ETC_DHCP_DIR}
+}
+
 do-mkdir-ppp()
 {
     sudo install -d -m 755 -o root -g root ${APL}${ETC_PPP_DIR}
@@ -300,6 +305,7 @@ do-mkdir-embedded()
 apl-mkdirs()
 {
     do-mkdir-system
+    do-mkdir-dhcp
     do-mkdir-ppp
     do-mkdir-srv
     do-mkdir-proxy
@@ -715,6 +721,8 @@ conf-others()
     sudo rm -rf ${APL}${LOCAL_DIR}/etc/ipsec.d/private && sudo ln -sf ${SSL_SERVER_DIR} ${APL}${LOCAL_DIR}/etc/ipsec.d/private
     sudo rm -rf ${APL}${LOCAL_DIR}/etc/ipsec.d/certs && sudo ln -sf ${SSL_SERVER_DIR} ${APL}${LOCAL_DIR}/etc/ipsec.d/certs
     sudo rm -rf ${APL}${LOCAL_DIR}/etc/ipsec.d/cacerts && sudo ln -sf ${SSL_LOCAL_CA_DIR} ${APL}${LOCAL_DIR}/etc/ipsec.d/cacerts
+
+    sudo rm -f ${APL}/etc/ppp/*.example
 }
 
 chroot-bind()

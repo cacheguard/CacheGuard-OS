@@ -75,24 +75,18 @@ init-account-environment()
     test -d ${USERENV_DIR} || exit 111
 }
 
-is-command-locked-files()
+is-command-locked-file()
 {
     test -n "${1}" || return 1
-    files=${*}
+    file=${1}
 
-    local file base
-    for file in ${files}
-    do
-	base=${file##*/}
-	! ls ${LOCK_DIR}/${ACCOUNT}.${base} > /dev/null 2>&1 || return 0
-    done
-
-    return 1
+    local base=$(file-basename ${file})
+    test -f ${LOCK_DIR}/${ACCOUNT}.${base}
 }
 
 set-implicit-parameters()
 {
-    set-global-parameters
+    set-tools-parameters
     set-embedded-rweb-parameters
     set-admin-parameters
     set-usage-parameters
@@ -124,15 +118,15 @@ set-implicit-parameters()
     set-flag-service-start-stop
 }
 
-wait-files-unlocking()
+wait-file-unlocking()
 {
     test -n "${1}" || return 1
-    files=${*}
+    file=${1}
 
     while true
     do
-	is-command-locked-files ${files} || break
-	usleep 300000
+	is-command-locked-file ${file} || break
+	usleep 250000
     done
 }
 
@@ -177,11 +171,11 @@ conf-lock-env()
 	${USERENV_DIR}/${ENV_CANCEL_NAME} \
 	${USERENV_DIR}/${ENV_NAME}
 
-    # At this point users of above files are running their trap programs : cleaning and unlocking
+    # At this point users of above files are running their trap programs: cleaning and unlocking
     # The file "${USERENV_DIR}/${ENV_NAME}" is a modifiable file by an administrator
     # Wait the termination of cleaning and unlocking process for this file
 
-    wait-files-unlocking ${USERENV_DIR}/${ENV_NAME}
+    wait-file-unlocking ${USERENV_DIR}/${ENV_NAME}
 }
 
 conf-unlock-env()
@@ -353,10 +347,8 @@ conf-save-new-env()
 conf-load-env()
 {
     conf-lock-env
-
     source ${USERENV_DIR}/${ENV_NAME}
     source ${USERENV_DIR}/${ENV_CURRENT_NAME}
-
     conf-unlock-env
     set-implicit-parameters
 }
@@ -375,17 +367,18 @@ conf-load-cancel-env()
 
 initialise()
 {
-    # First clean for a new session to prevent to restore from an old file if interrupted before saving the current env
+    # First clean for a new session to prevent to restore from old files in the event an interruption before saving the current env
     clean-userenv-backup || return 11
-    # clean-db-configuration-backup || return 13
-    clean-backup-conf || return 15
-    conf-load-env || return 17
+    clean-backup-conf || return 13
+    conf-load-env || return 15
 }
 
 set-flag-servie-start-stop-path()
 {
     test \
 	${FLAG_NETWORK} -eq 1 -o \
+	${FLAG_NETWORK_DHCP_ROUTE_CONFIGURATION} -eq 1 -o \
+	${FLAG_NETWORK_PPPOE_ROUTE_CONFIGURATION} -eq 1 -o \
 	${FLAG_IPTABLES} -eq 1 || return 0
     FLAG_PATH=1
 }
@@ -1128,7 +1121,8 @@ set-flag-service-start-stop()
 
     if test "${IP_EXTERNAL_IP}" != "${CURRENT_IP_EXTERNAL_IP}" -o \
 	    "${IP_EXTERNAL_MASK}" != "${CURRENT_IP_EXTERNAL_MASK}" -o \
-	    "${IP_EXTERNAL_MODE}" != "${CURRENT_IP_EXTERNAL_MODE}" ; then
+	    "${IP_EXTERNAL_MODE}" != "${CURRENT_IP_EXTERNAL_MODE}" -o \
+	    "${EXTERNAL_VLAN}" != "${CURRENT_EXTERNAL_VLAN}" ; then
 	FLAG_TC=1
 	FLAG_IPTABLES=1
 	FLAG_NETWORK=1
@@ -1151,13 +1145,17 @@ set-flag-service-start-stop()
 	fi
     fi
 
+    if test "${EXTERNAL_VLAN}" != "${CURRENT_EXTERNAL_VLAN}" ; then
+	FLAG_SYSNETCTL=1
+    fi
+
     if test "${IP_EXTERNAL_MODE}" != "${CURRENT_IP_EXTERNAL_MODE}" ; then
 	test "${IP_EXTERNAL_MODE}" != 'pppoe' -a "${CURRENT_IP_EXTERNAL_MODE}" != 'pppoe' || \
 	    FLAG_EBTABLES=1
     fi
 
     if test "${CURRENT_IP_EXTERNAL_MODE}" == 'pppoe' ; then
-	if test ${IP_EXTRNAL_PPPOE_CONFIGURATION_MODIFIED} == True ; then
+	if test ${IP_EXTERNAL_PPPOE_CONFIGURATION_MODIFIED} == True ; then
 	    FLAG_TC=1
 	    FLAG_IPTABLES=1
 	    FLAG_NETWORK=1
@@ -2630,10 +2628,17 @@ set-network-dependent-classic-config-files()
 	safe-generate	gen-clamd-conf			clamd.conf				|| return 199
     fi
 
-    if test ${FLAG_NETWORK_PPPOE_ROUTE_CONFIGURATION} -eq 1 ; then
+    if test ${FLAG_NETWORK_DHCP_ROUTE_CONFIGURATION} -eq 1 -a "${STATE_CFG_NETWORK}" != modified ; then
 	STATE_CFG_NETWORK=modified
 	backup-ifconfig-route-files
-	safe-generate-network-static-route							|| return 201
+	safe-generate-network-routing								|| return 201
+    fi
+
+    if test ${FLAG_NETWORK_PPPOE_ROUTE_CONFIGURATION} -eq 1 ; then
+	STATE_CFG_NETWORK=modified
+
+	backup-ifconfig-route-files
+	safe-generate-network-static-route							|| return 203
     fi
 }
 
@@ -2683,7 +2688,7 @@ set-classic-config-files1()
 	safe-generate	gen-loopback-conf		network.lo			|| return 21
     fi
 
-    safe-generate	gen-network			network				|| return 23
+    safe-generate	gen-sysconfig-network		network				|| return 23
     safe-generate	gen-route-table-names		rt_tables			|| return 25
     safe-generate	gen-hosts			hosts				|| return 27
     safe-generate	gen-at-allow			admin.at.allow			|| return 29
@@ -2858,8 +2863,11 @@ set-classic-config-files1()
     safe-generate	gen-embedded-vpnsubscr-php-constant	${EMBEDDED_VPNSUBSCR_NAME}-constant.php	|| return 127
     safe-generate	gen-sysconfig-vpnsubscr			sysconfig.vpnsubscr			|| return 129
 
-    test ${CONFIGURE_AFTER_NETWORK} == True || set-network-dependent-classic-config-files ${mode}
-
+    if test ${CONFIGURE_AFTER_NETWORK} == False ; then
+	set-network-dependent-classic-config-files ${mode}
+    else
+	test ${mode} != force || set-network-dependent-classic-config-files ${mode}
+    fi
     return 0
 }
 
@@ -2872,6 +2880,7 @@ commit-conf1()
 
     if test ${FLAG_NETWORK} -eq 1 -o \
 	    ${FLAG_NETWORK_DHCP_ROUTE_CONFIGURATION} -eq 1 -o \
+	    ${FLAG_NETWORK_PPPOE_ROUTE_CONFIGURATION} -eq 1 -o \
 	    ${mode} == force ; then
 	commit-network-conf || return 11
     fi
@@ -3275,8 +3284,7 @@ save-admin-level-db-configuration()
 save-admin-level-configuration()
 {
     local save_file_state
-    # local save_db_state
-    local save_db_state=0
+    local save_db_state
 
     log "Saving the configuration"
     save-admin-level-configuration-files ; save_file_state=${?}
@@ -3307,11 +3315,11 @@ build-os-configuration()
     local mode
 
     case ${context} in
-	apply|rollback)
+	apply)
 	    mode=auto
 	    ;;
 
-	configure|restore)
+	configure|restore|rollback)
 	    mode=force
 	    ;;
 	*)
@@ -3335,9 +3343,6 @@ build-os-configuration()
 
 build-after-network-os-configuration()
 {
-    test -n "${1}" || return 1
-    local mode=${1}
-
     test ${CONFIGURE_AFTER_NETWORK} == True || return 0
 
     case ${IP_EXTERNAL_MODE} in
@@ -3349,7 +3354,7 @@ build-after-network-os-configuration()
     esac
 
     log "Building network dependent configuration"
-    set-network-dependent-classic-config-files ${mode}
+    set-network-dependent-classic-config-files auto
     log-result ${?}
 
     log "Committing the network configuration"
@@ -3357,7 +3362,10 @@ build-after-network-os-configuration()
     log-result ${?}
 
     log "Committing the network dependent configuration"
-    commit-classic-conf
+
+    commit-classic-conf &&
+	commit-qos-index
+    
     log-result ${?}
     
     clean-backup-conf
@@ -3535,7 +3543,7 @@ service-fresh-av-start()
     if test ${FLAG_FRESH_AV_EXTENDED} -eq 1 ; then
 
 	if test -f ${AV_EXTENDED_CACHE_DIR}/${AV_EXTENDED_INDEX_FILENAME} ; then
-	    log "Updating the Extended AV signatures Index"
+	    log "Updating the extended AV signatures index"
 	    download-av-extended-index new
 	    ret=${?}
 	    log-result ${ret}
@@ -3941,24 +3949,6 @@ service-conf-keepalived()
 	activate-service keepalived
     else
 	deactivate-service keepalived
-    fi
-}
-
-service-conf-ebtables()
-{
-    local mode=${1}
-
-    if test "${mode}" != force ; then
-	test "${IP_EXTERNAL_MODE}" != "${CURRENT_IP_EXTERNAL_MODE}" -o \
-	     "${STATE_CFG_EBTABLES}" == modified || return 0
-    fi
-
-    STATE_CFG_EBTABLES=modified
-
-    if test "${IP_EXTERNAL_MODE}" == 'pppoe' ; then
-	activate-service ebtables
-    else
-	deactivate-service ebtables
     fi
 }
 
@@ -4529,6 +4519,24 @@ service-iptables()
     service-iptables1 ${action}
 }
 
+service-conf-ebtables()
+{
+    local mode=${1}
+
+    if test "${mode}" != force ; then
+	test "${IP_EXTERNAL_MODE}" != "${CURRENT_IP_EXTERNAL_MODE}" -o \
+	     "${STATE_CFG_EBTABLES}" == modified || return 0
+    fi
+
+    STATE_CFG_EBTABLES=modified
+
+    if test "${IP_EXTERNAL_MODE}" == 'pppoe' ; then
+	activate-service ebtables
+    else
+	deactivate-service ebtables
+    fi
+}
+
 service-ebtables1()
 {
     test -n "${1}" || return 1
@@ -4536,16 +4544,17 @@ service-ebtables1()
 
     STATE_SRV_EBTABLES=${action}
 
-    service ebtables ${action}
+    test ${action} != start -o "${EBTABLES_IS_ACTIVE}" == False || service ebtables ${action}
 }
 
 service-ebtables()
 {
-    test -n "${FLAG_EBTABLES}" || return 0
-    test ${FLAG_EBTABLES} -eq 1 || return 0
-
     test -n "${1}" || return 1
     local action=${1}
+
+    test -n "${FLAG_EBTABLES}" || return 0
+    test -n "${EBTABLES_IS_ACTIVE}" || return 0
+    test ${FLAG_EBTABLES} -eq 1 || return 0
 
     service-ebtables1 ${action}
 }
@@ -4800,10 +4809,10 @@ services-start-network()
 {
     service-sysctl start
     service-ebtables start
-    service-iptables start
     service-localnet start
     service-network start
-    service-tc start
+    service-statistics start
+    service-sysnetctl start
     service-named start
 }
 
@@ -4815,8 +4824,6 @@ services-start-services()
     service-ocspd start
     service-iked reload
     service-iked start
-    service-sysnetctl start
-    service-statistics start
     service-ntp start
     service-dhcp start
     service-ssh start
@@ -4836,7 +4843,7 @@ services-start-services()
     service-htcacheclean start
     service-keepalived start
     service-cron start
-    test -n "${SNMP_TRAP_SERVER_DN_LIST}" || service-snmp start
+    service-snmp start
     service-lcd4linux restart
     service-path start
 }
@@ -4874,15 +4881,15 @@ services-stop()
 
     test ${FLAG_HEALTH} -eq 1 || return 0
 
-    log "Updating Health Checks"
+    log "Updating health checks"
     apl_health_check ${$} < /dev/console
     log-result ${?}
 }
 
 firewall-if-modified-restart()
 {
+    test ${DN_IS_PRESENT} == 'True' || return 0
     test "${STATE_CFG_IPTABLES}" == modified -o "${STATE_CFG_TC}" == modified || return 0
-    test "${IP_EXTERNAL_MODE}" == 'pppoe' -o ${DN_IS_PRESENT} == 'True' || return 0
 
     service tc stop
     service iptables stop
@@ -4897,9 +4904,14 @@ services-state-start()
     test -z "${STATE_SRV_SYSLOG}"	|| service-syslog1 start
     test -z "${STATE_SRV_RLOGGER}"	|| service-rlogger1 start
     test -z "${STATE_SRV_EBTABLES}"	|| service-ebtables1 start
-    test -z "${STATE_SRV_IPTABLES}"	|| service-iptables1 start
     test -z "${STATE_SRV_LOOPBACK}"	|| service-localnet1 start
-    test -z "${STATE_SRV_NETWORK}"	|| service-network1 start
+
+    if test -n "${STATE_SRV_NETWORK}" ; then
+	service-network1 start
+	build-after-network-os-configuration
+    fi
+
+    test -z "${STATE_SRV_IPTABLES}"	|| service-iptables1 start
     test -z "${STATE_SRV_TC}"		|| service-tc1 start
     test -z "${STATE_SRV_SMANAGER}"	|| service-smanager1 start
     test -z "${STATE_SRV_OCSP}"		|| service-ocspd1 start
@@ -4993,7 +5005,22 @@ apl-halt()
     poweroff -d
 }
 
-clean-abort-cb()
+apl-rollback-core()
+{
+    local context=rollback
+
+    restore-admin-level-configuration || return 1
+    conf-load-cancel-env || return 3
+    prebuild-urllist
+    clean-loaded-urllist user
+    build-os-configuration ${context}
+    clean-patch
+    update-modification-state
+
+    return 0
+}
+
+do-clean-abort()
 {
     rm -f ${ADMIN_DIR}${GUI_ERRORS_FILE}.*
     apl-rollback-core
@@ -5005,22 +5032,31 @@ clean-abort-apply-cb()
 {
     trap "" INT QUIT TERM USR1
     log-abort-begin
-    services-state-stop
-    clean-abort-cb
-    services-state-start
-    log "Ending the Abort operation"
-    log-result 0
+
+    log "Stopping all services"
+    apl_service stop < /dev/console
+    log-result ${?}
+
+    do-clean-abort
+
+    log "Starting all services"
+    apl_service start < /dev/console
+    log-result ${?}
+
+    log-abort-end
     kill -s SIGUSR1 -- -${$}
+
     exit ${?}
 }
 
 clean-abort-configure-cb()
 {
     trap "" INT QUIT TERM
+
     log-abort-begin
-    clean-abort-cb
-    log "Ending the Abort operation"
-    log-result 0
+    do-clean-abort
+    log-abort-end
+
     exit 100
 }
 
@@ -5029,9 +5065,10 @@ end-rollback()
     local ret=${1}
     test -n "${ret}" || ret=0
 
-    log "Ending the Rollback operation"
+    log "Ending the rollback operation"
     manage-appliance-unlock apl_rollback
     log-ret ${?}
+
     exit ${ret}
 }
 
@@ -5048,29 +5085,6 @@ set-accessed-names-resolved()
     clean-backup-conf												|| return 17
 }
 
-set-snmp-trap-names-resolved()
-{
-    test "${STATE_CFG_SNMPD}" == modified || return 0
-    is-dn-present-in-snmp-conf || return 0
-
-    service-snmp 	start						|| return 11
-}
-
-apl-rollback-core()
-{
-    local context=rollback
-
-    restore-admin-level-configuration || return 1
-    conf-load-cancel-env || return 3
-    prebuild-urllist
-    clean-loaded-urllist user
-    build-os-configuration ${context}
-    clean-patch
-    update-modification-state
-
-    return 0
-}
-
 apl-rollback()
 {
     init-account-environment ${1}
@@ -5079,8 +5093,9 @@ apl-rollback()
     manage-appliance-lock
 
     log-reset
-    log "Begining the Rollback operation" ; log-ret 0
+    log "Begining the rollback operation" ; log-ret 0
     apl-rollback-core || end-rollback 1
+
     end-rollback 0
 }
 
@@ -5089,7 +5104,7 @@ end-configure()
     test -n "${1}" || return 1
     local ret=${1}
 
-    log "Ending the Configure operation"
+    log "Ending the configure operation"
     conf-unlock-env
     conf-unlock-apl-file
     log-ret ${?}
@@ -5128,15 +5143,34 @@ apl-configure()
     echo ${$} > /var/run/apl_configure.pid
 
     log-reset
-    log "Begining the Configure operation" ; log-result 0
+    log "Begining the configure operation" ; log-result 0
     apl-configure-core
     end-configure 0
+}
+
+apl-network-dependent-configure()
+{
+    init-account-environment &&
+	initialise &&
+	update-external-ip-variables
+
+    local ret=${?}
+
+    set-external-dynamic-ip-route-flags &&
+	set-network-dependent-classic-config-files force &&
+	commit-network-conf &&
+	commit-classic-conf &&
+	commit-qos-index &&
+	clean-backup-conf &&
+	save-admin-level-configuration-files
+
+    return ${ret}
 }
 
 apl-backup()
 {
     reset-backup-log
-    backup-log "Beginig the Backup operation" ; backup-log-ret ${?}
+    backup-log "Beginig the backup operation" ; backup-log-ret ${?}
 
     backup-log "Initialising the backup operation"
     init-account-environment ${1} &&
@@ -5148,7 +5182,7 @@ apl-backup()
     test ${ret} -eq 0 || clean-backup-files
     manage-appliance-unlock
 
-    backup-log "Ending the Backup operation" ; backup-log-ret ${?}
+    backup-log "Ending the backup operation" ; backup-log-ret ${?}
     return ${ret}
 }
 
@@ -5157,7 +5191,7 @@ end-apply()
     test -n "${1}" || return 1
     local ret=${1}
 
-    log "Ending the Apply operation"
+    log "Ending the apply operation"
     conf-unlock-env
     conf-unlock-apl-file
     update-modification-state
@@ -5193,115 +5227,99 @@ apl-kill-apply()
     manage-appliance-unlock
 }
 
-end-restore()
-{
-    local ret=${1}
-    test -n "${ret}" || ret=0
-
-    log "Checking the consistency of the operation"
-    if test ${ret} -ne 0 ; then
-	log-result ${ret}
-    	log "Starting all services"
-	apl_service start < /dev/console
-	log-result ${?}
-    else
-	log-result 0
-    fi
-
-    log "Ending the Restore operation"
-
-    conf-unlock-apl-file
-    log-result ${ret}
-    exit ${ret}
-}
-
-restore-system()
-{
-    log "Begining the restore operation" ; log-result 0
-
-    log "Stopping all services"
-    apl_service stop < /dev/console
-    log-result ${?}
-
-    log "Updating Health Checks"
-    apl_health_check ${$} < /dev/console
-    log-result ${?}
-
-    restore-system-before
-    log "Restoring backed up files"
-    restore-system-files
-    log-result ${?}
-    restore-system-after
-    clean-restore-files
-
-    initialise || end-restore 1
-    check-ram-capacity || end-restore 3
-    
-    apl-apply-core restore
-
-    log "Starting all services"
-    apl_service start < /dev/console
-    log-result ${?}
-
-    do-names-resolution
-    firewall-if-modified-restart
-    set-kerberos-create-state
-    update-modification-state
-    end-restore 0
-}
-
 apl-apply-core()
 {
+    test -n "${1}" || return 1
     local context=${1}
-    test -n "${context}" || context=apply
 
     prebuild-urllist
     build-all-urllists user
     build-av-whitelist
-    update-proxy-av-whitelist ${context}
+    update-proxy-av-whitelist
     update-sslmediation-exceptions new ${context}
     build-os-configuration ${context}
     vpnipsec-reset-access-db
     set-embedded-applications
 }
 
+apply-backup()
+{
+    local ret
+
+    log "Stopping all services"
+    apl_service stop < /dev/console
+    log-result ${?}
+
+    log "Restoring backed-up files"
+    restore-system-before
+    restore-system-files
+    ret=${?}
+    restore-system-after
+    clean-restore-files
+    log-result ${ret}
+
+    log "Loading restored environment"
+    initialise
+    log-result ${?}
+
+    check-ram-capacity
+    apl-apply-core restore
+
+    log "Starting all services"
+    apl_service start < /dev/console
+    log-result ${?}
+
+    update-modification-state
+}
+
+apply-new()
+{
+    update-external-dynamic-ip || return 11
+    services-stop
+    apl-apply-core apply
+
+    services-start-network
+    build-after-network-os-configuration
+    service-iptables start
+    service-tc start
+    do-names-resolution
+    firewall-if-modified-restart
+    services-start-services
+
+    update-ipsec-whitelist
+    service-health start
+
+    save-admin-level-configuration
+    set-registration
+    set-embedded-registration
+    apl-manage-patch ${1}
+}
+
 apl-apply()
 {
     init-account-environment ${1}
 
-    check-new-restore || trap 'clean-abort-apply-cb' INT QUIT TERM
+    trap 'clean-abort-apply-cb' INT QUIT TERM
     manage-appliance-lock
     echo ${$} > /var/run/apl_apply.pid
 
     log-reset
-    log "Begining the Apply operation" ; log-result 0
+
+    log "Begining the apply operation" ; log-result 0
+
     initialise || end-apply 11
     verify-new-usage || end-apply 13
     verify-new-embedded-usage || end-apply 15
-    check-ram-capacity || end-apply 17
     set-system-clock
-
-    update-external-dynamic-ip || end-apply 19
+    check-ram-capacity || end-apply 17
 
     if check-new-restore ; then
-	restore-system || end-apply 21
+	apply-backup || end-apply 19
     else
-	services-stop
-	apl-apply-core apply
-	services-start-network
-	build-after-network-os-configuration auto
-	do-names-resolution
-	firewall-if-modified-restart
-	services-start-services
-	update-ipsec-whitelist
-	service-health start
-	set-kerberos-create-state
-	save-admin-level-configuration
-	set-registration
-	set-embedded-registration
-	apl-manage-patch ${1}
+	apply-new
     fi
 
+    set-kerberos-create-state
     verify-usage active log
     end-apply 0
 }

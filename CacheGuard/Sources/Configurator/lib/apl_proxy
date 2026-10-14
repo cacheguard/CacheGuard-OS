@@ -1341,9 +1341,6 @@ gen-suspend-squid-conf()
 
 update-proxy-av-whitelist-domainname()
 {
-    test -n "${1}" || return 1
-    local context=${1}
-
     if test "${AV_WHITELIST_DOMAINNAME_LIST}" != "${CURRENT_AV_WHITELIST_DOMAINNAME_LIST}" ; then
 	local name
 	for name in ${AV_WHITELIST_DOMAINNAME_LIST}

@@ -74,7 +74,7 @@ get-magnified-error-text()
 	out_txt="${out_txt} ${wrd}"
     done
 
-    test ${TERM} == ${WADMIN_TERM} || out_txt="${out_txt} To do, so use the $(get-terminal-bold-text help) command followed by the command name."
+    test ${TERM} == ${WADMIN_TERM} || out_txt="${out_txt} To get help for a specific command, use the $(get-terminal-bold-text help) command followed by the command name."
 
     echo ${out_txt:1}
 }

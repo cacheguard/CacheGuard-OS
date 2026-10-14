@@ -21,24 +21,109 @@
 #
 ###########################################################################
 
+download-tls()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    test -n "${3}" || return 3
+    local tls=${1}
+    local component=${2}
+    local filename=${3}
+
+    local file=$(get-tls-server-component-file ${tls} ${component})
+    test -f ${file} || return 11
+
+    local size=$(get-characters-in-file ${file})
+
+    echo "Content-Disposition: attachment; filename=\"${filename}\""
+    echo "Content-Length: ${size}"
+    echo "Cache-control: private"
+
+    echo-http-header
+
+    cat ${file}
+}
+
 set-tls-server-manage()
 {
-    if test -n "${VALUES[5]}" ; then
-	if test "${VALUES[1]}" == 'csr' -a "${VALUES[2]}" == 'load' -a -n "${VALUES[6]}" ; then
-	    if test -z "${VALUES[7]}" ; then
-		log-command "tls" "server ${VALUES[2]} ${VALUES[0]} ${VALUES[1]} ${VALUES[3]:1} ${VALUES[4]} ${VALUES[5]} ${VALUES[6]}"
-		execute-command "tls server ${VALUES[2]} ${VALUES[0]} ${VALUES[1]} ${VALUES[3]:1} ${VALUES[4]} ${VALUES[5]} ${VALUES[6]}"
+    local tls="${VALUES[0]}"
+    local component="${VALUES[1]}"
+    local operation="${VALUES[2]}"
+
+    local protocol filename
+
+    case ${operation} in
+	load|save)
+	    protocol="${VALUES[3]:1}"
+	    local server=${VALUES[4]}
+	    filename=${VALUES[5]}
+
+	    if test -n "${filename}" ; then
+		if test "${component}" == 'csr' -a "${operation}" == 'load' -a -n "${VALUES[6]}" ; then
+		    if test -z "${VALUES[7]}" ; then
+			log-command "tls" "server ${operation} ${tls} ${component} ${protocol} ${server} ${filename} ${VALUES[6]}"
+			execute-command "tls server ${operation} ${tls} ${component} ${protocol} ${server} ${filename} ${VALUES[6]}"
+		    else
+			log-command "tls" "server ${operation} ${tls} ${component} ${protocol} ${server} ${filename} ${VALUES[6]} ocsp"
+			execute-command "tls server ${operation} ${tls} ${component} ${protocol} ${server} ${filename} ${VALUES[6]} ocsp"
+		    fi
+		else
+		    log-command "tls" "server ${operation} ${tls} ${component} ${protocol} ${server} ${filename}"
+		    execute-command "tls server ${operation} ${tls} ${component} ${protocol} ${server} ${filename}"
+		fi
 	    else
-		log-command "tls" "server ${VALUES[2]} ${VALUES[0]} ${VALUES[1]} ${VALUES[3]:1} ${VALUES[4]} ${VALUES[5]} ${VALUES[6]} ocsp"
-		execute-command "tls server ${VALUES[2]} ${VALUES[0]} ${VALUES[1]} ${VALUES[3]:1} ${VALUES[4]} ${VALUES[5]} ${VALUES[6]} ocsp"
+		gen-gui-error 6
 	    fi
-	else
-	    log-command "tls" "server ${VALUES[2]} ${VALUES[0]} ${VALUES[1]} ${VALUES[3]:1} ${VALUES[4]} ${VALUES[5]}"
-	    execute-command "tls server ${VALUES[2]} ${VALUES[0]} ${VALUES[1]} ${VALUES[3]:1} ${VALUES[4]} ${VALUES[5]}"
-	fi
-    else
-	gen-gui-error 6
-    fi
+	    ;;
+
+	upload)
+
+	    filename="${VALUES[4]}"
+
+	    if test -z "${filename}" ; then
+		gen-gui-error 6
+	    else
+		local uploaded_filename=${UPLOADED_FILES[0]}
+
+		if test -n "${uploaded_filename}" -a -f ${ADMIN_TMP_DIR}/${uploaded_filename} ; then
+		    if test "${component}" == 'csr' -a -n "${VALUES[5]}" ; then
+
+			local days=${VALUES[5]}
+			local ocsp=${VALUES[6]}
+
+			if test -z "${ocsp}" ; then
+			    log-command "tls" "server inject ${tls} ${component} ${filename} ${days}"
+			    execute-command "tls server inject ${tls} ${component} ${uploaded_filename} ${days}"
+			else
+			    log-command "tls" "server inject ${tls} ${component} ${filename} ${days} ocsp"
+			    execute-command "tls server inject ${tls} ${component} ${uploaded_filename} ${days} ocsp"
+			fi
+		    else
+			log-command "tls" "server inject ${tls} ${component} ${filename}"
+			execute-command "tls server inject ${tls} ${component} ${uploaded_filename}"
+		    fi
+
+		    rm -f ${ADMIN_TMP_DIR}/${uploaded_filename}
+		else
+		    rm -f ${ADMIN_TMP_DIR}/${uploaded_filename}
+		    gen-gui-error 16
+		fi
+	    fi
+	    ;;
+
+	download)
+	    protocol="${VALUES[3]:1}"
+	    test "${protocol}" == 'web' || exit 0
+	    filename=${VALUES[4]}
+	    test -n "${filename}" || filename=${tls}.${component}
+	    download-tls ${tls} ${component} ${filename}
+	    reset-gui-error-log
+	    exit 0 # important
+	    ;;
+	*)
+	    return 255
+	    ;;
+    esac
 }
 
 set-tls-server-manage

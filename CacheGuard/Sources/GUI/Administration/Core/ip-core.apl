@@ -63,10 +63,18 @@ show-ip-form()
     shortcutMenuTitle[0]="802.1q Tags"
     shortcutMenuTitle[1]="Send Pings"
 
-    if test ${CURRENT_IP_EXTERNAL_MODE} == 'dhcp' ; then
-	shortcutMenuTitle[2]="Renew DHCP Lease"
-	shortcutMenuItem[2]="ip-external-dhcp-renew"
-    fi
+    case ${CURRENT_IP_EXTERNAL_MODE} in
+	dhcp)
+	    shortcutMenuTitle[2]="Renew DHCP Lease"
+	    shortcutMenuItem[2]="ip-external-connect"
+	    ;;
+	pppoe)
+	    shortcutMenuTitle[2]="Reconnect PPPoE"
+	    shortcutMenuItem[2]="ip-external-connect"
+	    ;;
+	*)
+	    ;;
+    esac
 
     show-title "IP Addresses" "enabled" "ip vlan"
     echo "<div class='core-form'>"
@@ -76,10 +84,21 @@ show-ip-form()
 
     if gui-contextual-is-allowed ; then
 
+	local external_vlan_comment="Use <strong>none</strong> or leave the value blank if VLAN tagging is not required."
+	local external_vlan=${EXTERNAL_VLAN}
+	test "${external_vlan}" != 'none' || unset external_vlan
+
 	test ${IP_EXTERNAL_MODE} == 'pppoe' || pppoe_state=' disabled'
 
 	echo "<table class='highlight-form'>"
 	echo "<tbody>"
+
+	echo "<tr>"
+	echo "<td>External Interface VLAN Id</td>"
+	echo "<td><input id='external_vlan' name='external_vlan' type='text' size='7' maxlength='4' value='${external_vlan}' data-action='show-tooltip' data-tip='${external_vlan_comment}' $(print-check-pppoe-field-function)></td>"
+	echo "</td>"
+	echo "</tr>"
+
 	echo "<tr>"
 	echo "<td>External Interface Mode</td>"
 	echo "<td>"
@@ -89,17 +108,17 @@ show-ip-form()
 
 	echo "<tr>"
 	echo "<td>PPPoE Service Name</td>"
-	echo "<td><input id='${pppoe_service_name_id}' name='${pppoe_service_name_id}' type='text' size='32' maxlength='${MAX_LEN}' value='${IP_EXTRNAL_PPPOE_SERVICE_NAME}'${pppoe_state} $(print-check-pppoe-field-function)></td>"
+	echo "<td><input id='${pppoe_service_name_id}' name='${pppoe_service_name_id}' type='text' size='32' maxlength='${MAX_LEN}' value='${IP_EXTERNAL_PPPOE_SERVICE_NAME}'${pppoe_state} $(print-check-pppoe-field-function)></td>"
 	echo "</tr>"
 
 	echo "<tr>"
 	echo "<td>PPPoE Userame</td>"
-	echo "<td><input id='${pppoe_username_id}' name='${pppoe_username_id}' type='text' size='32' maxlength='${MAX_LEN}' value='${IP_EXTRNAL_PPPOE_USERNAME}'${pppoe_state} $(print-check-pppoe-field-function)></td>"
+	echo "<td><input id='${pppoe_username_id}' name='${pppoe_username_id}' type='text' size='32' maxlength='${MAX_LEN}' value='${IP_EXTERNAL_PPPOE_USERNAME}'${pppoe_state} $(print-check-pppoe-field-function)></td>"
 	echo "</tr>"
 
 	echo "<tr>"
 	echo "<td>PPPoE Password</td>"
-	echo "<td><input id='${pppoe_password_id}' name='${pppoe_password_id}' type='password' size='32' maxlength='${MAX_LEN}' value='${IP_EXTRNAL_PPPOE_PASSWORD}'${pppoe_state} $(print-check-pppoe-field-function)></td>"
+	echo "<td><input id='${pppoe_password_id}' name='${pppoe_password_id}' type='password' size='32' maxlength='${MAX_LEN}' value='${IP_EXTERNAL_PPPOE_PASSWORD}'${pppoe_state} $(print-check-pppoe-field-function)></td>"
 	echo "</tr>"
 
 	echo "</tbody>"

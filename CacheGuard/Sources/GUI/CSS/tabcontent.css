@@ -50,7 +50,7 @@
     border-radius:var(--boxborderradius) var(--boxborderradius) 0 0;
     border-bottom-color:var(--panel-bg);
     color:var(--textcolor);
-    background:linear-gradient(to bottom, var(--title-bg) 0%, var(--panel-bg));
+    background:linear-gradient(to bottom, var(--main-title-bg) 0%, var(--panel-bg));
 }
 
 .shadetabs li a:visited {

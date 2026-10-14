@@ -21,29 +21,6 @@
 #
 ###########################################################################
 
-file-size()
-{
-    test -n "${1}" || return 1
-    local file=${1}
-
-    if test ! -f ${file} ; then
-	echo 0
-	return 11
-    fi
-
-    local f1 f2 f3 f4 size fn
-
-    ls -l ${file} 2> /dev/null | \
-	while read f1 f2 f3 f4 size fn
-    do
-	test -n "${size}" || continue
-	echo ${size}
-	break
-    done
-
-    return 0
-}
-
 download-conf()
 {
     test -n "${1}" || return 1
@@ -52,13 +29,13 @@ download-conf()
     local file=${ADMIN_TMP_DIR}/${filename}
     test -f ${file} || return 11
 
-    local size=$(file-size ${file})
+    local size=$(get-characters-in-file ${file})
 
     echo "Content-Disposition: attachment; filename=\"${filename}\""
     echo "Content-Length: ${size}"
     echo "Cache-control: private"
 
-    echo-http-header "application/octet-stream"
+    echo-http-header
 
     cat ${file}
 }
@@ -122,12 +99,18 @@ set-conf-io-operation()
 	    esac
 	    ;;
 	upload)
-	    local uploaded_filename=${UPLOADED_FILES[0]}
-	    if test -n "${uploaded_filename}" -a -f ${ADMIN_TMP_DIR}/${uploaded_filename} ; then
-		execute-command "conf inject ${uploaded_filename}"
-		rm -f ${ADMIN_TMP_DIR}/${uploaded_filename}
+	    filename="${VALUES[2]}"
+	    if test -z "${filename}" ; then
+		gen-gui-error 6
 	    else
-		gen-gui-error 16
+		local uploaded_filename=${UPLOADED_FILES[0]}
+		if test -n "${uploaded_filename}" -a -f ${ADMIN_TMP_DIR}/${uploaded_filename} ; then
+		    execute-command "conf inject ${uploaded_filename}"
+		    rm -f ${ADMIN_TMP_DIR}/${uploaded_filename}
+		else
+		    rm -f ${ADMIN_TMP_DIR}/${uploaded_filename}
+		    gen-gui-error 16
+		fi
 	    fi
 	    ;;
 	download)
@@ -155,7 +138,7 @@ set-conf-io-operation()
 	    exit 0 # important
 	    ;;
 	*)
-	    return 13
+	    return 255
 	    ;;
     esac
 }

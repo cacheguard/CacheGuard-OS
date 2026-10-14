@@ -401,7 +401,7 @@ gen-keepalived-vrrp-conf()
     local vrrp_list vrrp_ip vrrp_state vrrp_priority vrrp_id
     local i=0 elt range
 
-    local rip prf brd bond_vrrp_device bond_mode script
+    local rip prf brd bond_mode script
 
     local auth_pass=z53!GakQfSz6!!qX
     local name_prefix="${SHOSTNAME}.${DOMAIN_NAME}:${interface}"
@@ -413,7 +413,6 @@ gen-keepalived-vrrp-conf()
 	    prf=${IP_WEB_PRF}
 	    brd=${IP_WEB_BRD}
 	    bond_mode=${BOND_INTERNAL_MODE}
-	    bond_vrrp_device=${IF_INTERNAL}
 	    script="check_bond_internal"
 	    ;;
 	external)
@@ -422,7 +421,6 @@ gen-keepalived-vrrp-conf()
 	    prf=${IP_EXTERNAL_PRF}
 	    brd=${IP_EXTERNAL_BRD}
 	    bond_mode=${BOND_EXTERNAL_MODE}
-	    bond_vrrp_device=${IF_EXTERNAL}
 	    script="check_bond_external"
 	    ;;
 	auxiliary)
@@ -431,7 +429,6 @@ gen-keepalived-vrrp-conf()
 	    prf=${IP_AUXILIARY_PRF}
 	    brd=${IP_AUXILIARY_BRD}
 	    bond_mode=${BOND_AUXILIARY_MODE}
-	    bond_vrrp_device=${IF_AUXILIARY}
 	    script="check_bond_auxiliary"
 	    ;;
 	web)
@@ -440,7 +437,6 @@ gen-keepalived-vrrp-conf()
 	    prf=${IP_WEB_PRF}
 	    brd=${IP_WEB_BRD}
 	    bond_mode=${BOND_INTERNAL_MODE}
-	    bond_vrrp_device=${IF_INTERNAL}
 	    script="check_bond_internal"
 	    ;;
 	rweb)
@@ -449,7 +445,6 @@ gen-keepalived-vrrp-conf()
 	    prf=${IP_RWEB_PRF}
 	    brd=${IP_RWEB_BRD}
 	    bond_mode=${BOND_INTERNAL_MODE}
-	    bond_vrrp_device=${IF_INTERNAL}
 	    script="check_bond_internal"
 	    ;;
 	antivirus)
@@ -458,7 +453,6 @@ gen-keepalived-vrrp-conf()
 	    prf=${IP_AV_PRF}
 	    brd=${IP_AV_BRD}
 	    bond_mode=${BOND_INTERNAL_MODE}
-	    bond_vrrp_device=${IF_INTERNAL}
 	    script="check_bond_internal"
 	    ;;
 	*)

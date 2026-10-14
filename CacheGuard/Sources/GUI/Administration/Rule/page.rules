@@ -130,9 +130,9 @@ edit-guard-policy		(\?[[:print:]]{0,192})? policy_name=[[:print:]]{0,192}(\&filt
 
 guard-rule			(\?page:[[:digit:]]{0,3}-[[:digit:]]{0,3})? (\&entry_[0-9]{1,2}=(old|anew|inew|move[[:digit:]]{1,3})\&policy_name_[0-9]{1,2}=[[:print:]]{0,192}\&operation_[0-9]{1,2}=(allow|deny)(\&del_[0-9]{1,2}=on)?){0,99}
 
-ip				nil ((ip_external_mode=static\&external_ip=[[:print:]]{0,45}\&external_mk=[[:print:]]{0,45}\&)|(ip_external_mode=dhcp\&)|(ip_external_mode=pppoe\&pppoe_service_name=[[:print:]]{0,192}\&pppoe_username=[[:print:]]{0,192}\&pppoe_password=[[:print:]]{0,192}\&))?internal_ip=[[:print:]]{0,45}\&internal_mk=[[:print:]]{0,45}(\&auxiliary_ip=[[:print:]]{0,45}\&auxiliary_mk=[[:print:]]{0,45}(\&internal_8021q_vlan_[0-9]{1,2}=[0-9]{1,4}\&internal_8021q_ip_[0-9]{1,2}=[[:print:]]{0,45}\&internal_8021q_mask_[0-9]{1,2}=[[:print:]]{0,45}){1,16})?
+ip				nil (external_vlan=[[:print:]]{0,12}\&((ip_external_mode=static\&external_ip=[[:print:]]{0,45}\&external_mk=[[:print:]]{0,45}\&)|(ip_external_mode=dhcp\&)|(ip_external_mode=pppoe\&pppoe_service_name=[[:print:]]{0,192}\&pppoe_username=[[:print:]]{0,192}\&pppoe_password=[[:print:]]{0,192}\&)))?internal_ip=[[:print:]]{0,45}\&internal_mk=[[:print:]]{0,45}(\&auxiliary_ip=[[:print:]]{0,45}\&auxiliary_mk=[[:print:]]{0,45}(\&internal_8021q_vlan_[0-9]{1,2}=[0-9]{1,4}\&internal_8021q_ip_[0-9]{1,2}=[[:print:]]{0,45}\&internal_8021q_mask_[0-9]{1,2}=[[:print:]]{0,45}){1,16})?
 
-ip-external-dhcp-renew		nil nil
+ip-external-connect		nil nil
 
 ip-name				(\?page:[[:digit:]]{0,3}-[[:digit:]]{0,3})? (\&entry_[0-9]{1,2}=(old|anew)\&name_[0-9]{1,3}=[[:print:]]{0,192}\&ip_[0-9]{1,3}=[[:print:]]{0,45}(\&del_[0-9]{1,3}=on)?)+
 
@@ -290,7 +290,7 @@ tls-client-manage		(\?[[:print:]]{0,66})? tls=[[:print:]]{0,66}\&tls_component=(
 
 tls-server-generate		(\?[[:print:]]{0,66})? tls=[[:print:]]{0,66}\&names=[[:print:]]{0,6207}\&numbits=[[:print:]]{0,16}\&days=[[:print:]]{0,24}\&country=[[:print:]]{0,6}\&province=[[:print:]]{0,96}\&locality=[[:print:]]{0,96}\&organisation=[[:print:]]{0,96}\&unit=[[:print:]]{0,96}(\&sign=on)?(\&ocsp=on)?
 
-tls-server-manage		(\?[[:print:]]{0,66})? tls=[[:print:]]{0,66}\&tls_component=(certificate|key|csr)\&operation=(load|save)\&protocol=(_ftp|_sftp|_tftp)\&server=[[:print:]]{0,192}\&filename=[[:print:]]{0,384}(\&days=[[:print:]]{0,24})?(\&ocsp=on)?
+tls-server-manage		(\?[[:print:]]{0,66})? tls=[[:print:]]{0,66}\&tls_component(u|d)?=(certificate|key|csr)\&operation(u)?=(load|save|upload|download)\&protocol=(_ftp|_sftp|_tftp|_web)(\&server=[[:print:]]{0,192})?(\&filename=[[:print:]]{0,384})?(\&days(u)?=[[:print:]]{0,24})?(\&ocsp(u)?=on)?
 
 tls-report
 tls-report-dashboard		(\?[[:digit:]]{0,16})?

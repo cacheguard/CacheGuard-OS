@@ -81,6 +81,10 @@ EOF
     echo "TECHNICAL_NAME=${TECHNICAL_NAME}"
     echo "DEFAULT_CA_CN='${DEFAULT_CA_CN}'"
 
+    echo "IF_EXTERNAL_NUM=${IF_EXTERNAL_NUM}"
+    echo "IF_INTERNAL_NUM=${IF_INTERNAL_NUM}"
+    echo "IF_AUXILIARY_NUM=${IF_AUXILIARY_NUM}"
+
     echo "WEBSITE=${WEBSITE}"
     echo "YEARS=${YEARS}"
     echo "PATCH_SERVER=${PATCH_SERVER}"
@@ -271,7 +275,7 @@ EOF
     echo "EXTERNAL_DHCP_IP_CONFIGURATION=${EXTERNAL_DHCP_IP_CONFIGURATION}"
     echo "EXTERNAL_DHCP_STATE=${EXTERNAL_DHCP_STATE}"
     echo "EXTERNAL_DHCP_DONE=${EXTERNAL_DHCP_DONE}"
-
+    
     echo "EXTERNAL_PPPOE_PEER_NAME=${EXTERNAL_PPPOE_PEER_NAME}"
     echo "EXTERNAL_PPPOE_IF=${EXTERNAL_PPPOE_IF}"
     echo "EXTERNAL_PPPOE_IP_CONFIGURATION=${EXTERNAL_PPPOE_IP_CONFIGURATION}"
@@ -596,6 +600,8 @@ gen-apl-constant()
 	    ;;
     esac
 
+    echo "DYNAMIC_IP_BOOTING=${DYNAMIC_IP_BOOTING}"
+
     echo "CSP_HEADER=\"default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; frame-src 'self'; form-action 'self'\""
     echo "LVM_VG_NAME=${LVM_VG_NAME}"
     echo "LVM_PE_SZ=${LVM_PE_SZ}"
@@ -731,6 +737,7 @@ gen-apl-constant()
     echo "SSL_SNMP_DIR=${SSL_SNMP_DIR}"
     echo "SSL_VAR_DIR=${SSL_VAR_DIR}"
 
+    echo "ETC_DHCP_DIR=${ETC_DHCP_DIR}"
     echo "ETC_PPP_PEERS_DIR=${ETC_PPP_PEERS_DIR}"
 
     echo "WAF_DIR=${WAF_DIR}"
@@ -804,10 +811,6 @@ gen-apl-constant()
     echo "WEB_SERVER_DENY_NAME=${WEB_SERVER_DENY_NAME}"
     echo "COSS_FILENAME=${COSS_FILENAME}"
     echo "SERVICES_HEALTH_FILENAME=${SERVICES_HEALTH_FILENAME}"
-
-    echo "IF_EXTERNAL_NUM=${IF_EXTERNAL_NUM}"
-    echo "IF_INTERNAL_NUM=${IF_INTERNAL_NUM}"
-    echo "IF_AUXILIARY_NUM=${IF_AUXILIARY_NUM}"
 
     echo "SNMP_OID=${SNMP_OID}"
     echo "PROXY_LOG=${PROXY_LOG}"

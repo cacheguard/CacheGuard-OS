@@ -38,6 +38,18 @@ case ${CLOUD_NAME} in
 	;;
 esac
 
+get-ip-px()
+{
+    test -n "${1}" || return 1
+    local dev=${1}
+
+    local ip_px=$(ip --oneline -4 address show dev ${dev} 2> /dev/null)
+    ip_px=${ip_px#* inet }
+    ip_px=${ip_px%% *}
+
+    echo ${ip_px}
+}
+
 check-cloud-ip()
 {
     test -z "${CLOUD_VALID_IP}" || return 0
@@ -69,7 +81,7 @@ check-cloud-ip()
 start-network()
 {
     local tries=0 max_tries=60 usleep=500000
-    local internal_net default_route
+    local internal_ip_px default_route
     local retval
 
     log_info_msg "Getting dynamic IP addresses..."
@@ -88,8 +100,8 @@ EOT
 		dhclient -4 -q ${CLOUD_NETWORK_SECOND_DEV} ${CLOUD_NETWORK_MAIN_DEV} 2> /dev/null
 		while true
 		do
-		    internal_net=$(ip address show dev ${CLOUD_NETWORK_SECOND_DEV} 2> /dev/null | tail -2 | head -1)
-		    if test "${internal_net/*net */net}" == net ; then
+		    internal_ip_px=$(get-ip-px ${CLOUD_NETWORK_SECOND_DEV})
+		    if test -n "${internal_ip_px}" ; then
 			retval=0
 			break
 		    fi

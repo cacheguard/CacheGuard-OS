@@ -151,7 +151,7 @@ show-register-form()
 	if test ${OS_FREE_USAGE} == True ; then
 	    itemTitle[${i}]=""
 	    itemID[${i}]='free_usage'
-	    blankItemContent[${i}]="<div class='information-notice'>Since CacheGuard-OS version UF-2.4.1, no license key is required to run the appliance. However, we strongly recommend purchasing a support contract. To do so, please click on the ${subscription_title}</div> link above."
+	    blankItemContent[${i}]="<div class='information-notice'>Since CacheGuard-OS version UF-2.4.1, no license key is required to run the appliance. However, we strongly recommend purchasing a support contract. To do so, please click on the ${subscription_title} link above</div>."
 	    itemForm[${i}]="text"
 	    ((i++))
 	fi

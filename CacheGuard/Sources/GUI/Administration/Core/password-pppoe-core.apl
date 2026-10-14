@@ -36,9 +36,9 @@ show-password-pppoe-form()
     itemID[1]="username"
     itemID[2]="password"
 
-    blankItemContent[0]="${IP_EXTRNAL_PPPOE_SERVICE_NAME}"
-    blankItemContent[1]="${IP_EXTRNAL_PPPOE_USERNAME}"
-    blankItemContent[2]="type='password' size='32' maxlength='${MAX_LEN}' value='${IP_EXTRNAL_PPPOE_PASSWORD}'"
+    blankItemContent[0]="${IP_EXTERNAL_PPPOE_SERVICE_NAME}"
+    blankItemContent[1]="${IP_EXTERNAL_PPPOE_USERNAME}"
+    blankItemContent[2]="type='password' size='32' maxlength='${MAX_LEN}' value='${IP_EXTERNAL_PPPOE_PASSWORD}'"
 
     checkItem[2]=printable
 

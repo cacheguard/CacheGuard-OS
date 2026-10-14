@@ -1,6 +1,19 @@
 <a name='main' class='doc-title'></a>
 <h1>Change Logs & Release Notes</h1>
 
+<a name='2.6.3' class='doc-title'></a><h3>Version UF-2.6.3 (14 October 2026)</h3>
+<ul>
+  <li>The external network interface can now be configured to use an 802.1Q-tagged VLAN, primarily for PPPoE connectivity over a VLAN-tagged ISP connection.</li>
+  <li>The <strong>ip external connect</strong> usage form has been added to the <strong>ip</strong> command to explicitly request a connection when external connectivity has not been properly initialised.</li>
+  <li>An issue where the appliance could become unreachable after one interface of a bonded pair failed, when running in a virtual machine, has been fixed.</li>
+  <li>The static route configuration bug when using an 802.1Q-tagged VLAN on the internal network interface, introduced in version UF-2.6.2, has been fixed.</li>
+  <li>The <strong>apply</strong> command has been fixed so that it no longer erroneously reports error 258 (overlapping networks) when VLAN mode is activated and the external network interface uses a 255.255.255.255 network mask.</li>
+  <li>The QoS module has been fixed to properly display a report for the external network interface after switching its IP configuration from static to PPPoE.</li>
+  <li>The OS has been enhanced to properly reconfigure all services and features that depend on the external interface IP address during boot when its dynamically assigned IP address has changed.</li>
+  <li>BIND has been upgraded to version 9.20.29, including support for the new DNSSEC root key (key tag 38696).</li>
+  <li>Minor bug fixes have been applied.</li>
+</ul>
+
 <a name='2.6.2' class='doc-title'></a><h3>Version UF-2.6.2 (29 September 2026)</h3>
 <ul>
   <li>The DHCP range configuration bug introduced in version UF-2.6.1 has been fixed.</li>

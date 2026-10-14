@@ -418,6 +418,11 @@ file-size()
     test -n "${1}" || return 1
     local file=${1}
 
+    if test ! -f ${file} ; then
+	echo 0
+	return 11
+    fi
+
     local size=$(ls --size --block-size=1024 ${file} 2>/dev/null)
     size=${size/ */}
 
@@ -1272,7 +1277,8 @@ get-dynamic-dns-report()
 {
     local ip
 
-    ip=$(dig +noall \
+    ip=$(dig -4 \
+	     +noall \
 	     +short \
 	     +ignore \
 	     +timeout=3 \

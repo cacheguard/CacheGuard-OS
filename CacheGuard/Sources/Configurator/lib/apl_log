@@ -35,6 +35,12 @@ log-abort-begin()
     log-ret 0
 }
 
+log-abort-end()
+{
+    log "Ending the abort operation"
+    log-result 0
+}
+
 log-msg()
 {
     test -n "${1}" || return 1

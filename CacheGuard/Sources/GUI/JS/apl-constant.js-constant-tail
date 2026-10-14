@@ -20,4 +20,4 @@ var UPDATE_TIMER = null;
 var REFRESH_SHORTCUTS_TIMER = null;
 var BLINK_DIV_TIMER = null;
 var BLINK_ICON_TIMERS = [];
-var UNAVAILABLE = "<center><div class='box-unavailable'><img src='" + GUI_IMAGE_DIR + "loading.gif' width='340' /></div></center>"
+var UNAVAILABLE = "<div class='box-unavailable'><img src='" + GUI_IMAGE_DIR + "loading.gif' /></div>"

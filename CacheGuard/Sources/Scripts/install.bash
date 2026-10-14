@@ -103,6 +103,7 @@ install-network-scripts()
 
     sudo install -m 755 -o root -g root ${dir}/dhclient-script ${APL}/sbin/dhclient-script
 
+    sudo install -m 644 -o root -g root ${dir}/dhclient-functions ${APL}${ETC_DHCP_DIR}
     sudo install -m 644 -o root -g root ${dir}/dhclient-enter-hooks ${APL}${LOCAL_DIR}/etc
     sudo install -m 644 -o root -g root ${dir}/dhclient-exit-hooks ${APL}${LOCAL_DIR}/etc
 }

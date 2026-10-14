@@ -129,6 +129,11 @@ show-conf-load-save-form()
     shortcutMenuTitle[2]="File Operations"
 
     show-title "Load Save Configuration" "${state}" "access conf file password"
+
+    echo "<div class='core-form'>"
+    echo "<div class='table-title'>Load & Save via File Server</div>"
+    echo "</div>"
+
     show-form "${width}" ${state}
 }
 
@@ -138,8 +143,8 @@ show-conf-upload-form()
     local button_id='upload-button'
 
     echo "<div class='core-form'>"
-    echo "<div class='table-title'>Upload Configuration form your Workstation</div>"
-    
+    echo "<div class='table-title'>Upload form Workstation</div>"
+
     echo "<form name='${form_id}' id='${form_id}' action='/${GUI_DIR_NAME}/submit-conf-load-save.${GUI_EXT_NAME}' method='post' enctype='multipart/form-data'>"
     echo "<input type='hidden' name='${GUI_CSRF_ATTRIBUTE}' value='${TOKEN}' />"
     echo "<input type='hidden' name='operation' value='upload' />"
@@ -185,7 +190,7 @@ show-conf-download-form()
     fi
 
     echo "<div class='core-form'>"
-    echo "<div class='table-title'>Download Configuration to your Workstation</div>"
+    echo "<div class='table-title'>Download to Workstation</div>"
 
     echo "<form name='${form_id}' id='${form_id}' action='/${GUI_DIR_NAME}/submit-conf-load-save.${GUI_EXT_NAME}' method='post' data-download='true'>"
     echo "<input type='hidden' name='${GUI_CSRF_ATTRIBUTE}' value='${TOKEN}' />"
@@ -198,7 +203,7 @@ show-conf-download-form()
     echo "<tr>"
     echo "<td>Configuration Version</td>"
     echo "<td>"
-    echo "<select name='verison'>"
+    echo "<select name='version'>"
     print-conf-version ${version}
     echo "</select>"
     echo "</td>"

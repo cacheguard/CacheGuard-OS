@@ -38,7 +38,7 @@ get-external-service-name()
     echo ${name}
 }
 
-set-global-parameters()
+set-tools-parameters()
 {
     if test -z "${APPLIANCE_DEBUG_LEVEL}" ; then
 	APPLIANCE_DEBUG_LEVEL=0

@@ -46,7 +46,7 @@ set-debug-mode()
     check-digit ${level} || return 13
     test ${level} -lt 6 || return 15
 
-    apl_service stop daemon-only
+    apl_service stop appliance
     apl_health_check < /dev/console
     APPLIANCE_DEBUG_LEVEL=${level} apl_configure
 
@@ -56,7 +56,7 @@ set-debug-mode()
 	rm -f ${LOG_DIR}/${WAF_DEBUG_LOG}
     fi
 
-    apl_service start daemon-only
+    apl_service start appliance
 }
 
 set-debug-mode "${@}"

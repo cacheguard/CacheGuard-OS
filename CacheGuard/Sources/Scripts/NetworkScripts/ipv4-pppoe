@@ -26,18 +26,26 @@ source ${CACHEGUARD_DIR}/constant
 
 source /lib/lsb/init-functions
 
+if test -f /var/run/${DYNAMIC_IP_BOOTING} ; then
+    PPPOE_CONTEXT=boot
+else
+    PPPOE_CONTEXT=run
+fi
+
 pppoe-up()
 {
     test -n "${1}" || return 1
     local dev=${1}
 
-    local timeout=3000000 gap=200000
+    local timeout=15000000 gap=500000
     local n=$((timeout / gap)) i=0
+    local state
 
-    pppd nodetach call ${EXTERNAL_PPPOE_PEER_NAME} \
-	 ip-up-script ${LOCAL_DIR}/bin/apl_pppoe_up \
-	 ip-down-script ${LOCAL_DIR}/bin/apl_pppoe_down > /dev/null 2>&1 &
+    local args=(nodetach call ${EXTERNAL_PPPOE_PEER_NAME}
+		ip-up-script ${LOCAL_DIR}/bin/apl_pppoe_up
+		ip-down-script ${LOCAL_DIR}/bin/apl_pppoe_down)
 
+    pppd "${args[@]}" > /dev/null 2>&1 &
     local pid=${!}
 
     echo ${pid} > /var/run/pppoe.pid
@@ -46,17 +54,38 @@ pppoe-up()
     do
 	test ${i} -lt ${n} || break
 	usleep ${gap}
-	((i++))
 
 	if ! kill -0 "${pid}" 2> /dev/null ; then
             wait "${pid}"
-            local ret=$?
-            echo "pppd exited with ${ret}" > /dev/null
-            return ${ret}
+            return ${?}
 	fi
+
+	((i++))
+    done
+    test ${i} -ne ${n} || return 11
+    test ${PPPOE_CONTEXT} == boot || return 0
+
+    i=0
+    while true
+    do
+	test ! -f ${RUN_DIR}/${EXTERNAL_PPPOE_DONE} || break
+	test ${i} -lt ${n} || break
+	usleep ${gap}
+	((i++))
+    done
+    test ${i} -ne ${n} || return 13
+
+    i=0
+    while true
+    do
+	read state < ${RUN_DIR}/${EXTERNAL_PPPOE_DONE}
+	test ${state} != 'finished' || return 0
+	test ${i} -lt ${n} || break
+	usleep ${gap}
+	((i++))
     done
 
-    test ${i} -ne ${n}
+    return 15
 }
 
 pppoe-down()
@@ -93,7 +122,6 @@ pppoe-down()
 	killall --quiet -KILL ${prog}
 	usleep ${timeout}
     fi
-
     
     return 0
 }
@@ -102,6 +130,23 @@ case "${2}" in
     up)
 	log_info_msg "Bringing up PPPoE for ${1}..."
 	pppoe-up ${1}
+	RETVAL=${?}
+
+	if [ ${RETVAL} -ne 0 ] ; then
+	    if [ -f ${RUN_DIR}/${EXTERNAL_PPPOE_IP_CONFIGURATION}.new ] ; then
+		mv -f \
+		   ${RUN_DIR}/${EXTERNAL_PPPOE_IP_CONFIGURATION}.new \
+		   ${RUN_DIR}/${EXTERNAL_PPPOE_IP_CONFIGURATION}.old
+	    fi
+
+	    rm -f ${RUN_DIR}/${EXTERNAL_PPPOE_DONE}
+
+	    test ${PPPOE_CONTEXT} != boot || rm -f /var/run/${DYNAMIC_IP_BOOTING}
+
+	    ${LOCAL_DIR}/sbin/apl_network_dependent_configure
+	fi
+
+	[ ${RETVAL} -eq 0 ]
 	evaluate_retval
 	;;
     down)

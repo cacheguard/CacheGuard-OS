@@ -149,7 +149,9 @@ gen-sysnetctl()
 	rp_filter=0
     fi
 
-    echo "net.ipv4.conf.${IF_EXTERNAL}.rp_filter = ${rp_filter}"
+    local if_external=${IF_EXTERNAL/./\/}
+
+    echo "net.ipv4.conf.${if_external}.rp_filter = ${rp_filter}"
 }
 
 gen-at-allow()

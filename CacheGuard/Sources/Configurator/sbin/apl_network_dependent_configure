@@ -2,7 +2,7 @@
 
 ###########################################################################
 #
-# MODULE:       GUI
+# MODULE:       Configurator
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -21,32 +21,17 @@
 #
 ###########################################################################
 
-show-ip-external-renew-report()
+exec 3> /var/lock/apl_network_dependent_configure
+flock -n 3 || exit 0
+
+source /usr/local/lib/apl_functions
+
+main()
 {
-    refresh-buttons
-    echo "<div class='table-title'>External interface DHCP renewal report</div>"
-    echo "<div id='${AUTO_REPORT_ID}' class='log-report'></div>"
-}
-
-show-ip-external-renew-form()
-{
-    local width
-
-    local state
-
-    if test "${REMOTE_USER}" != "${ADMIN_NAME}" ; then
-	state='disabled'
-    else
-	test ${CURRENT_IP_EXTERNAL_MODE} == 'dhcp' || state='disabled'
-    fi
-
-    shortcutMenuItem[0]="ip"
-    shortcutMenuTitle[0]="External IP Address"
-
-    show-title "Renew DHCP Lease" "${state}" "apply ip"
-    show-form "${width}" "${state}" show-ip-external-renew-report
+    su - ${ADMIN_NAME} --command 'cancel' 2> /dev/null
+    apl-network-dependent-configure "${@}"
 }
 
 # Main()
 
-show-ip-external-renew-form
+main "${@}"

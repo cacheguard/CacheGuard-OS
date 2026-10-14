@@ -261,14 +261,19 @@ show-report-link()
     test -f ${RUN_DIR}/${LINKS_STATE_FILENAME} || return 0
 
     local dev state ips
-    local ext_state ip
+    local low_dev ext_state ip
 
     while read dev state ips
     do
 	test -n "${ips}" || continue
 
 	if test ${dev} == ${EXTERNAL_PPPOE_IF} ; then
-	    dev="${EXTERNAL_PPPOE_IF} [${CURRENT_BOND_EXTERNALS}]"
+	    if test ${CURRENT_EXTERNAL_VLAN} == 'none' ; then
+		low_dev=${CURRENT_BOND_EXTERNALS}
+	    else
+		low_dev=${CURRENT_BOND_EXTERNALS}.${CURRENT_EXTERNAL_VLAN}
+	    fi
+	    dev="${EXTERNAL_PPPOE_IF} [${low_dev}]"
 	else
 	    dev=$(get-formatted-bond-devs ${dev})
 	    ext_state=$(echo-formated-state ${state})

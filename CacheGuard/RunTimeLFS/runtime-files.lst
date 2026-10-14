@@ -488,6 +488,7 @@ usr/sbin/partprobe
 usr/sbin/poweroff
 usr/sbin/pppd
 usr/sbin/pppdump
+usr/sbin/pppoe-discovery
 usr/sbin/pvcreate
 usr/sbin/pvdisplay
 usr/sbin/reboot
@@ -960,6 +961,7 @@ usr/share/man/man8/partprobe.8
 usr/share/man/man8/poweroff.8
 usr/share/man/man8/pppd.8
 usr/share/man/man8/pppdump.8
+usr/share/man/man8/pppoe-discovery.8
 usr/share/man/man8/pvcreate.8
 usr/share/man/man8/pvdisplay.8
 usr/share/man/man8/reboot.8

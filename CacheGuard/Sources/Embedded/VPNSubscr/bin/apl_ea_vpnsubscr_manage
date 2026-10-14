@@ -422,7 +422,7 @@ __BATCH_MODE=no tls server generate ${VPNSUBSCR_VPN_TLS_ID} sign < /tmp/${tls_co
     fi
 
     if test ${VPNSUBSCR_TEST_MODE} == yes ; then
-	local ntps=$(dig +short ntp.ubuntu.com 2> /dev/null)
+	local ntps=$(dig -4 +short ntp.ubuntu.com 2> /dev/null)
 	local ntp=$(get-nth-arg 1 ${ntps})
 	su - ${ADMIN_NAME} -c \
 	   "

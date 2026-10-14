@@ -2,7 +2,7 @@
 
 ###########################################################################
 #
-# MODULE:       GUI
+# MODULE:       Patch
 # COPYRIGHT:    (C) 2009-2025 by CacheGuard Technologies Ltd (UK)
 # COPYRIGHT:    (C) 2026-2026 by CacheGuard Technologies SAS (FR)
 #
@@ -20,6 +20,3 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 ###########################################################################
-
-log-command "ip" "external dhcp renew"
-execute-command "ip external dhcp renew"

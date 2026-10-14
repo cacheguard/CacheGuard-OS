@@ -53,28 +53,7 @@ set-environment()
 	CALLER_PID=${$}
     fi
 
-    if test ${CURRENT_IP_EXTERNAL_MODE} == 'pppoe' -a -f ${RUN_DIR}/${EXTERNAL_PPPOE_IP_CONFIGURATION}.new ; then
-
-	local line i=0
-
-	while read line
-	do
-	    case ${i} in
-		0|1|2)
-		    ;;
-		3)
-		    local peer=${line}
-	 	    ! check-expr-ip ${peer} || PPPOE_PEER=${peer}
-		    break
-		    ;;
-		*)
-		    break
-		    ;;
-	    esac
-	    ((i++))
-	done < ${RUN_DIR}/${EXTERNAL_PPPOE_IP_CONFIGURATION}.new
-	ret=0
-    fi
+    PPPOE_PEER=$(get-pppoe-peer)
 
     trap "clean-end-cb" USR1 INT QUIT TERM
 }

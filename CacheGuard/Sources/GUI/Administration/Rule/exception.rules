@@ -94,3 +94,8 @@ SecRule REQUEST_METHOD "^POST$" id:504,log,auditlog,severity:5,allow,chain
 SecRule MULTIPART_NAME "^(csrf_cookie|operation|protocol|filename)$" chain
 SecRule MULTIPART_FILENAME "^[[:print:]]{0,192}$" chain
 SecRule REQUEST_URI "^/gui/submit-conf-load-save\.apl$"
+
+SecRule REQUEST_METHOD "^POST$" id:506,log,auditlog,severity:5,allow,chain
+SecRule MULTIPART_NAME "^(csrf_cookie|tls|tls_componentu|operationu|protocol|filename|daysu|ocspu)$" chain
+SecRule MULTIPART_FILENAME "^[[:print:]]{0,192}$" chain
+SecRule REQUEST_URI "^/gui/submit-tls-server-manage\.apl(\?[[:print:]]{0,66})?$"

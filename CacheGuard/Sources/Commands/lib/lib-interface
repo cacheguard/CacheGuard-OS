@@ -642,7 +642,7 @@ get-registration-otp-url()
     read eth0 mac0 info0 < ${HARD_DIR}/hw-links
     mac0=${mac0//:}
 
-    resolve=$(dig ${APPLIANCE_WEBSITE} +noall +short +timeout=1 +tries=1 2> /dev/null 2>&1)
+    resolve=$(dig -4 +noall +short +timeout=1 +tries=1 ${APPLIANCE_WEBSITE} 2> /dev/null 2>&1)
     ret=${?}
 
     if test ${ret} -eq 0 ; then
@@ -1849,6 +1849,37 @@ is-bond-dev()
     local devs=${1}
 
     test "${devs}" != "${devs/ *}"
+}
+
+get-bond-index()
+{
+    test -n "${1}" || return 1
+    local interface=${1}
+
+    case ${APL_ROLE} in
+	gateway)
+	    case ${interface} in
+		external)
+		    echo ${IF_EXTERNAL_NUM}
+		    ;;
+		internal)
+		    echo ${IF_INTERNAL_NUM}
+		    ;;
+		auxiliary)
+		    echo ${IF_AUXILIARY_NUM}
+		    ;;
+		*)
+		    return 255
+		    ;;
+	    esac
+	    ;;
+	manager)
+	    echo 0
+	    ;;
+	*)
+	    return 255
+	    ;;
+    esac
 }
 
 gen-netrc()

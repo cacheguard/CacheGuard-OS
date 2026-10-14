@@ -28,7 +28,7 @@ check-access-vlan()
     test -n "${1}" || return 1
 
     case "${1}" in
-	web|rweb|file|peer|admin|mon|antivirus)
+	external|web|rweb|file|peer|admin|mon|antivirus)
 	    return 0
 	    ;;
 	*)
@@ -39,22 +39,30 @@ check-access-vlan()
 
 show-vlans()
 {
-    local vlan_ids="web rweb antivirus peer file admin mon"
-    local vlan_id cur_tag new_tag
+    local access_types="external web rweb antivirus peer file admin mon"
+    local access_type cur_tag new_tag
 
-    for vlan_id in ${vlan_ids}
+    for access_type in ${access_types}
     do
-	cur_tag=$(get-vlan-tag ${vlan_id} cur)
-	new_tag=$(get-vlan-tag ${vlan_id} new)
+	case ${access_type} in
+	    external)
+		cur_tag=${CURRENT_EXTERNAL_VLAN}
+		new_tag=${EXTERNAL_VLAN}
+		;;
+	    *)
+		cur_tag=$(get-vlan-tag ${access_type} cur)
+		new_tag=$(get-vlan-tag ${access_type} new)
+		;;
+	esac
 
 	echo-command-form "vlan"
 	echo-mark-cur
-	echo-value "${vlan_id} ${cur_tag}"
+	echo-value "${access_type} ${cur_tag}"
 
 	if test ${cur_tag} != ${new_tag} ; then
 	    echo-command-form "vlan"
 	    echo-mark-new
-	    echo-value "${vlan_id} ${new_tag}"
+	    echo-value "${access_type} ${new_tag}"
 	fi
     done
 }
@@ -64,8 +72,18 @@ show-vlan-type()
     test -n "${1}" || return 1
     local at=${1}
 
-    local cur_vid=$(get-vlan-tag ${at} cur)
-    local vid=$(get-vlan-tag ${at} new)
+    local cur_vid vid
+
+    case ${at} in
+	external)
+	    cur_vid=${CURRENT_EXTERNAL_VLAN}
+	    vid=${EXTERNAL_VLAN}
+	    ;;
+	*)
+	    cur_vid=$(get-vlan-tag ${at} cur)
+	    vid=$(get-vlan-tag ${at} new)
+	    ;;
+    esac
 
     echo-command-form "vlan"
     echo-mark-cur
@@ -83,7 +101,7 @@ show-vlan()
 {
     echo-begin-show
 
-    if test -z "${1}" ;then
+    if test -z "${1}" ; then
 	show-vlans
     else
 	show-vlan-type ${1}
@@ -92,7 +110,7 @@ show-vlan()
     echo-end-show
 }
 
-set-vlan()
+set-internal-vlan()
 {
     test -n "${1}" || return 1
     test -n "${2}" || return 1
@@ -174,8 +192,18 @@ run()
     
     if test -z "${ARGS[2]}" ; then show-vlan ${as} ; return 0 ; fi
     local vl=${ARGS[2]}
-    check-vlan ${vl} || return 41
-    set-vlan ${as} ${vl}
+
+    case ${as} in
+	external)
+	    test ${vl} == 'none' || check-vlan ${vl} || return 41
+	    EXTERNAL_VLAN=${vl}
+	    SAVENV=1
+	    ;;
+	*)
+	    check-vlan ${vl} || return 41
+	    set-internal-vlan ${as} ${vl}
+	    ;;
+    esac
 }
 
 main "${@}"

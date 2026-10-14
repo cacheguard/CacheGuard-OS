@@ -29,7 +29,7 @@ dhcp-up()
     test -n "${1}" || return 1
     local dev=${1}
 
-    dhclient -4 -q ${dev} 2> /dev/null    
+    dhclient -4 -q ${dev} > /dev/null 2>&1
 }
 
 dhcp-down()

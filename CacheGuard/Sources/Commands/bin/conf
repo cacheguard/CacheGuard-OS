@@ -368,7 +368,12 @@ show-diff()
     test "${BOND_EXTERNALS}" == "${CURRENT_BOND_EXTERNALS}" || echo link bond external >> ${transaction_file}
     test "${BOND_INTERNALS}" == "${CURRENT_BOND_INTERNALS}" || echo link bond internal >> ${transaction_file}
     test "${BOND_AUXILIARIES}" == "${CURRENT_BOND_AUXILIARIES}" || echo link bond auxiliary >> ${transaction_file}
-    test "${VLAN_FLOW_LIST}" == "${CURRENT_VLAN_FLOW_LIST}" || echo vlan >> ${transaction_file}
+
+    if test "${VLAN_FLOW_LIST}" != "${CURRENT_VLAN_FLOW_LIST}" ; then
+	echo vlan >> ${transaction_file}
+    else
+	test "${EXTERNAL_VLAN}" == "${CURRENT_EXTERNAL_VLAN}" || echo vlan external >> ${transaction_file}
+    fi
 
     if test "${IP_EXTERNAL_MODE}" != "${CURRENT_IP_EXTERNAL_MODE}" ; then
 	echo ip external >> ${transaction_file}
@@ -379,9 +384,9 @@ show-diff()
 		     "${IP_EXTERNAL_MASK}" == "${CURRENT_IP_EXTERNAL_MASK}" || echo ip external >> ${transaction_file}
 		;;
 	    pppoe)
-		test "${IP_EXTRNAL_PPPOE_SERVICE_NAME}" == "${CURRENT_IP_EXTRNAL_PPPOE_SERVICE_NAME}" -a \
-		     "${IP_EXTRNAL_PPPOE_USERNAME}" == "${CURRENT_IP_EXTRNAL_PPPOE_USERNAME}" -a \
-		     "${IP_EXTRNAL_PPPOE_PASSWORD}" == "${CURRENT_IP_EXTRNAL_PPPOE_PASSWORD}" || echo ip external >> ${transaction_file}
+		test "${IP_EXTERNAL_PPPOE_SERVICE_NAME}" == "${CURRENT_IP_EXTERNAL_PPPOE_SERVICE_NAME}" -a \
+		     "${IP_EXTERNAL_PPPOE_USERNAME}" == "${CURRENT_IP_EXTERNAL_PPPOE_USERNAME}" -a \
+		     "${IP_EXTERNAL_PPPOE_PASSWORD}" == "${CURRENT_IP_EXTERNAL_PPPOE_PASSWORD}" || echo ip external >> ${transaction_file}
 		;;
 	    *)
 		;;
@@ -1361,7 +1366,9 @@ create-conf()
 	done
 
 	echo
-    
+
+	echo "vlan external ${_EXTERNAL_VLAN}"
+
 	i=0
 	for elt in ${_VLAN_FLOW_LIST}
 	do
@@ -1397,9 +1404,9 @@ create-conf()
 		echo "ip external ${_IP_EXTERNAL_MODE}"
 		;;
 	    pppoe)
-		password=$(encrypt-password "clear:${_IP_EXTRNAL_PPPOE_PASSWORD}" "${PPPOE_PASSWD}")
+		password=$(encrypt-password "clear:${_IP_EXTERNAL_PPPOE_PASSWORD}" "${PPPOE_PASSWD}")
 		password=${password/encrypted:}
-		echo "ip external ${_IP_EXTERNAL_MODE}:encrypted '${_IP_EXTRNAL_PPPOE_SERVICE_NAME}' '${_IP_EXTRNAL_PPPOE_USERNAME}' ${password}"
+		echo "ip external ${_IP_EXTERNAL_MODE}:encrypted '${_IP_EXTERNAL_PPPOE_SERVICE_NAME}' '${_IP_EXTERNAL_PPPOE_USERNAME}' ${password}"
 		;;
 	    *)
 		;;

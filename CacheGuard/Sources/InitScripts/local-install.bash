@@ -70,11 +70,19 @@ add-link()
 {
     local level self_dns
 
-    if test ${DNS_MODE} == True ; then
-	self_dns=yes
-    else
-	! member "${NAME_SERVER_LIST}" "127.0.0.1" || self_dns=yes
-    fi
+    case ${APL_ROLE} in
+	gateway)
+	    if test ${DNS_MODE} == True ; then
+		self_dns=yes
+	    else
+		! member "${NAME_SERVER_LIST}" "127.0.0.1" || self_dns=yes
+	    fi
+	    ;;
+	manager)
+	    ;;
+	*)
+	    ;;
+    esac
 
     ####### Stop Part #######
     for level in 0 6
@@ -195,7 +203,7 @@ add-link()
     ln -sf ../init.d/rlogger _S11rlogger
     ln -sf ../init.d/smartd S12smartd
     ln -sf ../init.d/ebtables _S13ebtables
-    ln -sf ../init.d/iptables S14iptables
+    ln -sf ../init.d/iptables S22iptables
     ln -sf ../init.d/tc S24tc
 
     if test ${MANAGER_SYNC_ROLE} == True ; then

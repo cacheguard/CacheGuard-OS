@@ -115,7 +115,7 @@ show-system-report()
 
     local dashboard_file=${HOME}/${ENV_RDIR}/${GUI_DASHBOARD_LAYOUT_FILENAME}
 
-    titles[${i}]="HA, Links & Gateways" ; ((i++))
+    titles[${i}]="Links, IP & Gateways" ; ((i++))
     titles[${i}]="Load & Memory Usage" ; ((i++))
     titles[${i}]="Internal Network Activities" ; ((i++))
 

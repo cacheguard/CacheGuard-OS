@@ -29,15 +29,31 @@ source ${CACHEGUARD_DIR}/constant
 source ${ABASE_DIR}/${ENV_RDIR}/${ENV_CURRENT_NAME}
 
 test -n "${CURRENT_BOND_EXTERNALS}" || exit 0
-test "${CURRENT_IP_EXTERNAL_MODE}" == dhcp || exit 0
-test -f ${RUN_DIR}/${EXTERNAL_DHCP_IP_CONFIGURATION} || exit 15
 
 main()
 {
     local dev
 
-    read dev < ${RUN_DIR}/${EXTERNAL_DHCP_IP_CONFIGURATION}
-    test -n "${dev}" || return 21
+    case ${CURRENT_IP_EXTERNAL_MODE} in
+	dhcp)
+	    test -f ${RUN_DIR}/${EXTERNAL_DHCP_IP_CONFIGURATION} || return 21
+	    read dev < ${RUN_DIR}/${EXTERNAL_DHCP_IP_CONFIGURATION}
+	    ;;
+	pppoe)
+	    test -f ${RUN_DIR}/${EXTERNAL_PPPOE_IP_CONFIGURATION}.new || return 23
+
+	    local lines
+	    declare -a lines
+	    
+	    mapfile -t lines < ${RUN_DIR}/${EXTERNAL_PPPOE_IP_CONFIGURATION}.new
+	    dev=${lines[1]}
+	    ;;
+	*)
+	    return 0
+	    ;;
+    esac
+
+    test -n "${dev}" || return 31
 
     {
 	touch /var/lock/apl_dhcp_external_renew	

@@ -63,9 +63,15 @@ AUOTO_UPDATE_ID="auto-update-log"
 GUI_LOGOUT_TOKEN="logout,logout,logout,logout"
 
 MULTIPART_CONTENT_TYPE_HEADER_1="Content-Type: application/octet-stream"
-MULTIPART_CONTENT_TYPE_HEADER_2="Content-Type: text/plain"
+MULTIPART_CONTENT_TYPE_HEADER_2="Content-Type: application/pkix-cert"
+MULTIPART_CONTENT_TYPE_HEADER_3="Content-Type: application/pkcs10"
+MULTIPART_CONTENT_TYPE_HEADER_4="Content-Type: application/vnd.apple.keynote"
+MULTIPART_CONTENT_TYPE_HEADER_5="Content-Type: text/plain"
 MULTIPART_CONTENT_TYPE_HEADER_LEN_1=${#MULTIPART_CONTENT_TYPE_HEADER_1}
 MULTIPART_CONTENT_TYPE_HEADER_LEN_2=${#MULTIPART_CONTENT_TYPE_HEADER_2}
+MULTIPART_CONTENT_TYPE_HEADER_LEN_3=${#MULTIPART_CONTENT_TYPE_HEADER_3}
+MULTIPART_CONTENT_TYPE_HEADER_LEN_4=${#MULTIPART_CONTENT_TYPE_HEADER_4}
+MULTIPART_CONTENT_TYPE_HEADER_LEN_5=${#MULTIPART_CONTENT_TYPE_HEADER_5}
 
 FORM_DATA_HEADER="Content-Disposition: form-data;"
 FORM_DATA_HEADER_LEN=${#FORM_DATA_HEADER}
@@ -1544,12 +1550,15 @@ read-multipart-post-data()
     test -n "${1}" || return 1
     local boundary=${1}
 
+    local max_upload_size=$((10 * 1024 * 1024)) upload_size line_size
+    local LC_ALL=C
+
     local assertions assertion
     local attribute quoted_attribute
     local value src_filename dst_filename
     local line len
 
-    read line || return 11
+    IFS= read -r line || return 11
 
     test "${line:0:${FORM_DATA_HEADER_LEN}}" == "${FORM_DATA_HEADER}" || return 13
 
@@ -1570,7 +1579,6 @@ read-multipart-post-data()
     local i=0 j=0
     local eof=$(remove-cr "${boundary}")
     eof=$(echo -e "${eof}--\r")
-
 
     while read line
     do
@@ -1609,25 +1617,35 @@ read-multipart-post-data()
 		read line || return 51
 		test \
 		    "${line:0:${MULTIPART_CONTENT_TYPE_HEADER_LEN_1}}" == "${MULTIPART_CONTENT_TYPE_HEADER_1}" -o \
-		    "${line:0:${MULTIPART_CONTENT_TYPE_HEADER_LEN_2}}" == "${MULTIPART_CONTENT_TYPE_HEADER_2}" || return 53
+		    "${line:0:${MULTIPART_CONTENT_TYPE_HEADER_LEN_2}}" == "${MULTIPART_CONTENT_TYPE_HEADER_2}" -o \
+		    "${line:0:${MULTIPART_CONTENT_TYPE_HEADER_LEN_3}}" == "${MULTIPART_CONTENT_TYPE_HEADER_3}" -o \
+		    "${line:0:${MULTIPART_CONTENT_TYPE_HEADER_LEN_4}}" == "${MULTIPART_CONTENT_TYPE_HEADER_4}" -o \
+		    "${line:0:${MULTIPART_CONTENT_TYPE_HEADER_LEN_5}}" == "${MULTIPART_CONTENT_TYPE_HEADER_5}" || return 53
 		read line || return 55
 		test "${line}" == $'\r' || return 57
 
-		while read line
+		upload_size=0
+
+		while IFS= read -r line
 		do
-		    if test "${line}" == $'\r' ; then
+		    test "${line}" != "${eof}" || break
+		    test "${line}" != "${boundary}" || break
 
-			read line #### May return 1 if it's the last line
-			test "${line}" != "${eof}" || break
-			test "${line}" != "${boundary}" || break
-			echo
-			echo ${line}
-		    else
-			echo ${line}
+		    line_size=$((${#line} + 1))
+		    upload_size=$((upload_size + line_size))
+
+		    if (( upload_size > max_upload_size )); then
+			rm -f -- "/tmp/${dst_filename}"
+			return 61
 		    fi
-		done > /tmp/${dst_filename}
 
-                test "${line}" == "${eof}" -o "${line}" == "${boundary}" || return 61
+		    printf '%s\n' "$line"
+		done > "/tmp/${dst_filename}"
+
+		if test "${line}" != "${eof}" -a "${line}" != "${boundary}"; then
+		    rm -f -- "/tmp/${dst_filename}"
+		    return 63
+		fi
 
 		UPLOADED_FILES[${j}]=${dst_filename}
 		((j++))

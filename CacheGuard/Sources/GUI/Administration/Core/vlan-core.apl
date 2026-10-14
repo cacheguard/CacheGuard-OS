@@ -33,7 +33,7 @@ show-vlan-core()
     shortcutMenuItem[0]="ip"
     shortcutMenuTitle[0]="IP addresses"
 
-    show-title "802.1q VLAN Tags" "enabled" "vlan ip"
+    show-title "Internal 802.1Q VLAN Tags" "enabled" "vlan ip"
 
     echo "<div class='core-form'>"
     show-shortcuts-menu

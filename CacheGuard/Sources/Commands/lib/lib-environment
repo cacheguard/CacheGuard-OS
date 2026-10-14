@@ -476,7 +476,7 @@ is-locked-local-file()
 is-locked-global-file()
 {
     test -n "${1}" || return 1
-    test -n "${2}" || return 1
+    test -n "${2}" || return 2
     local user=${1}
     local file=${2}
 

@@ -32,6 +32,7 @@ test -x /sbin/tc || exit
 test -L ${TC_CONFIG} || exit
 
 DEBUG=no
+
 TC_CMD=tc
 IP_CMD=ip
 SERV=QoS
@@ -39,7 +40,37 @@ SERV=QoS
 cd /sys/class/net
 IFBS=$(ls -d ifb* 2> /dev/null)
 
+declare -A INTERFACE_EXISTS
+
 RETVAL=0
+
+get-service()
+(
+    test -n "${1}" || return 1
+    local file=${1}
+
+    source ${file}
+    echo ${SERVICE}
+)
+
+init-interface-exists()
+{
+    local dev
+
+    while read -r _ dev _
+    do
+	 dev=${dev%:}
+	INTERFACE_EXISTS["${dev}"]=1
+    done < <(ip -o link show 2> /dev/null)
+}
+
+interface-exist()
+{
+    test -n "${1}" || return 1
+    local interface=${1}
+
+    [[ ${INTERFACE_EXISTS[${interface}]+yes} ]]
+}
 
 link-ifb()
 {
@@ -96,70 +127,101 @@ show-tc-status()
     return ${ret}
 }
 
+start-tc()
+{
+    log_info_msg "Starting ${SERV}..."
+
+    local modifier action keyword dev rest
+    local line retval=0 i=0
+
+    while read -r modifier action keyword dev rest
+    do
+	((i++))
+
+	test -n "${modifier}" || continue
+	test "${modifier:0:1}" != "#" || continue
+
+	test "${keyword}" == dev || continue
+	interface-exist ${dev} || continue
+
+	line="${modifier} ${action} ${keyword} ${dev} ${rest}"
+
+	if [ "${DEBUG}" == yes ] ; then
+	    ${TC_CMD} ${line}
+	else
+	    ${TC_CMD} ${line} 2> /dev/null 1>&2
+	fi
+
+	if [ ${?} -ne 0 ] ; then
+	    ((retval++))
+	    [ "${DEBUG}" != yes ] || echo "*** Error on line ${i}: ${line}"
+	fi
+    done < ${TC_CONFIG}
+
+    link-ifb start
+    [ ${?} -eq 0 ] || ((retval++))
+
+    [ "${DEBUG}" != yes -o ${retval} -eq 0 ] || echo "*** Number of errors ${retval}"
+    [ ${retval} -eq 0 ]
+    evaluate_retval
+    return ${retval}
+}
+
+stop-tc()
+{
+    log_info_msg "Stopping ${SERV}... "
+
+    local file interface retval
+    local files=$(ls /etc/sysconfig/ifconfig.{eth,bond}* 2>/dev/null)
+
+    for file in ${files}
+    do
+	interface=$(basename ${file})
+	interface=${interface/ifconfig\./}
+        test "${interface/\:*}" == "${interface}" || continue
+
+	ls ${file}.* > /dev/null 2>&1
+	test ${?} -ne 0 || continue
+	SERVICE=$(get-service ${file})
+	test "${SERVICE/* }" != 'ipv4-pppoe' || interface=${EXTERNAL_PPPOE_IF}
+
+	interface-exist ${interface} || continue
+
+	${TC_CMD} qdisc del dev ${interface} root > /dev/null 2>&1
+	${TC_CMD} qdisc del dev ${interface} ingress > /dev/null 2>&1
+
+    done
+
+    for IFB in ${IFBS}
+    do
+	${TC_CMD} qdisc del dev ${IFB} root 2> /dev/null 1>&2
+    done
+
+    link-ifb stop
+    retval=${?}
+
+    rm -f ${RUN_DIR}/${QOS_DIFF_TRAFFIC_FILENAME} ${RUN_DIR}/${QOS_TRAFFIC_FILENAME}{,.old}
+    [ ${retval} -eq 0 ]
+    evaluate_retval
+    return ${retval}
+}
+
+init-interface-exists
+
 case "${1}" in
     start)
-	log_info_msg "Starting ${SERV}..."
-	RETVAL=0
-	I=0
-	while read LINE ; do
-	    ((I++))
-	    test -n "${LINE}" || continue
-	    test "${LINE:0:1}" != "#" || continue
-
-	    if [ "${DEBUG}" == no ] ; then
-		${TC_CMD} ${LINE} 2> /dev/null 1>&2
-	    else
-		${TC_CMD} ${LINE}
-	    fi
-
-	    if [ ${?} -ne 0 ] ; then
-		((RETVAL++))
-		[ "${DEBUG}" == no ] || echo "*** Error on LINE ${I}: ${LINE}"
-	    fi
-	done < ${TC_CONFIG}
-
-	link-ifb ${1}
-	[ ${?} -eq 0 ] || ((RETVAL++))
-	[ "${DEBUG}" == no -o ${RETVAL} -eq 0 ] || echo "*** Number of errors ${RETVAL}"
-	[ ${RETVAL} -eq 0 ]
-	evaluate_retval
-	exit ${RETVAL}
+	start-tc
 	;;
-
     stop)
-	log_info_msg "Stopping ${SERV}... "
-	FILES=$(ls /etc/sysconfig/ifconfig.{eth,bond}* 2>/dev/null)
-	for FILE in ${FILES}
-	do
-	    INTERFACE=$(basename ${FILE})
-	    INTERFACE=${INTERFACE/ifconfig\./}
-            test ${INTERFACE/\:*} == ${INTERFACE} || continue
-	    ls ${FILE}.* > /dev/null 2>&1
-	    test ${?} -ne 0 || continue
-
-	    ${TC_CMD} qdisc del dev ${INTERFACE} root 2> /dev/null 1>&2
-	    ${TC_CMD} qdisc del dev ${INTERFACE} ingress 2> /dev/null 1>&2
-	done
-
-	for IFB in ${IFBS}
-	do
-	    ${TC_CMD} qdisc del dev ${IFB} root 2> /dev/null 1>&2
-	done
-	link-ifb ${1}
-	RETVAL=${?}
-	rm -f ${RUN_DIR}/${QOS_DIFF_TRAFFIC_FILENAME} ${RUN_DIR}/${QOS_TRAFFIC_FILENAME}{,.old}
-	[ ${RETVAL} -eq 0 ]
-	evaluate_retval
-	exit ${RETVAL}
+	stop-tc
 	;;
-
     restart)
 	${0} stop
 	${0} start
 	;;
-
     status)
-	shift ; show-tc-status "${@}"
+	shift
+	show-tc-status "${@}"
 	RETVAL=${?}
 	exit ${RETVAL}
 	;;

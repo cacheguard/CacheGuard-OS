@@ -464,16 +464,24 @@ read-network-pppoe-conf()
     local message=${1}
 
     local external_dev=${BOND_EXTERNALS/* }
-    local service_name username password1 password2
     local len=64 visible_len=32 col=18
     local ret in_errors
     local line i
 
+    local vlan=${EXTERNAL_VLAN}
+    local service_name=${IP_EXTERNAL_PPPOE_SERVICE_NAME}
+    local username=${IP_EXTERNAL_PPPOE_USERNAME}
+    local password1=${IP_EXTERNAL_PPPOE_PASSWORD}
+    local password2=${password1}
+
+    test "${vlan}" != 'none' || unset vlan
+
     while true
     do
-	dialog ${SETUP_DIALOG_OPTIONS} --backtitle "${SETUP_BACK_TITLE}" --title "${message}" --no-cancel --form "Please enter your PPPoE Service Name (if any) and Username to connect the External [${external_dev}] Network Interface :\n\n(use arrow keys)" 0 0 2 \
-	       "Service Name:" 1 1 "${service_name}" 1 ${col} ${visible_len} ${len} \
-	       "Userame:" 2 1 "${username}" 2 ${col} ${visible_len} ${len} \
+	dialog ${SETUP_DIALOG_OPTIONS} --backtitle "${SETUP_BACK_TITLE}" --title "${message}" --no-cancel --form "Please enter your PPPoE VLAN Identifier (if any), Service Name (if any) and Username to connect the External [${external_dev}] Network Interface :\n\n(use arrow keys)" 0 0 3 \
+	       "VLAN Identifier:" 1 1 "${vlan}" 1 ${col} 5 5 \
+	       "Service Name:" 2 1 "${service_name}" 2 ${col} ${visible_len} ${len} \
+	       "Userame:" 3 1 "${username}" 3 ${col} ${visible_len} ${len} \
 	       2> ${ADMIN_TMP_DIR}/setup.${$}
 	ret=${?}
 
@@ -484,9 +492,12 @@ read-network-pppoe-conf()
 	do
 	    case ${i} in
 		0)
-		    service_name=${line}
+		    vlan=${line}
 		    ;;
 		1)
+		    service_name=${line}
+		    ;;
+		2)
 		    username=${line}
 		    ;;
 		*)
@@ -497,6 +508,7 @@ read-network-pppoe-conf()
 	done < ${ADMIN_TMP_DIR}/setup.${$}
 	rm -f ${ADMIN_TMP_DIR}/setup.${$}
 
+	test -z "${vlan}" || test ${vlan} == 'none' || check-vlan ${vlan} || in_errors="${in_errors} 41"
 	check-pppoe-service-name "${service_name}" || in_errors="${in_errors} 541"
 	check-pppoe-username "${username}"  || in_errors="${in_errors} 542"
 
@@ -563,6 +575,9 @@ read-network-pppoe-conf()
     fi
 
     test -n "${password1}" || unset username
+    test -n "${vlan}" || vlan='none'
+
+    echo "vlan external ${vlan}" >> ${SETUP_FILE}
     echo "ip external pppoe '${service_name}' '${username}' '${password1}'" >> ${SETUP_FILE}
 }
 

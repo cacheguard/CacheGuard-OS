@@ -69,7 +69,7 @@ show-ip-external()
 	    echo-value "${CURRENT_IP_EXTERNAL_MODE} (${CURRENT_IP_EXTERNAL_IP} ${CURRENT_IP_EXTERNAL_MASK})"
 	    ;;
 	pppoe)
-	    echo-value "${CURRENT_IP_EXTERNAL_MODE} '${CURRENT_IP_EXTRNAL_PPPOE_SERVICE_NAME}' '${CURRENT_IP_EXTRNAL_PPPOE_USERNAME}' ..."
+	    echo-value "${CURRENT_IP_EXTERNAL_MODE} '${CURRENT_IP_EXTERNAL_PPPOE_SERVICE_NAME}' '${CURRENT_IP_EXTERNAL_PPPOE_USERNAME}' ..."
 	    echo-blank-command
 	    echo-value "(${CURRENT_IP_EXTERNAL_IP} ${CURRENT_IP_EXTERNAL_MASK})"
 	    ;;
@@ -90,9 +90,9 @@ show-ip-external()
 	    dhcp)
 		;;
 	    pppoe)
-		test "${CURRENT_IP_EXTRNAL_PPPOE_SERVICE_NAME}" == "${IP_EXTRNAL_PPPOE_SERVICE_NAME}" -a \
-		     "${CURRENT_IP_EXTRNAL_PPPOE_USERNAME}" == "${IP_EXTRNAL_PPPOE_USERNAME}" -a \
-		     "${CURRENT_IP_EXTRNAL_PPPOE_PASSWORD}" == "${IP_EXTRNAL_PPPOE_PASSWORD}" || modified=yes
+		test "${CURRENT_IP_EXTERNAL_PPPOE_SERVICE_NAME}" == "${IP_EXTERNAL_PPPOE_SERVICE_NAME}" -a \
+		     "${CURRENT_IP_EXTERNAL_PPPOE_USERNAME}" == "${IP_EXTERNAL_PPPOE_USERNAME}" -a \
+		     "${CURRENT_IP_EXTERNAL_PPPOE_PASSWORD}" == "${IP_EXTERNAL_PPPOE_PASSWORD}" || modified=yes
 		;;
 	    *)
 		;;
@@ -112,7 +112,7 @@ show-ip-external()
 	    echo-value "${IP_EXTERNAL_MODE}"
 	    ;;
 	pppoe)
-	    echo-value "${IP_EXTERNAL_MODE} '${IP_EXTRNAL_PPPOE_SERVICE_NAME}' '${IP_EXTRNAL_PPPOE_USERNAME}' ..."
+	    echo-value "${IP_EXTERNAL_MODE} '${IP_EXTERNAL_PPPOE_SERVICE_NAME}' '${IP_EXTERNAL_PPPOE_USERNAME}' ..."
 	    ;;
 	*)
 	    ;;
@@ -446,20 +446,223 @@ show-route()
     echo-end-show
 }
 
-dhcp-external-renew()
+gen-external-dhcp-renew-report()
+{
+    local dhcp_state apply_state
+    local dhcp_reason
+
+    test -n "${COLUMNS}" || COLUMNS=80
+
+    if test ! -f ${RUN_DIR}/${EXTERNAL_DHCP_DONE} ; then
+	dhcp_state="OO In progress..."
+	apply_state="XX Waiting..."
+
+	if test -f ${RUN_DIR}/${EXTERNAL_DHCP_STATE} ; then
+	    read dhcp_reason < ${RUN_DIR}/${EXTERNAL_DHCP_STATE}
+	    echo-connect-report "Last DHCP Event" value $(get-external-dhcp-reason-text ${dhcp_reason})
+	fi
+    else
+	if test -f ${RUN_DIR}/${EXTERNAL_DHCP_STATE} ; then
+
+	    read dhcp_reason < ${RUN_DIR}/${EXTERNAL_DHCP_STATE}
+	    echo-connect-report "Last DHCP Event" value $(get-external-dhcp-reason-text ${dhcp_reason})
+
+	    case ${dhcp_reason} in
+		MEDIUM|ARPCHECK|ARPSEND|PREINIT)
+		    dhcp_state="XX In progress..."
+		    apply_state="XX Waiting..."
+		    ;;
+		BOUND|RENEW|REBIND)
+		    if test -f ${RUN_DIR}/${EXTERNAL_DHCP_IP_CONFIGURATION} ; then
+
+			local line i=0
+			local dv sv ip mk gws ld
+
+			while read line
+			do
+			    case ${i} in
+				0)
+				    dv=${line}
+				    ;;
+				1)
+				    sv=${line}
+				    ;;
+				2)
+				    ip=${line}
+				    ;;
+				3)
+				    mk=${line}
+				    ;;
+				4)
+				    gws=${line}
+				    ;;
+				5)
+				    ld=${line}
+				    ld=$(get-date-from-epoch-seconds ${ld})
+				    test -n "${ld}" || ld='unknown'
+				    break
+				    ;;
+				*)
+				    break
+				    ;;
+			    esac
+			    ((i++))
+			done < ${RUN_DIR}/${EXTERNAL_DHCP_IP_CONFIGURATION}
+
+			echo-connect-report "Physical NIC" value ${dv}
+			echo-connect-report "DHCP Server IP" value ${sv}
+			echo-connect-report "Acquired IP" value ${ip}
+			echo-connect-report "Acquired Mask" value ${mk}
+			echo-connect-report "Acquired Router(s)" value "${gws// /, }"
+			echo-connect-report "Lease End Date" value ${ld}
+		    fi
+
+		    dhcp_state="OK Done"
+
+		    if test -f ${ADMIN_LOCK_DIR}/apl_apply ; then
+			apply_state="XX In progress..."
+		    else
+			apply_state="OK Done"
+		    fi
+		    ;;
+		REBOOT)
+		    dhcp_state="XX In progress..."
+		    apply_state="XX Waiting..."
+		    ;;
+		FAIL)
+		    dhcp_state="KO Failed"
+		    apply_state="XX Delayed"
+		    ;;
+		EXPIRE)
+		    dhcp_state="KO Expired"
+		    apply_state="XX Waiting..."
+		    ;;
+		RELEASE|STOP)
+		    dhcp_state="OK N/A"
+		    apply_state="XX Delayed"
+		    ;;
+		TIMEOUT)
+		    dhcp_state="KO Failed"
+		    apply_state="XX Delayed"
+		    ;;
+		PREINIT6|BOUND6|RENEW6|REBIND6|DEPREF6|EXPIRE6|RELEASE6|STOP6)
+		    dhcp_state="KO In error[11]"
+		    ;;
+		*)
+		    dhcp_state="KO In error[13]"
+		    apply_state="XX Delayed"
+		    ;;
+	    esac
+	else
+	    dhcp_state="KO In error[21]"
+	    apply_state="XX Waiting..."
+	fi
+    fi
+
+    echo-connect-report "Connect State" state ${dhcp_state}
+    echo-connect-report "Apply State" state ${apply_state}
+}
+
+gen-external-pppoe-report()
+{
+    local pppoe_state apply_state
+
+    test -n "${COLUMNS}" || COLUMNS=80
+
+    if test ! -f ${RUN_DIR}/${EXTERNAL_PPPOE_DONE} ; then
+	pppoe_state="OO In progress..."
+	apply_state="XX Waiting..."
+    else
+	if test -f ${RUN_DIR}/${EXTERNAL_PPPOE_IP_CONFIGURATION}.new ; then
+
+	    local lines
+	    declare -a lines
+
+	    mapfile -t lines < ${RUN_DIR}/${EXTERNAL_PPPOE_IP_CONFIGURATION}.new
+
+	    local ppp_dev=${lines[0]}
+	    local eth_dev=${lines[1]}
+	    local ip=${lines[2]}
+	    local peer_ip=${lines[3]}
+	    local date=${lines[4]}
+
+	    date=$(get-date-from-epoch-seconds ${date})
+	    test -n "${date}" || date='unknown'
+
+	    echo-connect-report "PPP Device" value ${ppp_dev}
+	    echo-connect-report "Ethernet Device" value ${eth_dev}
+	    echo-connect-report "Acquired IP" value ${ip}
+	    echo-connect-report "Acquired Mask" value "255.255.255.255"
+	    echo-connect-report "Peer IP" value "${peer_ip}"
+	    echo-connect-report "Connection Date" value "${date}"
+
+	    pppoe_state="OK Done"
+
+	    if test -f ${ADMIN_LOCK_DIR}/apl_apply ; then
+		apply_state="XX In progress..."
+	    else
+		apply_state="OK Done"
+	    fi
+	else
+	    pppoe_state="KO In error[21]"
+	    apply_state="XX Waiting..."
+	fi
+    fi
+
+    echo-connect-report "Connect State" state ${pppoe_state}
+    echo-connect-report "Apply State" state ${apply_state}
+}
+
+gen-external-connect-report()
+{
+    case ${CURRENT_IP_EXTERNAL_MODE} in
+	dhcp)
+	    gen-external-dhcp-renew-report
+	    ;;
+	pppoe)
+	    gen-external-pppoe-report
+	    ;;
+	*)
+	    ;;
+    esac
+
+}
+
+display-external-connect-report()
+{
+    if test ${TERM} == ${WADMIN_TERM} ; then
+	gen-external-connect-report
+    else
+	echo-begin-show
+	gen-external-connect-report
+	echo-end-show
+    fi
+}
+
+ip-external-connect()
 {
     user-has-admin-rights || return 31
     check-lock || return 123
 
-    supervisor-action "dhcp-external-renew"
+    supervisor-action "ip-external-connect"
     test ${?} -eq 0 || return 104
 
     return 0
 }
 
+dhcp-external-renew()
+{
+    ip-external-connect
+}
+
+display-external-dhcp-renew-report()
+{
+    display-external-connect-report
+}
+
 remove-dhcp-default-routes()
 {
-    if test ! -f /var/run/${EXTERNAL_DHCP_IP_CONFIGURATION} ; then
+    if test ! -f ${RUN_DIR}/${EXTERNAL_DHCP_IP_CONFIGURATION} ; then
 	echo ${IP_ROUTE_LIST}
 	return 0
     fi
@@ -483,7 +686,7 @@ remove-dhcp-default-routes()
 
 remove-pppoe-default-route()
 {
-    if test ! -f /var/run/${EXTERNAL_PPPOE_IP_CONFIGURATION}.new ; then
+    if test ! -f ${RUN_DIR}/${EXTERNAL_PPPOE_IP_CONFIGURATION}.new ; then
 	echo ${IP_ROUTE_LIST}
 	return 0
     fi
@@ -823,7 +1026,7 @@ manage-via()
 
 show-ip-neighbour()
 {
-    test -f /var/run/${IP_NEIGHBOUR_FILENAME} || return 0
+    test -f ${RUN_DIR}/${IP_NEIGHBOUR_FILENAME} || return 0
     local ip dev mac
 
     echo-begin-show
@@ -834,12 +1037,12 @@ show-ip-neighbour()
 	echo-value "${ip}" 10 -n
 	echo-value "${dev}" 30 -n
 	echo-value "${mac}" 40
-    done < /var/run/${IP_NEIGHBOUR_FILENAME}
+    done < ${RUN_DIR}/${IP_NEIGHBOUR_FILENAME}
 
     echo-end-show
 }
 
-echo-dhcp-report()
+echo-connect-report()
 {
     test -n "${1}" || return 1
     test -n "${2}" || return 2
@@ -917,128 +1120,6 @@ get-external-dhcp-reason-text()
     echo ${reason}
 }
 
-gen-external-dhcp-renew-report()
-{
-    local dhcp_state apply_state
-
-    test -n "${COLUMNS}" || COLUMNS=80
-
-    if test -f /var/run/${EXTERNAL_DHCP_DONE} ; then
-	dhcp_state="OO In progress..."
-	apply_state="XX Waiting..."
-    else
-	if test -f /var/run/${EXTERNAL_DHCP_STATE} ; then
-
-	    local dhcp_reason
-
-	    read dhcp_reason < /var/run/${EXTERNAL_DHCP_STATE}
-	    echo-dhcp-report "Last DHCP Event" value $(get-external-dhcp-reason-text ${dhcp_reason})
-
-	    case ${dhcp_reason} in
-		MEDIUM|ARPCHECK|ARPSEND|PREINIT)
-		    dhcp_state="XX In progress..."
-		    apply_state="XX Waiting..."
-		    ;;
-		BOUND|RENEW|REBIND)
-		    if test -f /var/run/${EXTERNAL_DHCP_IP_CONFIGURATION} ; then
-
-			local line i=0
-			local dv sv ip mk gws ld
-
-			while read line
-			do
-			    case ${i} in
-				0)
-				    dv=${line}
-				    ;;
-				1)
-				    sv=${line}
-				    ;;
-				2)
-				    ip=${line}
-				    ;;
-				3)
-				    mk=${line}
-				    ;;
-				4)
-				    gws=${line}
-				    ;;
-				5)
-				    ld=${line}
-				    ld=$(get-date-from-epoch-seconds ${ld})
-				    test -n "${ld}" || ld='unknown'
-				    break
-				    ;;
-				*)
-				    break
-				    ;;
-			    esac
-			    ((i++))
-			done < /var/run/${EXTERNAL_DHCP_IP_CONFIGURATION}
-
-			echo-dhcp-report "Physical NIC" value ${dv}
-			echo-dhcp-report "DHCP Server IP" value ${sv}
-			echo-dhcp-report "Acquired IP" value ${ip}
-			echo-dhcp-report "Acquired Mask" value ${mk}
-			echo-dhcp-report "Acquired Router(s)" value "${gws// /, }"
-			echo-dhcp-report "Lease End Date" value ${ld}
-		    fi
-
-		    dhcp_state="OK Done"
-		    if test -f ${ADMIN_LOCK_DIR}/apl_apply ; then
-			apply_state="XX In progress..."
-		    else
-			apply_state="OK Done"
-		    fi
-		    ;;
-		REBOOT)
-		    dhcp_state="XX In progress..."
-		    apply_state="XX Waiting..."
-		    ;;
-		FAIL)
-		    dhcp_state="KO Failed"
-		    apply_state="XX Waiting..."
-		    ;;
-		EXPIRE)
-		    dhcp_state="KO Expired"
-		    apply_state="XX Waiting..."
-		    ;;
-		RELEASE|STOP)
-		    dhcp_state="XX In progress..."
-		    apply_state="XX Waiting..."
-		    ;;
-		TIMEOUT)
-		    dhcp_state="KO Failed"
-		    apply_state="XX In progress..."
-		    ;;
-		PREINIT6|BOUND6|RENEW6|REBIND6|DEPREF6|EXPIRE6|RELEASE6|STOP6)
-		    dhcp_state="KO In error[11]"
-		    ;;
-		*)
-		    dhcp_state="KO In error[13]"
-		    apply_state="XX Waiting..."
-		    ;;
-	    esac
-	else
-	    dhcp_state="KO In error[21]"
-	fi
-    fi
-
-    echo-dhcp-report "Request State" state ${dhcp_state}
-    echo-dhcp-report "Apply State" state ${apply_state}
-}
-
-display-external-dhcp-renew-report()
-{
-    if test ${TERM} == ${WADMIN_TERM} ; then
-	gen-external-dhcp-renew-report
-    else
-	echo-begin-show
-	gen-external-dhcp-renew-report
-	echo-end-show
-    fi
-}
-
 manage-external-dhcp()
 {
     local action=${1}
@@ -1071,6 +1152,31 @@ manage-external-dhcp()
 	    return 1
 	    ;;
     esac    
+}
+
+manage-external-connect()
+{
+    case ${CURRENT_IP_EXTERNAL_MODE} in
+	static)
+	    return 0
+	    ;;
+	*)
+	    ;;
+    esac
+
+    local key=${1}
+
+    case ${key} in
+	report)
+	    display-external-connect-report
+	    ;;
+	'')
+	    ip-external-connect
+	    ;;
+	*)
+	    return 1
+	    ;;
+    esac
 }
 
 manage-external-pppoe()
@@ -1116,9 +1222,9 @@ manage-external-pppoe()
     fi
 
     export IP_EXTERNAL_MODE='pppoe'
-    export IP_EXTRNAL_PPPOE_SERVICE_NAME=${service_name}
-    export IP_EXTRNAL_PPPOE_USERNAME=${username}
-    export IP_EXTRNAL_PPPOE_PASSWORD=${password}
+    export IP_EXTERNAL_PPPOE_SERVICE_NAME=${service_name}
+    export IP_EXTERNAL_PPPOE_USERNAME=${username}
+    export IP_EXTERNAL_PPPOE_PASSWORD=${password}
 
     SAVENV=1
 }
@@ -1219,6 +1325,11 @@ run()
 		pppoe|pppoe:encrypted)
 		    shift-args 2
 		    manage-external-pppoe ${ip_external_mode/pppoe}
+		    return ${?}
+		    ;;
+		connect)
+		    shift-args 2
+		    manage-external-connect ${ALLARGS}
 		    return ${?}
 		    ;;
 		*)

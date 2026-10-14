@@ -77,7 +77,7 @@ show-network-activity()
     test -n "${1}" || return 1
     test -n "${2}" || return 2
     local nic_name=${1}
-    local index=${2}
+    local bond_index=${2}
     local devs=${3}
     local compact=${4}
 
@@ -103,7 +103,7 @@ show-network-activity()
     fi
 
     if is-bond-dev "${devs}" ; then
-	nic="bond${index}"
+	nic="bond${bond_index}"
     else
 	nic="${devs}"
     fi
@@ -284,10 +284,11 @@ show-network-activity-external()
     local compact=${1}
     test -z "${compact}" || compact=" ${compact}"
 
+    local bond_index=$(get-bond-index external)
     local dyndns_report=$(gui-get-dynamic-dns-report external)
 
     echo "<div class='table-title${compact}'><strong>External</strong> [${CURRENT_BOND_EXTERNALS}]${dyndns_report}</div>"
-    show-network-activity external 1 "${CURRENT_BOND_EXTERNALS}"${compact}
+    show-network-activity external ${bond_index} "${CURRENT_BOND_EXTERNALS}"${compact}
 }
 
 show-network-activity-internal()
@@ -295,10 +296,11 @@ show-network-activity-internal()
     local compact=${1}
     test -z "${compact}" || compact=" ${compact}"
 
+    local bond_index=$(get-bond-index internal)
     local dyndns_report=$(gui-get-dynamic-dns-report internal)
 
     echo "<div class='table-title${compact}'><strong>Internal</strong> [${CURRENT_BOND_INTERNALS}]${dyndns_report}</div>"
-    show-network-activity internal 0 "${CURRENT_BOND_INTERNALS}"${compact}
+    show-network-activity internal ${bond_index} "${CURRENT_BOND_INTERNALS}"${compact}
 }
 
 show-network-activity-auxiliary()
@@ -306,6 +308,8 @@ show-network-activity-auxiliary()
     local compact=${1}
     test -z "${compact}" || compact=" ${compact}"
 
+    local bond_index=$(get-bond-index auxiliary)
+
     echo "<div class='table-title${compact}'><strong>Auxiliary</strong> [${CURRENT_BOND_AUXILIARIES}]</div>"
-    show-network-activity auxiliary 2 "${CURRENT_BOND_AUXILIARIES}"${compact}
+    show-network-activity auxiliary ${bond_index} "${CURRENT_BOND_AUXILIARIES}"${compact}
 }

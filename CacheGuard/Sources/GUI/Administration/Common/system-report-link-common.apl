@@ -24,10 +24,17 @@
 get-html-bond-devs()
 {
     test -n "${1}" || return 1
-    dev=${1}
+    local dev=${1}
+
+    local low_dev
 
     if test ${dev} == ${EXTERNAL_PPPOE_IF} ; then
-	dev="${EXTERNAL_PPPOE_IF} [${CURRENT_BOND_EXTERNALS}]"
+	if test ${CURRENT_EXTERNAL_VLAN} == 'none' ; then
+	    low_dev=${CURRENT_BOND_EXTERNALS}
+	else
+	    low_dev=${CURRENT_BOND_EXTERNALS}.${CURRENT_EXTERNAL_VLAN}
+	fi
+	dev="${EXTERNAL_PPPOE_IF} [${low_dev}]"
     else
 	local devs=$(get-bond-devs ${dev})
 	test "${devs/:}" == "${dev}" || dev="${devs/:*}<br />[${devs/*:}]"

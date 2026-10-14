@@ -39,6 +39,18 @@ case ${CLOUD_NAME} in
 	;;
 esac
 
+get-ip-px()
+{
+    test -n "${1}" || return 1
+    local dev=${1}
+
+    local ip_px=$(ip --oneline -4 address show dev ${dev} 2> /dev/null)
+    ip_px=${ip_px#* inet }
+    ip_px=${ip_px%% *}
+
+    echo ${ip_px}
+}
+
 update-cloud-usage()
 {
     sed -i \
@@ -133,13 +145,12 @@ update-cloud-ip-conf1()
     local internal_gw internal_routes
     local remote_ip remote_mask remote_network
 
-    local external_net=$(ip address show dev ${CLOUD_NETWORK_MAIN_DEV} 2> /dev/null | tail -2 | head -1)
+    local external_ip_px=$(get-ip-px ${CLOUD_NETWORK_MAIN_DEV})
 
-    if test "${external_net/*net */net}" != net ; then
+    if test -z "${external_ip_px}" ; then
 	external_ip='0.0.0.0'
 	external_mk='0.0.0.0'
     else
-	local external_ip_px=${external_net/*inet /} ; external_ip_px=${external_ip_px/ brd*}
 	external_ip=${external_ip_px/\/*}
 	external_mk=$(get-netmask ${external_ip_px})
 
@@ -158,17 +169,16 @@ update-cloud-ip-conf1()
 
     if test ${APL_ROLE} == gateway ; then
 
-	local internal_net=$(ip address show dev ${CLOUD_NETWORK_SECOND_DEV} 2> /dev/null | tail -2 | head -1)
+	local internal_ip_px=$(get-ip-px ${CLOUD_NETWORK_SECOND_DEV})
 
-	if test "${internal_net/*net */net}" != net ; then
+	if test -z "${internal_ip_px}" ; then
 	    internal_ip='0.0.0.0'
 	    internal_mk='0.0.0.0'
 	else
-	    local internal_ip_px=${internal_net/*inet /} ; internal_ip_px=${internal_ip_px/ brd*}
 	    internal_ip=${internal_ip_px/\/*}
 	    internal_mk=$(get-netmask ${internal_ip_px})
 
-	    if test -z "${internal_ip}" -o -z "${internal_mk}" ; then
+	    if test -z "${internal_ip}" -o -z "${internal_mk}"  ; then
 		internal_ip='0.0.0.0'
 		internal_mk='0.0.0.0'
 	    else

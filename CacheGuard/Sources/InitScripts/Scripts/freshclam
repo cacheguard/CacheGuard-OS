@@ -173,11 +173,11 @@ check-clamav-names-resolution()
 {
     local key value
     local names ip ips av_ip_list
-    local dig_opts="+short +timeout=5 +tries=3"
+    local dig_opts="-4 +short +timeout=5 +tries=3"
 
     dig_opts=( ${dig_opts} )
 
-    dig -t TXT current.cvd.clamav.net "${dig_opts[@]}" > /dev/null 2>&1
+    dig "${dig_opts[@]}" -t TXT current.cvd.clamav.net > /dev/null 2>&1
     test ${?} -eq 0 || return 101
 
     while read key value
@@ -188,7 +188,7 @@ check-clamav-names-resolution()
     names=${names:1}
     test -n "${names}" || return 103
     
-    ips=$(dig ${names} +noall "${dig_opts[@]}" 2> /dev/null)
+    ips=$(dig ${names} "${dig_opts[@]}" +noall 2> /dev/null)
     test ${?} -eq 0 || return 105
     test -n "${ips}" || return 107
 

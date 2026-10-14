@@ -2414,6 +2414,10 @@ gen-tc-qos-file-top()
     local interface interfaces=$(get-qos-logical-interfaces with-ipsec)
     local flow='file'
 
+    local idev irate iceil
+    local odev orate oceil
+    local odevs1 handle
+
     echo
     echo "# QoS for file traffic between the gateway and trusted file servers:"
 
@@ -2429,18 +2433,20 @@ gen-tc-qos-file-top()
 		;;
 	esac
 
-	local idev=$(get-qos-dev ${interface} ingress)
-	local odev odevs1 odevs=$(get-qos-dev ${interface} egress)
-	local irate=$(get-qos-rate ${interface} ingress ${flow})
-	local iceil=$(get-qos-ceil ${interface} ingress ${irate})
-	local orate=$(get-qos-rate ${interface} egress ${flow})
-	local oceil=$(get-qos-ceil ${interface} egress ${orate})
-	local handle="$[${QOS_CHILD_QDISC_HANDLE_OFFSET} + ${QOS_HANDLE_FILE}]:"
+	idev=$(get-qos-dev ${interface} ingress)
+	odevs=$(get-qos-dev ${interface} egress)
+	irate=$(get-qos-rate ${interface} ingress ${flow})
+	iceil=$(get-qos-ceil ${interface} ingress ${irate})
+	orate=$(get-qos-rate ${interface} egress ${flow})
+	oceil=$(get-qos-ceil ${interface} egress ${orate})
+	handle="$[${QOS_CHILD_QDISC_HANDLE_OFFSET} + ${QOS_HANDLE_FILE}]:"
 
 	if nic-exist ${idev} ; then
 	    echo "class add dev ${idev} parent ${QOS_CLASS_SELF_ID} classid ${QOS_CLASS_FILE_ID} htb rate ${irate}kbit ceil ${iceil}kbit ${QOS_HTB_QUANTUM} prio ${QOS_CLASS_FILE_PRIO}"
 	    echo "qdisc add dev ${idev} parent ${QOS_CLASS_FILE_ID} handle ${handle} pfifo"
 	fi
+
+	unset odevs1
 
 	for odev in ${odevs}
 	do
@@ -2450,8 +2456,8 @@ gen-tc-qos-file-top()
 		odevs1="${odevs1} ${odev}"
 	    fi
 	done
-	odevs1=${odevs1:1}
 
+	odevs1=${odevs1:1}
 	gen-qos-index file: pfifo ${interface} ${idev} ${odevs1// /:} ${handle}
     done
 }

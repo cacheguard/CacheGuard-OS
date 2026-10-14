@@ -34,6 +34,15 @@ set-main-env()
 {
     local mode=${1}
 
+    DHCP_LOW_DEV=eth2
+    DHCP_VLAN=10
+
+    if ip link show dev ${DHCP_LOW_DEV}.${DHCP_VLAN} >/dev/null 2>&1; then
+	DHCP_DEV=${DHCP_LOW_DEV}.${DHCP_VLAN}
+    else
+	DHCP_DEV=${DHCP_LOW_DEV}
+    fi
+
     DEVELOPMENT_INSTALL_MODE=yes
     REMOTE_DEBUG_MODE=no
     INSTALL_VERBOSE_MODE=no
@@ -67,8 +76,6 @@ set-main-env()
 	    COMPRESS_MODE=gz
 	    ;;
     esac
-
-    DHCPD_DEV=eth2
 
     export SYSLINUX_DIR=${LFS}/usr/share/syslinux
     export SYSLINUX_COMMON_FILES="ldlinux.c32 libcom32.c32 libutil.c32 menu.c32"
@@ -233,17 +240,24 @@ get-network-mask()
 	   $((mask & 255))
 }
 
+get-ip-px()
+{
+    test -n "${1}" || return 1
+    local dev=${1}
+
+    local ip_px=$(ip --oneline -4 address show dev ${dev} 2> /dev/null)
+    ip_px=${ip_px#* inet }
+    ip_px=${ip_px%% *}
+
+    echo ${ip_px}
+}
+
 gen-dhcp-conf()
 {
-    local network_info=$(ip address show dev ${DHCPD_DEV} | tail -2 | head -1 | tr -s ' ')
-    local inet=${network_info/ inet */inet}
-    test "${inet}" == inet || return 13
-
     local lease_time=86400
 
-    local boot_file
-    local ip_px=${network_info/*inet /}
-    ip_px=${ip_px/ brd*}
+    local ip_px=$(get-ip-px ${DHCP_DEV})
+    test -n "${ip_px}" || return 11
 
     local ip=${ip_px/\/*}
     local px=${ip_px/*\/}
@@ -283,7 +297,7 @@ gen-dhcp-conf()
 
 gen-default-dhcp-server()
 {
-    echo "INTERFACESv4=\"${DHCPD_DEV}\""
+    echo "INTERFACESv4=\"${DHCP_DEV}\""
 }
 
 gen-fstab()

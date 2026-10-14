@@ -153,7 +153,7 @@ start-loop()
 	    apply)
 		nice --adjustment=-14 apl_apply &
 		;;
-	    
+
 	    apply-cancel)
 	     	nice --adjustment=-15 apl_apply_cancel &
 		;;
@@ -316,8 +316,8 @@ start-loop()
 		apl-kerberos-keytab-report &
 		;;
 
-	    dhcp-external-renew)
-		apl_dhcp_external_renew &
+	    ip-external-connect)
+		apl_external_connect &
 		;;
 	    *)
 		;;

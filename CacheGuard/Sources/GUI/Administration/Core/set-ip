@@ -21,35 +21,68 @@
 #
 ###########################################################################
 
+get-ip-mk()
+{
+    local ip=${1}
+    local mk=${2}
+
+    if test -n "${ip}" ; then
+	test -n "${mk}" || mk='255.255.255.0'
+    else
+	ip='0.0.0.0'
+	mk='0.0.0.0'
+    fi
+
+    echo "${ip} ${mk}"
+}
+
 set-ip()
 {
     local transaction=/tmp/${TRANSACTION_FILE}.wadmin.${REMOTE_USER}.${$}
 
     local i n range j=0
-    local vlan ip netmask
+    local vlan ip mk ip_mk
 
     if gui-contextual-is-allowed ; then
 
-	local ip_external_mode=${VALUES[0]}
+	local external_vlan=${VALUES[0]}
+	test -n "${external_vlan}" || external_vlan='none'
+
+	echo "vlan external ${external_vlan}" > ${transaction}
+
+	local ip_external_mode=${VALUES[1]}
 
 	case ${ip_external_mode} in
 	    static)
-		echo "ip external ${ip_external_mode} ${VALUES[1]} ${VALUES[2]}" > ${transaction}
-		echo "ip internal ${VALUES[3]} ${VALUES[4]}"  >> ${transaction}
-		echo "ip auxiliary ${VALUES[5]} ${VALUES[6]}" >> ${transaction}
-		n=7
+		ip_mk=$(get-ip-mk "${VALUES[2]}" "${VALUES[3]}")
+		echo "ip external ${ip_external_mode} ${ip_mk}" >> ${transaction}
+
+		ip_mk=$(get-ip-mk "${VALUES[4]}" "${VALUES[5]}")
+		echo "ip internal ${ip_mk}"  >> ${transaction}
+
+		ip_mk=$(get-ip-mk "${VALUES[6]}" "${VALUES[7]}")
+		echo "ip auxiliary ${ip_mk}" >> ${transaction}
+		n=8
 		;;
 	    dhcp)
-		echo "ip external ${ip_external_mode}" > ${transaction}
-		echo "ip internal ${VALUES[1]} ${VALUES[2]}"  >> ${transaction}
-		echo "ip auxiliary ${VALUES[3]} ${VALUES[4]}" >> ${transaction}
-		n=5
+		echo "ip external ${ip_external_mode}" >> ${transaction}
+
+		ip_mk=$(get-ip-mk "${VALUES[2]}" "${VALUES[3]}")
+		echo "ip internal ${ip_mk}"  >> ${transaction}
+
+		ip_mk=$(get-ip-mk "${VALUES[4]}" "${VALUES[5]}")
+		echo "ip auxiliary ${ip_mk}" >> ${transaction}
+		n=6
 		;;
 	    pppoe)
-		echo "ip external ${ip_external_mode} '${VALUES[1]}' '${VALUES[2]}' '${VALUES[3]}'" > ${transaction}
-		echo "ip internal ${VALUES[4]} ${VALUES[5]}"  >> ${transaction}
-		echo "ip auxiliary ${VALUES[6]} ${VALUES[7]}" >> ${transaction}
-		n=8
+		echo "ip external ${ip_external_mode} '${VALUES[2]}' '${VALUES[3]}' '${VALUES[4]}'" >> ${transaction}
+
+		ip_mk=$(get-ip-mk "${VALUES[5]}" "${VALUES[6]}")
+		echo "ip internal ${ip_mk}" >> ${transaction}
+
+		ip_mk=$(get-ip-mk "${VALUES[7]}" "${VALUES[8]}")
+		echo "ip auxiliary ${ip_mk}" >> ${transaction}
+		n=9
 		;;
 	    *)
 		return 1
@@ -67,8 +100,10 @@ set-ip()
 		    ip=${VALUES[${i}]}
 		    ;;
 		2)
-		    netmask=${VALUES[${i}]}
-		    echo "ip internal.${vlan} ${ip} ${netmask}" >> ${transaction}
+		    mk=${VALUES[${i}]}
+
+		    ip_mk=$(get-ip-mk "${ip}" "${mk}")
+		    echo "ip internal.${vlan} ${ip_mk}" >> ${transaction}
 		    ;;
 		*)
 		    return 1
@@ -77,7 +112,8 @@ set-ip()
 	    ((j++))
 	done
     else
-	echo "ip internal ${VALUES[0]} ${VALUES[1]}" > ${transaction}
+	ip_mk=$(get-ip-mk "${VALUES[0]}" "${VALUES[1]}")
+	echo "ip internal ${ip_mk}" > ${transaction}
     fi
 
     execute-transaction ${transaction}

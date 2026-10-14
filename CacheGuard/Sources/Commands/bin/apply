@@ -338,12 +338,18 @@ disjunctive-vlan-network()
 
     local elt range i=0 nb=0
     local ip mk net2 brd2
+    local net1 brd1
 
-    local net1=$(ipcalc -s ${in_ip} ${in_mk} -n)
-    local brd1=$(ipcalc -s ${in_ip} ${in_mk} -b)
+    if test ${in_mk}  == 255.255.255.255 ; then
+	net1=${in_ip}
+	brd1=${in_ip}
+    else
+	net1=$(ipcalc -s ${in_ip} ${in_mk} -n)
+	brd1=$(ipcalc -s ${in_ip} ${in_mk} -b)
 
-    net1=${net1/NETWORK=/}
-    brd1=${brd1/BROADCAST=/}
+	net1=${net1/NETWORK=/}
+	brd1=${brd1/BROADCAST=/}
+    fi
 
     for elt in ${in_vlan_list}
     do
@@ -3510,6 +3516,8 @@ check-cloud-integrity()
 
 		    test ${VLAN_MODE} == False || ERRORS="${ERRORS} 356"
 		    test ${HA_MODE} == False || ERRORS="${ERRORS} 357"
+
+		    test ${EXTERNAL_VLAN} == 'none' || ERRORS="${ERRORS} 374"
 		    ;;
 
 		manager)
@@ -3639,8 +3647,12 @@ check-external-dhcp-route-integrity()
 {
     test ${IP_EXTERNAL_MODE} = 'dhcp' || return 0
     test ${IP_EXTERNAL_MODE} == ${CURRENT_IP_EXTERNAL_MODE} || return 0
+    test ${CURRENT_IP_EXTERNAL_IP} != '0.0.0.0' || return 0
 
-    local gw gws=$(get-dhcp-routers)
+    local gws=$(get-dhcp-routers)
+    test -n "${gws}" || return 0
+
+    local gw
 
     for gw in ${gws}
     do
@@ -3652,10 +3664,11 @@ check-external-dhcp-route-integrity()
 
 check-external-pppoe-route-integrity()
 {
-    test ${IP_EXTERNAL_MODE} = 'pppoe' || return 0
+    test ${IP_EXTERNAL_MODE} == 'pppoe' || return 0
     test ${IP_EXTERNAL_MODE} == ${CURRENT_IP_EXTERNAL_MODE} || return 0
 
     local peer=$(get-pppoe-peer)
+    test -n "${peer}" || return 0
 
     record-member 5 "${IP_ROUTE_LIST}" "0.0.0.0 0.0.0.0 ${peer}" || return 11
 

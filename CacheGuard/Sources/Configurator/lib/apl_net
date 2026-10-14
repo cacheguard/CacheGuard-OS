@@ -116,6 +116,7 @@ nic-exist()
 
     test "${nic:0:4}" != bond || return 0
     test "${nic:0:3}" != ifb || return 0
+    test "${nic:0:3}" != ppp || return 0
 
     local parent_nic=${nic%.*}
 
@@ -892,6 +893,9 @@ set-network-if-parameters()
 	export IF_EXTERNAL=bond${if_external_num}
     fi
 
+    IF_EXTERNAL_DEVICE=${IF_EXTERNAL}
+    test ${EXTERNAL_VLAN} == 'none' || IF_EXTERNAL=${IF_EXTERNAL}.${EXTERNAL_VLAN}
+
     master=${CURRENT_BOND_EXTERNALS/ *}
     if test "${CURRENT_BOND_EXTERNALS}" == "${master}" ; then
 	export CURRENT_BOND_EXTERNAL_MODE=False
@@ -901,6 +905,9 @@ set-network-if-parameters()
 	export CURRENT_BOND_EXTERNAL_MODE=True
 	export CURRENT_IF_EXTERNAL=bond${if_external_num}
     fi
+
+    CURRENT_IF_EXTERNAL_DEVICE=${CURRENT_IF_EXTERNAL}
+    test ${CURRENT_EXTERNAL_VLAN} == 'none' || CURRENT_IF_EXTERNAL=${CURRENT_IF_EXTERNAL}.${CURRENT_EXTERNAL_VLAN}
 
     if test -n "${BOND_AUXILIARIES}" ; then
 	master=${BOND_AUXILIARIES/ *}
@@ -1031,12 +1038,6 @@ set-network-if-parameters()
     test -z "${IF_AUXILIARY}" || export IF_QOS_AUXILIARY_INGRESS=ifb${IFB_AUXILIARY_INGRESS}	    
     test -z "${CURRENT_IF_AUXILIARY}" || export CURRENT_IF_QOS_AUXILIARY_INGRESS=ifb${IFB_AUXILIARY_INGRESS}
 
-    export IF_QOS_EXTERNAL_EGRESS=${IF_EXTERNAL}
-    export IF_QOS_AUXILIARY_EGRESS=${IF_AUXILIARY}
-
-    export CURRENT_IF_QOS_EXTERNAL_EGRESS=${CURRENT_IF_EXTERNAL}
-    export CURRENT_IF_QOS_AUXILIARY_EGRESS=${CURRENT_IF_AUXILIARY}
-
     if test -z "${IF_AUXILIARY}" -o ${IP_AUXILIARY_IP} == 0.0.0.0 ; then
 	unset AUXILIARY_IS_ACTIVE
     else
@@ -1060,6 +1061,12 @@ set-network-if-parameters()
     else
 	CURRENT_IF_LOGICAL_EXTERNAL=${CURRENT_IF_EXTERNAL}
     fi
+
+    export IF_QOS_EXTERNAL_EGRESS=${IF_LOGICAL_EXTERNAL}
+    export IF_QOS_AUXILIARY_EGRESS=${IF_AUXILIARY}
+
+    export CURRENT_IF_QOS_EXTERNAL_EGRESS=${CURRENT_IF_LOGICAL_EXTERNAL}
+    export CURRENT_IF_QOS_AUXILIARY_EGRESS=${CURRENT_IF_AUXILIARY}
 }
 
 get-broadcast-address()
@@ -1389,41 +1396,6 @@ set-network-ip-vlan-parameters()
     export IP_LOCAL_IP_LIST=${ip_local_ip_list}
 }
 
-set-current-external-ip-mk-variables()
-{
-    if test -z "${CURRENT_IF_EXTERNAL}" ; then
-	CURRENT_EXTERNAL_IP='0.0.0.0'
-	CURRENT_IP_EXTERNAL_MASK='0.0.0.0'
-	return 11
-    fi
-
-    local net=$(ip address show dev ${CURRENT_IF_EXTERNAL} 2> /dev/null | tail -2 | head -1)
-
-    if test "${net/*net */net}" != net ; then
-	CURRENT_IP_EXTERNAL_IP='0.0.0.0'
-	CURRENT_IP_EXTERNAL_MASK='0.0.0.0'
-	return 13
-    fi
-
-    source ${APPLIANCE_DIR}/lib/lib-ip
-    local ip_px ip px
-
-    ip_px=${net/*inet /}
-    ip_px=${ip_px/ brd*}
-
-    ip=${ip_px/\/*}
-    mk=$(get-netmask ${ip_px})
-
-    if test -z "${ip}" -o -z "${mk}"  ; then
-	CURRENT_IP_EXTERNAL_IP='0.0.0.0'
-	CURRENT_IP_EXTERNAL_MASK='0.0.0.0'
-	return 15
-    fi
-
-    CURRENT_IP_EXTERNAL_IP=${ip}
-    CURRENT_IP_EXTERNAL_MASK=${mk}
-}
-
 remove-default-from-routing-table()
 {
     test -n "${1}" || return 0
@@ -1469,7 +1441,14 @@ update-external-ip-variables-from-dhcp()
 {
     local ret
 
-    if test -f ${RUN_DIR}/${EXTERNAL_DHCP_IP_CONFIGURATION} ; then
+    if test -f ${RUN_DIR}/${EXTERNAL_DHCP_IP_CONFIGURATION}.failed ; then
+
+    	IP_EXTERNAL_IP='0.0.0.0'
+	IP_EXTERNAL_MASK='0.0.0.0'
+	IP_ROUTE_LIST=$(remove-default-from-routing-table "${IP_ROUTE_LIST}")
+	ret=0
+
+    elif test -f ${RUN_DIR}/${EXTERNAL_DHCP_IP_CONFIGURATION} ; then
 
 	local line i=0
 
@@ -1519,9 +1498,6 @@ update-external-ip-variables-from-dhcp()
 	done < ${RUN_DIR}/${EXTERNAL_DHCP_IP_CONFIGURATION}
 	ret=0
     else
-	IP_EXTERNAL_IP='0.0.0.0'
-	IP_EXTERNAL_MASK='0.0.0.0'
-	IP_ROUTE_LIST=$(remove-default-from-routing-table "${IP_ROUTE_LIST}")
 	ret=11
     fi
 
@@ -1529,6 +1505,20 @@ update-external-ip-variables-from-dhcp()
     set-network-routes-parameters
 
     return ${ret}
+}
+
+set-external-dynamic-ip-route-flags()
+{
+    case ${IP_EXTERNAL_MODE} in
+	dhcp)
+	    FLAG_NETWORK_DHCP_ROUTE_CONFIGURATION=1
+	    ;;
+	pppoe)
+	    FLAG_NETWORK_PPPOE_ROUTE_CONFIGURATION=1
+	    ;;
+	*)
+	    ;;
+    esac
 }
 
 update-external-dynamic-ip-flags()
@@ -1550,22 +1540,13 @@ update-external-dynamic-ip-flags()
 
     test -n "${go}" || return 0
 
+    set-external-dynamic-ip-route-flags
+
     FLAG_TC=1
     FLAG_IPTABLES=1
     FLAG_IKE=1
     FLAG_HEALTH=1
     FLAG_PATH=1
-
-    case ${mode} in
-	dhcp)
-	    FLAG_NETWORK_DHCP_ROUTE_CONFIGURATION=1
-	    ;;
-	pppoe)
-	    FLAG_NETWORK_PPPOE_ROUTE_CONFIGURATION=1
-	    ;;
-	*)
-	    ;;
-    esac
 
     if test "${CURRENT_RWEB_MODE}" == True ; then
 	FLAG_HTTPD=1
@@ -1581,6 +1562,36 @@ update-external-dynamic-ip-flags()
     if test "${CURRENT_AV_MODE}" = True -a "${CURRENT_AV_EXTERNAL}" == True ; then
 	FLAG_AV=1
     fi
+}
+
+bring-up-vdev()
+{
+    test -n "${1}" || return 1
+    test -n "${2}" || return 2
+    local dev=${1}
+    local vlan=${2}
+
+    local vdev=${dev}.${vlan}
+
+    ! ip link show dev ${vdev} > /dev/null 2>&1 || return 0
+
+    {
+	ip link add link ${dev} name ${vdev} type vlan id ${vlan} &&
+	    ip link set ${vdev} up
+    } > /dev/null 2>&1
+}
+
+bring-down-vdev()
+{
+    test -n "${1}" || return 1
+    local vdev=${1}
+
+    ip link show dev ${vdev} > /dev/null 2>&1 || return 0
+
+    {
+	ip link set ${vdev} down &&
+	    ip link delete ${vdev}
+    } > /dev/null 2>&1
 }
 
 update-external-dhcp-ip()
@@ -1613,48 +1624,72 @@ update-external-dhcp-ip()
 		;;
 	esac
     else
-	test ${CURRENT_IP_EXTERNAL_MODE} != 'dhcp' -o ${IF_EXTERNAL} != ${CURRENT_IF_EXTERNAL} || return 0
-    fi
+	test ${CURRENT_IP_EXTERNAL_MODE} != 'dhcp' -o \
+	     ${IF_EXTERNAL} != ${CURRENT_IF_EXTERNAL} -o \
+	     ${EXTERNAL_VLAN} != ${CURRENT_EXTERNAL_VLAN} || return 0
 
-    local dev tmp_lease_file=/tmp/apl-apply-dhcp-lease.${$}
-    local timeout=35 ret=11 pid
+	local dev tmp_lease_file=/tmp/apl-apply-dhcp-lease.${$}
+	local timeout=35 ret=31 pid
+	local tdev vdev
 
-    log "Requesting the external DHCP server"
+	log "Requesting the external DHCP server"
 
-    rm -f ${RUN_DIR}/${EXTERNAL_DHCP_DONE}
+	rm -f ${RUN_DIR}/${EXTERNAL_DHCP_DONE}
 
-    for dev in ${BOND_EXTERNALS}
-    do
-	rm -f "${tmp_lease_file}.${dev}"
-
-	iptables -A OUTPUT -o ${dev} -p udp --sport ${BOOTPC_PORT} --dport ${BOOTPS_PORT} -j ACCEPT
-	iptables -A INPUT -i ${dev} -p udp --sport ${BOOTPS_PORT} --dport ${BOOTPC_PORT} -j ACCEPT
-
-	timeout --signal=TERM --kill-after=3s ${timeout}s \
-		dhclient \
-		-q -4 -d --no-pid \
-		-cf /etc/dhclient-probe.conf \
-		-sf ${LOCAL_DIR}/bin/apl_dhclient \
-		-lf ${tmp_lease_file}.${dev} \
-		${dev} > /dev/null 2>&1 &
-	pid=${!}
-
-	while kill -0 "${pid}" 2>/dev/null
+	for dev in ${BOND_EXTERNALS}
 	do
-	    if test -f ${RUN_DIR}/${EXTERNAL_DHCP_DONE} ; then
-		kill "${pid}" 2>/dev/null
-		ret=0
-		break 2
+	    if test ${EXTERNAL_VLAN} == 'none' ; then
+		tdev=${dev}
+	    else
+		tdev=${dev}.${EXTERNAL_VLAN}
 	    fi
-	    usleep 200000
+
+	    if test ${EXTERNAL_VLAN} != ${CURRENT_EXTERNAL_VLAN} ; then
+		if test ${EXTERNAL_VLAN} != 'none' ; then
+		    bring-up-vdev ${dev} ${EXTERNAL_VLAN}
+		    vdev=${dev}.${EXTERNAL_VLAN}
+		else
+		    unset vdev
+		fi
+	    else
+		unset vdev
+	    fi
+
+	    rm -f "${tmp_lease_file}.${dev}"
+
+	    iptables -A OUTPUT -o ${tdev} -p udp --sport ${BOOTPC_PORT} --dport ${BOOTPS_PORT} -j ACCEPT
+	    iptables -A INPUT -i ${tdev} -p udp --sport ${BOOTPS_PORT} --dport ${BOOTPC_PORT} -j ACCEPT
+
+	    timeout --signal=TERM --kill-after=3s ${timeout}s \
+		    dhclient \
+		    -q -4 -d --no-pid \
+		    -cf /etc/dhclient-probe.conf \
+		    -sf ${LOCAL_DIR}/bin/apl_dhclient \
+		    -lf ${tmp_lease_file}.${dev} \
+		    ${tdev} > /dev/null 2>&1 &
+	    pid=${!}
+
+	    while kill -0 "${pid}" 2>/dev/null
+	    do
+		if test -f ${RUN_DIR}/${EXTERNAL_DHCP_DONE} ; then
+		    kill "${pid}" 2>/dev/null
+		    test -z "${vdev}" || bring-down-vdev ${vdev}
+		    ret=0
+		    break 2
+		fi
+		usleep 200000
+	    done
+
+	    test ! -f ${RUN_DIR}/${EXTERNAL_DHCP_DONE} || ret=0
+	    test -z "${vdev}" || bring-down-vdev ${vdev}
 	done
-    done
 
-    log-result ${ret}
+	log-result ${ret}
 
-    rm -f \
-       ${RUN_DIR}/${EXTERNAL_DHCP_DONE} \
-       ${tmp_lease_file}.*
+	rm -f ${tmp_lease_file}.*
+
+	test ${ret} -eq 0 || return ${ret}
+    fi
 
     update-external-ip-variables-from-dhcp
     update-external-dynamic-ip-flags dhcp variables
@@ -1697,6 +1732,9 @@ update-external-ip-variables-from-pppoe()
 		    fi
 		    break
 		    ;;
+		4)
+		    break
+		    ;;
 		*)
 		    break
 		    ;;
@@ -1721,8 +1759,9 @@ activate-pppoe-interface()
 {
     test ${IP_EXTERNAL_MODE} == 'pppoe' || return 0
 
-    local timeout=200000 i=0 n=100
-    local ret=0
+    local timeout=18000000 gap=400000
+    local n=$((timeout / gap)) i=0
+    local ret
 
     log "Waiting the PPPoE interface to comme up"
 
@@ -1730,20 +1769,29 @@ activate-pppoe-interface()
     do
 	test ! -f ${RUN_DIR}/${EXTERNAL_PPPOE_DONE} || break
 	test ${i} -lt ${n} || break
-	usleep ${timeout}
+	usleep ${gap}
 	((i++))
     done
 
-    if test -f ${RUN_DIR}/${EXTERNAL_PPPOE_DONE} ; then
-	rm -f ${RUN_DIR}/${EXTERNAL_PPPOE_DONE}
-	update-external-ip-variables-from-pppoe
-	ret=${?}
-    else
-	ret=21
-    fi
-
+    update-external-ip-variables-from-pppoe
+    ret=${?}
     log-result ${ret}
     return ${ret}
+}
+
+update-external-ip-variables()
+{
+    case ${IP_EXTERNAL_MODE} in
+	dhcp)
+	    update-external-ip-variables-from-dhcp
+	    ;;
+	pppoe)
+	    update-external-ip-variables-from-pppoe
+	    ;;
+	*)
+	    return 0
+	    ;;
+    esac
 }
 
 update-external-pppoe-ip()
@@ -1762,6 +1810,10 @@ update-external-pppoe-ip()
 		;;
 	esac
     else
+	test ${CURRENT_IP_EXTERNAL_MODE} != 'pppoe' -o \
+	     ${IF_EXTERNAL} != ${CURRENT_IF_EXTERNAL} -o \
+	     ${EXTERNAL_VLAN} != ${CURRENT_EXTERNAL_VLAN} || return 0
+
 	IP_EXTERNAL_IP='0.0.0.0'
 	IP_EXTERNAL_MASK='0.0.0.0'
 	IP_ROUTE_LIST=$(remove-default-from-routing-table "${IP_ROUTE_LIST}")
@@ -1790,12 +1842,12 @@ update-external-dynamic-ip()
 
 set-network-ip-parameters()
 {
-    if test "${IP_EXTRNAL_PPPOE_SERVICE_NAME}" != "${CURRENT_IP_EXTRNAL_PPPOE_SERVICE_NAME}" -o \
-	    "${IP_EXTRNAL_PPPOE_USERNAME}" != "${CURRENT_IP_EXTRNAL_PPPOE_USERNAME}" -o \
-	    "${IP_EXTRNAL_PPPOE_PASSWORD}" != "${CURRENT_IP_EXTRNAL_PPPOE_PASSWORD}" ; then
-	IP_EXTRNAL_PPPOE_CONFIGURATION_MODIFIED=True
+    if test "${IP_EXTERNAL_PPPOE_SERVICE_NAME}" != "${CURRENT_IP_EXTERNAL_PPPOE_SERVICE_NAME}" -o \
+	    "${IP_EXTERNAL_PPPOE_USERNAME}" != "${CURRENT_IP_EXTERNAL_PPPOE_USERNAME}" -o \
+	    "${IP_EXTERNAL_PPPOE_PASSWORD}" != "${CURRENT_IP_EXTERNAL_PPPOE_PASSWORD}" ; then
+	IP_EXTERNAL_PPPOE_CONFIGURATION_MODIFIED=True
     else
-	IP_EXTRNAL_PPPOE_CONFIGURATION_MODIFIED=False
+	IP_EXTERNAL_PPPOE_CONFIGURATION_MODIFIED=False
     fi
 
     set-network-ip-native-parameters
@@ -1976,6 +2028,7 @@ gen-modprobe-bonding-conf()
     local options="mode=active-backup miimon=300 use_carrier=1"
     local bonds
 
+    ! is-virtual-machine || options="${options} fail_over_mac=active"
     case ${APL_ROLE} in
 	gateway)
 	    bonds=3
@@ -1995,8 +2048,8 @@ gen-modprobe-bonding-conf()
     fi
 
     if test ${BOND_EXTERNAL_MODE} == True ; then
-	echo "alias ${IF_EXTERNAL} bonding"
-	echo "options ${IF_EXTERNAL} -o ${IF_EXTERNAL} ${options}"
+	echo "alias ${IF_EXTERNAL_DEVICE} bonding"
+	echo "options ${IF_EXTERNAL_DEVICE} -o ${IF_EXTERNAL_DEVICE} ${options}"
     fi
 
     if test ${BOND_AUXILIARY_MODE} == True ; then
@@ -2047,14 +2100,12 @@ get-connected-if()
 		echo ${IF_ADMIN}
 	    elif ip-is-included ${ip} ${IP_MON_NET} ${IP_MON_BRD} ${IP_MON_MASK} ; then
 		echo ${IF_MON}
-	    else
-		echo ${IF_WEB}
 	    fi
 	fi
     fi
 }
 
-gen-network()
+gen-sysconfig-network()
 {
     echo "HOSTNAME=${SHOSTNAME}"
 }
@@ -2238,7 +2289,7 @@ gen-resolv-conf()
 gen-network-interface-conf()
 {
     test -n "${1}" || return 1
-    test -n "${2}" || return 1
+    test -n "${2}" || return 2
     local master=${1}
     local bonding=${2}
     local ip=${3}
@@ -2247,19 +2298,24 @@ gen-network-interface-conf()
     local arp=${6}
     local gw=${7}
 
-    local services srv 
+    local services srv
 
-    local device=${master/\.*} vlan
     local alias_id=$(get-alias-dev-id "${master}")
+    local device=${master/\.*}
+    local vlan
 
-    test ${master} == ${device} || vlan=${master/*\.}
+    
+    if test ${master} != ${device} ; then
+	vlan=${master/*\.}
+	vlan=${vlan/:*}
+    fi
 
     echo "ONBOOT=yes"
     echo "IFACE=${master/:*}"
 
     test -z "${arp}" || echo "ARP_IGNORE=${arp}"
 
-    if test -n "${vlan}" ; then
+    if test -n "${vlan}" -a -z "${alias_id}" ; then
 	echo "VIRTINT=yes"
 	echo "VLAN_ID=${vlan}"
 	services="link-802-1q"
@@ -2306,10 +2362,12 @@ gen-network-interface-conf()
 	fi
     fi
 
-    if test -z "${services}" ; then
-	services="${srv}"
-    else
-	services="${services} ${srv}"
+    if test -n "${srv}" ; then
+	if test -z "${services}" ; then
+	    services="${srv}"
+	else
+	    services="${services} ${srv}"
+	fi
     fi
 
     echo "SERVICE='${services}'"
@@ -2613,8 +2671,22 @@ safe-generate-network-ip()
 	    ;;
 	'')
 	    if test ${APL_ROLE} == 'gateway' ; then
-		gen-network-interface external > ifconfig.${IF_EXTERNAL}.work
-		mv -f ifconfig.${IF_EXTERNAL}.work ifconfig.${IF_EXTERNAL}.new
+		if test "${EXTERNAL_VLAN}" == 'none' ; then
+		    gen-network-interface external > ifconfig.${IF_EXTERNAL}.work
+		    mv -f ifconfig.${IF_EXTERNAL}.work ifconfig.${IF_EXTERNAL}.new
+		else
+		    if test ${IF_EXTERNAL_DEVICE} != "${BOND_EXTERNALS}" ; then
+			gen-network-interface-conf ${IF_EXTERNAL_DEVICE} "${BOND_EXTERNALS}" '' '' '' ${ARP_IGNORE} > ifconfig.${IF_EXTERNAL_DEVICE}.work
+			mv -f ifconfig.${IF_EXTERNAL_DEVICE}.work ifconfig.${IF_EXTERNAL_DEVICE}.new
+		    fi
+
+		    local broadcast=$(get-broadcast-address ${IP_EXTERNAL_IP} ${IP_EXTERNAL_MASK})
+		    local prefix=$(ipcalc -s ${IP_EXTERNAL_IP} ${IP_EXTERNAL_MASK} -p) ; prefix=${prefix/PREFIX=}
+
+		    gen-network-interface-conf ${IF_EXTERNAL} "${IF_EXTERNAL_DEVICE}" \
+					       ${IP_EXTERNAL_IP} ${broadcast} ${prefix} ${ARP_IGNORE} > ifconfig.${IF_EXTERNAL}.work
+		    mv -f ifconfig.${IF_EXTERNAL}.work ifconfig.${IF_EXTERNAL}.new
+		fi
 	    fi
 
 	    if test ${VLAN_MODE} == False ; then
@@ -2628,7 +2700,7 @@ safe-generate-network-ip()
 
     test ${APL_ROLE} == gateway -a ${VLAN_MODE} == True || return 0
 
-    local elt i=0 range vlan ip netmask broadcast prefix
+    local elt range vlan ip netmask broadcast prefix i=0
 
     if test ${IF_INTERNAL} != "${BOND_INTERNALS}" ; then
 	gen-network-interface-conf ${IF_INTERNAL} "${BOND_INTERNALS}" '' '' '' ${ARP_IGNORE} > ifconfig.${IF_INTERNAL}.work
@@ -2766,6 +2838,7 @@ gen-network-static-route-conf()
     first_gw=${first_gw_wt_pg/\/*}
 
     device=$(get-connected-if ${first_gw})
+
     test -n "${device}" || device=${IF_EXTERNAL}
 
     echo "IFACE=${device}"
@@ -2796,157 +2869,6 @@ safe-generate-network-static-route-tproxy()
     gen-network-static-route-conf 0.0.0.0 0.0.0.0 local:${IF_WEB} ${TRANSPARENT_ROUTE_TABLE_NAME} > ifconfig.route${ROUTE_NB}.work
     mv -f ifconfig.route${ROUTE_NB}.work ifconfig.route${ROUTE_NB}.new
     ((ROUTE_NB++))
-}
-
-safe-generate-network-static-route-ipsec()
-{
-    test ${IKE_IS_ACTIVE} == True || return 0
-
-    local i elt range
-    local ipsec_type remote_subnets
-    local access_found
-    local remote_subnet_list remote_subnet remote_networks
-    local ip mk
-    local via_local_ip
-
-    if test ${VLAN_MODE} == False ; then
-	via_local_ip=${IP_INTERNAL_IP}
-    else
-	if test -z "${VPN_IPSEC_NETWORK_LIST}" ; then
-	    via_local_ip=${IP_WEB_IP}
-	else
-	    local bd vip vips
-	    local local_subnet_list local_subnet
-
-	    vips=$(uniq-elt ${IP_WEB_IP} ${IP_RWEB_IP} ${IP_AV_IP} ${IP_PEER_IP} ${IP_ADMIN_IP} ${IP_FILE_IP} ${IP_MON_IP})
-
-	    i=0
-	    for elt in ${VPN_IPSEC_NETWORK_LIST}
-	    do
-		range=$[${i} % 4]
-		case ${range} in
-		    0)
-			ipsec_type=${elt}
-			;;
-		    
-		    1)
-			;;
-		    2)
-			local_subnet_list=${elt}
-			;;
-		    3)
-			if test ${VPN_IPSEC_ACCESS_MODE} == True ; then
-			    if test ${ipsec_type} != 'access' ; then
-				((i++))
-				continue
-			    fi
-			else
-			    if test ${ipsec_type} != 'site' ; then
-				((i++))
-				continue
-			    fi
-			fi
-
-			if test ${local_subnet_list} == 'nil' ; then
-			    via_local_ip=${IP_WEB_IP}
-			    break
-			else
-			    local_subnet_list=${local_subnet_list//,/ }
-			    for local_subnet in ${local_subnet_list}
-			    do
-				ip=${local_subnet/\/*}
-				mk=${local_subnet/*\/}
-				bd=$(get-broadcast-address ${ip} ${mk})
-
-				for vip in ${vips}
-				do
-				    if ip-is-included ${vip} ${ip} ${bd} ${mk} ; then
-					via_local_ip=${vip}
-					break 3
-				    fi
-				done
-			    done
-			fi
-			;;
-		    *)
-			return 1
-			;;
-		esac
-		((i++))
-	    done
-
-	    test -n "${via_local_ip}" || via_local_ip=${IP_WEB_IP}
-	fi
-    fi
-
-    if test -z "${VPN_IPSEC_NETWORK_LIST}" ; then
-	if test ${VPN_IPSEC_ACCESS_MODE} == True ; then
-	    gen-network-static-route-conf ${VPN_IPSEC_REMOTE_ACCESS_DEFAULT_NETWORK} ${VPN_IPSEC_REMOTE_ACCESS_DEFAULT_NETMASK} ${via_local_ip} > ifconfig.route${ROUTE_NB}.work
-	    mv -f ifconfig.route${ROUTE_NB}.work ifconfig.route${ROUTE_NB}.new
-	    ((ROUTE_NB++))
-	fi
-    else
-	i=0
-	for elt in ${VPN_IPSEC_NETWORK_LIST}
-	do
-	    range=$[${i} % 4]
-	    case ${range} in
-		0)
-		    ipsec_type=${elt}
-		    ;;
-		1|2)
-		    ;;
-		3)
-		    if test ${VPN_IPSEC_ACCESS_MODE} == True ; then
-			if test ${ipsec_type} == 'access' ; then
-			    access_found='yes'
-			else
-			    ((i++))
-			    continue
-			fi
-		    else
-			if test ${ipsec_type} != 'site' ; then
-			    ((i++))
-			    continue
-			fi
-		    fi
-
-		    remote_subnets=${elt}
-
-		    if test ${remote_subnets} == 'nil' ; then
-			if test ${ipsec_type} == 'access' ; then
-			    remote_subnet_list="${VPN_IPSEC_REMOTE_ACCESS_DEFAULT_NETWORK}/${VPN_IPSEC_REMOTE_ACCESS_DEFAULT_NETMASK}"
-			else
-			    unset remote_subnet_list
-			fi
-		    else
-			remote_subnet_list=${remote_subnets//,/ }
-		    fi
-
-		    for remote_subnet in ${remote_subnet_list}
-		    do
-			! member "${remote_networks}" ${remote_subnet} || continue
-			remote_networks="${remote_networks} ${remote_subnet}"
-			ip=${remote_subnet/\/*}
-			mk=${remote_subnet/*\/}
-			gen-network-static-route-conf ${ip} ${mk} ${via_local_ip} > ifconfig.route${ROUTE_NB}.work
-			mv -f ifconfig.route${ROUTE_NB}.work ifconfig.route${ROUTE_NB}.new
-			((ROUTE_NB++))
-		    done
-		    ;;
-		*)
-		    return 1
-		    ;;
-	    esac
-	    ((i++))
-	done
-
-	if test ${VPN_IPSEC_ACCESS_MODE} == True -a -z "${access_found}" ; then
-	    gen-network-static-route-conf ${VPN_IPSEC_REMOTE_ACCESS_DEFAULT_NETWORK} ${VPN_IPSEC_REMOTE_ACCESS_DEFAULT_NETMASK} ${via_local_ip} > ifconfig.route${ROUTE_NB}.work
-	    mv -f ifconfig.route${ROUTE_NB}.work ifconfig.route${ROUTE_NB}.new
-	    ((ROUTE_NB++))
-	fi
-    fi
 }
 
 safe-generate-network-static-route-multi-gateways()
@@ -3032,6 +2954,7 @@ safe-generate-network-static-route-regular()
 		    do
 			gw=${gw_wt_pg/\/*}
 			device=$(get-connected-if ${gw})
+
 			if test -z "${device}" ; then
 			    gen-network-static-route-conf ${gw} 255.255.255.255 host:${IF_EXTERNAL} > ifconfig.route${ROUTE_NB}.work
 			    mv -f ifconfig.route${ROUTE_NB}.work ifconfig.route${ROUTE_NB}.new
@@ -3059,7 +2982,6 @@ safe-generate-network-static-route()
     ROUTE_NB=0
 
     safe-generate-network-static-route-tproxy
-    # safe-generate-network-static-route-ipsec
     safe-generate-network-static-route-multi-gateways
     safe-generate-network-static-route-regular
 }
@@ -3211,15 +3133,14 @@ generate-dhclient-script()
     esac
 
     if test -n "${doit}" ; then
-	mkdir -p /etc/dhcp
-	install ${LOCAL_DIR}/etc/${enter_hook_file} /etc/dhcp/${enter_hook_file}
-	install ${LOCAL_DIR}/etc/${exit_hook_file} /etc/dhcp/${exit_hook_file}
+	install ${LOCAL_DIR}/etc/${enter_hook_file} ${ETC_DHCP_DIR}/${enter_hook_file}
+	install ${LOCAL_DIR}/etc/${exit_hook_file} ${ETC_DHCP_DIR}/${exit_hook_file}
     else
 	rm -f \
-	   ${RUN_DIR}/${EXTERNAL_DHCP_IP_CONFIGURATION},${EXTERNAL_DHCP_DONE}} \
+	   ${RUN_DIR}/{${EXTERNAL_DHCP_IP_CONFIGURATION},${EXTERNAL_DHCP_IP_CONFIGURATION}.failed} \
+	   ${RUN_DIR}/{${EXTERNAL_DHCP_STATE},${EXTERNAL_DHCP_DONE}} \
 	   /etc/dhcp/{${enter_hook_file},${exit_hook_file}} \
 	   /var/db/dhclient.leases
-	test ! -d /etc/dhcp || rmdir /etc/dhcp
     fi
 }
 
@@ -3685,7 +3606,7 @@ gen-sysconfig-path()
 
 gen-pppoe-secret()
 {
-    echo "\"${IP_EXTRNAL_PPPOE_USERNAME}\" * \"${IP_EXTRNAL_PPPOE_PASSWORD}\""
+    echo "\"${IP_EXTERNAL_PPPOE_USERNAME}\" * \"${IP_EXTERNAL_PPPOE_PASSWORD}\""
 }
 
 gen-pppoe-conf()
@@ -3700,9 +3621,9 @@ gen-pppoe-conf()
     cat pppoe-constant
     echo
 
-    test -z "${IP_EXTRNAL_PPPOE_SERVICE_NAME}" || echo "pppoe-service \"${IP_EXTRNAL_PPPOE_SERVICE_NAME}\""
+    test -z "${IP_EXTERNAL_PPPOE_SERVICE_NAME}" || echo "pppoe-service \"${IP_EXTERNAL_PPPOE_SERVICE_NAME}\""
     cat << EOT
-user "${IP_EXTRNAL_PPPOE_USERNAME}"
+user "${IP_EXTERNAL_PPPOE_USERNAME}"
 
 ifname ${EXTERNAL_PPPOE_IF}
 nic-${dev}

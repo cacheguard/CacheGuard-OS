@@ -52,8 +52,11 @@ __complete-vlan()
 		r|rw|rwe|rweb)
 		    COMPREPLY=(rweb)
 		    ;;
+		e|ex|ext|exte|exter|extern|externa|external)
+		    COMPREPLY=(external)
+		    ;;
 		'')
-		    COMPREPLY=('' '<RET>' admin mon file web rweb antivirus)
+		    COMPREPLY=('' '<RET>' external admin mon file web rweb antivirus)
 		    ;;
 	    esac
 	    ;;
@@ -61,6 +64,16 @@ __complete-vlan()
 	    case ${COMP_WORDS[1]} in
 		admin|peer|mon|file|web|rweb|antivirus)
 		    COMPREPLY=('' '<RET>' '<vlan-id>')
+		    ;;
+		external)
+		    case ${COMP_WORDS[2]} in
+			n|no|non|none)
+			    COMPREPLY=(none)
+			    ;;
+			*)
+			    COMPREPLY=('' '<RET>' '<vlan-id>' none)
+			    ;;
+		    esac
 		    ;;
 		*)
 		    COMPREPLY=()

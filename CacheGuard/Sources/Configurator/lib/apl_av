@@ -245,7 +245,7 @@ get-db-sig-sz()
 	local ls_info=$(ls -l ${db_file} 2> /dev/null)
 	if test -z "${ls_info}" ; then sz=0 ; else sz=$(get-record-field "${ls_info}" 5) ; fi
     else
-	local dig_options="+noall +short +ignore +timeout=5 +tries=2"
+	local dig_options="-4 +noall +short +ignore +timeout=5 +tries=2"
 	local av_name=$(dig ${dig_options} ${AV_DOMAIN_NAME} cname 2> /dev/null)
 	if test "${av_name:0:2}" == ';;' ; then
 	    sz=0

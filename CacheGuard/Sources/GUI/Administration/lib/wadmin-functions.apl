@@ -328,7 +328,7 @@ show-title-donate()
 	    ;;
     esac
 
-    echo "<span id='donate-iconbar'><a class='title-bar-item' href='${DONATE_URL}' target='_blank'><img src='${IMAGE_DIR}/dollar-reflect.png' alt='Make a Donation' title='Make a Donation' /></a></span>"
+    echo "<span id='donate-iconbar'><a class='title-bar-item' href='${DONATE_URL}' target='_blank'><img src='${IMAGE_DIR}/donate-reflect.png' alt='Support the Project' title='Support the Project' /></a></span>"
 }
 
 get-apply-icon-title()

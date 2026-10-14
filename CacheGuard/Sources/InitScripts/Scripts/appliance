@@ -205,6 +205,39 @@ read-license()
     test -z "${response}" -o "${response}" == y -o "${response}" == Y || return 1
 }
 
+appliance-dynamic-ip-booting()
+(
+    if test -z "${RUNLEVEL}" ; then
+	rm -f /var/run/${DYNAMIC_IP_BOOTING}
+	return 0
+    fi
+
+    local ifconfigs=$(ls -1 /etc/sysconfig/ifconfig.eth* /etc/sysconfig/ifconfig.bond* 2> /dev/null | sort --version-sort)
+    local ifconfig dynamic
+
+    for ifconfig in ${ifconfigs}
+    do
+	unset SERVICE
+	source ${ifconfig}
+
+	if test "${SERVICE/ipv4-pppoe}" != "${SERVICE}" ; then
+	    dynamic=yes
+	    break
+	fi
+
+	if test "${SERVICE/ipv4-dhcp}" != "${SERVICE}" ; then
+	    dynamic=yes
+	    break
+	fi
+    done
+
+    if test -n "${dynamic}" ; then
+	touch /var/run/${DYNAMIC_IP_BOOTING}
+    else
+	rm -f /var/run/${DYNAMIC_IP_BOOTING}
+    fi
+)
+
 appliance-first-startup()
 {
     test ! -f ${HARD_DIR}/${FIRST_STARTUP} || return 0
@@ -486,6 +519,7 @@ appliance-if-restore-configuration()
 
 case "${1}" in
     start)
+	appliance-dynamic-ip-booting
 	appliance-first-startup
 	appliance-clean-av
 	appliance-apply-patch

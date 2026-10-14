@@ -132,7 +132,7 @@ gen-ipsec-site-fqdn-resolved-lists()
 
     local vpn_ipsec_site_nr_list
 
-    local dig_options="+noall +short +ignore +timeout=4 +tries=2"
+    local dig_options="-4 +noall +short +ignore +timeout=4 +tries=2"
 
     for elt in ${VPN_IPSEC_SITE_DN_LIST}
     do
@@ -155,7 +155,7 @@ gen-ipsec-site-fqdn-resolved-lists()
 
 		for name in ${fqdns}
 		do
-		    ips=$(dig ${name} ${dig_options} 2> /dev/null)
+		    ips=$(dig ${dig_options} ${name} 2> /dev/null)
 		    if test ${?} -ne 0 ; then
 			error_list="${error_list} ${name}"
 		    else
@@ -204,7 +204,7 @@ gen-names-resolved-lists()
     local kerberos_server_nr_list
     local email_server_nr_list
 
-    local dig_options="+noall +short +ignore +timeout=4 +tries=2"
+    local dig_options="-4 +noall +short +ignore +timeout=4 +tries=2"
 
     gen-ipsec-site-fqdn-resolved-lists new
     ipsec_ret=${?}
@@ -223,7 +223,7 @@ gen-names-resolved-lists()
 		2)
 		    port=${elt}
 
-		    ips=$(dig ${name} ${dig_options} 2> /dev/null)
+		    ips=$(dig ${dig_options} ${name} 2> /dev/null)
 		    if test ${?} -ne 0 ; then
 			unset ips
 			error_list="${error_list} ${name}"
@@ -246,7 +246,7 @@ gen-names-resolved-lists()
     if test ${AUTHENTICATE_MODE} == True -a ${AUTHENTICATE_KERBEROS} == True ; then
 	for name in ${KERBEROS_SERVER_DN_LIST}
 	do
-	    ips=$(dig ${name} ${dig_options} 2> /dev/null)
+	    ips=$(dig ${dig_options} ${name} 2> /dev/null)
 	    if test ${?} -ne 0 ; then
 		unset ips
 		error_list="${error_list} ${name}"
@@ -267,7 +267,7 @@ gen-names-resolved-lists()
 	interface=${if_name/:*}
 	name=${if_name#*:}
 
-	ips=$(dig ${name} ${dig_options} 2> /dev/null)
+	ips=$(dig ${dig_options} ${name} 2> /dev/null)
 	if test ${?} -ne 0 ; then
 	    unset ips
 	    error_list="${error_list} ${name}"
@@ -287,7 +287,7 @@ gen-names-resolved-lists()
 	interface=${if_name/:*}
 	name=${if_name#*:}
 
-	ips=$(dig ${name} ${dig_options} 2> /dev/null)
+	ips=$(dig ${dig_options} ${name} 2> /dev/null)
 	if test ${?} -ne 0 ; then
 	    unset ips
 	    error_list="${error_list} ${name}"
@@ -307,7 +307,7 @@ gen-names-resolved-lists()
 	name=${name_port/:*/}
 	port=${name_port/*:/}
 
-	ips=$(dig ${name} ${dig_options} 2> /dev/null)
+	ips=$(dig ${dig_options} ${name} 2> /dev/null)
 	if test ${?} -ne 0 ; then
 	    unset ips
 	    error_list="${error_list} ${name}"
@@ -336,7 +336,7 @@ gen-names-resolved-lists()
 	    2)
 		port=${elt}
 
-		ips=$(dig ${name} ${dig_options} 2> /dev/null)
+		ips=$(dig ${dig_options} ${name} 2> /dev/null)
 		if test ${?} -ne 0 ; then
 		    unset ips
 		    error_list="${error_list} ${name}"
@@ -358,7 +358,7 @@ gen-names-resolved-lists()
     done
 
     if test -n "${EMAIL_ACCOUNT_SERVER_FQDN}" ; then
-	ips=$(dig ${EMAIL_ACCOUNT_SERVER_FQDN} ${dig_options} 2> /dev/null)
+	ips=$(dig ${dig_options} ${EMAIL_ACCOUNT_SERVER_FQDN} 2> /dev/null)
 	if test ${?} -ne 0 ; then
 	    unset ips
 	    error_list="${error_list} ${EMAIL_ACCOUNT_SERVER_FQDN}"
@@ -442,7 +442,7 @@ check-av-names-resolution()
     test -n "${NAME_SERVER_LIST}" -o "${SELF_NS}" == True || return 11
 
     names="db.${AV_COUNTRY_CODE}.clamav.net database.clamav.net ${AV_DOMAIN_NAME}"
-    ips=$(dig ${names} +noall +short +ignore +timeout=4 +tries=2 2> /dev/null)
+    ips=$(dig -4 +noall +short +ignore +timeout=4 +tries=2 ${names} 2> /dev/null)
 
     test ${?} -eq 0 || return 13
     test -n "${ips}" || return 15
@@ -475,14 +475,13 @@ do-names-resolution-av()
 
 do-names-resolution()
 {
-    local ret1 ret2 ret3
+    local ret1 ret2
 
     do-accessed-names-resolution ; ret1=${?}
     do-names-resolution-av ; ret2=${?}
-    set-snmp-trap-names-resolved ; ret3=${?}
 
     rm -f ${TMP_DIR}/${NAME_2RESOLVE}
-    test ${ret1} -eq 0 -a ${ret2} -eq 0 -a ${ret3} -eq 0
+    test ${ret1} -eq 0 -a ${ret2} -eq 0
 }
 
 LIB_APL_DNS=Yes
